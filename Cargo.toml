@@ -1,0 +1,24 @@
+[package]
+name = "ttf-parser"
+version = "0.1.0"
+authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
+keywords = ["ttf", "truetype", "opentype"]
+categories = ["parser-implementations"]
+license = "MIT/Apache-2.0"
+description = "A high-level, safe, zero-allocation TrueType font parser."
+repository = "https://github.com/RazrFalcon/ttf-parser"
+documentation = "https://docs.rs/ttf-parser/"
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
+bitflags = "1"
+
+[dev-dependencies]
+bencher = "0.1"
+svgtypes = "0.4"
+time = "0.1"
+
+[[bench]]
+name = "outline"
+harness = false

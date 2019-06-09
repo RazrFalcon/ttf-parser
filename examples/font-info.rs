@@ -34,6 +34,7 @@ fn process() -> Result<(), Box<std::error::Error>> {
     println!("Number of glyphs: {:?}", font.number_of_glyphs());
     println!("Underline: {:?}", font.underline());
     println!("Strikeout: {:?}", font.strikeout());
+    println!("Valid: {:?}", font.is_valid());
 
     let end = time::precise_time_ns();
     println!("Elapsed: {:.6}s", (end - start) as f64 / 1_000_000_000.0);

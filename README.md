@@ -24,18 +24,18 @@ A high-level, safe, zero-allocation TrueType font parser.
 ### Safety
 
 - The library heavily relies on Rust's bounds checking and assumes that font is well-formed.
-  ??? You can invoke a checksums checking manually.
+  You can invoke a checksums checking manually.
 - The library uses per table slices, so it can't read data outside the specified TrueType table.
 - The library forbids `unsafe` code.
 
 ### Alternatives
 
-- [font-rs](https://github.com/raphlinus/font-rs) - Quite similar. No documentation.
-  A lot of magic numbers.
+- [font-rs](https://github.com/raphlinus/font-rs) - Mainly a glyph outline extractor.
+  No documentation. Has less features. A lot of magic numbers.
 - [truetype](https://crates.io/crates/truetype) - Isn't allocation free.
   Does a little postprocessing (parses most of the data as is). Has some **unsafe**.
-- [stb_truetype](https://crates.io/crates/stb_truetype) - Isn't allocation free.
-  Mainly a glyph extractor. Has less features. Uses `panic` a lot.
+- [stb_truetype](https://crates.io/crates/stb_truetype) - Mainly a glyph outline extractor.
+  Isn't allocation free. Has less features. Uses `panic` a lot.
 
 ### License
 

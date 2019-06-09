@@ -20,7 +20,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 ## Safety
 
 - The library heavily relies on Rust's bounds checking and assumes that font is well-formed.
-  ??? You can invoke a checksums checking manually.
+  You can invoke a checksums checking manually.
 - The library uses per table slices, so it can't read data outside the specified TrueType table.
 - The library forbids `unsafe` code.
 */
@@ -70,6 +70,9 @@ pub enum Error {
 
     /// One of the required tables is missing.
     TableMissing(Tag),
+
+    /// An invalid table checksum.
+    InvalidTableChecksum(Tag),
 }
 
 impl std::fmt::Display for Error {
@@ -83,6 +86,9 @@ impl std::fmt::Display for Error {
             }
             Error::TableMissing(tag) => {
                 write!(f, "font doesn't have a {} table", tag)
+            }
+            Error::InvalidTableChecksum(tag) => {
+                write!(f, "table {} has an invalid checksum", tag)
             }
         }
     }
@@ -165,6 +171,8 @@ pub struct LineMetrics {
 
 #[derive(Clone, Copy, Debug)]
 struct TableInfo {
+    tag: Tag,
+    checksum: u32,
     offset: u32,
     length: u32,
 }
@@ -220,6 +228,10 @@ impl<'a> Font<'a> {
     /// For simple `ttf` fonts set `index` to 0.
     ///
     /// This function only parses font tables, so it's relatively light.
+    ///
+    /// Required tables: `cmap`, `glyp`, `head`, `hhea`, `hmtx`, `loca`, `post`.
+    ///
+    /// Optional tables: `GDEF`, `name`, `OS/2`
     pub fn from_data(data: &'a [u8], index: u32) -> Result<Self, Error> {
         let table_data = if let Some(n) = Self::fonts_number(data) {
             if index < n {
@@ -277,8 +289,9 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(data);
         for _ in 0..num_tables {
             let tag = s.read_tag();
-            s.skip_u32(); // checksum
             let table = TableInfo {
+                tag,
+                checksum: s.read_u32(),
                 offset: s.read_u32(),
                 length: s.read_u32(),
             };
@@ -304,4 +317,48 @@ impl<'a> Font<'a> {
         const NUM_GLYPHS_OFFSET: usize = 4;
         Stream::read_at(data, NUM_GLYPHS_OFFSET)
     }
+
+    /// Checks tables [checksum](https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums).
+    ///
+    /// Checks only used tables.
+    pub fn is_valid(&self) -> Result<(), Error> {
+        // We are ignoring the `head` table, because to calculate it's checksum
+        // we have to modify it. And we can't, since input data is read-only.
+        // TODO: write a custom `calc_checksum` for `head`.
+
+        self.calc_table_checksum(&self.cmap)?;
+        self.calc_table_checksum(&self.glyf)?;
+        self.calc_table_checksum(&self.hhea)?;
+        self.calc_table_checksum(&self.hmtx)?;
+        self.calc_table_checksum(&self.loca)?;
+        self.calc_table_checksum(&self.post)?;
+
+        if let Some(ref gdef) = self.gdef { self.calc_table_checksum(gdef)?; }
+        if let Some(ref name) = self.name { self.calc_table_checksum(name)?; }
+        if let Some(ref os_2) = self.os_2 { self.calc_table_checksum(os_2)?; }
+
+        Ok(())
+    }
+
+    fn calc_table_checksum(&self, table: &TableInfo) -> Result<(), Error> {
+        let sum = calc_checksum(&self.data[table.offset as usize..], table.length);
+        if sum == table.checksum {
+            Ok(())
+        } else {
+            Err(Error::InvalidTableChecksum(table.tag))
+        }
+    }
+}
+
+fn calc_checksum(data: &[u8], length: u32) -> u32 {
+    // 'This function implies that the length of a table must be a multiple of four bytes.'
+    let length = (length + 3) & !3;
+
+    // 'Table checksums are the unsigned sum of the uint32 units of a given table.'
+    let mut sum: u32 = 0;
+    for n in Stream::new(data).read_array::<u32>(length as usize / 4) {
+        sum = sum.wrapping_add(n);
+    }
+
+    sum
 }

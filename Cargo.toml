@@ -16,7 +16,7 @@ bitflags = "1"
 
 [dev-dependencies]
 bencher = "0.1"
-svgtypes = "0.4"
+svgtypes = { version = "0.4.3", default-features = false }
 time = "0.1"
 
 [[bench]]

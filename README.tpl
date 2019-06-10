@@ -7,7 +7,7 @@
 
 ### Alternatives
 
-- [font-rs](https://github.com/raphlinus/font-rs) - Mainly a glyph outline extractor.
+- [font-rs](https://crates.io/crates/font-rs) - Mainly a glyph outline extractor.
   No documentation. Has less features. A lot of magic numbers.
 - [truetype](https://crates.io/crates/truetype) - Isn't allocation free.
   Does a little postprocessing (parses most of the data as is). Has some **unsafe**.

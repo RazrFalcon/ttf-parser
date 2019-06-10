@@ -351,6 +351,8 @@ impl<'a> Font<'a> {
 }
 
 fn calc_checksum(data: &[u8], length: u32) -> u32 {
+    // TODO: speed up
+
     // 'This function implies that the length of a table must be a multiple of four bytes.'
     let length = (length + 3) & !3;
 

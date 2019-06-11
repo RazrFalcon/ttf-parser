@@ -27,7 +27,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.1.0")]
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
@@ -159,7 +159,7 @@ impl std::fmt::Display for Tag {
 /// A line metrics.
 ///
 /// Used for underline and strikeout.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct LineMetrics {
     /// Line position.
     pub position: i16,

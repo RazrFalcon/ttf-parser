@@ -25,6 +25,8 @@ impl<'a> Font<'a> {
     }
 
     /// Returns font's units per EM set in the `head` table.
+    ///
+    /// Returns `None` if value is not in a 16..16384 range.
     pub fn units_per_em(&self) -> Option<u16> {
         const UNITS_PER_EM_OFFSET: usize = 18;
 

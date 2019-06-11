@@ -1,9 +1,19 @@
-use std::mem::size_of;
-
 use crate::Tag;
 
 pub trait FromData: Sized {
+    /// Parses an object from a raw data.
     fn parse(data: &[u8]) -> Self;
+
+    /// Returns an object size in raw data.
+    ///
+    /// `mem::size_of` by default.
+    ///
+    /// Reimplement, when size of `Self` != size of raw data.
+    /// For example, when you parsing u16, but storing it as u8.
+    /// In this case `size_of::<Self>()` == 1, but `FromData::size_of()` == 2.
+    fn size_of() -> usize {
+        std::mem::size_of::<Self>()
+    }
 }
 
 impl FromData for u16 {
@@ -33,7 +43,7 @@ pub struct Array<'a, T> {
 impl<'a, T: FromData> Array<'a, T> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
-        assert_eq!(data.len() % size_of::<T>(), 0);
+        assert_eq!(data.len() % T::size_of(), 0);
 
         Array {
             data,
@@ -49,8 +59,8 @@ impl<'a, T: FromData> Array<'a, T> {
     #[inline]
     pub fn get(&self, index: usize) -> Option<T> {
         if index < self.len() {
-            let start = index * size_of::<T>();
-            let end = start + size_of::<T>();
+            let start = index * T::size_of();
+            let end = start + T::size_of();
             Some(T::parse(&self.data[start..end]))
         } else {
             None
@@ -64,7 +74,7 @@ impl<'a, T: FromData> Array<'a, T> {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.data.len() / size_of::<T>()
+        self.data.len() / T::size_of()
     }
 }
 
@@ -98,7 +108,7 @@ impl<'a, T: FromData> Iterator for ArrayIter<'a, T> {
             return None;
         }
 
-        self.offset += size_of::<T>();
+        self.offset += T::size_of();
         Some(Stream::read_at(self.data, offset))
     }
 }
@@ -141,7 +151,7 @@ impl<'a> Stream<'a> {
 
     #[inline]
     fn skip_item<T: FromData>(&mut self) {
-        self.offset += size_of::<T>();
+        self.offset += T::size_of();
     }
 
     #[inline]
@@ -157,14 +167,14 @@ impl<'a> Stream<'a> {
     #[inline]
     fn read<T: FromData>(&mut self) -> T {
         let item = Self::read_at(self.data, self.offset);
-        self.offset += size_of::<T>();
+        self.offset += T::size_of();
         item
     }
 
     #[inline]
     pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> T {
         let start = offset;
-        let end = start + size_of::<T>();
+        let end = start + T::size_of();
         T::parse(&data[start..end])
     }
 
@@ -177,7 +187,7 @@ impl<'a> Stream<'a> {
 
     #[inline]
     pub fn read_array<T: FromData>(&mut self, len: usize) -> Array<'a, T> {
-        let len = len * size_of::<T>();
+        let len = len * T::size_of();
         let array = Array::new(&self.data[self.offset..(self.offset + len)]);
         self.offset += len;
         array

@@ -191,7 +191,6 @@ impl<'a> Iterator for Names<'a> {
             return None;
         }
 
-        // TODO: to FromData
         let platform_id = PlatformId::try_from(self.stream.read_u16());
         let encoding_id = self.stream.read_u16();
         let language_id = self.stream.read_u16();

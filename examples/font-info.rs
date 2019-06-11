@@ -32,8 +32,10 @@ fn process() -> Result<(), Box<std::error::Error>> {
     println!("Bold: {:?}", font.is_bold());
     println!("Oblique: {:?}", font.is_oblique());
     println!("Number of glyphs: {:?}", font.number_of_glyphs());
-    println!("Underline: {:?}", font.underline());
-    println!("Strikeout: {:?}", font.strikeout());
+    println!("Underline: {:?}", font.underline_metrics());
+    println!("Strikeout: {:?}", font.strikeout_metrics());
+    println!("Subscript: {:?}", font.subscript_metrics());
+    println!("Superscript: {:?}", font.superscript_metrics());
     println!("Valid: {:?}", font.is_valid());
 
     let end = time::precise_time_ns();

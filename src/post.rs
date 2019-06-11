@@ -7,7 +7,7 @@ use crate::{Font, LineMetrics};
 
 impl<'a> Font<'a> {
     /// Parses font's underline metrics set in the `post` table.
-    pub fn underline(&self) -> LineMetrics {
+    pub fn underline_metrics(&self) -> LineMetrics {
         const UNDERLINE_POSITION_OFFSET: usize = 8;
         const UNDERLINE_THICKNESS_OFFSET: usize = 10;
 

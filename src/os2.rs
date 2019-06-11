@@ -3,7 +3,7 @@
 
 use std::convert::TryFrom;
 
-use crate::stream::Stream;
+use crate::stream::{Stream, FromData};
 use crate::{Font, LineMetrics};
 
 
@@ -123,6 +123,35 @@ impl Default for Width {
 }
 
 
+/// A script metrics used by subscript and superscript.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct ScriptMetrics {
+    /// Horizontal font size.
+    pub x_size: i16,
+
+    /// Vertical font size.
+    pub y_size: i16,
+
+    /// X offset.
+    pub x_offset: i16,
+
+    /// Y offset.
+    pub y_offset: i16,
+}
+
+impl FromData for ScriptMetrics {
+    fn parse(data: &[u8]) -> Self {
+        let mut s = Stream::new(data);
+        ScriptMetrics {
+            x_size: s.read_i16(),
+            y_size: s.read_i16(),
+            x_offset: s.read_i16(),
+            y_offset: s.read_i16(),
+        }
+    }
+}
+
+
 impl<'a> Font<'a> {
     /// Parses font's weight set in the OS/2 table.
     ///
@@ -215,7 +244,7 @@ impl<'a> Font<'a> {
     /// Parses font's strikeout metrics set in the OS/2 table.
     ///
     /// Returns `None` when OS/2 table is not present.
-    pub fn strikeout(&self) -> Option<LineMetrics> {
+    pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
         const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
         const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
 
@@ -224,5 +253,25 @@ impl<'a> Font<'a> {
             position:  Stream::read_at(data, Y_STRIKEOUT_SIZE_OFFSET),
             thickness: Stream::read_at(data, Y_STRIKEOUT_POSITION_OFFSET),
         })
+    }
+
+    /// Parses font's subscript metrics set in the OS/2 table.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
+        const Y_SUBSCRIPT_XSIZE_OFFSET: usize = 10;
+
+        let data = &self.data[self.os_2?.range()];
+        Some(Stream::read_at(data, Y_SUBSCRIPT_XSIZE_OFFSET))
+    }
+
+    /// Parses font's superscript metrics set in the OS/2 table.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
+        const Y_SUPERSCRIPT_XSIZE_OFFSET: usize = 18;
+
+        let data = &self.data[self.os_2?.range()];
+        Some(Stream::read_at(data, Y_SUPERSCRIPT_XSIZE_OFFSET))
     }
 }

@@ -358,6 +358,14 @@ impl<'a> Font<'a> {
     pub fn name_table(&self) -> Option<name::Table> {
         Some(name::Table { data: &self.data[self.name?.range()] })
     }
+
+    /// Returns a handle to a `GDEF` table.
+    pub fn gdef_table(&self) -> Option<gdef::Table> {
+        Some(gdef::Table {
+            data: &self.data[self.name?.range()],
+            number_of_glyphs: self.number_of_glyphs,
+        })
+    }
 }
 
 fn calc_checksum(data: &[u8], length: u32) -> u32 {

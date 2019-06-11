@@ -5,7 +5,6 @@ use std::convert::{TryFrom, TryInto};
 use std::ops::Range;
 
 use crate::stream::{Stream, FromData};
-use crate::Font;
 
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
@@ -49,23 +48,27 @@ impl FromData for ClassRangeRecord {
 }
 
 
-impl<'a> Font<'a> {
-    /// Returns glyph's class set in the GDEF table.
+/// Handle to a `GDEF` table.
+#[derive(Clone, Copy)]
+#[allow(missing_debug_implementations)]
+pub struct Table<'a> {
+    pub(crate) data: &'a [u8],
+    pub(crate) number_of_glyphs: u16,
+}
+
+impl<'a> Table<'a> {
+    /// Returns glyph's class.
     ///
-    /// Returns `None`:
-    /// - when GDEF table is not present
-    /// - when font doesn't have such glyph ID
+    /// Returns `None` when font doesn't have such glyph ID.
     pub fn glyph_class(&self, glyph_id: u16) -> Option<GlyphClass> {
         const GLYPH_CLASS_DEF_OFFSET_OFFSET: usize = 4;
         self.parse_glyph_class_def_table(glyph_id, GLYPH_CLASS_DEF_OFFSET_OFFSET)
             .and_then(|c| c.try_into().ok())
     }
 
-    /// Returns glyph's mark attachment class set in the GDEF table.
+    /// Returns glyph's mark attachment class.
     ///
-    /// Returns `None`:
-    /// - when GDEF table is not present
-    /// - when font doesn't have such glyph ID
+    /// Returns `None` when font doesn't have such glyph ID.
     pub fn glyph_mark_attachment_class(&self, glyph_id: u16) -> Option<u16> {
         const MARK_ATTACH_CLASS_DEF_OFFSET_OFFSET: usize = 10;
         self.parse_glyph_class_def_table(glyph_id, MARK_ATTACH_CLASS_DEF_OFFSET_OFFSET)
@@ -76,9 +79,8 @@ impl<'a> Font<'a> {
             return None;
         }
 
-        let data = &self.data[self.gdef?.range()];
-        let offset: u16 = Stream::read_at(data, offset);
-        Self::parse_glyph_class_table(&data[offset as usize ..], glyph_id)
+        let offset: u16 = Stream::read_at(self.data, offset);
+        Self::parse_glyph_class_table(&self.data[offset as usize ..], glyph_id)
     }
 
     fn parse_glyph_class_table(data: &[u8], glyph_id: u16) -> Option<u16> {

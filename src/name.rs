@@ -221,6 +221,7 @@ impl<'a> Iterator for Names<'a> {
 
 
 /// Handle to a `name` table.
+#[derive(Clone, Copy)]
 #[allow(missing_debug_implementations)]
 pub struct Table<'a> {
     pub(crate) data: &'a [u8],

@@ -153,6 +153,7 @@ impl FromData for ScriptMetrics {
 
 
 /// Handle to a OS/2 table.
+#[derive(Clone, Copy)]
 #[allow(missing_debug_implementations)]
 pub struct Table<'a> {
     pub(crate) data: &'a [u8],

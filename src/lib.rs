@@ -203,25 +203,6 @@ pub struct Font<'a> {
 }
 
 impl<'a> Font<'a> {
-    /// Checks that provided data is a TrueType font collection.
-    pub fn is_collection(data: &'a [u8]) -> bool {
-        data.len() >= 4 && &data[0..4] == b"ttcf"
-    }
-
-    /// Returns number of fonts stored in a TrueType font collection.
-    ///
-    /// Returns `Note` if a provided data is not a TrueType font collection.
-    pub fn fonts_number(data: &'a [u8]) -> Option<u32> {
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
-        const NUM_FONTS_OFFSET: usize = 8;
-
-        if !Self::is_collection(data) {
-            return None;
-        }
-
-        Some(Stream::read_at(data, NUM_FONTS_OFFSET))
-    }
-
     /// Creates a `Font` object from raw data.
     ///
     /// You can set `index` in case of font collections.
@@ -233,7 +214,7 @@ impl<'a> Font<'a> {
     ///
     /// Optional tables: `GDEF`, `name`, `OS/2`
     pub fn from_data(data: &'a [u8], index: u32) -> Result<Self, Error> {
-        let table_data = if let Some(n) = Self::fonts_number(data) {
+        let table_data = if let Some(n) = fonts_in_collection(data) {
             if index < n {
                 // // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
                 const OFFSETS_TABLE_OFFSET: usize = 12;
@@ -381,4 +362,23 @@ fn calc_checksum(data: &[u8], length: u32) -> u32 {
     }
 
     sum
+}
+
+/// Checks that provided data is a TrueType font collection.
+fn is_collection(data: &[u8]) -> bool {
+    data.len() >= 4 && &data[0..4] == b"ttcf"
+}
+
+/// Returns a number of fonts stored in a TrueType font collection.
+///
+/// Returns `Note` if a provided data is not a TrueType font collection.
+pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
+    // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
+    const NUM_FONTS_OFFSET: usize = 8;
+
+    if !is_collection(data) {
+        return None;
+    }
+
+    Some(Stream::read_at(data, NUM_FONTS_OFFSET))
 }

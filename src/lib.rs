@@ -353,6 +353,11 @@ impl<'a> Font<'a> {
     pub fn os2_table(&self) -> Option<os2::Table> {
         Some(os2::Table { data: &self.data[self.os_2?.range()] })
     }
+
+    /// Returns a handle to a `name` table.
+    pub fn name_table(&self) -> Option<name::Table> {
+        Some(name::Table { data: &self.data[self.name?.range()] })
+    }
 }
 
 fn calc_checksum(data: &[u8], length: u32) -> u32 {

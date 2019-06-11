@@ -4,13 +4,6 @@
 use std::convert::TryFrom;
 
 use crate::stream::{Stream, Array};
-use crate::Font;
-
-// https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
-const NAME_RECORD_SIZE: usize = 12;
-
-// https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
-const LANG_TAG_RECORD_SIZE: usize = 4;
 
 
 /// A [platform ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids).
@@ -227,40 +220,45 @@ impl<'a> Iterator for Names<'a> {
 }
 
 
-impl<'a> Font<'a> {
+/// Handle to a `name` table.
+#[allow(missing_debug_implementations)]
+pub struct Table<'a> {
+    pub(crate) data: &'a [u8],
+}
+
+impl<'a> Table<'a> {
     /// Returns an iterator over [Name Records].
     ///
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
     pub fn names(&self) -> Names {
-        match self.name {
-            Some(table) => {
-                let mut s = Stream::new(&self.data[table.range()]);
-                let format = s.read_u16();
-                let count = s.read_u16() as usize;
-                s.skip_u16(); // offset
-                let name_record_len = count * NAME_RECORD_SIZE;
-                let name_records_data = s.read_bytes(name_record_len);
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
+        const NAME_RECORD_SIZE: usize = 12;
 
-                if format == 0 {
-                    Names {
-                        stream: Stream::new(name_records_data),
-                        storage: s.tail(),
-                    }
-                } else if format == 1 {
-                    let lang_tag_count = s.read_u16() as usize;
-                    s.skip(lang_tag_count * LANG_TAG_RECORD_SIZE); // langTagRecords
-                    Names {
-                        stream: Stream::new(name_records_data),
-                        storage: s.tail(),
-                    }
-                } else {
-                    // Invalid format.
-                    Names { stream: Stream::new(&[]), storage: &[] }
-                }
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
+        const LANG_TAG_RECORD_SIZE: usize = 4;
+
+        let mut s = Stream::new(self.data);
+        let format = s.read_u16();
+        let count = s.read_u16() as usize;
+        s.skip_u16(); // offset
+        let name_record_len = count * NAME_RECORD_SIZE;
+        let name_records_data = s.read_bytes(name_record_len);
+
+        if format == 0 {
+            Names {
+                stream: Stream::new(name_records_data),
+                storage: s.tail(),
             }
-            None => {
-                Names { stream: Stream::new(&[]), storage: &[] }
+        } else if format == 1 {
+            let lang_tag_count = s.read_u16() as usize;
+            s.skip(lang_tag_count * LANG_TAG_RECORD_SIZE); // langTagRecords
+            Names {
+                stream: Stream::new(name_records_data),
+                storage: s.tail(),
             }
+        } else {
+            // Invalid format.
+            Names { stream: Stream::new(&[]), storage: &[] }
         }
     }
 

@@ -238,8 +238,8 @@ impl<'a> Table<'a> {
         const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
 
         LineMetrics {
-            position:  Stream::read_at(self.data, Y_STRIKEOUT_SIZE_OFFSET),
-            thickness: Stream::read_at(self.data, Y_STRIKEOUT_POSITION_OFFSET),
+            position:  Stream::read_at(self.data, Y_STRIKEOUT_POSITION_OFFSET),
+            thickness: Stream::read_at(self.data, Y_STRIKEOUT_SIZE_OFFSET),
         }
     }
 

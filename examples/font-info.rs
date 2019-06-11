@@ -23,19 +23,23 @@ fn process() -> Result<(), Box<std::error::Error>> {
     println!("Units per EM: {:?}", font.units_per_em());
     println!("Ascender: {}", font.ascender());
     println!("Descender: {}", font.descender());
-    println!("X height: {:?}", font.x_height());
     println!("Line gap: {}", font.line_gap());
-    println!("Weight: {:?}", font.weight());
-    println!("Width: {:?}", font.width());
-    println!("Regular: {:?}", font.is_regular());
-    println!("Italic: {:?}", font.is_italic());
-    println!("Bold: {:?}", font.is_bold());
-    println!("Oblique: {:?}", font.is_oblique());
     println!("Number of glyphs: {:?}", font.number_of_glyphs());
     println!("Underline: {:?}", font.underline_metrics());
-    println!("Strikeout: {:?}", font.strikeout_metrics());
-    println!("Subscript: {:?}", font.subscript_metrics());
-    println!("Superscript: {:?}", font.superscript_metrics());
+
+    if let Some(table) = font.os2_table() {
+        println!("X height: {:?}", table.x_height());
+        println!("Weight: {:?}", table.weight());
+        println!("Width: {:?}", table.width());
+        println!("Regular: {:?}", table.is_regular());
+        println!("Italic: {:?}", table.is_italic());
+        println!("Bold: {:?}", table.is_bold());
+        println!("Oblique: {:?}", table.is_oblique());
+        println!("Strikeout: {:?}", table.strikeout_metrics());
+        println!("Subscript: {:?}", table.subscript_metrics());
+        println!("Superscript: {:?}", table.superscript_metrics());
+    }
+
     println!("Valid: {:?}", font.is_valid());
 
     let end = time::precise_time_ns();

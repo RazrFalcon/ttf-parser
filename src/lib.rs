@@ -348,6 +348,11 @@ impl<'a> Font<'a> {
             Err(Error::InvalidTableChecksum(table.tag))
         }
     }
+
+    /// Returns a handle to a OS/2 table.
+    pub fn os2_table(&self) -> Option<os2::Table> {
+        Some(os2::Table { data: &self.data[self.os_2?.range()] })
+    }
 }
 
 fn calc_checksum(data: &[u8], length: u32) -> u32 {

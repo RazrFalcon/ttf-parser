@@ -4,7 +4,7 @@
 use std::convert::TryFrom;
 
 use crate::stream::{Stream, FromData};
-use crate::{Font, LineMetrics};
+use crate::LineMetrics;
 
 
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
@@ -152,126 +152,105 @@ impl FromData for ScriptMetrics {
 }
 
 
-impl<'a> Font<'a> {
-    /// Parses font's weight set in the OS/2 table.
-    ///
-    /// Returns `None` when OS/2 table is not present.
-    pub fn weight(&self) -> Option<Weight> {
+/// Handle to a OS/2 table.
+#[allow(missing_debug_implementations)]
+pub struct Table<'a> {
+    pub(crate) data: &'a [u8],
+}
+
+impl<'a> Table<'a> {
+    /// Parses font's weight.
+    pub fn weight(&self) -> Weight {
         const US_WEIGHT_CLASS_OFFSET: usize = 4;
 
-        let n: u16 = Stream::read_at(&self.data[self.os_2?.range()], US_WEIGHT_CLASS_OFFSET);
-        Some(Weight::from(n))
+        let n: u16 = Stream::read_at(self.data, US_WEIGHT_CLASS_OFFSET);
+        Weight::from(n)
     }
 
-    /// Parses font's width set in the OS/2 table.
+    /// Parses font's width.
     ///
-    /// Returns `None` when OS/2 table is not present.
-    /// Or when value is out of 1..9 range.
+    /// Returns `None` when value is out of 1..9 range.
     pub fn width(&self) -> Option<Width> {
         const US_WIDTH_CLASS_OFFSET: usize = 6;
 
-        let n: u16 = Stream::read_at(&self.data[self.os_2?.range()], US_WIDTH_CLASS_OFFSET);
+        let n: u16 = Stream::read_at(self.data, US_WIDTH_CLASS_OFFSET);
         Width::try_from(n).ok()
     }
 
-    /// Checks that font is marked as *Regular* in the OS/2 table.
-    ///
-    /// Returns `None` when OS/2 table is not present.
-    pub fn is_regular(&self) -> Option<bool> {
+    /// Checks that font is marked as *Regular*.
+    pub fn is_regular(&self) -> bool {
         const REGULAR_FLAG: u16 = 6;
-        Some((self.get_fs_selection()? >> REGULAR_FLAG) & 1 == 1)
+        (self.get_fs_selection() >> REGULAR_FLAG) & 1 == 1
     }
 
-    /// Checks that font is marked as *Italic* in the OS/2 table.
-    ///
-    /// Returns `None` when OS/2 table is not present.
-    pub fn is_italic(&self) -> Option<bool> {
+    /// Checks that font is marked as *Italic*.
+    pub fn is_italic(&self) -> bool {
         const ITALIC_FLAG: u16 = 0;
-        Some((self.get_fs_selection()? >> ITALIC_FLAG) & 1 == 1)
+        (self.get_fs_selection() >> ITALIC_FLAG) & 1 == 1
     }
 
-    /// Checks that font is marked as *Bold* in the OS/2 table.
-    ///
-    /// Returns `None` when OS/2 table is not present.
-    pub fn is_bold(&self) -> Option<bool> {
+    /// Checks that font is marked as *Bold*.
+    pub fn is_bold(&self) -> bool {
         const BOLD_FLAG: u16 = 5;
-        Some((self.get_fs_selection()? >> BOLD_FLAG) & 1 == 1)
+        (self.get_fs_selection() >> BOLD_FLAG) & 1 == 1
     }
 
-    /// Checks that font is marked as *Oblique* in the OS/2 table.
+    /// Checks that font is marked as *Oblique*.
     ///
     /// Available only in OS/2 table version >= 4.
-    ///
-    /// Returns `None` when OS/2 table is not present.
     pub fn is_oblique(&self) -> Option<bool> {
         const VERSION_OFFSET: usize = 0;
 
-        let version: u16 = Stream::read_at(&self.data[self.os_2?.range()], VERSION_OFFSET);
+        let version: u16 = Stream::read_at(self.data, VERSION_OFFSET);
 
         if version < 4 {
             return None;
         }
 
         const OBLIQUE_FLAG: u16 = 9;
-        Some((self.get_fs_selection()? >> OBLIQUE_FLAG) & 1 == 1)
+        Some((self.get_fs_selection() >> OBLIQUE_FLAG) & 1 == 1)
     }
 
-    fn get_fs_selection(&self) -> Option<u16> {
+    fn get_fs_selection(&self) -> u16 {
         const FS_SELECTION_OFFSET: usize = 62;
-        let n: u16 = Stream::read_at(&self.data[self.os_2?.range()], FS_SELECTION_OFFSET);
-        Some(n)
+        Stream::read_at(self.data, FS_SELECTION_OFFSET)
     }
 
-    /// Parses font's X height set in the OS/2 table.
+    /// Parses font's X height.
     ///
     /// Available only in OS/2 table version >= 2.
-    ///
-    /// Returns `None` when OS/2 table is not present.
     pub fn x_height(&self) -> Option<i16> {
         const VERSION_OFFSET: usize = 0;
         const SX_HEIGHT_OFFSET: usize = 86;
 
-        let data = &self.data[self.os_2?.range()];
-        let version: u16 = Stream::read_at(data, VERSION_OFFSET);
+        let version: u16 = Stream::read_at(self.data, VERSION_OFFSET);
         if version < 2 {
             return None;
         }
 
-        let n: i16 = Stream::read_at(data, SX_HEIGHT_OFFSET);
-        Some(n)
+        Some(Stream::read_at(self.data, SX_HEIGHT_OFFSET))
     }
 
-    /// Parses font's strikeout metrics set in the OS/2 table.
-    ///
-    /// Returns `None` when OS/2 table is not present.
-    pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
+    /// Parses font's strikeout metrics.
+    pub fn strikeout_metrics(&self) -> LineMetrics {
         const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
         const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
 
-        let data = &self.data[self.os_2?.range()];
-        Some(LineMetrics {
-            position:  Stream::read_at(data, Y_STRIKEOUT_SIZE_OFFSET),
-            thickness: Stream::read_at(data, Y_STRIKEOUT_POSITION_OFFSET),
-        })
+        LineMetrics {
+            position:  Stream::read_at(self.data, Y_STRIKEOUT_SIZE_OFFSET),
+            thickness: Stream::read_at(self.data, Y_STRIKEOUT_POSITION_OFFSET),
+        }
     }
 
-    /// Parses font's subscript metrics set in the OS/2 table.
-    ///
-    /// Returns `None` when OS/2 table is not present.
-    pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
+    /// Parses font's subscript metrics.
+    pub fn subscript_metrics(&self) -> ScriptMetrics {
         const Y_SUBSCRIPT_XSIZE_OFFSET: usize = 10;
-
-        let data = &self.data[self.os_2?.range()];
-        Some(Stream::read_at(data, Y_SUBSCRIPT_XSIZE_OFFSET))
+        Stream::read_at(self.data, Y_SUBSCRIPT_XSIZE_OFFSET)
     }
 
-    /// Parses font's superscript metrics set in the OS/2 table.
-    ///
-    /// Returns `None` when OS/2 table is not present.
-    pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
+    /// Parses font's superscript metrics.
+    pub fn superscript_metrics(&self) -> ScriptMetrics {
         const Y_SUPERSCRIPT_XSIZE_OFFSET: usize = 18;
-
-        let data = &self.data[self.os_2?.range()];
-        Some(Stream::read_at(data, Y_SUPERSCRIPT_XSIZE_OFFSET))
+        Stream::read_at(self.data, Y_SUPERSCRIPT_XSIZE_OFFSET)
     }
 }

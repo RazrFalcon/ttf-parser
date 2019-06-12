@@ -3,8 +3,6 @@
 
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
-use bitflags::bitflags;
-
 use crate::stream::{Stream, Array};
 use crate::{Font, Rect};
 use crate::loca;
@@ -77,36 +75,44 @@ impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
 
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#simple-glyph-description
-bitflags! {
-    struct SimpleGlyphFlags: u8 {
-        const ON_CURVE_POINT                       = 1 << 0;
-        const X_SHORT_VECTOR                       = 1 << 1;
-        const Y_SHORT_VECTOR                       = 1 << 2;
-        const REPEAT_FLAG                          = 1 << 3;
-        const X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR = 1 << 4;
-        const Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR = 1 << 5;
-        const OVERLAP_SIMPLE                       = 1 << 6;
-        const RESERVED                             = 1 << 7;
-    }
+#[derive(Clone, Copy)]
+struct SimpleGlyphFlags(u8);
+
+impl SimpleGlyphFlags {
+    const ON_CURVE_POINT: Self                          = Self(1 << 0);
+    const X_SHORT_VECTOR: Self                          = Self(1 << 1);
+    const Y_SHORT_VECTOR: Self                          = Self(1 << 2);
+    const REPEAT_FLAG: Self                             = Self(1 << 3);
+    const X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR: Self    = Self(1 << 4);
+    const Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR: Self    = Self(1 << 5);
+
+    #[inline] fn empty() -> Self { Self(0) }
+    #[inline] fn all() -> Self { Self(63) }
+    #[inline] fn from_bits_truncate(bits: u8) -> Self { Self(bits & Self::all().0) }
+    #[inline] fn contains(&self, other: Self) -> bool { (self.0 & other.0) == other.0 }
 }
 
+impl_bit_ops!(SimpleGlyphFlags);
+
+
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
-bitflags! {
-    struct CompositeGlyphFlags: u16 {
-        const ARG_1_AND_2_ARE_WORDS     = 1 << 0;
-        const ARGS_ARE_XY_VALUES        = 1 << 1;
-        const ROUND_XY_TO_GRID          = 1 << 2;
-        const WE_HAVE_A_SCALE           = 1 << 3;
-        const MORE_COMPONENTS           = 1 << 5;
-        const WE_HAVE_AN_X_AND_Y_SCALE  = 1 << 6;
-        const WE_HAVE_A_TWO_BY_TWO      = 1 << 7;
-        const WE_HAVE_INSTRUCTIONS      = 1 << 8;
-        const USE_MY_METRICS            = 1 << 9;
-        const OVERLAP_COMPOUND          = 1 << 10;
-        const SCALED_COMPONENT_OFFSET   = 1 << 11;
-        const UNSCALED_COMPONENT_OFFSET = 1 << 12;
-    }
+#[derive(Clone, Copy)]
+struct CompositeGlyphFlags(u16);
+
+impl CompositeGlyphFlags {
+    const ARG_1_AND_2_ARE_WORDS: Self     = Self(1 << 0);
+    const ARGS_ARE_XY_VALUES: Self        = Self(1 << 1);
+    const WE_HAVE_A_SCALE: Self           = Self(1 << 3);
+    const MORE_COMPONENTS: Self           = Self(1 << 5);
+    const WE_HAVE_AN_X_AND_Y_SCALE: Self  = Self(1 << 6);
+    const WE_HAVE_A_TWO_BY_TWO: Self      = Self(1 << 7);
+
+    #[inline] fn all() -> Self { Self(235) }
+    #[inline] fn from_bits_truncate(bits: u16) -> Self { Self(bits & Self::all().0) }
+    #[inline] fn contains(&self, other: Self) -> bool { (self.0 & other.0) == other.0 }
 }
+
+impl_bit_ops!(CompositeGlyphFlags);
 
 
 /// A glyph handle.

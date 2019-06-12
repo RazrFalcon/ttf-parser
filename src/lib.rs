@@ -6,9 +6,9 @@ A high-level, safe, zero-allocation TrueType font parser.
 - A high-level API.
 - Zero allocations.
 - Zero `unsafe`.
+- Zero dependencies.
 - Fast.
 - Simple and maintainable code (no magic numbers).
-- Minimal dependencies (currently, depends only on `bitflags`).
 
 ## Limitations
 
@@ -31,6 +31,28 @@ A high-level, safe, zero-allocation TrueType font parser.
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
+
+macro_rules! impl_bit_ops {
+    ($name:ty) => {
+        impl std::ops::BitOr for $name {
+            type Output = Self;
+
+            #[inline]
+            fn bitor(self, other: Self) -> Self {
+                Self(self.0 | other.0)
+            }
+        }
+
+        impl std::ops::BitAnd for $name {
+            type Output = Self;
+
+            #[inline]
+            fn bitand(self, other: Self) -> Self {
+                Self(self.0 & other.0)
+            }
+        }
+    }
+}
 
 pub mod cmap;
 pub mod gdef;

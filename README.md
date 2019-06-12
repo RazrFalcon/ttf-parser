@@ -10,9 +10,9 @@ A high-level, safe, zero-allocation TrueType font parser.
 - A high-level API.
 - Zero allocations.
 - Zero `unsafe`.
+- Zero dependencies.
 - Fast.
 - Simple and maintainable code (no magic numbers).
-- Minimal dependencies (currently, depends only on `bitflags`).
 
 ### Limitations
 

@@ -30,6 +30,11 @@ impl ttf_parser::glyf::OutlineBuilder for Builder {
     fn quad_to(&mut self, _: f32, _: f32, _: f32, _: f32) {
         self.0 += 2;
     }
+
+    #[inline]
+    fn close(&mut self) {
+        self.0 += 1;
+    }
 }
 
 bencher::benchmark_group!(outline_group, outline);

@@ -62,8 +62,10 @@ pub mod loca;
 pub mod name;
 pub mod os2;
 pub mod post;
+pub mod vmtx;
 mod head;
 mod hhea;
+mod vhea;
 mod parser;
 
 type Range32 = std::ops::Range<u32>;
@@ -232,6 +234,8 @@ pub struct Font<'a> {
     name: Option<TableInfo>,
     os_2: Option<TableInfo>,
     post: TableInfo,
+    vhea: Option<TableInfo>,
+    vmtx: Option<TableInfo>,
     number_of_glyphs: GlyphId,
 }
 
@@ -243,13 +247,11 @@ impl<'a> Font<'a> {
     ///
     /// This function only parses font tables, so it's relatively light.
     ///
-    /// Required tables: `cmap`, `glyp`, `head`, `hhea`, `hmtx`, `loca`, `post`.
-    ///
-    /// Optional tables: `GDEF`, `name`, `OS/2`
+    /// Required tables: `cmap`, `glyf`, `head`, `hhea`, `hmtx`, `loca`, `maxp`, `post`.
     pub fn from_data(data: &'a [u8], index: u32) -> Result<Self, Error> {
         let table_data = if let Some(n) = fonts_in_collection(data) {
             if index < n {
-                // // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
+                // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
                 const OFFSETS_TABLE_OFFSET: usize = 12;
                 const OFFSET_32_SIZE: usize = 4;
 
@@ -293,6 +295,8 @@ impl<'a> Font<'a> {
             name: Self::find_table(s.tail(), num_tables, b"name").ok(),
             os_2: Self::find_table(s.tail(), num_tables, b"OS/2").ok(),
             post: Self::find_table(s.tail(), num_tables, b"post")?,
+            vhea: Self::find_table(s.tail(), num_tables, b"vhea").ok(),
+            vmtx: Self::find_table(s.tail(), num_tables, b"vmtx").ok(),
             number_of_glyphs,
         })
     }
@@ -350,6 +354,8 @@ impl<'a> Font<'a> {
         if let Some(ref gdef) = self.gdef { self.calc_table_checksum(gdef)?; }
         if let Some(ref name) = self.name { self.calc_table_checksum(name)?; }
         if let Some(ref os_2) = self.os_2 { self.calc_table_checksum(os_2)?; }
+        if let Some(ref vhea) = self.vhea { self.calc_table_checksum(vhea)?; }
+        if let Some(ref vmtx) = self.vmtx { self.calc_table_checksum(vmtx)?; }
 
         Ok(())
     }
@@ -378,6 +384,20 @@ impl<'a> Font<'a> {
         Some(gdef::Table {
             data: &self.data[self.name?.range()],
             number_of_glyphs: self.number_of_glyphs,
+        })
+    }
+
+    /// Returns a handle to a `vhea` table.
+    pub(crate) fn vhea_table(&self) -> Option<vhea::Table> {
+        Some(vhea::Table { data: &self.data[self.vhea?.range()] })
+    }
+
+    /// Returns a handle to a `vmtx` table.
+    pub fn vmtx_table(&self) -> Option<vmtx::Table> {
+        Some(vmtx::Table {
+            data: &self.data[self.vmtx?.range()],
+            number_of_glyphs: self.number_of_glyphs(),
+            number_of_vmetrics: self.vhea_table()?.number_of_vmetrics(),
         })
     }
 }

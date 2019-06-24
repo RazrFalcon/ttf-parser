@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
+- Vertical metrics querying from the `vmtx` table.
 
 ### Changed
 - Use `GlyphId` instead of `u16`.

@@ -241,3 +241,25 @@ fn os2_superscript_metrics() {
         ttf_parser::os2::ScriptMetrics { x_size: 550, y_size: 800, x_offset: 100, y_offset: 350 },
     );
 }
+
+#[test]
+fn vmtx_first_array() {
+    let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let table = font.vmtx_table().unwrap();
+    assert_eq!(
+        table.glyph_ver_metrics(GlyphId(0)).unwrap(),
+        ttf_parser::vmtx::VerticalMetrics { advance: 1000, top_side_bearing: 666 },
+    );
+}
+
+#[test]
+fn vmtx_second_array() {
+    let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let table = font.vmtx_table().unwrap();
+    assert_eq!(
+        table.glyph_ver_metrics(GlyphId(1)).unwrap(),
+        ttf_parser::vmtx::VerticalMetrics { advance: 1000, top_side_bearing: 83 },
+    );
+}

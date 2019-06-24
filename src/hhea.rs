@@ -29,7 +29,7 @@ impl<'a> Font<'a> {
     }
 
     pub(crate) fn number_of_hmetrics(&self) -> u16 {
-        const NUMBER_OF_HMETRICS: usize = 34;
-        Stream::read_at(&self.data[self.hhea.range()], NUMBER_OF_HMETRICS)
+        const NUMBER_OF_HMETRICS_OFFSET: usize = 34;
+        Stream::read_at(&self.data[self.hhea.range()], NUMBER_OF_HMETRICS_OFFSET)
     }
 }

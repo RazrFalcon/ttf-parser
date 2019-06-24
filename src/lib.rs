@@ -1,7 +1,7 @@
 /*!
 A high-level, safe, zero-allocation TrueType font parser.
 
-## Goals
+## Features
 
 - A high-level API.
 - Zero allocations.
@@ -393,7 +393,7 @@ fn is_collection(data: &[u8]) -> bool {
 
 /// Returns a number of fonts stored in a TrueType font collection.
 ///
-/// Returns `Note` if a provided data is not a TrueType font collection.
+/// Returns `None` if a provided data is not a TrueType font collection.
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
     const NUM_FONTS_OFFSET: usize = 8;

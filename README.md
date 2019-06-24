@@ -5,7 +5,7 @@
 
 A high-level, safe, zero-allocation TrueType font parser.
 
-### Goals
+### Features
 
 - A high-level API.
 - Zero allocations.

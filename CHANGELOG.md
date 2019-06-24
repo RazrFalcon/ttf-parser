@@ -11,4 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Use `GlyphId` instead of `u16`.
 
+### Fixed
+- `GDEF` table parsing.
+
 [Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.1.0...HEAD

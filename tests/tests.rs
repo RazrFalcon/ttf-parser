@@ -1,6 +1,7 @@
 use std::fs;
 
-use ttf_parser::{Font, GlyphId};
+use ttf_parser as ttf;
+use ttf::{Font, GlyphId};
 
 struct Builder(svgtypes::Path);
 
@@ -10,7 +11,7 @@ impl Builder {
     }
 }
 
-impl ttf_parser::glyf::OutlineBuilder for Builder {
+impl ttf::glyf::OutlineBuilder for Builder {
     fn move_to(&mut self, x: f32, y: f32) {
         self.0.push(svgtypes::PathSegment::MoveTo { abs: true, x: x as f64, y: y as f64 });
     }
@@ -128,7 +129,7 @@ fn underline_metrics() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
     assert_eq!(font.underline_metrics(),
-               ttf_parser::LineMetrics { position: -75, thickness: 50 });
+               ttf::LineMetrics { position: -75, thickness: 50 });
 }
 
 #[test]
@@ -136,7 +137,7 @@ fn os2_weight() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
     let table = font.os2_table().unwrap();
-    assert_eq!(table.weight(), ttf_parser::os2::Weight::SemiBold);
+    assert_eq!(table.weight(), ttf::os2::Weight::SemiBold);
 }
 
 #[test]
@@ -144,7 +145,7 @@ fn os2_width() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
     let table = font.os2_table().unwrap();
-    assert_eq!(table.width().unwrap(), ttf_parser::os2::Width::Expanded);
+    assert_eq!(table.width().unwrap(), ttf::os2::Width::Expanded);
 }
 
 #[test]
@@ -177,7 +178,7 @@ fn os2_strikeout_metrics() {
     let font = Font::from_data(&data, 0).unwrap();
     let table = font.os2_table().unwrap();
     assert_eq!(table.strikeout_metrics(),
-               ttf_parser::LineMetrics { position: 322, thickness: 50 });
+               ttf::LineMetrics { position: 322, thickness: 50 });
 }
 
 #[test]
@@ -227,7 +228,7 @@ fn os2_subscript_metrics() {
     let table = font.os2_table().unwrap();
     assert_eq!(
         table.subscript_metrics(),
-        ttf_parser::os2::ScriptMetrics { x_size: 650, y_size: 600, x_offset: 0, y_offset: 75 },
+        ttf::os2::ScriptMetrics { x_size: 650, y_size: 600, x_offset: 0, y_offset: 75 },
     );
 }
 
@@ -238,7 +239,7 @@ fn os2_superscript_metrics() {
     let table = font.os2_table().unwrap();
     assert_eq!(
         table.superscript_metrics(),
-        ttf_parser::os2::ScriptMetrics { x_size: 550, y_size: 800, x_offset: 100, y_offset: 350 },
+        ttf::os2::ScriptMetrics { x_size: 550, y_size: 800, x_offset: 100, y_offset: 350 },
     );
 }
 
@@ -249,7 +250,7 @@ fn vmtx_first_array() {
     let table = font.vmtx_table().unwrap();
     assert_eq!(
         table.glyph_ver_metrics(GlyphId(0)).unwrap(),
-        ttf_parser::vmtx::VerticalMetrics { advance: 1000, top_side_bearing: 666 },
+        ttf::vmtx::VerticalMetrics { advance: 1000, top_side_bearing: 666 },
     );
 }
 
@@ -260,6 +261,46 @@ fn vmtx_second_array() {
     let table = font.vmtx_table().unwrap();
     assert_eq!(
         table.glyph_ver_metrics(GlyphId(1)).unwrap(),
-        ttf_parser::vmtx::VerticalMetrics { advance: 1000, top_side_bearing: 83 },
+        ttf::vmtx::VerticalMetrics { advance: 1000, top_side_bearing: 83 },
     );
+}
+
+#[test]
+fn gdef_glyph_class_1() {
+    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let table = font.gdef_table().unwrap();
+    assert_eq!(table.glyph_class(GlyphId(0)), None);
+}
+
+#[test]
+fn gdef_glyph_class_2() {
+    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let table = font.gdef_table().unwrap();
+    assert_eq!(table.glyph_class(GlyphId(2)), Some(ttf::gdef::GlyphClass::Base));
+}
+
+#[test]
+fn gdef_glyph_class_3() {
+    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let table = font.gdef_table().unwrap();
+    assert_eq!(table.glyph_class(GlyphId(4)), Some(ttf::gdef::GlyphClass::Mark));
+}
+
+#[test]
+fn gdef_glyph_mark_attachment_class_1() {
+    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let table = font.gdef_table().unwrap();
+    assert_eq!(table.glyph_mark_attachment_class(GlyphId(0)), None);
+}
+
+#[test]
+fn gdef_glyph_mark_attachment_class_2() {
+    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let table = font.gdef_table().unwrap();
+    assert_eq!(table.glyph_mark_attachment_class(GlyphId(4)), Some(1));
 }

@@ -382,7 +382,7 @@ impl<'a> Font<'a> {
     /// Returns a handle to a `GDEF` table.
     pub fn gdef_table(&self) -> Option<gdef::Table> {
         Some(gdef::Table {
-            data: &self.data[self.name?.range()],
+            data: &self.data[self.gdef?.range()],
             number_of_glyphs: self.number_of_glyphs,
         })
     }

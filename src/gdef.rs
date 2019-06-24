@@ -5,6 +5,7 @@ use std::convert::{TryFrom, TryInto};
 use std::ops::Range;
 
 use crate::stream::{Stream, FromData};
+use crate::GlyphId;
 
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
@@ -33,7 +34,7 @@ impl TryFrom<u16> for GlyphClass {
 
 
 struct ClassRangeRecord {
-    range: Range<u16>,
+    range: Range<GlyphId>,
     class: u16,
 }
 
@@ -41,8 +42,8 @@ impl FromData for ClassRangeRecord {
     fn parse(data: &[u8]) -> Self {
         let mut s = Stream::new(data);
         ClassRangeRecord {
-            range: s.read_u16()..s.read_u16(),
-            class: s.read_u16(),
+            range: s.read()..s.read(),
+            class: s.read(),
         }
     }
 }
@@ -53,14 +54,14 @@ impl FromData for ClassRangeRecord {
 #[allow(missing_debug_implementations)]
 pub struct Table<'a> {
     pub(crate) data: &'a [u8],
-    pub(crate) number_of_glyphs: u16,
+    pub(crate) number_of_glyphs: GlyphId,
 }
 
 impl<'a> Table<'a> {
     /// Returns glyph's class.
     ///
     /// Returns `None` when font doesn't have such glyph ID.
-    pub fn glyph_class(&self, glyph_id: u16) -> Option<GlyphClass> {
+    pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
         const GLYPH_CLASS_DEF_OFFSET_OFFSET: usize = 4;
         self.parse_glyph_class_def_table(glyph_id, GLYPH_CLASS_DEF_OFFSET_OFFSET)
             .and_then(|c| c.try_into().ok())
@@ -69,12 +70,12 @@ impl<'a> Table<'a> {
     /// Returns glyph's mark attachment class.
     ///
     /// Returns `None` when font doesn't have such glyph ID.
-    pub fn glyph_mark_attachment_class(&self, glyph_id: u16) -> Option<u16> {
+    pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Option<u16> {
         const MARK_ATTACH_CLASS_DEF_OFFSET_OFFSET: usize = 10;
         self.parse_glyph_class_def_table(glyph_id, MARK_ATTACH_CLASS_DEF_OFFSET_OFFSET)
     }
 
-    fn parse_glyph_class_def_table(&self, glyph_id: u16, offset: usize) -> Option<u16> {
+    fn parse_glyph_class_def_table(&self, glyph_id: GlyphId, offset: usize) -> Option<u16> {
         if glyph_id >= self.number_of_glyphs {
             return None;
         }
@@ -83,7 +84,7 @@ impl<'a> Table<'a> {
         Self::parse_glyph_class_table(&self.data[offset as usize ..], glyph_id)
     }
 
-    fn parse_glyph_class_table(data: &[u8], glyph_id: u16) -> Option<u16> {
+    fn parse_glyph_class_table(data: &[u8], glyph_id: GlyphId) -> Option<u16> {
         let mut s = Stream::new(data);
         let class_format = s.read_u16();
         match class_format {
@@ -93,8 +94,8 @@ impl<'a> Table<'a> {
         }
     }
 
-    fn parse_glyph_class_table_1(s: &mut Stream, glyph_id: u16) -> Option<u16> {
-        let start_glyph_id = s.read_u16();
+    fn parse_glyph_class_table_1(s: &mut Stream, glyph_id: GlyphId) -> Option<u16> {
+        let start_glyph_id = s.read_glyph_id();
         let glyph_count = s.read_u16() as usize;
         let class_values = s.read_array::<u16>(glyph_count);
 
@@ -103,10 +104,10 @@ impl<'a> Table<'a> {
             return None;
         }
 
-        class_values.get((glyph_id - start_glyph_id) as usize)
+        class_values.get((glyph_id.0 - start_glyph_id.0) as usize)
     }
 
-    fn parse_glyph_class_table_2(s: &mut Stream, glyph_id: u16) -> Option<u16> {
+    fn parse_glyph_class_table_2(s: &mut Stream, glyph_id: GlyphId) -> Option<u16> {
         let class_range_count = s.read_u16() as usize;
         let records = s.read_array::<ClassRangeRecord>(class_range_count);
         for record in records {

@@ -4,7 +4,7 @@
 use std::ops::Range;
 
 use crate::stream::{Stream, FromData};
-use crate::Font;
+use crate::{Font, GlyphId};
 
 
 /// A code point to glyph matching error.
@@ -37,7 +37,7 @@ impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
     ///
     /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
-    pub fn glyph_index(&self, c: char) -> Result<u16, Error> {
+    pub fn glyph_index(&self, c: char) -> Result<GlyphId, Error> {
         let cmap_data = &self.data[self.cmap.range()];
         let mut s = Stream::new(cmap_data);
         s.skip_u16(); // version
@@ -49,7 +49,7 @@ impl<'a> Font<'a> {
             let offset = s.read_u32() as usize;
 
             match parse_subtable(c as u32, &cmap_data[offset..]) {
-                Ok(id) => return Ok(id),
+                Ok(id) => return Ok(GlyphId(id)),
                 Err(Error::NoGlyph) => continue,
                 Err(e) => return Err(e),
             }

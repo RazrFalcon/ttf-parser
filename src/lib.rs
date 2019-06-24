@@ -68,7 +68,7 @@ mod stream;
 
 type Range32 = std::ops::Range<u32>;
 
-use stream::Stream;
+use stream::{Stream, FromData};
 
 /// Rectangle.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -78,6 +78,17 @@ pub struct Rect {
     pub y_min: i16,
     pub x_max: i16,
     pub y_max: i16,
+}
+
+
+/// A type-safe wrapper for glyph ID.
+#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Debug)]
+pub struct GlyphId(pub u16);
+
+impl FromData for GlyphId {
+    fn parse(data: &[u8]) -> Self {
+        GlyphId(Stream::read_at(data, 0))
+    }
 }
 
 
@@ -221,7 +232,7 @@ pub struct Font<'a> {
     name: Option<TableInfo>,
     os_2: Option<TableInfo>,
     post: TableInfo,
-    number_of_glyphs: u16,
+    number_of_glyphs: GlyphId,
 }
 
 impl<'a> Font<'a> {
@@ -312,13 +323,13 @@ impl<'a> Font<'a> {
     /// The value was already parsed, so this function doesn't involve any parsing.
     #[inline]
     pub fn number_of_glyphs(&self) -> u16 {
-        self.number_of_glyphs
+        self.number_of_glyphs.0
     }
 
     /// Parses a total number of glyphs in the font.
-    fn parse_number_of_glyphs(data: &[u8]) -> u16 {
+    fn parse_number_of_glyphs(data: &[u8]) -> GlyphId {
         const NUM_GLYPHS_OFFSET: usize = 4;
-        Stream::read_at(data, NUM_GLYPHS_OFFSET)
+        GlyphId(Stream::read_at(data, NUM_GLYPHS_OFFSET))
     }
 
     /// Checks tables [checksum](https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums).

@@ -1,6 +1,6 @@
 use std::fs;
 
-use ttf_parser::Font;
+use ttf_parser::{Font, GlyphId};
 
 struct Builder(svgtypes::Path);
 
@@ -42,7 +42,7 @@ fn number_of_glyphs() {
 fn glyph_outline_single_contour() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    let glyph = font.glyph(0).unwrap();
+    let glyph = font.glyph(GlyphId(0)).unwrap();
 
     let mut builder = Builder::new();
     glyph.outline(&mut builder);
@@ -54,7 +54,7 @@ fn glyph_outline_single_contour() {
 fn glyph_outline_two_contours() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    let glyph = font.glyph(1).unwrap();
+    let glyph = font.glyph(GlyphId(1)).unwrap();
 
     let mut builder = Builder::new();
     glyph.outline(&mut builder);
@@ -67,7 +67,7 @@ fn glyph_outline_two_contours() {
 fn glyph_outline_composite() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    let glyph = font.glyph(4).unwrap();
+    let glyph = font.glyph(GlyphId(4)).unwrap();
 
     let mut builder = Builder::new();
     glyph.outline(&mut builder);

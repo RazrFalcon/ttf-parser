@@ -4,8 +4,7 @@
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
 use crate::stream::{Stream, Array};
-use crate::{Font, Rect};
-use crate::loca;
+use crate::{loca, Font, Rect, GlyphId};
 
 
 /// A trait for outline construction.
@@ -322,7 +321,7 @@ impl<'a> Glyph<'a> {
 
         let mut s = Stream::new(glyph_data);
         let flags = Flags::from_bits_truncate(s.read_u16());
-        let glyph_id = s.read_u16();
+        let glyph_id = s.read_glyph_id();
 
         let mut ts = Transform::default();
 
@@ -384,7 +383,7 @@ fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
 
 impl<'a> Font<'a> {
     /// Returns a glyph handle.
-    pub fn glyph(&self, glyph_id: u16) -> Result<Glyph, loca::Error> {
+    pub fn glyph(&self, glyph_id: GlyphId) -> Result<Glyph, loca::Error> {
         let range = self.glyph_range(glyph_id)?;
         let start = (self.glyf.offset + range.start) as usize;
         let end   = (self.glyf.offset + range.end) as usize;

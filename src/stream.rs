@@ -1,4 +1,4 @@
-use crate::Tag;
+use crate::{Tag, GlyphId};
 
 pub trait FromData: Sized {
     /// Parses an object from a raw data.
@@ -165,7 +165,7 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    fn read<T: FromData>(&mut self) -> T {
+    pub fn read<T: FromData>(&mut self) -> T {
         let item = Self::read_at(self.data, self.offset);
         self.offset += T::size_of();
         item
@@ -223,6 +223,11 @@ impl<'a> Stream<'a> {
     #[inline]
     pub fn read_f2_14(&mut self) -> f32 {
         self.read_i16() as f32 / 16384.0
+    }
+
+    #[inline]
+    pub fn read_glyph_id(&mut self) -> GlyphId {
+        GlyphId(self.read())
     }
 
     #[inline]

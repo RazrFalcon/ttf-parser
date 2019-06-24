@@ -64,11 +64,11 @@ pub mod os2;
 pub mod post;
 mod head;
 mod hhea;
-mod stream;
+mod parser;
 
 type Range32 = std::ops::Range<u32>;
 
-use stream::{Stream, FromData};
+use parser::{Stream, FromData};
 
 /// Rectangle.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -266,7 +266,7 @@ impl<'a> Font<'a> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
         const SFNT_VERSION_TRUE_TYPE: u32 = 0x00010000;
 
-        let mut s = stream::Stream::new(table_data);
+        let mut s = Stream::new(table_data);
 
         let sfnt_version = s.read_u32();
         if sfnt_version != SFNT_VERSION_TRUE_TYPE {

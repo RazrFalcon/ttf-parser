@@ -3,7 +3,7 @@
 
 use std::convert::TryFrom;
 
-use crate::stream::{Stream, Array};
+use crate::parser::{Stream, LazyArray};
 
 
 /// A [platform ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids).
@@ -150,7 +150,7 @@ impl<'a> Name<'a> {
 
     fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
-        for c in Array::new(self.name) {
+        for c in LazyArray::new(self.name) {
             name.push(c);
         }
 

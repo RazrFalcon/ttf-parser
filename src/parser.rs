@@ -35,17 +35,17 @@ impl FromData for u32 {
 }
 
 
-pub struct Array<'a, T> {
+pub struct LazyArray<'a, T> {
     data: &'a [u8],
     phantom: std::marker::PhantomData<T>,
 }
 
-impl<'a, T: FromData> Array<'a, T> {
+impl<'a, T: FromData> LazyArray<'a, T> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
         assert_eq!(data.len() % T::size_of(), 0);
 
-        Array {
+        LazyArray {
             data,
             phantom: std::marker::PhantomData,
         }
@@ -78,7 +78,7 @@ impl<'a, T: FromData> Array<'a, T> {
     }
 }
 
-impl<'a, T: FromData> IntoIterator for Array<'a, T> {
+impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
     type Item = T;
     type IntoIter = ArrayIter<'a, T>;
 
@@ -186,9 +186,9 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn read_array<T: FromData>(&mut self, len: usize) -> Array<'a, T> {
+    pub fn read_array<T: FromData>(&mut self, len: usize) -> LazyArray<'a, T> {
         let len = len * T::size_of();
-        let array = Array::new(&self.data[self.offset..(self.offset + len)]);
+        let array = LazyArray::new(&self.data[self.offset..(self.offset + len)]);
         self.offset += len;
         array
     }

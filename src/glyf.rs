@@ -3,7 +3,7 @@
 
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
-use crate::stream::{Stream, Array};
+use crate::parser::{Stream, LazyArray};
 use crate::{loca, Font, Rect, GlyphId};
 
 
@@ -170,7 +170,7 @@ impl<'a> Glyph<'a> {
         builder: &mut Builder<T>,
     ) {
         let mut s = Stream::new(glyph_data);
-        let endpoints: Array<u16> = s.read_array(number_of_contours as usize);
+        let endpoints: LazyArray<u16> = s.read_array(number_of_contours as usize);
         let points_total = endpoints.last() + 1;
 
         let instructions_len = s.read_u16();

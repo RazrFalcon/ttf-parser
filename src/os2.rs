@@ -3,7 +3,7 @@
 
 use std::convert::TryFrom;
 
-use crate::stream::{Stream, FromData};
+use crate::parser::{Stream, FromData};
 use crate::LineMetrics;
 
 

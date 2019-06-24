@@ -1,7 +1,7 @@
 //! The [head](https://docs.microsoft.com/en-us/typography/opentype/spec/head)
 //! table parsing primitives.
 
-use crate::stream::Stream;
+use crate::parser::Stream;
 use crate::Font;
 
 #[derive(Clone, Copy, PartialEq, Debug)]

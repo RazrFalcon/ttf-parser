@@ -3,7 +3,7 @@
 
 use std::ops::Range;
 
-use crate::stream::{Stream, FromData};
+use crate::parser::{Stream, FromData};
 use crate::{Font, GlyphId};
 
 

@@ -1,7 +1,7 @@
 //! The [loca](https://docs.microsoft.com/en-us/typography/opentype/spec/loca)
 //! table parsing primitives.
 
-use crate::stream::Stream;
+use crate::parser::Stream;
 use crate::{Font, Range32, GlyphId};
 
 /// A glyph location resolving error.

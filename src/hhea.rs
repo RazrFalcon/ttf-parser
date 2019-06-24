@@ -1,7 +1,7 @@
 //! The [hhea](https://docs.microsoft.com/en-us/typography/opentype/spec/hhea)
 //! table parsing primitives.
 
-use crate::stream::Stream;
+use crate::parser::Stream;
 use crate::Font;
 
 impl<'a> Font<'a> {

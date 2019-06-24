@@ -4,7 +4,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::ops::Range;
 
-use crate::stream::{Stream, FromData};
+use crate::parser::{Stream, FromData};
 use crate::GlyphId;
 
 

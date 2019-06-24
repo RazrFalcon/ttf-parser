@@ -1,7 +1,7 @@
 //! The [hmtx](https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx)
 //! table parsing primitives.
 
-use crate::stream::Stream;
+use crate::parser::Stream;
 use crate::{Font, GlyphId};
 
 

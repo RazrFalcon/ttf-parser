@@ -1,7 +1,7 @@
 //! The [post](https://docs.microsoft.com/en-us/typography/opentype/spec/post)
 //! table parsing primitives.
 
-use crate::stream::Stream;
+use crate::parser::Stream;
 use crate::{Font, LineMetrics};
 
 

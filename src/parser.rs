@@ -45,6 +45,7 @@ impl FromData for u32 {
 }
 
 
+#[derive(Clone, Copy)]
 pub struct LazyArray<'a, T> {
     data: &'a [u8],
     phantom: std::marker::PhantomData<T>,
@@ -119,13 +120,25 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 }
 
+impl<'a, T: FromData + std::fmt::Debug> std::fmt::Debug for LazyArray<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let array: LazyArrayIter<T> = LazyArrayIter {
+            data: self.data,
+            offset: 0,
+            phantom: std::marker::PhantomData,
+        };
+
+        f.debug_list().entries(array).finish()
+    }
+}
+
 impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
     type Item = T;
-    type IntoIter = ArrayIter<'a, T>;
+    type IntoIter = LazyArrayIter<'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        ArrayIter {
+        LazyArrayIter {
             data: self.data,
             offset: 0,
             phantom: std::marker::PhantomData,
@@ -133,13 +146,14 @@ impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
     }
 }
 
-pub struct ArrayIter<'a, T> {
+
+pub struct LazyArrayIter<'a, T> {
     data: &'a [u8],
     offset: usize,
     phantom: std::marker::PhantomData<T>,
 }
 
-impl<'a, T: FromData> Iterator for ArrayIter<'a, T> {
+impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
     type Item = T;
 
     #[inline]

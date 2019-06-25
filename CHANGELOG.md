@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - Vertical metrics querying from the `vmtx` table.
 - OpenType fonts are allowed now.
-- Unicode Variation Sequences `cmap` table support.
+- High Byte Mapping Through Table (2) `cmap` subtable support.
+- Unicode Variation Sequences (14) `cmap` subtable support.
 
 ### Changed
 - A major rewrite. TrueType tables are no longer public.

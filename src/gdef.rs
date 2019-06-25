@@ -39,7 +39,8 @@ impl FromData for ClassRangeRecord {
     fn parse(data: &[u8]) -> Self {
         let mut s = Stream::new(data);
         ClassRangeRecord {
-            range: s.read()..s.read(),
+            // Make the upper bound inclusive.
+            range: s.read()..GlyphId(s.read_u16() + 1),
             class: s.read(),
         }
     }

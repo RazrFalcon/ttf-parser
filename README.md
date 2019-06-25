@@ -17,7 +17,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 ### Limitations
 
 - Non [ARGS_ARE_XY_VALUES] transform is not supported yet.
-- Only 0, 4, 12 and 13 formats of `cmap` table are supported.
+- `cmap` table formats 6, 8 and 10 are not supported.
 
 [ARGS_ARE_XY_VALUES]: https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
 

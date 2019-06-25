@@ -286,14 +286,45 @@ fn glyph_mark_attachment_class_2() {
 }
 
 #[test]
-fn glyph_index_01() {
+fn glyph_index_f00_01() {
+    let data = fs::read("tests/fonts/cmap0_font1.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.glyph_index('4').unwrap(), GlyphId(17));
+    assert_eq!(font.glyph_index('5').unwrap(), GlyphId(56));
+    assert_eq!(font.glyph_index('6').unwrap(), GlyphId(12));
+}
+
+#[test]
+fn glyph_index_f02_01() {
+    let data = fs::read("tests/fonts/cmap2_font1.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.glyph_index('4').unwrap(), GlyphId(17));
+    assert_eq!(font.glyph_index('5').unwrap(), GlyphId(56));
+    assert_eq!(font.glyph_index('6').unwrap(), GlyphId(12));
+    assert_eq!(font.glyph_index('\u{8432}').unwrap(), GlyphId(20));
+    assert_eq!(font.glyph_index('\u{8433}').unwrap(), GlyphId(21));
+    assert_eq!(font.glyph_index('\u{8434}').unwrap(), GlyphId(22));
+    assert_eq!(font.glyph_index('\u{9232}').unwrap(), GlyphId(23));
+    assert_eq!(font.glyph_index('\u{9233}').unwrap(), GlyphId(24));
+    assert_eq!(font.glyph_index('\u{9234}').unwrap(), GlyphId(25));
+}
+
+#[test]
+fn glyph_index_f04_01() {
     let data = fs::read("tests/fonts/TestCMAP14.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
     assert_eq!(font.glyph_index('芦').unwrap(), GlyphId(1));
 }
 
 #[test]
-fn glyph_index_02() {
+fn glyph_index_f12_01() {
+    let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.glyph_index('明').unwrap(), GlyphId(1));
+}
+
+#[test]
+fn glyph_variation_index_01() {
     let data = fs::read("tests/fonts/TestCMAP14.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
     assert_eq!(font.glyph_variation_index('芦', '\u{E0101}').unwrap(), GlyphId(2));

@@ -16,20 +16,30 @@ pub trait FromData: Sized {
     }
 }
 
+impl FromData for u8 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        data[0]
+    }
+}
+
 impl FromData for u16 {
-    fn parse(data: &[u8]) -> u16 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
         (data[0] as u16) << 8 | data[1] as u16
     }
 }
 
 impl FromData for i16 {
-    fn parse(data: &[u8]) -> i16 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
         ((data[0] as u16) << 8 | data[1] as u16) as i16
     }
 }
 
 impl FromData for u32 {
-    fn parse(data: &[u8]) -> u32 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
         (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
     }
 }
@@ -75,6 +85,37 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     #[inline]
     pub fn len(&self) -> usize {
         self.data.len() / T::size_of()
+    }
+
+    #[inline]
+    pub fn binary_search_by<F>(&self, mut f: F) -> Option<T>
+        where F: FnMut(&T) -> std::cmp::Ordering
+    {
+        // Based on Rust std implementation.
+
+        use std::cmp::Ordering;
+
+        let mut size = self.len();
+        if size == 0 {
+            return None;
+        }
+
+        let mut base = 0usize;
+        while size > 1 {
+            let half = size / 2;
+            let mid = base + half;
+            // mid is always in [0, size), that means mid is >= 0 and < size.
+            // mid >= 0: by definition
+            // mid < size: mid = size / 2 + size / 4 + size / 8 ...
+            let cmp = f(&self.at(mid));
+            base = if cmp == Ordering::Greater { base } else { mid };
+            size -= half;
+        }
+
+        // base is always in [0, size) because base <= mid.
+        let value = self.at(base);
+        let cmp = f(&value);
+        if cmp == Ordering::Equal { Some(value) } else { None }
     }
 }
 
@@ -205,6 +246,14 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
+    pub fn read_u24(&mut self) -> u32 {
+        let d = self.data;
+        let n = 0 << 24 | (d[0] as u32) << 16 | (d[1] as u32) << 8 | d[2] as u32;
+        self.offset += 3;
+        n
+    }
+
+    #[inline]
     pub fn read_u32(&mut self) -> u32 {
         self.read()
     }
@@ -227,6 +276,29 @@ impl<'a> Stream<'a> {
 
     #[inline]
     pub fn read_glyph_id(&mut self) -> GlyphId {
-        GlyphId(self.read())
+        self.read()
+    }
+}
+
+
+#[derive(Clone, Copy, Debug)]
+pub struct Offset32(pub u32);
+
+impl FromData for Offset32 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        Offset32(Stream::read_at(data, 0))
+    }
+}
+
+impl FromData for Option<Offset32> {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        let offset: Offset32 = Stream::read_at(data, 0);
+        if offset.0 != 0 { Some(offset) } else { None }
+    }
+
+    fn size_of() -> usize {
+        Offset32::size_of()
     }
 }

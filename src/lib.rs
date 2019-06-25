@@ -93,6 +93,7 @@ pub struct Rect {
 pub struct GlyphId(pub u16);
 
 impl FromData for GlyphId {
+    #[inline]
     fn parse(data: &[u8]) -> Self {
         GlyphId(Stream::read_at(data, 0))
     }
@@ -229,6 +230,7 @@ impl std::fmt::Display for Tag {
 }
 
 impl FromData for Tag {
+    #[inline]
     fn parse(data: &[u8]) -> Self {
         let tag = [data[0], data[1], data[2], data[3]];
         Tag { tag }
@@ -459,6 +461,11 @@ impl<'a> Font<'a> {
         font.table_data(TableName::MaximumProfile)?;
 
         Ok(font)
+    }
+
+    /// Checks that font has a specified table.
+    pub fn has_table(&self, name: TableName) -> bool {
+        self.tables.iter().any(|t| t.name == name)
     }
 
     pub(crate) fn table_data(&self, name: TableName) -> Result<&[u8]> {

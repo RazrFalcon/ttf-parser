@@ -363,6 +363,7 @@ impl<'a> Glyph<'a> {
     }
 }
 
+#[inline]
 fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
     debug_assert!(min.is_finite());
     debug_assert!(val.is_finite());
@@ -425,6 +426,7 @@ impl Transform {
 }
 
 impl Default for Transform {
+    #[inline]
     fn default() -> Self {
         Transform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }
     }
@@ -535,6 +537,7 @@ struct Point {
 }
 
 impl Point {
+    #[inline]
     fn lerp(&self, other: Point, t: f32) -> Point {
         Point {
             x: self.x + t * (other.x - self.x),

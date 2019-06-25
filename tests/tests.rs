@@ -284,3 +284,17 @@ fn gdef_glyph_mark_attachment_class_2() {
     let font = Font::from_data(&data, 0).unwrap();
     assert_eq!(font.glyph_mark_attachment_class(GlyphId(4)).unwrap(), 1);
 }
+
+#[test]
+fn glyph_index_01() {
+    let data = fs::read("tests/fonts/TestCMAP14.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.glyph_index('芦').unwrap(), GlyphId(1));
+}
+
+#[test]
+fn glyph_index_02() {
+    let data = fs::read("tests/fonts/TestCMAP14.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.glyph_variation_index('芦', '\u{E0101}').unwrap(), GlyphId(2));
+}

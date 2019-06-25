@@ -1,9 +1,7 @@
-//! The [name](https://docs.microsoft.com/en-us/typography/opentype/spec/name)
-//! table parsing primitives.
-
 use std::convert::TryFrom;
 
 use crate::parser::{Stream, LazyArray};
+use crate::{Font, TableName};
 
 
 /// A [platform ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids).
@@ -219,14 +217,7 @@ impl<'a> Iterator for Names<'a> {
 }
 
 
-/// Handle to a `name` table.
-#[derive(Clone, Copy)]
-#[allow(missing_debug_implementations)]
-pub struct Table<'a> {
-    pub(crate) data: &'a [u8],
-}
-
-impl<'a> Table<'a> {
+impl<'a> Font<'a> {
     /// Returns an iterator over [Name Records].
     ///
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
@@ -237,7 +228,12 @@ impl<'a> Table<'a> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
         const LANG_TAG_RECORD_SIZE: usize = 4;
 
-        let mut s = Stream::new(self.data);
+        let data = match self.table_data(TableName::Naming) {
+            Ok(data) => data,
+            Err(_) => return Names { stream: Stream::new(&[]), storage: &[] },
+        };
+
+        let mut s = Stream::new(data);
         let format = s.read_u16();
         let count = s.read_u16() as usize;
         s.skip_u16(); // offset
@@ -289,7 +285,7 @@ impl<'a> Table<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
-    pub fn poststript_name(&self) -> Option<String> {
+    pub fn post_stript_name(&self) -> Option<String> {
         self.names()
             .find(|name| name.name_id == NameId::PostScriptName && name.is_supported_encoding())
             .and_then(|name| name.to_string())

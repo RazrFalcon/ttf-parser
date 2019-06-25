@@ -1,10 +1,7 @@
-//! The [OS/2](https://docs.microsoft.com/en-us/typography/opentype/spec/os2)
-//! table parsing primitives.
-
 use std::convert::TryFrom;
 
 use crate::parser::{Stream, FromData};
-use crate::LineMetrics;
+use crate::{Font, TableName, LineMetrics, Result, Error};
 
 
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
@@ -98,9 +95,9 @@ impl Width {
 }
 
 impl TryFrom<u16> for Width {
-    type Error = ();
+    type Error = Error;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+    fn try_from(value: u16) -> Result<Self> {
         match value {
             1 => Ok(Width::UltraCondensed),
             2 => Ok(Width::ExtraCondensed),
@@ -111,7 +108,7 @@ impl TryFrom<u16> for Width {
             7 => Ok(Width::Expanded),
             8 => Ok(Width::ExtraExpanded),
             9 => Ok(Width::UltraExpanded),
-            _ => Err(()),
+            _ => Err(Error::InvalidFontWidth(value)),
         }
     }
 }
@@ -152,30 +149,23 @@ impl FromData for ScriptMetrics {
 }
 
 
-/// Handle to a OS/2 table.
-#[derive(Clone, Copy)]
-#[allow(missing_debug_implementations)]
-pub struct Table<'a> {
-    pub(crate) data: &'a [u8],
-}
-
-impl<'a> Table<'a> {
+impl<'a> Font<'a> {
     /// Parses font's weight.
-    pub fn weight(&self) -> Weight {
+    pub fn weight(&self) -> Result<Weight> {
         const US_WEIGHT_CLASS_OFFSET: usize = 4;
 
-        let n: u16 = Stream::read_at(self.data, US_WEIGHT_CLASS_OFFSET);
-        Weight::from(n)
+        let data = self.table_data(TableName::WindowsMetrics)?;
+        let n: u16 = Stream::read_at(data, US_WEIGHT_CLASS_OFFSET);
+        Ok(Weight::from(n))
     }
 
     /// Parses font's width.
-    ///
-    /// Returns `None` when value is out of 1..9 range.
-    pub fn width(&self) -> Option<Width> {
+    pub fn width(&self) -> Result<Width> {
         const US_WIDTH_CLASS_OFFSET: usize = 6;
 
-        let n: u16 = Stream::read_at(self.data, US_WIDTH_CLASS_OFFSET);
-        Width::try_from(n).ok()
+        let data = self.table_data(TableName::WindowsMetrics)?;
+        let n: u16 = Stream::read_at(data, US_WIDTH_CLASS_OFFSET);
+        Width::try_from(n)
     }
 
     /// Checks that font is marked as *Regular*.
@@ -199,22 +189,29 @@ impl<'a> Table<'a> {
     /// Checks that font is marked as *Oblique*.
     ///
     /// Available only in OS/2 table version >= 4.
-    pub fn is_oblique(&self) -> Option<bool> {
+    pub fn is_oblique(&self) -> bool {
         const VERSION_OFFSET: usize = 0;
 
-        let version: u16 = Stream::read_at(self.data, VERSION_OFFSET);
+        let data = match self.table_data(TableName::WindowsMetrics) {
+            Ok(data) => data,
+            Err(_) => return false,
+        };
 
+        let version: u16 = Stream::read_at(data, VERSION_OFFSET);
         if version < 4 {
-            return None;
+            return false;
         }
 
         const OBLIQUE_FLAG: u16 = 9;
-        Some((self.get_fs_selection() >> OBLIQUE_FLAG) & 1 == 1)
+        (self.get_fs_selection() >> OBLIQUE_FLAG) & 1 == 1
     }
 
     fn get_fs_selection(&self) -> u16 {
         const FS_SELECTION_OFFSET: usize = 62;
-        Stream::read_at(self.data, FS_SELECTION_OFFSET)
+        match self.table_data(TableName::WindowsMetrics) {
+            Ok(data) => Stream::read_at(data, FS_SELECTION_OFFSET),
+            Err(_) => 0,
+        }
     }
 
     /// Parses font's X height.
@@ -224,34 +221,38 @@ impl<'a> Table<'a> {
         const VERSION_OFFSET: usize = 0;
         const SX_HEIGHT_OFFSET: usize = 86;
 
-        let version: u16 = Stream::read_at(self.data, VERSION_OFFSET);
+        let data = self.table_data(TableName::WindowsMetrics).ok()?;
+        let version: u16 = Stream::read_at(data, VERSION_OFFSET);
         if version < 2 {
             return None;
         }
 
-        Some(Stream::read_at(self.data, SX_HEIGHT_OFFSET))
+        Some(Stream::read_at(data, SX_HEIGHT_OFFSET))
     }
 
     /// Parses font's strikeout metrics.
-    pub fn strikeout_metrics(&self) -> LineMetrics {
+    pub fn strikeout_metrics(&self) -> Result<LineMetrics> {
         const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
         const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
 
-        LineMetrics {
-            position:  Stream::read_at(self.data, Y_STRIKEOUT_POSITION_OFFSET),
-            thickness: Stream::read_at(self.data, Y_STRIKEOUT_SIZE_OFFSET),
-        }
+        let data = self.table_data(TableName::WindowsMetrics)?;
+        Ok(LineMetrics {
+            position:  Stream::read_at(data, Y_STRIKEOUT_POSITION_OFFSET),
+            thickness: Stream::read_at(data, Y_STRIKEOUT_SIZE_OFFSET),
+        })
     }
 
     /// Parses font's subscript metrics.
-    pub fn subscript_metrics(&self) -> ScriptMetrics {
+    pub fn subscript_metrics(&self) -> Result<ScriptMetrics> {
         const Y_SUBSCRIPT_XSIZE_OFFSET: usize = 10;
-        Stream::read_at(self.data, Y_SUBSCRIPT_XSIZE_OFFSET)
+        let data = self.table_data(TableName::WindowsMetrics)?;
+        Ok(Stream::read_at(data, Y_SUBSCRIPT_XSIZE_OFFSET))
     }
 
     /// Parses font's superscript metrics.
-    pub fn superscript_metrics(&self) -> ScriptMetrics {
+    pub fn superscript_metrics(&self) -> Result<ScriptMetrics> {
         const Y_SUPERSCRIPT_XSIZE_OFFSET: usize = 18;
-        Stream::read_at(self.data, Y_SUPERSCRIPT_XSIZE_OFFSET)
+        let data = self.table_data(TableName::WindowsMetrics)?;
+        Ok(Stream::read_at(data, Y_SUPERSCRIPT_XSIZE_OFFSET))
     }
 }

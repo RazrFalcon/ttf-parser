@@ -54,23 +54,28 @@ macro_rules! impl_bit_ops {
     }
 }
 
-pub mod cmap;
-pub mod gdef;
-pub mod glyf;
-pub mod hmtx;
-pub mod loca;
-pub mod name;
-pub mod os2;
-pub mod post;
-pub mod vmtx;
+use std::convert::TryFrom;
+
+mod cmap;
+mod gdef;
+mod glyf;
+mod hmtx;
+mod loca;
+mod name;
+mod os2;
+mod post;
+mod vmtx;
 mod head;
 mod hhea;
 mod vhea;
 mod parser;
 
-type Range32 = std::ops::Range<u32>;
+use parser::{Stream, FromData, LazyArray};
+pub use gdef::*;
+pub use glyf::*;
+pub use name::*;
+pub use os2::*;
 
-use parser::{Stream, FromData};
 
 /// Rectangle.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -104,10 +109,25 @@ pub enum Error {
     IndexOutOfBounds,
 
     /// One of the required tables is missing.
-    TableMissing(Tag),
+    TableMissing(TableName),
 
     /// An invalid table checksum.
-    InvalidTableChecksum(Tag),
+    InvalidTableChecksum(TableName),
+
+    /// Font doesn't have such glyph ID.
+    NoGlyph,
+
+    /// Glyph doesn't have an outline.
+    NoOutline,
+
+    /// An unsupported character map format.
+    UnsupportedCharMapFormat(u16),
+
+    /// An invalid glyph class.
+    InvalidGlyphClass(u16),
+
+    /// An invalid font width.
+    InvalidFontWidth(u16),
 }
 
 impl std::fmt::Display for Error {
@@ -120,16 +140,33 @@ impl std::fmt::Display for Error {
                 write!(f, "font index is out of bounds")
             }
             Error::TableMissing(tag) => {
-                write!(f, "font doesn't have a {} table", tag)
+                write!(f, "font doesn't have a {:?} table", tag)
             }
             Error::InvalidTableChecksum(tag) => {
-                write!(f, "table {} has an invalid checksum", tag)
+                write!(f, "table {:?} has an invalid checksum", tag)
+            }
+            Error::NoGlyph => {
+                write!(f, "font doesn't have such glyph ID")
+            }
+            Error::NoOutline => {
+                write!(f, "glyph has no outline")
+            }
+            Error::UnsupportedCharMapFormat(id) => {
+                write!(f, "charmap table format {} is not supported", id)
+            }
+            Error::InvalidGlyphClass(n) => {
+                write!(f, "{} is not a valid glyph class", n)
+            }
+            Error::InvalidFontWidth(n) => {
+                write!(f, "{} is not a valid font width", n)
             }
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 
 /// A TrueType's `Tag` data type.
@@ -140,7 +177,8 @@ pub struct Tag {
 
 impl Tag {
     /// Creates a `Tag` object from bytes.
-    pub fn new(c1: u8, c2: u8, c3: u8, c4: u8) -> Self {
+    #[inline]
+    pub const fn new(c1: u8, c2: u8, c3: u8, c4: u8) -> Self {
         Tag { tag: [c1, c2, c3, c4] }
     }
 
@@ -152,6 +190,10 @@ impl Tag {
         Tag { tag: [data[0], data[1], data[2], data[3]] }
     }
 
+    const fn make_u32(data: &[u8]) -> u32 {
+        (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
+    }
+
     fn to_ascii(&self) -> [char; 4] {
         let mut tag2 = [' '; 4];
         for i in 0..4 {
@@ -161,10 +203,6 @@ impl Tag {
         }
 
         tag2
-    }
-
-    fn zero() -> Self {
-        Tag { tag: [0; 4] }
     }
 }
 
@@ -190,6 +228,13 @@ impl std::fmt::Display for Tag {
     }
 }
 
+impl FromData for Tag {
+    fn parse(data: &[u8]) -> Self {
+        let tag = [data[0], data[1], data[2], data[3]];
+        Tag { tag }
+    }
+}
+
 
 /// A line metrics.
 ///
@@ -204,18 +249,122 @@ pub struct LineMetrics {
 }
 
 
-#[derive(Clone, Copy, Debug)]
-struct TableInfo {
+/// A horizontal metrics of a glyph.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct HorizontalMetrics {
+    /// A horizontal advance.
+    pub advance: u16,
+
+    /// Left side bearing.
+    pub left_side_bearing: i16,
+}
+
+
+/// A vertical metrics of a glyph.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct VerticalMetrics {
+    /// A vertical advance.
+    pub advance: u16,
+
+    /// Top side bearing.
+    pub top_side_bearing: i16,
+}
+
+impl FromData for VerticalMetrics {
+    fn parse(data: &[u8]) -> Self {
+        let mut s = Stream::new(data);
+        VerticalMetrics {
+            advance: s.read(),
+            top_side_bearing: s.read(),
+        }
+    }
+}
+
+
+/// A table name.
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[allow(missing_docs)]
+#[repr(u32)]
+pub enum TableName {
+    CharacterToGlyphIndexMapping    = Tag::make_u32(b"cmap"),
+    GlyphData                       = Tag::make_u32(b"glyf"),
+    GlyphDefinition                 = Tag::make_u32(b"GDEF"),
+    Header                          = Tag::make_u32(b"head"),
+    HorizontalHeader                = Tag::make_u32(b"hhea"),
+    HorizontalMetrics               = Tag::make_u32(b"hmtx"),
+    IndexToLocation                 = Tag::make_u32(b"loca"),
+    MaximumProfile                  = Tag::make_u32(b"maxp"),
+    Naming                          = Tag::make_u32(b"name"),
+    PostScript                      = Tag::make_u32(b"post"),
+    VerticalHeader                  = Tag::make_u32(b"vhea"),
+    VerticalMetrics                 = Tag::make_u32(b"vmtx"),
+    WindowsMetrics                  = Tag::make_u32(b"OS/2"),
+}
+
+impl TryFrom<Tag> for TableName {
+    type Error = ();
+
+    fn try_from(value: Tag) -> std::result::Result<Self, Self::Error> {
+        // TODO: Rust doesn't support `const fn` in patterns yet
+        match &*value {
+            b"cmap" => Ok(TableName::CharacterToGlyphIndexMapping),
+            b"GDEF" => Ok(TableName::GlyphDefinition),
+            b"glyf" => Ok(TableName::GlyphData),
+            b"head" => Ok(TableName::Header),
+            b"head" => Ok(TableName::HorizontalMetrics),
+            b"hhea" => Ok(TableName::HorizontalHeader),
+            b"hmtx" => Ok(TableName::HorizontalMetrics),
+            b"loca" => Ok(TableName::IndexToLocation),
+            b"maxp" => Ok(TableName::MaximumProfile),
+            b"name" => Ok(TableName::Naming),
+            b"OS/2" => Ok(TableName::WindowsMetrics),
+            b"post" => Ok(TableName::PostScript),
+            b"vhea" => Ok(TableName::VerticalHeader),
+            b"vmtx" => Ok(TableName::VerticalMetrics),
+            _ => Err(()),
+        }
+    }
+}
+
+
+struct RawTable {
     tag: Tag,
     checksum: u32,
     offset: u32,
     length: u32,
 }
 
-impl TableInfo {
+impl RawTable {
     fn range(&self) -> std::ops::Range<usize> {
-        self.offset as usize .. (self.offset as usize + self.length as usize)
+        // 'The length of a table must be a multiple of four bytes.'
+        // But Table Record stores an actual table length.
+        // So we have to expand it.
+        //
+        // This is mainly for checksum code.
+        let length = (self.length + 3) & !3;
+
+        self.offset as usize .. (self.offset as usize + length as usize)
     }
+}
+
+impl FromData for RawTable {
+    fn parse(data: &[u8]) -> Self {
+        let mut s = Stream::new(data);
+        RawTable {
+            tag: s.read(),
+            checksum: s.read(),
+            offset: s.read(),
+            length: s.read(),
+        }
+    }
+}
+
+
+#[derive(Clone, Copy)]
+struct TableInfo<'a> {
+    name: TableName,
+    checksum: u32,
+    data: &'a [u8],
 }
 
 
@@ -223,19 +372,7 @@ impl TableInfo {
 #[derive(Clone)]
 #[allow(missing_debug_implementations)]
 pub struct Font<'a> {
-    data: &'a [u8],
-    cmap: TableInfo,
-    gdef: Option<TableInfo>,
-    glyf: TableInfo,
-    head: TableInfo,
-    hhea: TableInfo,
-    hmtx: TableInfo,
-    loca: TableInfo,
-    name: Option<TableInfo>,
-    os_2: Option<TableInfo>,
-    post: TableInfo,
-    vhea: Option<TableInfo>,
-    vmtx: Option<TableInfo>,
+    tables: [TableInfo<'a>; 12],
     number_of_glyphs: GlyphId,
 }
 
@@ -247,8 +384,8 @@ impl<'a> Font<'a> {
     ///
     /// This function only parses font tables, so it's relatively light.
     ///
-    /// Required tables: `cmap`, `glyf`, `head`, `hhea`, `hmtx`, `loca`, `maxp`, `post`.
-    pub fn from_data(data: &'a [u8], index: u32) -> Result<Self, Error> {
+    /// Required tables: `head`, `hhea` and `maxp`.
+    pub fn from_data(data: &'a [u8], index: u32) -> Result<Self> {
         let table_data = if let Some(n) = fonts_in_collection(data) {
             if index < n {
                 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
@@ -280,46 +417,56 @@ impl<'a> Font<'a> {
         s.skip_u16(); // entrySelector
         s.skip_u16(); // rangeShift
 
-        let maxp = Self::find_table(s.tail(), num_tables, b"maxp")?;
-        let number_of_glyphs = Self::parse_number_of_glyphs(&data[maxp.range()]);
+        let mut tables = [TableInfo {
+            name: TableName::MaximumProfile, // dummy
+            checksum: 0,
+            data: b"",
+        }; 12];
 
-        Ok(Font {
-            data,
-            cmap: Self::find_table(s.tail(), num_tables, b"cmap")?,
-            gdef: Self::find_table(s.tail(), num_tables, b"GDEF").ok(),
-            glyf: Self::find_table(s.tail(), num_tables, b"glyf")?,
-            head: Self::find_table(s.tail(), num_tables, b"head")?,
-            hhea: Self::find_table(s.tail(), num_tables, b"hhea")?,
-            hmtx: Self::find_table(s.tail(), num_tables, b"hmtx")?,
-            loca: Self::find_table(s.tail(), num_tables, b"loca")?,
-            name: Self::find_table(s.tail(), num_tables, b"name").ok(),
-            os_2: Self::find_table(s.tail(), num_tables, b"OS/2").ok(),
-            post: Self::find_table(s.tail(), num_tables, b"post")?,
-            vhea: Self::find_table(s.tail(), num_tables, b"vhea").ok(),
-            vmtx: Self::find_table(s.tail(), num_tables, b"vmtx").ok(),
-            number_of_glyphs,
-        })
-    }
+        let mut number_of_glyphs = GlyphId(0);
 
-    fn find_table(data: &[u8], num_tables: u16, name: &[u8]) -> Result<TableInfo, Error> {
-        // TODO: do not parse each time
+        let raw_tables: LazyArray<RawTable> = s.read_array(num_tables as usize);
 
-        let mut s = Stream::new(data);
-        for _ in 0..num_tables {
-            let tag = s.read_tag();
-            let table = TableInfo {
-                tag,
-                checksum: s.read_u32(),
-                offset: s.read_u32(),
-                length: s.read_u32(),
+        let mut i = 0;
+        for table in raw_tables {
+            let name = match TableName::try_from(table.tag) {
+                Ok(v) => v,
+                Err(_) => continue,
             };
 
-            if &*tag == name {
-                return Ok(table);
+            tables[i] = TableInfo {
+                name,
+                checksum: table.checksum,
+                data: &data[table.range()],
+            };
+
+            if name == TableName::MaximumProfile {
+                number_of_glyphs = Self::parse_number_of_glyphs(&data[table.range()]);
             }
+
+            i += 1;
         }
 
-        Err(Error::TableMissing(Tag::from_slice(name)))
+        let font = Font {
+            tables,
+            number_of_glyphs,
+        };
+
+        // Check for mandatory tables.
+        font.table_data(TableName::Header)?;
+        font.table_data(TableName::HorizontalHeader)?;
+        font.table_data(TableName::MaximumProfile)?;
+
+        Ok(font)
+    }
+
+    pub(crate) fn table_data(&self, name: TableName) -> Result<&[u8]> {
+        let info = self.tables
+            .iter()
+            .find(|t| t.name == name)
+            .ok_or_else(|| Error::TableMissing(name))?;
+
+        Ok(info.data)
     }
 
     /// Returns a total number of glyphs in the font.
@@ -336,81 +483,42 @@ impl<'a> Font<'a> {
         GlyphId(Stream::read_at(data, NUM_GLYPHS_OFFSET))
     }
 
-    /// Checks tables [checksum](https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums).
-    ///
-    /// Checks only used tables.
-    pub fn is_valid(&self) -> Result<(), Error> {
-        // We are ignoring the `head` table, because to calculate it's checksum
-        // we have to modify it. And we can't, since input data is read-only.
-        // TODO: write a custom `calc_checksum` for `head`.
-
-        self.calc_table_checksum(&self.cmap)?;
-        self.calc_table_checksum(&self.glyf)?;
-        self.calc_table_checksum(&self.hhea)?;
-        self.calc_table_checksum(&self.hmtx)?;
-        self.calc_table_checksum(&self.loca)?;
-        self.calc_table_checksum(&self.post)?;
-
-        if let Some(ref gdef) = self.gdef { self.calc_table_checksum(gdef)?; }
-        if let Some(ref name) = self.name { self.calc_table_checksum(name)?; }
-        if let Some(ref os_2) = self.os_2 { self.calc_table_checksum(os_2)?; }
-        if let Some(ref vhea) = self.vhea { self.calc_table_checksum(vhea)?; }
-        if let Some(ref vmtx) = self.vmtx { self.calc_table_checksum(vmtx)?; }
-
-        Ok(())
-    }
-
-    fn calc_table_checksum(&self, table: &TableInfo) -> Result<(), Error> {
-        let sum = calc_checksum(&self.data[table.offset as usize..], table.length);
-        if sum == table.checksum {
+    pub(crate) fn check_glyph_id(&self, glyph_id: GlyphId) -> Result<()> {
+        if glyph_id < self.number_of_glyphs {
             Ok(())
         } else {
-            Err(Error::InvalidTableChecksum(table.tag))
+            Err(Error::NoGlyph)
         }
     }
 
-    /// Returns a handle to a OS/2 table.
-    pub fn os2_table(&self) -> Option<os2::Table> {
-        Some(os2::Table { data: &self.data[self.os_2?.range()] })
-    }
+    /// Checks tables [checksum](https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums).
+    ///
+    /// Checks only used tables.
+    pub fn is_valid(&self) -> Result<()> {
+        for table in &self.tables {
+            if table.name == TableName::Header {
+                // We are ignoring the `head` table, because to calculate it's checksum
+                // we have to modify an original data. And we can't, since it's read-only.
+                // TODO: write a custom `calc_checksum` for `head`.
+                continue;
+            }
 
-    /// Returns a handle to a `name` table.
-    pub fn name_table(&self) -> Option<name::Table> {
-        Some(name::Table { data: &self.data[self.name?.range()] })
-    }
+            let sum = calc_checksum(table.data);
+            if sum != table.checksum {
+                return Err(Error::InvalidTableChecksum(table.name));
+            }
+        }
 
-    /// Returns a handle to a `GDEF` table.
-    pub fn gdef_table(&self) -> Option<gdef::Table> {
-        Some(gdef::Table {
-            data: &self.data[self.gdef?.range()],
-            number_of_glyphs: self.number_of_glyphs,
-        })
-    }
-
-    /// Returns a handle to a `vhea` table.
-    pub(crate) fn vhea_table(&self) -> Option<vhea::Table> {
-        Some(vhea::Table { data: &self.data[self.vhea?.range()] })
-    }
-
-    /// Returns a handle to a `vmtx` table.
-    pub fn vmtx_table(&self) -> Option<vmtx::Table> {
-        Some(vmtx::Table {
-            data: &self.data[self.vmtx?.range()],
-            number_of_glyphs: self.number_of_glyphs(),
-            number_of_vmetrics: self.vhea_table()?.number_of_vmetrics(),
-        })
+        Ok(())
     }
 }
 
-fn calc_checksum(data: &[u8], length: u32) -> u32 {
+fn calc_checksum(data: &[u8]) -> u32 {
     // TODO: speed up
-
-    // 'This function implies that the length of a table must be a multiple of four bytes.'
-    let length = (length + 3) & !3;
 
     // 'Table checksums are the unsigned sum of the uint32 units of a given table.'
     let mut sum: u32 = 0;
-    for n in Stream::new(data).read_array::<u32>(length as usize / 4) {
+    for n in Stream::new(data).read_array::<u32>(data.len() as usize / 4) {
         sum = sum.wrapping_add(n);
     }
 

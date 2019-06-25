@@ -1,10 +1,7 @@
-//! The [glyf](https://docs.microsoft.com/en-us/typography/opentype/spec/glyf)
-//! table parsing primitives.
-
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
 use crate::parser::{Stream, LazyArray};
-use crate::{loca, Font, Rect, GlyphId};
+use crate::{Font, Rect, GlyphId, TableName, Result};
 
 
 /// A trait for outline construction.
@@ -383,11 +380,10 @@ fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
 
 impl<'a> Font<'a> {
     /// Returns a glyph handle.
-    pub fn glyph(&self, glyph_id: GlyphId) -> Result<Glyph, loca::Error> {
+    pub fn glyph(&self, glyph_id: GlyphId) -> Result<Glyph> {
         let range = self.glyph_range(glyph_id)?;
-        let start = (self.glyf.offset + range.start) as usize;
-        let end   = (self.glyf.offset + range.end) as usize;
-        Ok(Glyph { font: self, data: &self.data[start..end] })
+        let data = self.table_data(TableName::GlyphData)?;
+        Ok(Glyph { font: self, data: &data[range] })
     }
 }
 

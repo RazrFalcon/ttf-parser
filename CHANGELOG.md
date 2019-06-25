@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Vertical metrics querying from the `vmtx` table.
 
 ### Changed
+- A major rewrite. TrueType tables are no longer public.
 - Use `GlyphId` instead of `u16`.
 
 ### Fixed

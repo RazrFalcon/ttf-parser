@@ -129,7 +129,7 @@ fn glyph_to_path(
 
 struct Builder(svgtypes::Path);
 
-impl ttf_parser::glyf::OutlineBuilder for Builder {
+impl ttf_parser::OutlineBuilder for Builder {
     fn move_to(&mut self, x: f32, y: f32) {
         self.0.push(svgtypes::PathSegment::MoveTo { abs: true, x: x as f64, y: y as f64 });
     }

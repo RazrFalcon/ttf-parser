@@ -1,44 +1,15 @@
-//! The [cmap](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap)
-//! table parsing primitives.
-
 use std::ops::Range;
 
 use crate::parser::{Stream, FromData};
-use crate::{Font, GlyphId};
-
-
-/// A code point to glyph matching error.
-#[derive(Clone, Copy, Debug)]
-pub enum Error {
-    /// No glyph for a specified char was found.
-    NoGlyph,
-
-    /// An unsupported table format.
-    UnsupportedTableFormat(u16),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Error::NoGlyph => {
-                write!(f, "no glyph for a specified char was found")
-            }
-            Error::UnsupportedTableFormat(id) => {
-                write!(f, "table format {} is not supported", id)
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {}
+use crate::{Font, GlyphId, TableName, Result, Error};
 
 
 impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
     ///
     /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
-    pub fn glyph_index(&self, c: char) -> Result<GlyphId, Error> {
-        let cmap_data = &self.data[self.cmap.range()];
+    pub fn glyph_index(&self, c: char) -> Result<GlyphId> {
+        let cmap_data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
         let mut s = Stream::new(cmap_data);
         s.skip_u16(); // version
         let num_tables = s.read_u16();
@@ -59,7 +30,7 @@ impl<'a> Font<'a> {
     }
 }
 
-fn parse_subtable(code_point: u32, data: &[u8]) -> Result<u16, Error> {
+fn parse_subtable(code_point: u32, data: &[u8]) -> Result<u16> {
     let mut s = Stream::new(data);
     let format = s.read_u16();
     match format {
@@ -150,7 +121,7 @@ fn parse_subtable(code_point: u32, data: &[u8]) -> Result<u16, Error> {
 
             Err(Error::NoGlyph)
         }
-        _ => Err(Error::UnsupportedTableFormat(format)),
+        _ => Err(Error::UnsupportedCharMapFormat(format))
     }
 }
 

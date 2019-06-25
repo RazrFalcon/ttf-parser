@@ -1,11 +1,8 @@
-//! The [GDEF](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef)
-//! table parsing primitives.
-
 use std::convert::{TryFrom, TryInto};
 use std::ops::Range;
 
 use crate::parser::{Stream, FromData};
-use crate::GlyphId;
+use crate::{GlyphId, Font, TableName, Result, Error};
 
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
@@ -19,15 +16,15 @@ pub enum GlyphClass {
 }
 
 impl TryFrom<u16> for GlyphClass {
-    type Error = ();
+    type Error = Error;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+    fn try_from(value: u16) -> Result<Self> {
         match value {
             1 => Ok(GlyphClass::Base),
             2 => Ok(GlyphClass::Ligature),
             3 => Ok(GlyphClass::Mark),
             4 => Ok(GlyphClass::Component),
-            _ => Err(()),
+            _ => Err(Error::InvalidGlyphClass(value)),
         }
     }
 }
@@ -49,73 +46,59 @@ impl FromData for ClassRangeRecord {
 }
 
 
-/// Handle to a `GDEF` table.
-#[derive(Clone, Copy)]
-#[allow(missing_debug_implementations)]
-pub struct Table<'a> {
-    pub(crate) data: &'a [u8],
-    pub(crate) number_of_glyphs: GlyphId,
-}
-
-impl<'a> Table<'a> {
+impl<'a> Font<'a> {
     /// Returns glyph's class.
-    ///
-    /// Returns `None` when font doesn't have such glyph ID.
-    pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
+    pub fn glyph_class(&self, glyph_id: GlyphId) -> Result<GlyphClass> {
         const GLYPH_CLASS_DEF_OFFSET_OFFSET: usize = 4;
         self.parse_glyph_class_def_table(glyph_id, GLYPH_CLASS_DEF_OFFSET_OFFSET)
-            .and_then(|c| c.try_into().ok())
+            .and_then(|c| c.try_into())
     }
 
     /// Returns glyph's mark attachment class.
-    ///
-    /// Returns `None` when font doesn't have such glyph ID.
-    pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Option<u16> {
+    pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Result<u16> {
         const MARK_ATTACH_CLASS_DEF_OFFSET_OFFSET: usize = 10;
         self.parse_glyph_class_def_table(glyph_id, MARK_ATTACH_CLASS_DEF_OFFSET_OFFSET)
     }
 
-    fn parse_glyph_class_def_table(&self, glyph_id: GlyphId, offset: usize) -> Option<u16> {
-        if glyph_id >= self.number_of_glyphs {
-            return None;
-        }
-
-        let offset: u16 = Stream::read_at(self.data, offset);
-        Self::parse_glyph_class_table(&self.data[offset as usize ..], glyph_id)
+    fn parse_glyph_class_def_table(&self, glyph_id: GlyphId, offset: usize) -> Result<u16> {
+        self.check_glyph_id(glyph_id)?;
+        let data = self.table_data(TableName::GlyphDefinition)?;
+        let offset: u16 = Stream::read_at(data, offset);
+        Self::parse_glyph_class_table(&data[offset as usize ..], glyph_id)
     }
 
-    fn parse_glyph_class_table(data: &[u8], glyph_id: GlyphId) -> Option<u16> {
+    fn parse_glyph_class_table(data: &[u8], glyph_id: GlyphId) -> Result<u16> {
         let mut s = Stream::new(data);
         let class_format = s.read_u16();
         match class_format {
             1 => Self::parse_glyph_class_table_1(&mut s, glyph_id),
             2 => Self::parse_glyph_class_table_2(&mut s, glyph_id),
-            _ => None,
+            _ => Ok(0),
         }
     }
 
-    fn parse_glyph_class_table_1(s: &mut Stream, glyph_id: GlyphId) -> Option<u16> {
+    fn parse_glyph_class_table_1(s: &mut Stream, glyph_id: GlyphId) -> Result<u16> {
         let start_glyph_id = s.read_glyph_id();
         let glyph_count = s.read_u16() as usize;
         let class_values = s.read_array::<u16>(glyph_count);
 
         // Prevent overflow.
         if glyph_id < start_glyph_id {
-            return None;
+            return Ok(0);
         }
 
-        class_values.get((glyph_id.0 - start_glyph_id.0) as usize)
+        Ok(class_values.get((glyph_id.0 - start_glyph_id.0) as usize).unwrap_or(0))
     }
 
-    fn parse_glyph_class_table_2(s: &mut Stream, glyph_id: GlyphId) -> Option<u16> {
+    fn parse_glyph_class_table_2(s: &mut Stream, glyph_id: GlyphId) -> Result<u16> {
         let class_range_count = s.read_u16() as usize;
         let records = s.read_array::<ClassRangeRecord>(class_range_count);
         for record in records {
             if record.range.contains(&glyph_id) {
-                return Some(record.class);
+                return Ok(record.class);
             }
         }
 
-        None
+        Ok(0)
     }
 }

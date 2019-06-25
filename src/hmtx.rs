@@ -1,40 +1,22 @@
-//! The [hmtx](https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx)
-//! table parsing primitives.
-
 use crate::parser::Stream;
-use crate::{Font, GlyphId};
+use crate::{Font, TableName, GlyphId, HorizontalMetrics, Result};
 
-
-/// A horizontal metrics of a glyph.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct HorizontalMetrics {
-    /// A horizontal advance.
-    pub advance: u16,
-
-    /// Left side bearing.
-    pub left_side_bearing: i16,
-}
 
 impl<'a> Font<'a> {
     /// Returns glyph's horizontal metrics.
-    ///
-    /// Returns `None` when font doesn't have such `glyph_id`.
-    pub fn glyph_hor_metrics(&self, glyph_id: GlyphId) -> Option<HorizontalMetrics> {
+    pub fn glyph_hor_metrics(&self, glyph_id: GlyphId) -> Result<HorizontalMetrics> {
         const HOR_METRIC_RECORD_SIZE: usize = 4;
         const U16_SIZE: usize = 2;
 
-        if glyph_id >= self.number_of_glyphs {
-            return None;
-        }
-
+        self.check_glyph_id(glyph_id)?;
+        let data = self.table_data(TableName::HorizontalMetrics)?;
         let number_of_hmetrics = self.number_of_hmetrics();
-        let data = &self.data[self.hmtx.range()];
 
         if glyph_id.0 < number_of_hmetrics {
             // Records are indexed by glyph ID.
             let data = &data[glyph_id.0 as usize * HOR_METRIC_RECORD_SIZE..];
             let mut s = Stream::new(data);
-            Some(HorizontalMetrics {
+            Ok(HorizontalMetrics {
                 advance: s.read_u16(),
                 left_side_bearing: s.read_i16(),
             })
@@ -53,7 +35,7 @@ impl<'a> Font<'a> {
                 (glyph_id.0 - number_of_hmetrics) as usize * U16_SIZE;
             let left_side_bearing = Stream::read_at(data, offset);
 
-            Some(HorizontalMetrics {
+            Ok(HorizontalMetrics {
                 advance,
                 left_side_bearing,
             })

@@ -404,11 +404,12 @@ impl<'a> Font<'a> {
 
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
         const SFNT_VERSION_TRUE_TYPE: u32 = 0x00010000;
+        const SFNT_VERSION_OPEN_TYPE: u32 = 0x4F54544F;
 
         let mut s = Stream::new(table_data);
 
         let sfnt_version = s.read_u32();
-        if sfnt_version != SFNT_VERSION_TRUE_TYPE {
+        if let SFNT_VERSION_TRUE_TYPE | SFNT_VERSION_OPEN_TYPE = sfnt_version {} else {
             return Err(Error::NotATrueType);
         }
 

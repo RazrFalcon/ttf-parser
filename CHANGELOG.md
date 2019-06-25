@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - Vertical metrics querying from the `vmtx` table.
+- OpenType fonts are allowed now.
 
 ### Changed
 - A major rewrite. TrueType tables are no longer public.

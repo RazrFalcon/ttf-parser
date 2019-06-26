@@ -1,6 +1,11 @@
-use std::convert::TryFrom;
+#[cfg(feature = "std")]
+use std::vec::Vec;
+#[cfg(feature = "std")]
+use std::string::String;
 
-use crate::parser::{Stream, LazyArray};
+use core::convert::TryFrom;
+
+use crate::parser::Stream;
 use crate::{Font, TableName};
 
 
@@ -101,6 +106,7 @@ impl TryFrom<u16> for NameId {
 
 /// A [Name Record](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records).
 #[derive(Clone, Copy)]
+#[cfg_attr(not(feature = "std"), derive(Debug))]
 pub struct Name<'a> {
     /// Raw name data.
     pub name: &'a [u8],
@@ -127,6 +133,7 @@ impl<'a> Name<'a> {
     /// Supports:
     /// - Unicode Platform ID
     /// - Windows Platform ID + Unicode BMP
+    #[cfg(feature = "std")]
     pub fn to_string(&self) -> Option<String> {
         if self.is_supported_encoding() {
             self.name_from_utf16_be()
@@ -135,6 +142,7 @@ impl<'a> Name<'a> {
         }
     }
 
+    #[cfg(feature = "std")]
     fn is_supported_encoding(&self) -> bool {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
         const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
@@ -146,7 +154,10 @@ impl<'a> Name<'a> {
         }
     }
 
+    #[cfg(feature = "std")]
     fn name_from_utf16_be(&self) -> Option<String> {
+        use crate::parser::LazyArray;
+
         let mut name: Vec<u16> = Vec::new();
         for c in LazyArray::new(self.name) {
             name.push(c);
@@ -156,13 +167,14 @@ impl<'a> Name<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for Name<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+#[cfg(feature = "std")]
+impl<'a> core::fmt::Debug for Name<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         // TODO: https://github.com/rust-lang/rust/issues/50264
 
         let name = self.to_string();
         f.debug_struct("Name")
-            .field("name", &name.as_ref().map(std::ops::Deref::deref)
+            .field("name", &name.as_ref().map(core::ops::Deref::deref)
                                 .unwrap_or("unsupported encoding"))
             .field("platform_id", &self.platform_id)
             .field("encoding_id", &self.encoding_id)
@@ -263,6 +275,7 @@ impl<'a> Font<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
+    #[cfg(feature = "std")]
     pub fn family_name(&self) -> Option<String> {
         // Prefer Typographic Family name.
 
@@ -285,6 +298,7 @@ impl<'a> Font<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
+    #[cfg(feature = "std")]
     pub fn post_stript_name(&self) -> Option<String> {
         self.names()
             .find(|name| name.name_id == NameId::PostScriptName && name.is_supported_encoding())

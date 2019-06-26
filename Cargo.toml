@@ -16,6 +16,13 @@ bencher = "0.1"
 svgtypes = { version = "0.4.4", default-features = false }
 time = "0.1"
 
+[features]
+default = ["std"]
+std = []
+
 [[bench]]
 name = "outline"
 harness = false
+
+[package.metadata.docs.rs]
+features = ["std"]

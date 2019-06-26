@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use core::convert::TryFrom;
 
 use crate::parser::{Stream, FromData};
 use crate::{Font, TableName, LineMetrics, Result, Error};

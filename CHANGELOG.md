@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - OpenType fonts are allowed now.
 - High Byte Mapping Through Table (2) `cmap` subtable support.
 - Unicode Variation Sequences (14) `cmap` subtable support.
+- `no_std` compatibility.
 
 ### Changed
 - A major rewrite. TrueType tables are no longer public.

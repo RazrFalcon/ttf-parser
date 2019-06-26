@@ -7,6 +7,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Zero allocations.
 - Zero `unsafe`.
 - Zero dependencies.
+- `no_std` compatible.
 - Fast.
 - Simple and maintainable code (no magic numbers).
 
@@ -27,14 +28,19 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.1.0")]
 
+#![no_std]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
 
+#[cfg(feature = "std")]
+extern crate std;
+
+
 macro_rules! impl_bit_ops {
     ($name:ty) => {
-        impl std::ops::BitOr for $name {
+        impl core::ops::BitOr for $name {
             type Output = Self;
 
             #[inline]
@@ -43,7 +49,7 @@ macro_rules! impl_bit_ops {
             }
         }
 
-        impl std::ops::BitAnd for $name {
+        impl core::ops::BitAnd for $name {
             type Output = Self;
 
             #[inline]
@@ -54,7 +60,7 @@ macro_rules! impl_bit_ops {
     }
 }
 
-use std::convert::TryFrom;
+use core::convert::TryFrom;
 
 mod cmap;
 mod gdef;
@@ -128,8 +134,8 @@ pub enum Error {
     InvalidFontWidth(u16),
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match *self {
             Error::NotATrueType => {
                 write!(f, "not a TrueType font")
@@ -159,9 +165,10 @@ impl std::fmt::Display for Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Result<T> = core::result::Result<T, Error>;
 
 
 /// A TrueType's `Tag` data type.
@@ -201,7 +208,7 @@ impl Tag {
     }
 }
 
-impl std::ops::Deref for Tag {
+impl core::ops::Deref for Tag {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -209,15 +216,15 @@ impl std::ops::Deref for Tag {
     }
 }
 
-impl std::fmt::Debug for Tag {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Debug for Tag {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let tag = self.to_ascii();
         write!(f, "Tag({}{}{}{})", tag[0], tag[1], tag[2], tag[3])
     }
 }
 
-impl std::fmt::Display for Tag {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for Tag {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let tag = self.to_ascii();
         write!(f, "{}{}{}{}", tag[0], tag[1], tag[2], tag[3])
     }
@@ -300,7 +307,7 @@ pub enum TableName {
 impl TryFrom<Tag> for TableName {
     type Error = ();
 
-    fn try_from(value: Tag) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: Tag) -> core::result::Result<Self, Self::Error> {
         // TODO: Rust doesn't support `const fn` in patterns yet
         match &*value {
             b"cmap" => Ok(TableName::CharacterToGlyphIndexMapping),
@@ -331,7 +338,7 @@ struct RawTable {
 }
 
 impl RawTable {
-    fn range(&self) -> std::ops::Range<usize> {
+    fn range(&self) -> core::ops::Range<usize> {
         // 'The length of a table must be a multiple of four bytes.'
         // But Table Record stores an actual table length.
         // So we have to expand it.

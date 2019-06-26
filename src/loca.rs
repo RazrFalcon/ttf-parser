@@ -1,9 +1,11 @@
+use core::ops::Range;
+
 use crate::parser::Stream;
 use crate::{Font, GlyphId, TableName, Result, Error};
 
 
 impl<'a> Font<'a> {
-    pub(crate) fn glyph_range(&self, glyph_id: GlyphId) -> Result<std::ops::Range<usize>> {
+    pub(crate) fn glyph_range(&self, glyph_id: GlyphId) -> Result<Range<usize>> {
         use crate::head::IndexToLocationFormat as Format;
         const U16_LEN: u32 = 2;
         const U32_LEN: u32 = 4;

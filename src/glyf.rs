@@ -235,7 +235,7 @@ impl<'a> Glyph<'a> {
     }
 
     fn parse_contour<T: OutlineBuilder>(
-        points: std::iter::Take<&mut GlyphPoints>,
+        points: core::iter::Take<&mut GlyphPoints>,
         builder: &mut Builder<T>,
     ) {
         let mut first_oncurve: Option<Point> = None;
@@ -432,8 +432,8 @@ impl Default for Transform {
     }
 }
 
-impl std::fmt::Debug for Transform {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Debug for Transform {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "Transform({} {} {} {} {} {})", self.a, self.b, self.c, self.d, self.e, self.f)
     }
 }

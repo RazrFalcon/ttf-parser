@@ -11,17 +11,17 @@ impl<'a> Font<'a> {
     pub fn glyph_index(&self, c: char) -> Result<GlyphId> {
         let cmap_data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
         let mut s = Stream::new(cmap_data);
-        s.skip_u16(); // version
-        let num_tables = s.read_u16();
+        s.skip::<u16>(); // version
+        let num_tables: u16 = s.read();
 
         for _ in 0..num_tables {
-            s.skip_u16(); // platform_id
-            s.skip_u16(); // encoding_id
-            let offset = s.read_u32() as usize;
+            s.skip::<u16>(); // platform_id
+            s.skip::<u16>(); // encoding_id
+            let offset: u32 = s.read();
 
-            let subtable_data = &cmap_data[offset..];
+            let subtable_data = &cmap_data[offset as usize..];
             let mut s = Stream::new(subtable_data);
-            let format = match parse_format(s.read_u16()) {
+            let format = match parse_format(s.read()) {
                 Some(format) => format,
                 None => continue,
             };
@@ -65,17 +65,17 @@ impl<'a> Font<'a> {
     pub fn glyph_variation_index(&self, c: char, variation: char) -> Result<GlyphId> {
         let cmap_data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
         let mut s = Stream::new(cmap_data);
-        s.skip_u16(); // version
-        let num_tables = s.read_u16();
+        s.skip::<u16>(); // version
+        let num_tables: u16 = s.read();
 
         for _ in 0..num_tables {
-            s.skip_u16(); // platform_id
-            s.skip_u16(); // encoding_id
-            let offset = s.read_u32() as usize;
+            s.skip::<u16>(); // platform_id
+            s.skip::<u16>(); // encoding_id
+            let offset: u32 = s.read();
 
-            let subtable_data = &cmap_data[offset..];
+            let subtable_data = &cmap_data[offset as usize..];
             let mut s = Stream::new(subtable_data);
-            let format = match parse_format(s.read_u16()) {
+            let format = match parse_format(s.read()) {
                 Some(format) => format,
                 None => continue,
             };
@@ -99,17 +99,17 @@ impl<'a> Font<'a> {
         let cp = c as u32;
 
         let mut s = Stream::new(data);
-        s.skip_u16(); // format
-        s.skip_u32(); // length
-        let num_var_selector_records = s.read_u32() as usize;
-        let records = s.read_array::<VariationSelectorRecord>(num_var_selector_records);
+        s.skip::<u16>(); // format
+        s.skip::<u32>(); // length
+        let num_var_selector_records: u32 = s.read();
+        let records: LazyArray<VariationSelectorRecord> = s.read_array(num_var_selector_records);
 
         let record = records.binary_search_by(|v| v.variation.cmp(&variation)).ok_or(Error::NoGlyph)?;
 
         if let Some(offset) = record.default_uvs_offset {
             let mut s = Stream::new(&data[offset.0 as usize..]);
             let count: u32 = s.read(); // numUnicodeValueRanges
-            let ranges: LazyArray<UnicodeRangeRecord> = s.read_array(count as usize);
+            let ranges: LazyArray<UnicodeRangeRecord> = s.read_array(count);
             for range in ranges {
                 if range.contains(c) {
                     // This is a default glyph.
@@ -121,7 +121,7 @@ impl<'a> Font<'a> {
         if let Some(offset) = record.non_default_uvs_offset {
             let mut s = Stream::new(&data[offset.0 as usize..]);
             let count: u32 = s.read(); // numUVSMappings
-            let uvs_mappings: LazyArray<UVSMappingRecord> = s.read_array(count as usize);
+            let uvs_mappings: LazyArray<UVSMappingRecord> = s.read_array(count);
             if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&cp)) {
                 return Ok(mapping.glyph);
             }
@@ -133,12 +133,12 @@ impl<'a> Font<'a> {
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table
 fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Option<u16> {
-    let length = s.read_u16();
-    s.skip_u16(); // language
+    let length: u16 = s.read();
+    s.skip::<u16>(); // language
 
     if code_point < (length as u32) {
-        s.skip(code_point as usize);
-        Some(s.read_u8() as u16)
+        s.skip_len(code_point);
+        Some(s.read::<u8>() as u16)
     } else {
         None
     }
@@ -160,22 +160,22 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
     let low_byte = (code_point & 0x00FF) as u16;
 
     let mut s = Stream::new(data);
-    s.skip_u16(); // format
-    s.skip_u16(); // length
-    s.skip_u16(); // language
-    let sub_header_keys: LazyArray<u16> = s.read_array(256);
+    s.skip::<u16>(); // format
+    s.skip::<u16>(); // length
+    s.skip::<u16>(); // language
+    let sub_header_keys: LazyArray<u16> = s.read_array(256_u32);
     // The maximum index in a sub_header_keys is a sub_headers count.
     let sub_headers_count = sub_header_keys.into_iter().map(|n| n / 8).max()? + 1;
     // Remember sub_headers offset before reading. Will be used later.
     let sub_headers_offset = s.offset();
-    let sub_headers: LazyArray<SubHeaderRecord> = s.read_array(sub_headers_count as usize);
+    let sub_headers: LazyArray<SubHeaderRecord> = s.read_array(sub_headers_count);
 
     let i = if code_point < 0xff {
         // 'SubHeader 0 is special: it is used for single-byte character codes.'
         0
     } else {
         // 'Array that maps high bytes to subHeaders: value is subHeader index × 8.'
-        (sub_header_keys.at(high_byte as usize) / 8) as usize
+        sub_header_keys.at(high_byte) / 8
     };
 
     let sub_header = sub_headers.at(i);
@@ -187,16 +187,16 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
 
     // SubHeaderRecord::id_range_offset points to SubHeaderRecord::first_code
     // in the glyphIndexArray. So we have to advance to our code point.
-    let index_offset = (low_byte - sub_header.first_code) as usize * u16::size_of();
+    let index_offset = (low_byte - sub_header.first_code) as usize * u16::raw_size();
 
     // 'The value of the idRangeOffset is the number of bytes
     // past the actual location of the idRangeOffset'.
     let offset =
           sub_headers_offset
         // Advance to required subheader.
-        + SubHeaderRecord::size_of() * (i + 1)
+        + SubHeaderRecord::raw_size() * (i + 1) as usize
         // Move back to idRangeOffset start.
-        - u16::size_of()
+        - u16::raw_size()
         // Use defined offset.
         + sub_header.id_range_offset as usize
         // Advance to required index in the glyphIndexArray.
@@ -221,20 +221,20 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
     let code_point = code_point as u16;
 
     let mut s = Stream::new(data);
-    s.skip_u16(); // format
-    s.skip_u16(); // length
-    s.skip_u16(); // language
-    let seg_count_x2 = s.read_u16() as usize;
+    s.skip::<u16>(); // format
+    s.skip::<u16>(); // length
+    s.skip::<u16>(); // language
+    let seg_count_x2: u16 = s.read();
     let seg_count = seg_count_x2 / 2;
-    s.skip_u16(); // searchRange
-    s.skip_u16(); // entrySelector
-    s.skip_u16(); // rangeShift
-    let end_codes = s.read_array::<u16>(seg_count);
-    s.skip_u16(); // reservedPad
-    let start_codes = s.read_array::<u16>(seg_count);
-    let id_deltas = s.read_array::<i16>(seg_count);
+    s.skip::<u16>(); // searchRange
+    s.skip::<u16>(); // entrySelector
+    s.skip::<u16>(); // rangeShift
+    let end_codes: LazyArray<u16> = s.read_array(seg_count);
+    s.skip::<u16>(); // reservedPad
+    let start_codes: LazyArray<u16> = s.read_array(seg_count);
+    let id_deltas: LazyArray<i16> = s.read_array(seg_count);
     let id_range_offset_pos = s.offset();
-    let id_range_offsets = s.read_array::<u16>(seg_count);
+    let id_range_offsets: LazyArray<u16> = s.read_array(seg_count);
 
     // A custom binary search.
     let mut start = 0;
@@ -254,7 +254,7 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
                 }
 
                 let delta = (code_point - start_value) * 2;
-                let id_range_offset_pos = (id_range_offset_pos + index * 2) as u16;
+                let id_range_offset_pos = (id_range_offset_pos + index as usize * 2) as u16;
                 let pos = id_range_offset_pos.wrapping_add(delta) + id_range_offset;
                 let glyph_array_value: u16 = Stream::read_at(data, pos as usize);
                 if glyph_array_value == 0 {
@@ -276,11 +276,11 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-13-many-to-one-range-mappings
 fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> Option<u16> {
-    s.skip_u16(); // reserved
-    s.skip_u32(); // length
-    s.skip_u32(); // language
-    let num_groups = s.read_u32() as usize;
-    let groups = s.read_array::<SequentialMapGroup>(num_groups);
+    s.skip::<u16>(); // reserved
+    s.skip::<u32>(); // length
+    s.skip::<u32>(); // language
+    let num_groups: u32 = s.read();
+    let groups: LazyArray<SequentialMapGroup> = s.read_array(num_groups);
     for group in groups {
         if group.char_code_range.contains(&code_point) {
             if format == Format::SegmentedCoverage {
@@ -358,8 +358,8 @@ impl FromData for SequentialMapGroup {
         let mut s = Stream::new(data);
         SequentialMapGroup {
             // Make the upper bound inclusive.
-            char_code_range: s.read_u32()..(s.read_u32() + 1),
-            start_glyph_id: s.read_u32(),
+            char_code_range: s.read()..(s.read::<u32>() + 1),
+            start_glyph_id: s.read(),
         }
     }
 }
@@ -381,9 +381,9 @@ impl FromData for VariationSelectorRecord {
         }
     }
 
-    fn size_of() -> usize {
+    fn raw_size() -> usize {
         // variation_selector is u24.
-        3 + Offset32::size_of() + Offset32::size_of()
+        3 + Offset32::raw_size() + Offset32::raw_size()
     }
 }
 
@@ -409,7 +409,7 @@ impl FromData for UnicodeRangeRecord {
         }
     }
 
-    fn size_of() -> usize {
+    fn raw_size() -> usize {
         // start_unicode_value is u24.
         3 + 1
     }
@@ -430,8 +430,8 @@ impl FromData for UVSMappingRecord {
         }
     }
 
-    fn size_of() -> usize {
+    fn raw_size() -> usize {
         // unicode_value is u24.
-        3 + GlyphId::size_of()
+        3 + GlyphId::raw_size()
     }
 }

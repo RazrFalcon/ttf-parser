@@ -201,12 +201,12 @@ impl<'a> Iterator for Names<'a> {
             return None;
         }
 
-        let platform_id = PlatformId::try_from(self.stream.read_u16());
-        let encoding_id = self.stream.read_u16();
-        let language_id = self.stream.read_u16();
-        let name_id = NameId::try_from(self.stream.read_u16());
-        let length = self.stream.read_u16() as usize;
-        let offset = self.stream.read_u16() as usize;
+        let platform_id = PlatformId::try_from(self.stream.read::<u16>());
+        let encoding_id: u16 = self.stream.read();
+        let language_id: u16 = self.stream.read();
+        let name_id = NameId::try_from(self.stream.read::<u16>());
+        let length = self.stream.read::<u16>() as usize;
+        let offset = self.stream.read::<u16>() as usize;
 
         let platform_id = match platform_id {
             Ok(v) => v,
@@ -235,10 +235,10 @@ impl<'a> Font<'a> {
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
     pub fn names(&self) -> Names {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
-        const NAME_RECORD_SIZE: usize = 12;
+        const NAME_RECORD_SIZE: u16 = 12;
 
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
-        const LANG_TAG_RECORD_SIZE: usize = 4;
+        const LANG_TAG_RECORD_SIZE: u16 = 4;
 
         let data = match self.table_data(TableName::Naming) {
             Ok(data) => data,
@@ -246,9 +246,9 @@ impl<'a> Font<'a> {
         };
 
         let mut s = Stream::new(data);
-        let format = s.read_u16();
-        let count = s.read_u16() as usize;
-        s.skip_u16(); // offset
+        let format: u16 = s.read();
+        let count: u16 = s.read();
+        s.skip::<u16>(); // offset
         let name_record_len = count * NAME_RECORD_SIZE;
         let name_records_data = s.read_bytes(name_record_len);
 
@@ -258,8 +258,8 @@ impl<'a> Font<'a> {
                 storage: s.tail(),
             }
         } else if format == 1 {
-            let lang_tag_count = s.read_u16() as usize;
-            s.skip(lang_tag_count * LANG_TAG_RECORD_SIZE); // langTagRecords
+            let lang_tag_count: u16 = s.read();
+            s.skip_len(lang_tag_count * LANG_TAG_RECORD_SIZE); // langTagRecords
             Names {
                 stream: Stream::new(name_records_data),
                 storage: s.tail(),

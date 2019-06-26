@@ -1,5 +1,3 @@
-use crate::GlyphId;
-
 pub trait FromData: Sized {
     /// Parses an object from a raw data.
     fn parse(data: &[u8]) -> Self;
@@ -8,10 +6,10 @@ pub trait FromData: Sized {
     ///
     /// `mem::size_of` by default.
     ///
-    /// Reimplement, when size of `Self` != size of raw data.
+    /// Reimplement when size of `Self` != size of a raw data.
     /// For example, when you parsing u16, but storing it as u8.
-    /// In this case `size_of::<Self>()` == 1, but `FromData::size_of()` == 2.
-    fn size_of() -> usize {
+    /// In this case `size_of::<Self>()` == 1, but `FromData::raw_size()` == 2.
+    fn raw_size() -> usize {
         core::mem::size_of::<Self>()
     }
 }
@@ -20,6 +18,13 @@ impl FromData for u8 {
     #[inline]
     fn parse(data: &[u8]) -> Self {
         data[0]
+    }
+}
+
+impl FromData for i8 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        data[0] as i8
     }
 }
 
@@ -45,6 +50,23 @@ impl FromData for u32 {
 }
 
 
+// Like `usize`, but for font.
+pub trait FSize {
+    fn to_usize(&self) -> usize;
+}
+
+impl FSize for u16 {
+    #[inline]
+    fn to_usize(&self) -> usize { *self as usize }
+}
+
+impl FSize for u32 {
+    #[inline]
+    fn to_usize(&self) -> usize { *self as usize }
+}
+
+
+
 #[derive(Clone, Copy)]
 pub struct LazyArray<'a, T> {
     data: &'a [u8],
@@ -54,7 +76,7 @@ pub struct LazyArray<'a, T> {
 impl<'a, T: FromData> LazyArray<'a, T> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
-        assert_eq!(data.len() % T::size_of(), 0);
+        assert_eq!(data.len() % T::raw_size(), 0);
 
         LazyArray {
             data,
@@ -63,15 +85,15 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 
     #[inline]
-    pub fn at(&self, index: usize) -> T {
+    pub fn at<L: FSize>(&self, index: L) -> T {
         self.get(index).unwrap()
     }
 
     #[inline]
-    pub fn get(&self, index: usize) -> Option<T> {
-        if index < self.len() {
-            let start = index * T::size_of();
-            let end = start + T::size_of();
+    pub fn get<L: FSize>(&self, index: L) -> Option<T> {
+        if index.to_usize() < self.len() {
+            let start = index.to_usize() * T::raw_size();
+            let end = start + T::raw_size();
             Some(T::parse(&self.data[start..end]))
         } else {
             None
@@ -80,12 +102,12 @@ impl<'a, T: FromData> LazyArray<'a, T> {
 
     #[inline]
     pub fn last(&self) -> T {
-        self.at(self.len() - 1)
+        self.at(self.len() as u32 - 1)
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.data.len() / T::size_of()
+        self.data.len() / T::raw_size()
     }
 
     #[inline]
@@ -96,12 +118,12 @@ impl<'a, T: FromData> LazyArray<'a, T> {
 
         use core::cmp::Ordering;
 
-        let mut size = self.len();
+        let mut size = self.len() as u32;
         if size == 0 {
             return None;
         }
 
-        let mut base = 0usize;
+        let mut base = 0;
         while size > 1 {
             let half = size / 2;
             let mid = base + half;
@@ -163,7 +185,7 @@ impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
             return None;
         }
 
-        self.offset += T::size_of();
+        self.offset += T::raw_size();
         Some(Stream::read_at(self.data, offset))
     }
 }
@@ -200,63 +222,42 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn skip(&mut self, len: usize) {
-        self.offset += len;
+    pub fn skip<T: FromData>(&mut self) {
+        self.offset += T::raw_size();
     }
 
     #[inline]
-    fn skip_item<T: FromData>(&mut self) {
-        self.offset += T::size_of();
-    }
-
-    #[inline]
-    pub fn skip_u16(&mut self) {
-        self.skip_item::<u16>()
-    }
-
-    #[inline]
-    pub fn skip_u32(&mut self) {
-        self.skip_item::<u32>()
+    pub fn skip_len<L: FSize>(&mut self, len: L) {
+        self.offset += len.to_usize();
     }
 
     #[inline]
     pub fn read<T: FromData>(&mut self) -> T {
         let item = Self::read_at(self.data, self.offset);
-        self.offset += T::size_of();
+        self.offset += T::raw_size();
         item
     }
 
     #[inline]
     pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> T {
         let start = offset;
-        let end = start + T::size_of();
+        let end = start + T::raw_size();
         T::parse(&data[start..end])
     }
 
     #[inline]
-    pub fn read_bytes(&mut self, len: usize) -> &'a [u8] {
+    pub fn read_bytes<L: FSize>(&mut self, len: L) -> &'a [u8] {
         let offset = self.offset;
-        self.offset += len;
-        &self.data[offset..(offset + len)]
+        self.offset += len.to_usize();
+        &self.data[offset..(offset + len.to_usize())]
     }
 
     #[inline]
-    pub fn read_array<T: FromData>(&mut self, len: usize) -> LazyArray<'a, T> {
-        let len = len * T::size_of();
+    pub fn read_array<T: FromData, L: FSize>(&mut self, len: L) -> LazyArray<'a, T> {
+        let len = len.to_usize() * T::raw_size();
         let array = LazyArray::new(&self.data[self.offset..(self.offset + len)]);
         self.offset += len;
         array
-    }
-
-    #[inline]
-    pub fn read_u8(&mut self) -> u8 {
-        self.offset += 1;
-        self.data[self.offset - 1]
-    }
-
-    #[inline]
-    pub fn read_u16(&mut self) -> u16 {
-        self.read()
     }
 
     #[inline]
@@ -267,30 +268,8 @@ impl<'a> Stream<'a> {
         n
     }
 
-    #[inline]
-    pub fn read_u32(&mut self) -> u32 {
-        self.read()
-    }
-
-    #[inline]
-    pub fn read_i8(&mut self) -> i8 {
-        self.offset += 1;
-        self.data[self.offset - 1] as i8
-    }
-
-    #[inline]
-    pub fn read_i16(&mut self) -> i16 {
-        self.read()
-    }
-
-    #[inline]
     pub fn read_f2_14(&mut self) -> f32 {
-        self.read_i16() as f32 / 16384.0
-    }
-
-    #[inline]
-    pub fn read_glyph_id(&mut self) -> GlyphId {
-        self.read()
+        self.read::<i16>() as f32 / 16384.0
     }
 }
 
@@ -312,7 +291,7 @@ impl FromData for Option<Offset32> {
         if offset.0 != 0 { Some(offset) } else { None }
     }
 
-    fn size_of() -> usize {
-        Offset32::size_of()
+    fn raw_size() -> usize {
+        Offset32::raw_size()
     }
 }

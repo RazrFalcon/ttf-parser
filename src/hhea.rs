@@ -3,6 +3,7 @@ use crate::{Font, TableName};
 
 impl<'a> Font<'a> {
     /// Returns font's ascender set in the `hhea` table.
+    #[inline(never)]
     pub fn ascender(&self) -> i16 {
         const ASCENDER_OFFSET: usize = 4;
         let data = self.table_data(TableName::HorizontalHeader).expect("required table");
@@ -10,6 +11,7 @@ impl<'a> Font<'a> {
     }
 
     /// Returns font's descender set in the `hhea` table.
+    #[inline(never)]
     pub fn descender(&self) -> i16 {
         const DESCENDER_OFFSET: usize = 6;
         let data = self.table_data(TableName::HorizontalHeader).expect("required table");
@@ -22,6 +24,7 @@ impl<'a> Font<'a> {
     }
 
     /// Returns font's line gap set in the `hhea` table.
+    #[inline(never)]
     pub fn line_gap(&self) -> i16 {
         const LINEGAP_OFFSET: usize = 8;
         let data = self.table_data(TableName::HorizontalHeader).expect("required table");

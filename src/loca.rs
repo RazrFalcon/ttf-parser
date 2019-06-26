@@ -18,13 +18,13 @@ impl<'a> Font<'a> {
 
         let (start, end) = match format {
             Format::Short => {
-                s.skip((glyph_id.0 as u32 * U16_LEN) as usize);
+                s.skip_len(glyph_id.0 as u32 * U16_LEN);
                 // 'The actual local offset divided by 2 is stored.'
-                (s.read_u16() as u32 * 2, s.read_u16() as u32 * 2)
+                (s.read::<u16>() as u32 * 2, s.read::<u16>() as u32 * 2)
             }
             Format::Long  => {
-                s.skip((glyph_id.0 as u32 * U32_LEN) as usize);
-                (s.read_u32(), s.read_u32())
+                s.skip_len(glyph_id.0 as u32 * U32_LEN);
+                (s.read::<u32>(), s.read::<u32>())
             }
         };
 

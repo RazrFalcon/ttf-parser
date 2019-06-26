@@ -17,8 +17,8 @@ impl<'a> Font<'a> {
             let data = &data[glyph_id.0 as usize * HOR_METRIC_RECORD_SIZE..];
             let mut s = Stream::new(data);
             Ok(HorizontalMetrics {
-                advance: s.read_u16(),
-                left_side_bearing: s.read_i16(),
+                advance: s.read(),
+                left_side_bearing: s.read(),
             })
         } else {
             assert!(number_of_hmetrics > 0);

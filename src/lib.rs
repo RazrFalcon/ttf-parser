@@ -411,15 +411,15 @@ impl<'a> Font<'a> {
 
         let mut s = Stream::new(table_data);
 
-        let sfnt_version = s.read_u32();
+        let sfnt_version: u32 = s.read();
         if let SFNT_VERSION_TRUE_TYPE | SFNT_VERSION_OPEN_TYPE = sfnt_version {} else {
             return Err(Error::NotATrueType);
         }
 
-        let num_tables = s.read_u16();
-        s.skip_u16(); // searchRange
-        s.skip_u16(); // entrySelector
-        s.skip_u16(); // rangeShift
+        let num_tables: u16 = s.read();
+        s.skip::<u16>(); // searchRange
+        s.skip::<u16>(); // entrySelector
+        s.skip::<u16>(); // rangeShift
 
         let mut tables = [TableInfo {
             name: TableName::MaximumProfile, // dummy
@@ -429,7 +429,7 @@ impl<'a> Font<'a> {
 
         let mut number_of_glyphs = GlyphId(0);
 
-        let raw_tables: LazyArray<RawTable> = s.read_array(num_tables as usize);
+        let raw_tables: LazyArray<RawTable> = s.read_array(num_tables);
 
         let mut i = 0;
         for table in raw_tables {
@@ -469,6 +469,7 @@ impl<'a> Font<'a> {
         self.tables.iter().any(|t| t.name == name)
     }
 
+    #[inline(never)]
     pub(crate) fn table_data(&self, name: TableName) -> Result<&[u8]> {
         let info = self.tables
             .iter()
@@ -527,7 +528,8 @@ fn calc_checksum(data: &[u8]) -> u32 {
 
     // 'Table checksums are the unsigned sum of the uint32 units of a given table.'
     let mut sum: u32 = 0;
-    for n in Stream::new(data).read_array::<u32>(data.len() as usize / 4) {
+    let numbers: LazyArray<u32> = Stream::new(data).read_array(data.len() as u32 / 4);
+    for n in numbers {
         sum = sum.wrapping_add(n);
     }
 

@@ -11,10 +11,10 @@ impl<'a> Font<'a> {
         let number_of_vmetrics = self.number_of_vmetrics()?;
 
         let mut s = Stream::new(data);
-        let vmetrics_array = s.read_array::<VerticalMetrics>(number_of_vmetrics as usize);
+        let vmetrics_array: LazyArray<VerticalMetrics> = s.read_array(number_of_vmetrics);
 
         if glyph_id.0 < number_of_vmetrics {
-            vmetrics_array.get(glyph_id.0 as usize).ok_or(Error::NotATrueType)
+            vmetrics_array.get(glyph_id.0).ok_or(Error::NotATrueType)
         } else {
             // 'The number of entries in this array is calculated by subtracting the value of
             // numOfLongVerMetrics from the number of glyphs in the font.'
@@ -25,10 +25,10 @@ impl<'a> Font<'a> {
             // height as the last entry in the vMetrics array.'
             let advance = vmetrics_array.last().advance;
 
-            let array: LazyArray<i16> = s.read_array(tsb_array_len as usize);
+            let array: LazyArray<i16> = s.read_array(tsb_array_len);
             Ok(VerticalMetrics {
                 advance,
-                top_side_bearing: array.at((glyph_id.0 - number_of_vmetrics) as usize),
+                top_side_bearing: array.at(glyph_id.0 - number_of_vmetrics),
             })
         }
     }

@@ -1,7 +1,7 @@
 use core::convert::{TryFrom, TryInto};
 use core::ops::Range;
 
-use crate::parser::{Stream, FromData};
+use crate::parser::{Stream, FromData, LazyArray};
 use crate::{GlyphId, Font, TableName, Result, Error};
 
 
@@ -40,7 +40,7 @@ impl FromData for ClassRangeRecord {
         let mut s = Stream::new(data);
         ClassRangeRecord {
             // Make the upper bound inclusive.
-            range: s.read()..GlyphId(s.read_u16() + 1),
+            range: s.read()..GlyphId(s.read::<u16>() + 1),
             class: s.read(),
         }
     }
@@ -70,7 +70,7 @@ impl<'a> Font<'a> {
 
     fn parse_glyph_class_table(data: &[u8], glyph_id: GlyphId) -> Result<u16> {
         let mut s = Stream::new(data);
-        let class_format = s.read_u16();
+        let class_format: u16 = s.read();
         match class_format {
             1 => Self::parse_glyph_class_table_1(&mut s, glyph_id),
             2 => Self::parse_glyph_class_table_2(&mut s, glyph_id),
@@ -79,21 +79,21 @@ impl<'a> Font<'a> {
     }
 
     fn parse_glyph_class_table_1(s: &mut Stream, glyph_id: GlyphId) -> Result<u16> {
-        let start_glyph_id = s.read_glyph_id();
-        let glyph_count = s.read_u16() as usize;
-        let class_values = s.read_array::<u16>(glyph_count);
+        let start_glyph_id: GlyphId = s.read();
+        let glyph_count: u16 = s.read();
+        let class_values: LazyArray<u16> = s.read_array(glyph_count);
 
         // Prevent overflow.
         if glyph_id < start_glyph_id {
             return Ok(0);
         }
 
-        Ok(class_values.get((glyph_id.0 - start_glyph_id.0) as usize).unwrap_or(0))
+        Ok(class_values.get(glyph_id.0 - start_glyph_id.0).unwrap_or(0))
     }
 
     fn parse_glyph_class_table_2(s: &mut Stream, glyph_id: GlyphId) -> Result<u16> {
-        let class_range_count = s.read_u16() as usize;
-        let records = s.read_array::<ClassRangeRecord>(class_range_count);
+        let class_range_count: u16 = s.read();
+        let records: LazyArray<ClassRangeRecord> = s.read_array(class_range_count);
         for record in records {
             if record.range.contains(&glyph_id) {
                 return Ok(record.class);

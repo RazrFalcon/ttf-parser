@@ -140,10 +140,10 @@ impl FromData for ScriptMetrics {
     fn parse(data: &[u8]) -> Self {
         let mut s = Stream::new(data);
         ScriptMetrics {
-            x_size: s.read_i16(),
-            y_size: s.read_i16(),
-            x_offset: s.read_i16(),
-            y_offset: s.read_i16(),
+            x_size: s.read(),
+            y_size: s.read(),
+            x_offset: s.read(),
+            y_offset: s.read(),
         }
     }
 }

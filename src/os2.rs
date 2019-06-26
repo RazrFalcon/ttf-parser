@@ -137,8 +137,7 @@ pub struct ScriptMetrics {
 }
 
 impl FromData for ScriptMetrics {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         ScriptMetrics {
             x_size: s.read(),
             y_size: s.read(),

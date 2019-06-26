@@ -1,6 +1,6 @@
 pub trait FromData: Sized {
     /// Parses an object from a raw data.
-    fn parse(data: &[u8]) -> Self;
+    fn parse(s: &mut Stream) -> Self;
 
     /// Returns an object size in raw data.
     ///
@@ -16,35 +16,38 @@ pub trait FromData: Sized {
 
 impl FromData for u8 {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
-        data[0]
+    fn parse(s: &mut Stream) -> Self {
+        s.tail()[0]
     }
 }
 
 impl FromData for i8 {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
-        data[0] as i8
+    fn parse(s: &mut Stream) -> Self {
+        s.tail()[0] as i8
     }
 }
 
 impl FromData for u16 {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
+    fn parse(s: &mut Stream) -> Self {
+        let data = s.tail();
         (data[0] as u16) << 8 | data[1] as u16
     }
 }
 
 impl FromData for i16 {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
+    fn parse(s: &mut Stream) -> Self {
+        let data = s.tail();
         ((data[0] as u16) << 8 | data[1] as u16) as i16
     }
 }
 
 impl FromData for u32 {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
+    fn parse(s: &mut Stream) -> Self {
+        let data = s.tail();
         (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
     }
 }
@@ -89,12 +92,12 @@ impl<'a, T: FromData> LazyArray<'a, T> {
         self.get(index).unwrap()
     }
 
-    #[inline]
     pub fn get<L: FSize>(&self, index: L) -> Option<T> {
         if index.to_usize() < self.len() {
             let start = index.to_usize() * T::raw_size();
             let end = start + T::raw_size();
-            Some(T::parse(&self.data[start..end]))
+            let mut s = Stream::new(&self.data[start..end]);
+            Some(T::parse(&mut s))
         } else {
             None
         }
@@ -242,7 +245,8 @@ impl<'a> Stream<'a> {
     pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> T {
         let start = offset;
         let end = start + T::raw_size();
-        T::parse(&data[start..end])
+        let mut s = Stream::new(&data[start..end]);
+        T::parse(&mut s)
     }
 
     #[inline]
@@ -279,15 +283,15 @@ pub struct Offset32(pub u32);
 
 impl FromData for Offset32 {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
-        Offset32(Stream::read_at(data, 0))
+    fn parse(s: &mut Stream) -> Self {
+        Offset32(s.read())
     }
 }
 
 impl FromData for Option<Offset32> {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
-        let offset: Offset32 = Stream::read_at(data, 0);
+    fn parse(s: &mut Stream) -> Self {
+        let offset: Offset32 = s.read();
         if offset.0 != 0 { Some(offset) } else { None }
     }
 

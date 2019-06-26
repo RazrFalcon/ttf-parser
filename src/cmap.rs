@@ -334,8 +334,7 @@ struct SubHeaderRecord {
 }
 
 impl FromData for SubHeaderRecord {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         SubHeaderRecord {
             first_code: s.read(),
             entry_count: s.read(),
@@ -354,8 +353,7 @@ struct SequentialMapGroup {
 }
 
 impl FromData for SequentialMapGroup {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         SequentialMapGroup {
             // Make the upper bound inclusive.
             char_code_range: s.read()..(s.read::<u32>() + 1),
@@ -372,8 +370,7 @@ struct VariationSelectorRecord {
 }
 
 impl FromData for VariationSelectorRecord {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         VariationSelectorRecord {
             variation: s.read_u24(),
             default_uvs_offset: s.read(),
@@ -401,8 +398,7 @@ impl UnicodeRangeRecord {
 }
 
 impl FromData for UnicodeRangeRecord {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         UnicodeRangeRecord {
             start_unicode_value: s.read_u24(),
             additional_count: s.read(),
@@ -422,8 +418,7 @@ struct UVSMappingRecord {
 }
 
 impl FromData for UVSMappingRecord {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         UVSMappingRecord {
             unicode_value: s.read_u24(),
             glyph: s.read(),

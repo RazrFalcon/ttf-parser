@@ -100,8 +100,8 @@ pub struct GlyphId(pub u16);
 
 impl FromData for GlyphId {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
-        GlyphId(Stream::read_at(data, 0))
+    fn parse(s: &mut Stream) -> Self {
+        GlyphId(s.read())
     }
 }
 
@@ -232,7 +232,8 @@ impl core::fmt::Display for Tag {
 
 impl FromData for Tag {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
+    fn parse(s: &mut Stream) -> Self {
+        let data = s.tail();
         let tag = [data[0], data[1], data[2], data[3]];
         Tag { tag }
     }
@@ -274,8 +275,7 @@ pub struct VerticalMetrics {
 }
 
 impl FromData for VerticalMetrics {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         VerticalMetrics {
             advance: s.read(),
             top_side_bearing: s.read(),
@@ -351,8 +351,7 @@ impl RawTable {
 }
 
 impl FromData for RawTable {
-    fn parse(data: &[u8]) -> Self {
-        let mut s = Stream::new(data);
+    fn parse(s: &mut Stream) -> Self {
         RawTable {
             tag: s.read(),
             checksum: s.read(),

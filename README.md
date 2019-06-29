@@ -11,7 +11,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Zero allocations.
 - Zero `unsafe`.
 - Zero dependencies.
-- `no_std` compatible.
 - Fast.
 - Stateless.
 - Simple and maintainable code (no magic numbers).

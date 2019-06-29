@@ -7,7 +7,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Zero allocations.
 - Zero `unsafe`.
 - Zero dependencies.
-- `no_std` compatible.
 - Fast.
 - Stateless.
 - Simple and maintainable code (no magic numbers).
@@ -29,14 +28,10 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.1.0")]
 
-#![no_std]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
-
-#[cfg(feature = "std")]
-extern crate std;
 
 
 macro_rules! impl_bit_ops {
@@ -175,7 +170,6 @@ impl From<CFFError> for Error {
     }
 }
 
-#[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
 pub(crate) type Result<T> = core::result::Result<T, Error>;

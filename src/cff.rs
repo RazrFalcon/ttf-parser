@@ -84,7 +84,6 @@ impl core::fmt::Display for CFFError {
     }
 }
 
-#[cfg(feature = "std")]
 impl std::error::Error for CFFError {}
 
 

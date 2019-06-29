@@ -1,8 +1,3 @@
-#[cfg(feature = "std")]
-use std::vec::Vec;
-#[cfg(feature = "std")]
-use std::string::String;
-
 use core::convert::TryFrom;
 
 use crate::parser::Stream;
@@ -106,7 +101,6 @@ impl TryFrom<u16> for NameId {
 
 /// A [Name Record](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records).
 #[derive(Clone, Copy)]
-#[cfg_attr(not(feature = "std"), derive(Debug))]
 pub struct Name<'a> {
     /// Raw name data.
     pub name: &'a [u8],
@@ -133,7 +127,6 @@ impl<'a> Name<'a> {
     /// Supports:
     /// - Unicode Platform ID
     /// - Windows Platform ID + Unicode BMP
-    #[cfg(feature = "std")]
     pub fn to_string(&self) -> Option<String> {
         if self.is_supported_encoding() {
             self.name_from_utf16_be()
@@ -142,7 +135,6 @@ impl<'a> Name<'a> {
         }
     }
 
-    #[cfg(feature = "std")]
     fn is_supported_encoding(&self) -> bool {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
         const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
@@ -154,7 +146,6 @@ impl<'a> Name<'a> {
         }
     }
 
-    #[cfg(feature = "std")]
     fn name_from_utf16_be(&self) -> Option<String> {
         use crate::parser::LazyArray;
 
@@ -167,7 +158,6 @@ impl<'a> Name<'a> {
     }
 }
 
-#[cfg(feature = "std")]
 impl<'a> core::fmt::Debug for Name<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         // TODO: https://github.com/rust-lang/rust/issues/50264
@@ -275,7 +265,6 @@ impl<'a> Font<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
-    #[cfg(feature = "std")]
     pub fn family_name(&self) -> Option<String> {
         // Prefer Typographic Family name.
 
@@ -298,7 +287,6 @@ impl<'a> Font<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
-    #[cfg(feature = "std")]
     pub fn post_stript_name(&self) -> Option<String> {
         self.names()
             .find(|name| name.name_id == NameId::PostScriptName && name.is_supported_encoding())

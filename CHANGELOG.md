@@ -6,10 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
-- Vertical metrics querying from the `vmtx` table.
-- OpenType fonts are allowed now.
+- CFF support.
 - High Byte Mapping Through Table (2) `cmap` subtable support.
 - Unicode Variation Sequences (14) `cmap` subtable support.
+- Vertical metrics querying from the `vmtx` table.
+- OpenType fonts are allowed now.
 - `no_std` compatibility.
 
 ### Changed

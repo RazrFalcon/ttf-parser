@@ -38,7 +38,7 @@ struct ClassRangeRecord {
 impl FromData for ClassRangeRecord {
     fn parse(s: &mut Stream) -> Self {
         ClassRangeRecord {
-            // Make the upper bound inclusive.
+            // +1 makes the upper bound inclusive.
             range: s.read()..GlyphId(s.read::<u16>() + 1),
             class: s.read(),
         }

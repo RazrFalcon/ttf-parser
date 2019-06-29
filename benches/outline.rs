@@ -3,12 +3,7 @@ fn outline(bencher: &mut bencher::Bencher) {
     bencher.iter(|| {
         let font = ttf_parser::Font::from_data(&font_data, 0).unwrap();
         for id in 0..font.number_of_glyphs() {
-            let glyph = match font.glyph(ttf_parser::GlyphId(id)) {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-
-            glyph.outline(&mut Builder(0));
+            let _ = font.outline_glyph(ttf_parser::GlyphId(id), &mut Builder(0));
         }
     })
 }
@@ -29,6 +24,11 @@ impl ttf_parser::OutlineBuilder for Builder {
     #[inline]
     fn quad_to(&mut self, _: f32, _: f32, _: f32, _: f32) {
         self.0 += 2;
+    }
+
+    #[inline]
+    fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) {
+        self.0 += 3;
     }
 
     #[inline]

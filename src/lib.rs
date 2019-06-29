@@ -9,6 +9,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Zero dependencies.
 - `no_std` compatible.
 - Fast.
+- Stateless.
 - Simple and maintainable code (no magic numbers).
 
 ## Limitations
@@ -62,36 +63,27 @@ macro_rules! impl_bit_ops {
 
 use core::convert::TryFrom;
 
+mod cff;
 mod cmap;
 mod gdef;
 mod glyf;
+mod head;
+mod hhea;
 mod hmtx;
 mod loca;
 mod name;
 mod os2;
-mod post;
-mod vmtx;
-mod head;
-mod hhea;
-mod vhea;
 mod parser;
+mod post;
+mod vhea;
+mod vmtx;
 
 use parser::{Stream, FromData, LazyArray};
+pub use cff::CFFError;
 pub use gdef::*;
 pub use glyf::*;
 pub use name::*;
 pub use os2::*;
-
-
-/// Rectangle.
-#[derive(Clone, Copy, PartialEq, Debug)]
-#[allow(missing_docs)]
-pub struct Rect {
-    pub x_min: i16,
-    pub y_min: i16,
-    pub x_max: i16,
-    pub y_max: i16,
-}
 
 
 /// A type-safe wrapper for glyph ID.
@@ -132,6 +124,12 @@ pub enum Error {
 
     /// An invalid font width.
     InvalidFontWidth(u16),
+
+    /// An unsupported table version.
+    UnsupportedTableVersion(TableName, u8),
+
+    /// A CFF table parsing error.
+    CFFError(CFFError)
 }
 
 impl core::fmt::Display for Error {
@@ -143,11 +141,11 @@ impl core::fmt::Display for Error {
             Error::IndexOutOfBounds => {
                 write!(f, "font index is out of bounds")
             }
-            Error::TableMissing(tag) => {
-                write!(f, "font doesn't have a {:?} table", tag)
+            Error::TableMissing(name) => {
+                write!(f, "font doesn't have a {:?} table", name)
             }
-            Error::InvalidTableChecksum(tag) => {
-                write!(f, "table {:?} has an invalid checksum", tag)
+            Error::InvalidTableChecksum(name) => {
+                write!(f, "table {:?} has an invalid checksum", name)
             }
             Error::NoGlyph => {
                 write!(f, "font doesn't have such glyph ID")
@@ -161,7 +159,19 @@ impl core::fmt::Display for Error {
             Error::InvalidFontWidth(n) => {
                 write!(f, "{} is not a valid font width", n)
             }
+            Error::UnsupportedTableVersion(name, version) => {
+                write!(f, "table {:?} with version {} is not supported", name, version)
+            }
+            Error::CFFError(e) => {
+                write!(f, "{:?} table parsing failed cause {}", TableName::CompactFontFormat, e)
+            }
         }
+    }
+}
+
+impl From<CFFError> for Error {
+    fn from(e: CFFError) -> Self {
+        Error::CFFError(e)
     }
 }
 
@@ -174,10 +184,12 @@ pub(crate) type Result<T> = core::result::Result<T, Error>;
 /// A TrueType's `Tag` data type.
 #[derive(Clone, Copy, PartialEq)]
 pub struct Tag {
-    tag: [u8; 4],
+    tag: [u8; Tag::LENGTH],
 }
 
 impl Tag {
+    const LENGTH: usize = 4;
+
     /// Creates a `Tag` object from bytes.
     #[inline]
     pub const fn new(c1: u8, c2: u8, c3: u8, c4: u8) -> Self {
@@ -188,7 +200,7 @@ impl Tag {
     ///
     /// Will panic if data length != 4.
     pub fn from_slice(data: &[u8]) -> Self {
-        assert_eq!(data.len(), 4);
+        assert_eq!(data.len(), Tag::LENGTH);
         Tag { tag: [data[0], data[1], data[2], data[3]] }
     }
 
@@ -196,9 +208,9 @@ impl Tag {
         (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
     }
 
-    fn to_ascii(&self) -> [char; 4] {
-        let mut tag2 = [' '; 4];
-        for i in 0..4 {
+    fn to_ascii(self) -> [char; Tag::LENGTH] {
+        let mut tag2 = [' '; Tag::LENGTH];
+        for i in 0..Tag::LENGTH {
             if self.tag[i].is_ascii() {
                 tag2[i] = self.tag[i] as char;
             }
@@ -284,12 +296,36 @@ impl FromData for VerticalMetrics {
 }
 
 
+/// A trait for glyph outline construction.
+pub trait OutlineBuilder {
+    /// Appends a MoveTo segment.
+    ///
+    /// Start of a contour.
+    fn move_to(&mut self, x: f32, y: f32);
+
+    /// Appends a LineTo segment.
+    fn line_to(&mut self, x: f32, y: f32);
+
+    /// Appends a QuadTo segment.
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32);
+
+    /// Appends a CurveTo segment.
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32);
+
+    /// Appends a ClosePath segment.
+    ///
+    /// End of a contour.
+    fn close(&mut self);
+}
+
+
 /// A table name.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
 #[repr(u32)]
 pub enum TableName {
     CharacterToGlyphIndexMapping    = Tag::make_u32(b"cmap"),
+    CompactFontFormat               = Tag::make_u32(b"CFF "),
     GlyphData                       = Tag::make_u32(b"glyf"),
     GlyphDefinition                 = Tag::make_u32(b"GDEF"),
     Header                          = Tag::make_u32(b"head"),
@@ -310,6 +346,7 @@ impl TryFrom<Tag> for TableName {
     fn try_from(value: Tag) -> core::result::Result<Self, Self::Error> {
         // TODO: Rust doesn't support `const fn` in patterns yet
         match &*value {
+            b"CFF " => Ok(TableName::CompactFontFormat),
             b"cmap" => Ok(TableName::CharacterToGlyphIndexMapping),
             b"GDEF" => Ok(TableName::GlyphDefinition),
             b"glyf" => Ok(TableName::GlyphData),
@@ -520,6 +557,60 @@ impl<'a> Font<'a> {
 
         Ok(())
     }
+
+    /// Outlines a glyph.
+    ///
+    /// This method support both `glyf` and `CFF` tables.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::fmt::Write;
+    /// use ttf_parser;
+    ///
+    /// struct Builder(String);
+    ///
+    /// impl ttf_parser::OutlineBuilder for Builder {
+    ///     fn move_to(&mut self, x: f32, y: f32) {
+    ///         write!(&mut self.0, "M {} {} ", x, y).unwrap();
+    ///     }
+    ///
+    ///     fn line_to(&mut self, x: f32, y: f32) {
+    ///         write!(&mut self.0, "L {} {} ", x, y).unwrap();
+    ///     }
+    ///
+    ///     fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+    ///         write!(&mut self.0, "Q {} {} {} {} ", x1, y1, x, y).unwrap();
+    ///     }
+    ///
+    ///     fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+    ///         write!(&mut self.0, "C {} {} {} {} {} {} ", x1, y1, x2, y2, x, y).unwrap();
+    ///     }
+    ///
+    ///     fn close(&mut self) {
+    ///         write!(&mut self.0, "Z ").unwrap();
+    ///     }
+    /// }
+    ///
+    /// let data = std::fs::read("tests/fonts/glyphs.ttf").unwrap();
+    /// let font = ttf_parser::Font::from_data(&data, 0).unwrap();
+    /// let mut builder = Builder(String::new());
+    /// let glyph = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap();
+    /// assert_eq!(builder.0, "M 50 0 L 50 750 L 450 750 L 450 0 L 50 0 Z ");
+    /// ```
+    pub fn outline_glyph(
+        &self,
+        glyph_id: GlyphId,
+        builder: &mut impl OutlineBuilder,
+    ) -> Result<()> {
+        if self.has_table(TableName::GlyphData) {
+            self.glyf_glyph_outline(glyph_id, builder)
+        } else if self.has_table(TableName::CompactFontFormat) {
+            self.cff_glyph_outline(glyph_id, builder)
+        } else {
+            Err(Error::NoGlyph)
+        }
+    }
 }
 
 fn calc_checksum(data: &[u8]) -> u32 {
@@ -537,7 +628,7 @@ fn calc_checksum(data: &[u8]) -> u32 {
 
 /// Checks that provided data is a TrueType font collection.
 fn is_collection(data: &[u8]) -> bool {
-    data.len() >= 4 && &data[0..4] == b"ttcf"
+    data.len() >= Tag::LENGTH && &data[0..Tag::LENGTH] == b"ttcf"
 }
 
 /// Returns a number of fonts stored in a TrueType font collection.

@@ -1,3 +1,6 @@
+use crate::Result;
+
+
 pub trait FromData: Sized {
     /// Parses an object from a raw data.
     fn parse(s: &mut Stream) -> Self;
@@ -49,6 +52,23 @@ impl FromData for u32 {
     fn parse(s: &mut Stream) -> Self {
         let data = s.tail();
         (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
+    }
+}
+
+
+pub trait TryFromData: Sized {
+    /// Parses an object from a raw data.
+    fn try_parse(s: &mut Stream) -> Result<Self>;
+
+    /// Returns an object size in raw data.
+    ///
+    /// `mem::size_of` by default.
+    ///
+    /// Reimplement when size of `Self` != size of a raw data.
+    /// For example, when you parsing u16, but storing it as u8.
+    /// In this case `size_of::<Self>()` == 1, but `TryFromData::raw_size()` == 2.
+    fn raw_size() -> usize {
+        core::mem::size_of::<Self>()
     }
 }
 
@@ -215,6 +235,11 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
+    pub fn jump_to_end(&mut self) {
+        self.offset = self.data.len();
+    }
+
+    #[inline]
     pub fn offset(&self) -> usize {
         self.offset
     }
@@ -239,6 +264,15 @@ impl<'a> Stream<'a> {
         let item = Self::read_at(self.data, self.offset);
         self.offset += T::raw_size();
         item
+    }
+
+    #[inline]
+    pub fn try_read<T: TryFromData>(&mut self) -> Result<T> {
+        let start = self.offset;
+        self.offset += T::raw_size();
+        let end = start + T::raw_size();
+        let mut s = Stream::new(&self.data[start..end]);
+        T::try_parse(&mut s)
     }
 
     #[inline]

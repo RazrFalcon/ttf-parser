@@ -26,6 +26,15 @@ impl ttf::OutlineBuilder for Builder {
         });
     }
 
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.0.push(svgtypes::PathSegment::CurveTo {
+            abs: true,
+            x1: x1 as f64, y1: y1 as f64,
+            x2: x2 as f64, y2: y2 as f64,
+            x: x as f64, y: y as f64
+        });
+    }
+
     fn close(&mut self) {
         self.0.push(svgtypes::PathSegment::ClosePath { abs: true });
     }
@@ -40,46 +49,66 @@ fn number_of_glyphs() {
 }
 
 #[test]
-fn glyph_outline_single_contour() {
+fn outline_glyph_single_contour() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    let glyph = font.glyph(GlyphId(0)).unwrap();
-
     let mut builder = Builder::new();
-    glyph.outline(&mut builder);
+    font.outline_glyph(GlyphId(0), &mut builder).unwrap();
     assert_eq!(builder.0.to_string(),
                "M 50 0 L 50 750 L 450 750 L 450 0 L 50 0 Z");
 }
 
 #[test]
-fn glyph_outline_two_contours() {
+fn outline_glyph_two_contours() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    let glyph = font.glyph(GlyphId(1)).unwrap();
-
     let mut builder = Builder::new();
-    glyph.outline(&mut builder);
+    font.outline_glyph(GlyphId(1), &mut builder).unwrap();
     assert_eq!(builder.0.to_string(),
                "M 56 416 L 56 487 L 514 487 L 514 416 L 56 416 Z \
                 M 56 217 L 56 288 L 514 288 L 514 217 L 56 217 Z");
 }
 
 #[test]
-fn glyph_outline_composite() {
+fn outline_glyph_composite() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    let glyph = font.glyph(GlyphId(4)).unwrap();
-
     let mut builder = Builder::new();
-    glyph.outline(&mut builder);
+    font.outline_glyph(GlyphId(4), &mut builder).unwrap();
     assert_eq!(builder.0.to_string(),
                "M 332 468 L 197 468 L 197 0 L 109 0 L 109 468 L 15 468 L 15 509 L 109 539 \
-               L 109 570 Q 109 674 155 719.5 Q 201 765 283 765 Q 315 765 341.5 759.5 \
-               Q 368 754 387 747 L 364 678 Q 348 683 327 688 Q 306 693 284 693 \
-               Q 240 693 218.5 663.5 Q 197 634 197 571 L 197 536 L 332 536 L 332 468 Z \
-               M 474 737 Q 494 737 509.5 723.5 Q 525 710 525 681 Q 525 653 509.5 639 \
-               Q 494 625 474 625 Q 452 625 437 639 Q 422 653 422 681 Q 422 710 437 723.5 \
-               Q 452 737 474 737 Z M 517 536 L 517 0 L 429 0 L 429 536 L 517 536 Z");
+                L 109 570 Q 109 674 155 719.5 Q 201 765 283 765 Q 315 765 341.5 759.5 \
+                Q 368 754 387 747 L 364 678 Q 348 683 327 688 Q 306 693 284 693 \
+                Q 240 693 218.5 663.5 Q 197 634 197 571 L 197 536 L 332 536 L 332 468 Z \
+                M 474 737 Q 494 737 509.5 723.5 Q 525 710 525 681 Q 525 653 509.5 639 \
+                Q 494 625 474 625 Q 452 625 437 639 Q 422 653 422 681 Q 422 710 437 723.5 \
+                Q 452 737 474 737 Z M 517 536 L 517 0 L 429 0 L 429 536 L 517 536 Z");
+}
+
+#[test]
+fn outline_glyph_cff_flex() {
+    let data = fs::read("tests/fonts/cff1_flex.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let mut builder = Builder::new();
+    font.outline_glyph(GlyphId(1), &mut builder).unwrap();
+    assert_eq!(builder.0.to_string(),
+               "M 0 0 C 100 0 150 -20 250 -20 C 350 -20 400 0 500 0 C 500 100 520 150 520 250 \
+                C 520 350 500 400 500 500 C 400 500 350 520 250 520 C 150 520 100 500 0 500 \
+                C 0 400 -20 350 -20 250 C -20 150 0 100 0 0 Z M 50 50 C 50 130 34 170 34 250 \
+                C 34 330 50 370 50 450 C 130 450 170 466 250 466 C 330 466 370 450 450 450 \
+                C 450 370 466 330 466 250 C 466 170 450 130 450 50 C 370 50 330 34 250 34 \
+                C 170 34 130 50 50 50 Z");
+}
+
+#[test]
+fn outline_glyph_cff_1() {
+    let data = fs::read("tests/fonts/cff1_dotsect.nohints.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let mut builder = Builder::new();
+    font.outline_glyph(GlyphId(1), &mut builder).unwrap();
+    assert_eq!(builder.0.to_string(),
+               "M 82 0 L 164 0 L 164 486 L 82 486 Z M 124 586 C 156 586 181 608 181 639 \
+                C 181 671 156 692 124 692 C 92 692 67 671 67 639 C 67 608 92 586 124 586 Z");
 }
 
 #[test]
@@ -329,3 +358,4 @@ fn glyph_variation_index_01() {
     let font = Font::from_data(&data, 0).unwrap();
     assert_eq!(font.glyph_variation_index('芦', '\u{E0101}').unwrap(), GlyphId(2));
 }
+

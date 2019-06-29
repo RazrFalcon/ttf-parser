@@ -1,27 +1,7 @@
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
 use crate::parser::{Stream, LazyArray};
-use crate::{Font, Rect, GlyphId, TableName, Result};
-
-
-/// A trait for outline construction.
-pub trait OutlineBuilder {
-    /// Appends a MoveTo segment.
-    ///
-    /// Start of a contour.
-    fn move_to(&mut self, x: f32, y: f32);
-
-    /// Appends a LineTo segment.
-    fn line_to(&mut self, x: f32, y: f32);
-
-    /// Appends a QuadTo segment.
-    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32);
-
-    /// Appends a ClosePath segment.
-    ///
-    /// End of a contour.
-    fn close(&mut self);
-}
+use crate::{Font, GlyphId, OutlineBuilder, TableName, Result};
 
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
@@ -111,43 +91,51 @@ impl CompositeGlyphFlags {
 impl_bit_ops!(CompositeGlyphFlags);
 
 
-/// A glyph handle.
-#[derive(Clone, Copy)]
-#[allow(missing_debug_implementations)]
-pub struct Glyph<'a> {
-    font: &'a Font<'a>,
-    data: &'a [u8],
-}
+#[inline]
+fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
+    debug_assert!(min.is_finite());
+    debug_assert!(val.is_finite());
+    debug_assert!(max.is_finite());
 
-impl<'a> Glyph<'a> {
-    /// Returns glyph's bounding box.
-    pub fn bounding_box(&self) -> Rect {
-        let mut s = Stream::new(self.data);
-        s.skip::<u16>();
-        let x_min = s.read();
-        let y_min = s.read();
-        let x_max = s.read();
-        let y_max = s.read();
-
-        Rect { x_min, y_min, x_max, y_max }
+    if val > max {
+        return max;
+    } else if val < min {
+        return min;
     }
 
-    /// Returns glyph's outline.
-    pub fn outline(&self, builder: &mut impl OutlineBuilder) {
+    val
+}
+
+
+impl<'a> Font<'a> {
+    pub(crate) fn glyf_glyph_outline(
+        &self,
+        glyph_id: GlyphId,
+        builder: &mut impl OutlineBuilder,
+    ) -> Result<()> {
         let mut b = Builder {
             builder,
             transform: Transform::default(),
             is_default_ts: true,
         };
 
-        self.outline_impl(&mut b)
+        let glyph_data = self.glyph_data(glyph_id)?;
+        self.outline_impl(glyph_data, &mut b);
+        Ok(())
+    }
+
+    fn glyph_data(&self, glyph_id: GlyphId) -> Result<&[u8]> {
+        let range = self.glyph_range(glyph_id)?;
+        let data = self.table_data(TableName::GlyphData)?;
+        Ok(&data[range])
     }
 
     fn outline_impl<T: OutlineBuilder>(
         &self,
+        data: &[u8],
         builder: &mut Builder<T>,
     ) {
-        let mut s = Stream::new(self.data);
+        let mut s = Stream::new(data);
 
         let number_of_contours: i16 = s.read();
         s.skip_len(8_u32); // skip bbox
@@ -349,10 +337,9 @@ impl<'a> Glyph<'a> {
             ts.d = ts.a;
         }
 
-        if let Ok(glyph) = self.font.glyph(glyph_id) {
+        if let Ok(glyph_data) = self.glyph_data(glyph_id) {
             let transform = Transform::combine(builder.transform, ts);
-
-            glyph.outline_impl(&mut Builder {
+            self.outline_impl(glyph_data, &mut Builder {
                 builder: builder.builder,
                 transform,
                 is_default_ts: transform.is_default(),
@@ -362,31 +349,6 @@ impl<'a> Glyph<'a> {
         if flags.contains(Flags::MORE_COMPONENTS) {
             self.parse_composite_outline(s.tail(), builder);
         }
-    }
-}
-
-#[inline]
-fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
-    debug_assert!(min.is_finite());
-    debug_assert!(val.is_finite());
-    debug_assert!(max.is_finite());
-
-    if val > max {
-        return max;
-    } else if val < min {
-        return min;
-    }
-
-    val
-}
-
-
-impl<'a> Font<'a> {
-    /// Returns a glyph handle.
-    pub fn glyph(&self, glyph_id: GlyphId) -> Result<Glyph> {
-        let range = self.glyph_range(glyph_id)?;
-        let data = self.table_data(TableName::GlyphData)?;
-        Ok(Glyph { font: self, data: &data[range] })
     }
 }
 

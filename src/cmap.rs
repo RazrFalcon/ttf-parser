@@ -355,7 +355,7 @@ struct SequentialMapGroup {
 impl FromData for SequentialMapGroup {
     fn parse(s: &mut Stream) -> Self {
         SequentialMapGroup {
-            // Make the upper bound inclusive.
+            // +1 makes the upper bound inclusive.
             char_code_range: s.read()..(s.read::<u32>() + 1),
             start_glyph_id: s.read(),
         }

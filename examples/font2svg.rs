@@ -104,13 +104,20 @@ fn glyph_to_path(
     scale: f64,
     output: &mut String,
 ) {
-    let glyph = match font.glyph(glyph_id) {
-        Ok(v) => v,
-        Err(_) => return,
-    };
+    output.write_fmt(format_args!(
+        "<text x='{}' y='{}' font-size='36' fill='grey'>{}</text>\n",
+        x + 2.0, y + cell_size - 4.0, glyph_id.0
+    )).unwrap();
 
     let mut builder = Builder(svgtypes::Path::new());
-    glyph.outline(&mut builder);
+    match font.outline_glyph(glyph_id, &mut builder) {
+        Ok(v) => v,
+        Err(ttf_parser::Error::NoGlyph) => return,
+        Err(e) => {
+            eprintln!("Warning (glyph {}): {}.", glyph_id.0, e);
+            return;
+        }
+    }
 
     let path = builder.0;
     if path.is_empty() {
@@ -131,16 +138,29 @@ struct Builder(svgtypes::Path);
 
 impl ttf_parser::OutlineBuilder for Builder {
     fn move_to(&mut self, x: f32, y: f32) {
-        self.0.push(svgtypes::PathSegment::MoveTo { abs: true, x: x as f64, y: y as f64 });
+        self.0.push(svgtypes::PathSegment::MoveTo {
+            abs: true, x: x as f64, y: y as f64
+        });
     }
 
     fn line_to(&mut self, x: f32, y: f32) {
-        self.0.push(svgtypes::PathSegment::LineTo { abs: true, x: x as f64, y: y as f64 });
+        self.0.push(svgtypes::PathSegment::LineTo {
+            abs: true, x: x as f64, y: y as f64
+        });
     }
 
     fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
         self.0.push(svgtypes::PathSegment::Quadratic {
             abs: true, x1: x1 as f64, y1: y1 as f64, x: x as f64, y: y as f64
+        });
+    }
+
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.0.push(svgtypes::PathSegment::CurveTo {
+            abs: true,
+            x1: x1 as f64, y1: y1 as f64,
+            x2: x2 as f64, y2: y2 as f64,
+            x: x as f64, y: y as f64
         });
     }
 

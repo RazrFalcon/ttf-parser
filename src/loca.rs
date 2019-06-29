@@ -1,4 +1,4 @@
-use core::ops::Range;
+use std::ops::Range;
 
 use crate::parser::Stream;
 use crate::{Font, GlyphId, TableName, Result, Error};

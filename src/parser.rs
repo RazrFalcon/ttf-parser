@@ -13,7 +13,7 @@ pub trait FromData: Sized {
     /// For example, when you parsing u16, but storing it as u8.
     /// In this case `size_of::<Self>()` == 1, but `FromData::raw_size()` == 2.
     fn raw_size() -> usize {
-        core::mem::size_of::<Self>()
+        std::mem::size_of::<Self>()
     }
 }
 
@@ -68,7 +68,7 @@ pub trait TryFromData: Sized {
     /// For example, when you parsing u16, but storing it as u8.
     /// In this case `size_of::<Self>()` == 1, but `TryFromData::raw_size()` == 2.
     fn raw_size() -> usize {
-        core::mem::size_of::<Self>()
+        std::mem::size_of::<Self>()
     }
 }
 
@@ -93,7 +93,7 @@ impl FSize for u32 {
 #[derive(Clone, Copy)]
 pub struct LazyArray<'a, T> {
     data: &'a [u8],
-    phantom: core::marker::PhantomData<T>,
+    phantom: std::marker::PhantomData<T>,
 }
 
 impl<'a, T: FromData> LazyArray<'a, T> {
@@ -103,7 +103,7 @@ impl<'a, T: FromData> LazyArray<'a, T> {
 
         LazyArray {
             data,
-            phantom: core::marker::PhantomData,
+            phantom: std::marker::PhantomData,
         }
     }
 
@@ -135,11 +135,11 @@ impl<'a, T: FromData> LazyArray<'a, T> {
 
     #[inline]
     pub fn binary_search_by<F>(&self, mut f: F) -> Option<T>
-        where F: FnMut(&T) -> core::cmp::Ordering
+        where F: FnMut(&T) -> std::cmp::Ordering
     {
         // Based on Rust std implementation.
 
-        use core::cmp::Ordering;
+        use std::cmp::Ordering;
 
         let mut size = self.len() as u32;
         if size == 0 {
@@ -165,12 +165,12 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 }
 
-impl<'a, T: FromData + core::fmt::Debug> core::fmt::Debug for LazyArray<'a, T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl<'a, T: FromData + std::fmt::Debug> std::fmt::Debug for LazyArray<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let array: LazyArrayIter<T> = LazyArrayIter {
             data: self.data,
             offset: 0,
-            phantom: core::marker::PhantomData,
+            phantom: std::marker::PhantomData,
         };
 
         f.debug_list().entries(array).finish()
@@ -186,7 +186,7 @@ impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
         LazyArrayIter {
             data: self.data,
             offset: 0,
-            phantom: core::marker::PhantomData,
+            phantom: std::marker::PhantomData,
         }
     }
 }
@@ -195,7 +195,7 @@ impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
 pub struct LazyArrayIter<'a, T> {
     data: &'a [u8],
     offset: usize,
-    phantom: core::marker::PhantomData<T>,
+    phantom: std::marker::PhantomData<T>,
 }
 
 impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {

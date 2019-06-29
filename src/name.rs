@@ -1,4 +1,4 @@
-use core::convert::TryFrom;
+use std::convert::TryFrom;
 
 use crate::parser::Stream;
 use crate::{Font, TableName};
@@ -158,13 +158,13 @@ impl<'a> Name<'a> {
     }
 }
 
-impl<'a> core::fmt::Debug for Name<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl<'a> std::fmt::Debug for Name<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // TODO: https://github.com/rust-lang/rust/issues/50264
 
         let name = self.to_string();
         f.debug_struct("Name")
-            .field("name", &name.as_ref().map(core::ops::Deref::deref)
+            .field("name", &name.as_ref().map(std::ops::Deref::deref)
                                 .unwrap_or("unsupported encoding"))
             .field("platform_id", &self.platform_id)
             .field("encoding_id", &self.encoding_id)

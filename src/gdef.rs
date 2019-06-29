@@ -1,5 +1,5 @@
-use core::convert::{TryFrom, TryInto};
-use core::ops::Range;
+use std::convert::{TryFrom, TryInto};
+use std::ops::Range;
 
 use crate::parser::{Stream, FromData, LazyArray};
 use crate::{GlyphId, Font, TableName, Result, Error};

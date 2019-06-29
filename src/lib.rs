@@ -36,7 +36,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 macro_rules! impl_bit_ops {
     ($name:ty) => {
-        impl core::ops::BitOr for $name {
+        impl std::ops::BitOr for $name {
             type Output = Self;
 
             #[inline]
@@ -45,7 +45,7 @@ macro_rules! impl_bit_ops {
             }
         }
 
-        impl core::ops::BitAnd for $name {
+        impl std::ops::BitAnd for $name {
             type Output = Self;
 
             #[inline]
@@ -56,7 +56,7 @@ macro_rules! impl_bit_ops {
     }
 }
 
-use core::convert::TryFrom;
+use std::convert::TryFrom;
 
 mod cff;
 mod cmap;
@@ -127,8 +127,8 @@ pub enum Error {
     CFFError(CFFError)
 }
 
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             Error::NotATrueType => {
                 write!(f, "not a TrueType font")
@@ -172,7 +172,7 @@ impl From<CFFError> for Error {
 
 impl std::error::Error for Error {}
 
-pub(crate) type Result<T> = core::result::Result<T, Error>;
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 
 /// A TrueType's `Tag` data type.
@@ -214,7 +214,7 @@ impl Tag {
     }
 }
 
-impl core::ops::Deref for Tag {
+impl std::ops::Deref for Tag {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -222,15 +222,15 @@ impl core::ops::Deref for Tag {
     }
 }
 
-impl core::fmt::Debug for Tag {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl std::fmt::Debug for Tag {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let tag = self.to_ascii();
         write!(f, "Tag({}{}{}{})", tag[0], tag[1], tag[2], tag[3])
     }
 }
 
-impl core::fmt::Display for Tag {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl std::fmt::Display for Tag {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let tag = self.to_ascii();
         write!(f, "{}{}{}{}", tag[0], tag[1], tag[2], tag[3])
     }
@@ -337,7 +337,7 @@ pub enum TableName {
 impl TryFrom<Tag> for TableName {
     type Error = ();
 
-    fn try_from(value: Tag) -> core::result::Result<Self, Self::Error> {
+    fn try_from(value: Tag) -> std::result::Result<Self, Self::Error> {
         // TODO: Rust doesn't support `const fn` in patterns yet
         match &*value {
             b"CFF " => Ok(TableName::CompactFontFormat),
@@ -369,7 +369,7 @@ struct RawTable {
 }
 
 impl RawTable {
-    fn range(&self) -> core::ops::Range<usize> {
+    fn range(&self) -> std::ops::Range<usize> {
         // 'The length of a table must be a multiple of four bytes.'
         // But Table Record stores an actual table length.
         // So we have to expand it.

@@ -53,8 +53,8 @@ pub enum CFFError {
     InvalidArgumentsStackLength,
 }
 
-impl core::fmt::Display for CFFError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl std::fmt::Display for CFFError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             CFFError::InvalidOperand => {
                 write!(f, "an invalid operand occurred")
@@ -1187,7 +1187,7 @@ fn parse_float(s: &mut Stream) -> Result<Number> {
         lookup(nibble2)?;
     }
 
-    let s = core::str::from_utf8(&data[..idx]).map_err(|_| CFFError::InvalidFloat)?;
+    let s = std::str::from_utf8(&data[..idx]).map_err(|_| CFFError::InvalidFloat)?;
     let n = s.parse().map_err(|_| CFFError::InvalidFloat)?;
     Ok(Number::Float(n))
 }
@@ -1274,8 +1274,8 @@ impl ArgumentsStack {
     }
 }
 
-impl<'a> core::fmt::Debug for ArgumentsStack {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl<'a> std::fmt::Debug for ArgumentsStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_list().entries(&self.data[..self.len]).finish()
     }
 }

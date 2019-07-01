@@ -226,6 +226,14 @@ fn parse_private_dict<'a>(s: &'a mut Stream<'a>) -> Result<PrivateDict> {
     Ok(dict)
 }
 
+struct CharStringParserContext<'a> {
+    global_subrs: DataIndex<'a>,
+    local_subrs: DataIndex<'a>,
+    is_first_move_to: bool,
+    width_parsed: bool,
+    stems_len: u32,
+}
+
 fn parse_char_string(
     global_subrs: DataIndex,
     local_subrs: DataIndex,
@@ -245,25 +253,17 @@ fn parse_char_string(
     };
 
     let mut stack = ArgumentsStack::new();
-    let _ = parse(&mut ctx, data, 0.0, 0.0, &mut stack, 0, builder)?;
+    let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, builder)?;
     Ok(())
 }
 
-struct CharStringParserContext<'a> {
-    global_subrs: DataIndex<'a>,
-    local_subrs: DataIndex<'a>,
-    is_first_move_to: bool,
-    width_parsed: bool,
-    stems_len: u32,
-}
-
-fn parse(
+fn _parse_char_string(
     ctx: &mut CharStringParserContext,
     char_string: &[u8],
     mut x: f32,
     mut y: f32,
     stack: &mut ArgumentsStack,
-    stack_depth: u8,
+    depth: u8,
     builder: &mut impl OutlineBuilder,
 ) -> Result<(f32, f32)> {
     let mut s = Stream::new(char_string);
@@ -400,14 +400,14 @@ fn parse(
                     return Err(CFFError::InvalidArgumentsStackLength.into());
                 }
 
-                if stack_depth == STACK_LIMIT {
+                if depth == STACK_LIMIT {
                     return Err(CFFError::NestingLimitReached.into());
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.local_subrs.len() as u16);
                 let index = stack.pop() as i32 + subroutine_bias as i32;
                 let char_string = ctx.local_subrs.get(index as u16).ok_or(Error::NoGlyph)?;
-                let pos = parse(ctx, char_string, x, y, stack, stack_depth + 1, builder)?;
+                let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
                 y = pos.1;
             }
@@ -732,14 +732,14 @@ fn parse(
                     return Err(CFFError::InvalidArgumentsStackLength.into());
                 }
 
-                if stack_depth == STACK_LIMIT {
+                if depth == STACK_LIMIT {
                     return Err(CFFError::NestingLimitReached.into());
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.global_subrs.len() as u16);
                 let index = stack.pop() as i32 + subroutine_bias as i32;
                 let char_string = ctx.global_subrs.get(index as u16).ok_or(Error::NoGlyph)?;
-                let pos = parse(ctx, char_string, x, y, stack, stack_depth + 1, builder)?;
+                let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
                 y = pos.1;
             }

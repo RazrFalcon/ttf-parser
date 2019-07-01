@@ -37,6 +37,9 @@ impl<'a> Font<'a> {
                 Format::SegmentMappingToDeltaValues => {
                     parse_segment_mapping_to_delta_values(subtable_data, c)
                 }
+                Format::TrimmedTableMapping => {
+                    parse_trimmed_table_mapping(&mut s, c)
+                }
                 Format::SegmentedCoverage | Format::ManyToOneRangeMappings => {
                     parse_segmented_coverage(&mut s, c, format)
                 }
@@ -270,6 +273,30 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
     }
 
     None
+}
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-6-trimmed-table-mapping
+fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Option<u16> {
+    // This subtable supports code points only in a u16 range.
+    if code_point > 0xffff {
+        return None;
+    }
+
+    s.skip::<u16>(); // length
+    s.skip::<u16>(); // language
+    let first_code_point: u16 = s.read();
+    let count: u16 = s.read();
+    let glyphs: LazyArray<u16> = s.read_array(count);
+
+    let code_point = code_point as u16;
+
+    // Check for overflow.
+    if code_point < first_code_point {
+        return None;
+    }
+
+    let idx = code_point - first_code_point;
+    glyphs.get(idx)
 }
 
 // + ManyToOneRangeMappings

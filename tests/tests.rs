@@ -364,6 +364,24 @@ fn glyph_index_f06_01() {
 }
 
 #[test]
+fn glyph_index_f10_01() {
+    let data = fs::read("tests/fonts/cmap-10.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+
+    assert_eq!(font.glyph_index('\u{109423}').unwrap(), GlyphId(26));
+    assert_eq!(font.glyph_index('\u{109424}').unwrap(), GlyphId(27));
+    assert_eq!(font.glyph_index('\u{109425}').unwrap(), GlyphId(32));
+
+    // Char before character map.
+    // Should not overflow.
+    assert!(font.glyph_index('!').is_err());
+
+    // Char after character map.
+    // Should not read out of bounds.
+    assert!(font.glyph_index('\u{109426}').is_err());
+}
+
+#[test]
 fn glyph_index_f12_01() {
     let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();

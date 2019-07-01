@@ -40,6 +40,9 @@ impl<'a> Font<'a> {
                 Format::TrimmedTableMapping => {
                     parse_trimmed_table_mapping(&mut s, c)
                 }
+                Format::TrimmedArray => {
+                    parse_trimmed_array(&mut s, c)
+                }
                 Format::SegmentedCoverage | Format::ManyToOneRangeMappings => {
                     parse_segmented_coverage(&mut s, c, format)
                 }
@@ -289,6 +292,24 @@ fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Option<u16> {
     let glyphs: LazyArray<u16> = s.read_array(count);
 
     let code_point = code_point as u16;
+
+    // Check for overflow.
+    if code_point < first_code_point {
+        return None;
+    }
+
+    let idx = code_point - first_code_point;
+    glyphs.get(idx)
+}
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-10-trimmed-array
+fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Option<u16> {
+    s.skip::<u16>(); // reserved
+    s.skip::<u32>(); // length
+    s.skip::<u32>(); // language
+    let first_code_point: u32 = s.read();
+    let count: u32 = s.read();
+    let glyphs: LazyArray<u16> = s.read_array(count);
 
     // Check for overflow.
     if code_point < first_code_point {

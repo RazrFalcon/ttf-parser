@@ -347,12 +347,12 @@ fn glyph_index_f04_01() {
 
 #[test]
 fn glyph_index_f06_01() {
-    let data = fs::read("tests/fonts/cmap6_font1.otf").unwrap();
+    let data = fs::read("tests/fonts/cmap-6.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
 
-    assert_eq!(font.glyph_index('"').unwrap(), GlyphId(17));
-    assert_eq!(font.glyph_index('#').unwrap(), GlyphId(56));
-    assert_eq!(font.glyph_index('$').unwrap(), GlyphId(12));
+    assert_eq!(font.glyph_index('"').unwrap(), GlyphId(6));
+    assert_eq!(font.glyph_index('#').unwrap(), GlyphId(7));
+    assert_eq!(font.glyph_index('$').unwrap(), GlyphId(5));
 
     // Char before character map.
     // Should not overflow.

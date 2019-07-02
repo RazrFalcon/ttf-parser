@@ -11,6 +11,9 @@ documentation = "https://docs.rs/ttf-parser/"
 readme = "README.md"
 edition = "2018"
 
+[workspace]
+exclude = ["fonts"]
+
 [dev-dependencies]
 bencher = "0.1"
 svgtypes = { version = "0.4.4", default-features = false }
@@ -18,4 +21,8 @@ time = "0.1"
 
 [[bench]]
 name = "outline"
+harness = false
+
+[[bench]]
+name = "methods_perf"
 harness = false

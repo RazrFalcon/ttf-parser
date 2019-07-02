@@ -1,7 +1,17 @@
-fn outline(bencher: &mut bencher::Bencher) {
-    let font_data = std::fs::read("benches/font.ttf").expect("see readme");
+fn outline_glyf(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = ttf_parser::Font::from_data(&font_data, 0).unwrap();
     bencher.iter(|| {
-        let font = ttf_parser::Font::from_data(&font_data, 0).unwrap();
+        for id in 0..font.number_of_glyphs() {
+            let _ = font.outline_glyph(ttf_parser::GlyphId(id), &mut Builder(0));
+        }
+    })
+}
+
+fn outline_cff(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.otf").unwrap();
+    let font = ttf_parser::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
         for id in 0..font.number_of_glyphs() {
             let _ = font.outline_glyph(ttf_parser::GlyphId(id), &mut Builder(0));
         }
@@ -37,5 +47,5 @@ impl ttf_parser::OutlineBuilder for Builder {
     }
 }
 
-bencher::benchmark_group!(outline_group, outline);
+bencher::benchmark_group!(outline_group, outline_glyf, outline_cff);
 bencher::benchmark_main!(outline_group);

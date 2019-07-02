@@ -112,6 +112,7 @@ fn glyph_to_path(
     let mut builder = Builder(svgtypes::Path::new());
     match font.outline_glyph(glyph_id, &mut builder) {
         Ok(v) => v,
+        Err(ttf_parser::Error::NoOutline) => return,
         Err(ttf_parser::Error::NoGlyph) => return,
         Err(e) => {
             eprintln!("Warning (glyph {}): {}.", glyph_id.0, e);

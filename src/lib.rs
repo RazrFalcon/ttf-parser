@@ -71,6 +71,41 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_class()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_class
 [glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
 
+## Methods' computational complexity
+
+TrueType fonts designed for fast querying, so most of the methods are very fast.
+The main exception is glyph outlining. Glyphs can be stored using two different methods:
+using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/glyf) format
+and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
+The first one is fairly simple which makes it faster to process.
+The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
+Currently, it takes almost 2.5x times longer to outline all glyphs in
+*SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
+
+```text
+test outline_cff  ... bench:   2,506,071 ns/iter (+/- 1,719)
+test outline_glyf ... bench:   1,078,679 ns/iter (+/- 3,865)
+```
+
+Here is some methods benchmarks:
+
+```text
+test outline_glyph_276_from_cff  ... bench:       1,620 ns/iter (+/- 77)
+test outline_glyph_8_from_cff    ... bench:         963 ns/iter (+/- 49)
+test outline_glyph_276_from_glyf ... bench:         902 ns/iter (+/- 34)
+test outline_glyph_8_from_glyf   ... bench:         377 ns/iter (+/- 8)
+test family_name                 ... bench:         451 ns/iter (+/- 3)
+test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
+test glyph_2_hor_metrics         ... bench:          15 ns/iter (+/- 0)
+test width                       ... bench:           8 ns/iter (+/- 0)
+test units_per_em                ... bench:           6 ns/iter (+/- 0)
+```
+
+All other methods are essentially free. All they do is read a value at a specified offset.
+
+`family_name` is expensive, because it allocates a `String` and the original data
+is stored as UTF-16 BE.
+
 ## Safety
 
 - The library relies heavily on Rust's bounds checking and assumes that font is well-formed.

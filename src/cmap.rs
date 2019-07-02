@@ -8,6 +8,8 @@ impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
     ///
     /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
+    ///
+    /// All subtable formats except Mixed Coverage (8) are supported.
     pub fn glyph_index(&self, c: char) -> Result<GlyphId> {
         let cmap_data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
         let mut s = Stream::new(cmap_data);
@@ -40,6 +42,10 @@ impl<'a> Font<'a> {
                 Format::TrimmedTableMapping => {
                     parse_trimmed_table_mapping(&mut s, c)
                 }
+                Format::MixedCoverage => {
+                    // Unsupported.
+                    continue;
+                }
                 Format::TrimmedArray => {
                     parse_trimmed_array(&mut s, c)
                 }
@@ -50,7 +56,6 @@ impl<'a> Font<'a> {
                     // This subtable is used only by glyph_variation_index().
                     continue;
                 }
-                _ => continue,
             };
 
             if let Some(id) = glyph {

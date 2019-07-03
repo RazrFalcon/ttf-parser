@@ -118,28 +118,6 @@ is stored as UTF-16 BE.
 #![warn(missing_debug_implementations)]
 
 
-macro_rules! impl_bit_ops {
-    ($name:ty) => {
-        impl std::ops::BitOr for $name {
-            type Output = Self;
-
-            #[inline]
-            fn bitor(self, other: Self) -> Self {
-                Self(self.0 | other.0)
-            }
-        }
-
-        impl std::ops::BitAnd for $name {
-            type Output = Self;
-
-            #[inline]
-            fn bitand(self, other: Self) -> Self {
-                Self(self.0 & other.0)
-            }
-        }
-    }
-}
-
 use std::convert::TryFrom;
 
 mod cff;

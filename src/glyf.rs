@@ -68,8 +68,6 @@ impl SimpleGlyphFlags {
     #[inline] fn contains(&self, other: Self) -> bool { (self.0 & other.0) == other.0 }
 }
 
-impl_bit_ops!(SimpleGlyphFlags);
-
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
 #[derive(Clone, Copy)]
@@ -87,8 +85,6 @@ impl CompositeGlyphFlags {
     #[inline] fn from_bits_truncate(bits: u16) -> Self { Self(bits & Self::all().0) }
     #[inline] fn contains(&self, other: Self) -> bool { (self.0 & other.0) == other.0 }
 }
-
-impl_bit_ops!(CompositeGlyphFlags);
 
 
 #[inline]

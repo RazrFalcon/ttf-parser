@@ -287,7 +287,7 @@ impl<'a> Font<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
-    pub fn post_stript_name(&self) -> Option<String> {
+    pub fn post_script_name(&self) -> Option<String> {
         self.names()
             .find(|name| name.name_id == NameId::PostScriptName && name.is_supported_encoding())
             .and_then(|name| name.to_string())

@@ -19,7 +19,7 @@ fn process() -> Result<(), Box<std::error::Error>> {
     let font = ttf_parser::Font::from_data(&font_data, 0)?;
 
     println!("Family name: {:?}", font.family_name());
-    println!("PostScript name: {:?}", font.post_stript_name());
+    println!("PostScript name: {:?}", font.post_script_name());
     println!("Units per EM: {:?}", font.units_per_em());
     println!("Ascender: {}", font.ascender());
     println!("Descender: {}", font.descender());

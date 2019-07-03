@@ -22,7 +22,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`maxp`) Retrieving a total number of glyphs using [number_of_glyphs()] method.
 - (`name`) Listing all name records using [names()] method.
 - (`name`) Retrieving a font's family name using [family_name()] method.
-- (`name`) Retrieving a font's PostScript name using [post_stript_name()] method.
+- (`name`) Retrieving a font's PostScript name using [post_script_name()] method.
 - (`post`) Retrieving a font's underline metrics name using [underline_metrics()] method.
 - (`head`) Retrieving a font's units per EM value using [units_per_em()] method.
 - (`hhea`) Retrieving a generic font info using: [ascender()], [descender()], [height()]
@@ -36,7 +36,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [number_of_glyphs()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.number_of_glyphs
 [names()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.names
 [family_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.family_name
-[post_stript_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.post_stript_name
+[post_script_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.post_stript_name
 [underline_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.underline_metrics
 [units_per_em()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.units_per_em
 [ascender()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.ascender

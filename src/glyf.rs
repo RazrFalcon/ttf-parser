@@ -177,7 +177,12 @@ impl<'a> Font<'a> {
         let mut total = 0u16;
         for n in endpoints {
             let n = n + 1 - total;
-            Self::parse_contour(points.by_ref().take(n as usize), builder);
+
+            // Contour must have at least 2 points.
+            if n >= 2 {
+                Self::parse_contour(points.by_ref().take(n as usize), builder);
+            }
+
             total += n;
         }
     }

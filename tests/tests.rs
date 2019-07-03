@@ -45,7 +45,7 @@ impl ttf::OutlineBuilder for Builder {
 fn number_of_glyphs() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.number_of_glyphs(), 5);
+    assert_eq!(font.number_of_glyphs(), 7);
 }
 
 #[test]
@@ -83,6 +83,28 @@ fn outline_glyph_composite() {
                 M 474 737 Q 494 737 509.5 723.5 Q 525 710 525 681 Q 525 653 509.5 639 \
                 Q 494 625 474 625 Q 452 625 437 639 Q 422 653 422 681 Q 422 710 437 723.5 \
                 Q 452 737 474 737 Z M 517 536 L 517 0 L 429 0 L 429 536 L 517 536 Z");
+}
+
+#[test]
+fn outline_glyph_single_point() {
+    let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let mut builder = Builder::new();
+    font.outline_glyph(GlyphId(5), &mut builder).unwrap();
+    assert_eq!(builder.0.to_string(), "");
+}
+
+#[test]
+fn outline_glyph_single_point_2() {
+    let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    let mut builder = Builder::new();
+    font.outline_glyph(GlyphId(6), &mut builder).unwrap();
+    assert_eq!(builder.0.to_string(),
+               "M 332 468 L 197 468 L 197 0 L 109 0 L 109 468 L 15 468 L 15 509 L 109 539 \
+               L 109 570 Q 109 674 155 719.5 Q 201 765 283 765 Q 315 765 341.5 759.5 \
+               Q 368 754 387 747 L 364 678 Q 348 683 327 688 Q 306 693 284 693 \
+               Q 240 693 218.5 663.5 Q 197 634 197 571 L 197 536 L 332 536 L 332 468 Z");
 }
 
 #[test]

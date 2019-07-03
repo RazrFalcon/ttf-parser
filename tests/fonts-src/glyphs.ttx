@@ -7,6 +7,8 @@
     <GlyphID id="2" name="f"/>
     <GlyphID id="3" name="i"/>
     <GlyphID id="4" name="fi"/>
+    <GlyphID id="5" name="space"/>
+    <GlyphID id="6" name="f+space"/>
   </GlyphOrder>
 
   <head>
@@ -62,6 +64,8 @@
     <mtx name="f" width="344" lsb="15"/>
     <mtx name="i" width="258" lsb="78"/>
     <mtx name="fi" width="602" lsb="15"/>
+    <mtx name="space" width="602" lsb="15"/>
+    <mtx name="f+space" width="602" lsb="15"/>
   </hmtx>
 
   <cmap>
@@ -159,6 +163,18 @@
     <TTGlyph name="fi">
       <component glyphName="f" x="0" y="0" flags="0x4"/>
       <component glyphName="i" x="344" y="0" flags="0x4"/>
+    </TTGlyph>
+
+    <TTGlyph name="space">
+      <contour>
+        <pt x="0" y="0" on="0"/>
+      </contour>
+      <instructions/>
+    </TTGlyph>
+
+    <TTGlyph name="f+space">
+      <component glyphName="f" x="0" y="0" flags="0x4"/>
+      <component glyphName="space" x="1" y="0" flags="0x4"/>
     </TTGlyph>
   </glyf>
 

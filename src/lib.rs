@@ -160,7 +160,7 @@ pub enum Error {
     NotATrueType,
 
     /// The font index is out of bounds.
-    IndexOutOfBounds,
+    FontIndexOutOfBounds,
 
     /// One of the required tables is missing.
     TableMissing(TableName),
@@ -193,7 +193,7 @@ impl std::fmt::Display for Error {
             Error::NotATrueType => {
                 write!(f, "not a TrueType font")
             }
-            Error::IndexOutOfBounds => {
+            Error::FontIndexOutOfBounds => {
                 write!(f, "font index is out of bounds")
             }
             Error::TableMissing(name) => {
@@ -418,6 +418,8 @@ impl TryFrom<Tag> for TableName {
     }
 }
 
+const MAX_NUMBER_OF_TABLES: usize = 12;
+
 
 struct RawTable {
     tag: Tag,
@@ -459,11 +461,18 @@ struct TableInfo<'a> {
 }
 
 
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
+const OFFSET_TABLE_SIZE: usize = 12;
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
+const MIN_TTC_SIZE: usize = 12 + OFFSET_TABLE_SIZE;
+
+
 /// A font data handle.
 #[derive(Clone)]
 #[allow(missing_debug_implementations)]
 pub struct Font<'a> {
-    tables: [TableInfo<'a>; 12],
+    tables: [TableInfo<'a>; MAX_NUMBER_OF_TABLES],
     number_of_glyphs: GlyphId,
 }
 
@@ -487,11 +496,15 @@ impl<'a> Font<'a> {
                 let font_offset: u32 = Stream::read_at(data, offset);
                 &data[font_offset as usize ..]
             } else {
-                return Err(Error::IndexOutOfBounds);
+                return Err(Error::FontIndexOutOfBounds);
             }
         } else {
             data
         };
+
+        if data.len() < OFFSET_TABLE_SIZE {
+            return Err(Error::NotATrueType);
+        }
 
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
         const SFNT_VERSION_TRUE_TYPE: u32 = 0x00010000;
@@ -513,7 +526,7 @@ impl<'a> Font<'a> {
             name: TableName::MaximumProfile, // dummy
             checksum: 0,
             data: b"",
-        }; 12];
+        }; MAX_NUMBER_OF_TABLES];
 
         let mut number_of_glyphs = GlyphId(0);
 
@@ -687,6 +700,10 @@ fn is_collection(data: &[u8]) -> bool {
 ///
 /// Returns `None` if a provided data is not a TrueType font collection.
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
+    if data.len() < MIN_TTC_SIZE {
+        return None;
+    }
+
     // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
     const NUM_FONTS_OFFSET: usize = 8;
 

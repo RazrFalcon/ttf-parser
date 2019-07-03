@@ -59,8 +59,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`OS/2`) Retrieving a font's strikeout metrics using [strikeout_metrics()] method.
 - (`OS/2`) Retrieving a font's subscript metrics using [subscript_metrics()] method.
 - (`OS/2`) Retrieving a font's superscript metrics using [superscript_metrics()] method.
-- (`GDEF`) Retrieving a glyph's class using [glyph_class()] method.
-- (`GDEF`) Retrieving a glyph's mark attachment class using [glyph_mark_attachment_class()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.is_italic
@@ -72,8 +70,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 [strikeout_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.strikeout_metrics
 [subscript_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.subscript_metrics
 [superscript_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.superscript_metrics
-[glyph_class()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_class
-[glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
 
 ### Methods' computational complexity
 

@@ -55,8 +55,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`OS/2`) Retrieving a font's strikeout metrics using [strikeout_metrics()] method.
 - (`OS/2`) Retrieving a font's subscript metrics using [subscript_metrics()] method.
 - (`OS/2`) Retrieving a font's superscript metrics using [superscript_metrics()] method.
-- (`GDEF`) Retrieving a glyph's class using [glyph_class()] method.
-- (`GDEF`) Retrieving a glyph's mark attachment class using [glyph_mark_attachment_class()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.is_italic
@@ -68,8 +66,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 [strikeout_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.strikeout_metrics
 [subscript_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.subscript_metrics
 [superscript_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.superscript_metrics
-[glyph_class()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_class
-[glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
 
 ## Methods' computational complexity
 
@@ -148,7 +144,6 @@ use std::convert::TryFrom;
 
 mod cff;
 mod cmap;
-mod gdef;
 mod glyf;
 mod head;
 mod hhea;
@@ -163,7 +158,6 @@ mod vmtx;
 
 use parser::{Stream, FromData, LazyArray};
 pub use cff::CFFError;
-pub use gdef::*;
 pub use glyf::*;
 pub use name::*;
 pub use os2::*;
@@ -409,7 +403,6 @@ pub enum TableName {
     CharacterToGlyphIndexMapping    = Tag::make_u32(b"cmap"),
     CompactFontFormat               = Tag::make_u32(b"CFF "),
     GlyphData                       = Tag::make_u32(b"glyf"),
-    GlyphDefinition                 = Tag::make_u32(b"GDEF"),
     Header                          = Tag::make_u32(b"head"),
     HorizontalHeader                = Tag::make_u32(b"hhea"),
     HorizontalMetrics               = Tag::make_u32(b"hmtx"),
@@ -430,7 +423,6 @@ impl TryFrom<Tag> for TableName {
         match &*value {
             b"CFF " => Ok(TableName::CompactFontFormat),
             b"cmap" => Ok(TableName::CharacterToGlyphIndexMapping),
-            b"GDEF" => Ok(TableName::GlyphDefinition),
             b"glyf" => Ok(TableName::GlyphData),
             b"head" => Ok(TableName::Header),
             b"head" => Ok(TableName::HorizontalMetrics),

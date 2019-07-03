@@ -280,41 +280,6 @@ fn glyph_ver_metrics_2() {
 }
 
 #[test]
-fn glyph_class_1() {
-    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert!(font.glyph_class(GlyphId(0)).is_err());
-}
-
-#[test]
-fn glyph_class_2() {
-    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_class(GlyphId(2)).unwrap(), ttf::GlyphClass::Base);
-}
-
-#[test]
-fn glyph_class_3() {
-    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_class(GlyphId(4)).unwrap(), ttf::GlyphClass::Mark);
-}
-
-#[test]
-fn glyph_mark_attachment_class_1() {
-    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_mark_attachment_class(GlyphId(0)).unwrap(), 0);
-}
-
-#[test]
-fn glyph_mark_attachment_class_2() {
-    let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_mark_attachment_class(GlyphId(4)).unwrap(), 1);
-}
-
-#[test]
 fn glyph_index_f00_01() {
     let data = fs::read("tests/fonts/cmap0_font1.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();

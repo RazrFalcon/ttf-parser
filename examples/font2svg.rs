@@ -1,3 +1,5 @@
+use ttf_parser as ttf;
+
 use std::fmt::Write;
 
 const FONT_SIZE: f64 = 128.0;
@@ -18,7 +20,7 @@ fn process() -> Result<(), Box<std::error::Error>> {
     }
 
     let font_data = std::fs::read(&args[1])?;
-    let font = ttf_parser::Font::from_data(&font_data, 0)?;
+    let font = ttf::Font::from_data(&font_data, 0)?;
     let units_per_em = font.units_per_em().ok_or("invalid units per em")?;
     let scale = FONT_SIZE / units_per_em as f64;
 
@@ -33,14 +35,16 @@ fn process() -> Result<(), Box<std::error::Error>> {
 
     draw_grid(font.number_of_glyphs(), cell_size, &mut output);
 
+    let dy = font.height()? as f64 * scale + font.descender()? as f64 * scale;
+
     let mut row = 0;
     let mut column = 0;
     for id in 0..font.number_of_glyphs() {
         glyph_to_path(
             column as f64 * cell_size,
-            row as f64 * cell_size,
+            row as f64 * cell_size + dy,
             &font,
-            ttf_parser::GlyphId(id),
+            ttf::GlyphId(id),
             cell_size,
             scale,
             &mut output,
@@ -98,8 +102,8 @@ fn draw_grid(
 fn glyph_to_path(
     x: f64,
     y: f64,
-    font: &ttf_parser::Font,
-    glyph_id: ttf_parser::GlyphId,
+    font: &ttf::Font,
+    glyph_id: ttf::GlyphId,
     cell_size: f64,
     scale: f64,
     output: &mut String,
@@ -112,8 +116,8 @@ fn glyph_to_path(
     let mut builder = Builder(svgtypes::Path::new());
     match font.outline_glyph(glyph_id, &mut builder) {
         Ok(v) => v,
-        Err(ttf_parser::Error::NoOutline) => return,
-        Err(ttf_parser::Error::NoGlyph) => return,
+        Err(ttf::Error::NoOutline) => return,
+        Err(ttf::Error::NoGlyph) => return,
         Err(e) => {
             eprintln!("Warning (glyph {}): {}.", glyph_id.0, e);
             return;
@@ -125,10 +129,15 @@ fn glyph_to_path(
         return;
     }
 
-    let dx = (cell_size - font.glyph_hor_metrics(glyph_id).unwrap().advance as f64 * scale) / 2.0;
+    let metrics = match font.glyph_hor_metrics(glyph_id) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let dx = (cell_size - metrics.advance as f64 * scale) / 2.0;
 
     let mut ts = svgtypes::Transform::default();
-    ts.translate(x + dx, y + font.height().unwrap() as f64 * scale + font.descender().unwrap() as f64 * scale);
+    ts.translate(x + dx, y);
     ts.scale(1.0, -1.0);
     ts.scale(scale, scale);
 
@@ -137,7 +146,7 @@ fn glyph_to_path(
 
 struct Builder(svgtypes::Path);
 
-impl ttf_parser::OutlineBuilder for Builder {
+impl ttf::OutlineBuilder for Builder {
     fn move_to(&mut self, x: f32, y: f32) {
         self.0.push(svgtypes::PathSegment::MoveTo {
             abs: true, x: x as f64, y: y as f64

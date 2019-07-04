@@ -138,7 +138,6 @@ impl<'a> Font<'a> {
         if number_of_contours > 0 {
             Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)
         } else if number_of_contours < 0 {
-            debug_assert_eq!(number_of_contours, -1);
             self.parse_composite_outline(s.tail()?, builder)
         } else {
             // An empty glyph.

@@ -563,14 +563,19 @@ impl<'a> Font<'a> {
                 Err(_) => continue,
             };
 
+            let data = match data.get(table.range()) {
+                Some(data) => data,
+                None => continue,
+            };
+
             tables[i] = TableInfo {
                 name,
                 checksum: table.checksum,
-                data: &data[table.range()],
+                data,
             };
 
             if name == TableName::MaximumProfile {
-                number_of_glyphs = Self::parse_number_of_glyphs(&data[table.range()])?;
+                number_of_glyphs = Self::parse_number_of_glyphs(data)?;
             }
 
             i += 1;

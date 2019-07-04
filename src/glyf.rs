@@ -116,8 +116,7 @@ impl<'a> Font<'a> {
         };
 
         let glyph_data = self.glyph_data(glyph_id)?;
-        self.outline_impl(glyph_data, &mut b);
-        Ok(())
+        self.outline_impl(glyph_data, &mut b)
     }
 
     fn glyph_data(&self, glyph_id: GlyphId) -> Result<&[u8]> {
@@ -130,18 +129,20 @@ impl<'a> Font<'a> {
         &self,
         data: &[u8],
         builder: &mut Builder<T>,
-    ) {
+    ) -> Result<()> {
         let mut s = Stream::new(data);
 
-        let number_of_contours: i16 = s.read();
+        let number_of_contours: i16 = s.read()?;
         s.skip_len(8_u32); // skip bbox
 
         if number_of_contours > 0 {
-            Self::parse_simple_outline(s.tail(), number_of_contours as u16, builder);
+            Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)
         } else if number_of_contours < 0 {
-            self.parse_composite_outline(s.tail(), builder);
+            debug_assert_eq!(number_of_contours, -1);
+            self.parse_composite_outline(s.tail()?, builder)
         } else {
             // An empty glyph.
+            Ok(())
         }
     }
 
@@ -150,16 +151,19 @@ impl<'a> Font<'a> {
         glyph_data: &[u8],
         number_of_contours: u16,
         builder: &mut Builder<T>,
-    ) {
-        let mut s = Stream::new(glyph_data);
-        let endpoints: LazyArray<u16> = s.read_array(number_of_contours);
-        let points_total = endpoints.last() + 1;
+    ) -> Result<()> {
+        debug_assert!(number_of_contours > 0);
 
-        let instructions_len: u16 = s.read();
+        let mut s = Stream::new(glyph_data);
+        let endpoints: LazyArray<u16> = s.read_array(number_of_contours)?;
+        // Unwrap is safe, because it's guarantee that array has at least one value.
+        let points_total = endpoints.last().unwrap() + 1;
+
+        let instructions_len: u16 = s.read()?;
         s.skip_len(instructions_len);
 
         let flags_offset = s.offset();
-        let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total);
+        let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)?;
         let x_coords_offset = s.offset();
         let y_coords_offset = x_coords_offset + x_coords_len as usize;
 
@@ -185,6 +189,8 @@ impl<'a> Font<'a> {
 
             total += n;
         }
+
+        Ok(())
     }
 
     /// Resolves the X coordinates length.
@@ -193,17 +199,17 @@ impl<'a> Font<'a> {
     fn resolve_x_coords_len(
         s: &mut Stream,
         points_total: u16,
-    ) -> u16 {
+    ) -> Result<u16> {
         type Flags = SimpleGlyphFlags;
 
         let mut flags_left = points_total;
         let mut x_coords_len = 0;
         while flags_left > 0 {
-            let flags = Flags::from_bits_truncate(s.read());
+            let flags = Flags::from_bits_truncate(s.read()?);
 
             // The number of times a glyph point repeats.
             let repeats = if flags.contains(Flags::REPEAT_FLAG) {
-                s.read::<u8>() as u16 + 1
+                s.read::<u8>()? as u16 + 1
             } else {
                 1
             };
@@ -221,7 +227,7 @@ impl<'a> Font<'a> {
             flags_left -= repeats;
         }
 
-        x_coords_len
+        Ok(x_coords_len)
     }
 
     fn parse_contour<T: OutlineBuilder>(
@@ -304,37 +310,37 @@ impl<'a> Font<'a> {
         &self,
         glyph_data: &[u8],
         builder: &mut Builder<T>,
-    ) {
+    ) -> Result<()> {
         type Flags = CompositeGlyphFlags;
 
         let mut s = Stream::new(glyph_data);
-        let flags = Flags::from_bits_truncate(s.read());
-        let glyph_id: GlyphId = s.read();
+        let flags = Flags::from_bits_truncate(s.read()?);
+        let glyph_id: GlyphId = s.read()?;
 
         let mut ts = Transform::default();
 
         if flags.contains(Flags::ARGS_ARE_XY_VALUES) {
             if flags.contains(Flags::ARG_1_AND_2_ARE_WORDS) {
-                ts.e = s.read::<i16>() as f32;
-                ts.f = s.read::<i16>() as f32;
+                ts.e = s.read::<i16>()? as f32;
+                ts.f = s.read::<i16>()? as f32;
             } else {
-                ts.e = s.read::<i8>() as f32;
-                ts.f = s.read::<i8>() as f32;
+                ts.e = s.read::<i8>()? as f32;
+                ts.f = s.read::<i8>()? as f32;
             }
         } else {
             debug_assert!(false, "unsupported");
         }
 
         if flags.contains(Flags::WE_HAVE_A_TWO_BY_TWO) {
-            ts.a = s.read_f2_14();
-            ts.b = s.read_f2_14();
-            ts.c = s.read_f2_14();
-            ts.d = s.read_f2_14();
+            ts.a = s.read_f2_14()?;
+            ts.b = s.read_f2_14()?;
+            ts.c = s.read_f2_14()?;
+            ts.d = s.read_f2_14()?;
         } else if flags.contains(Flags::WE_HAVE_AN_X_AND_Y_SCALE) {
-            ts.a = s.read_f2_14();
-            ts.d = s.read_f2_14();
+            ts.a = s.read_f2_14()?;
+            ts.d = s.read_f2_14()?;
         } else if flags.contains(Flags::WE_HAVE_A_SCALE) {
-            ts.a = f32_bound(-2.0, s.read_f2_14(), 2.0);
+            ts.a = f32_bound(-2.0, s.read_f2_14()?, 2.0);
             ts.d = ts.a;
         }
 
@@ -344,12 +350,14 @@ impl<'a> Font<'a> {
                 builder: builder.builder,
                 transform,
                 is_default_ts: transform.is_default(),
-            });
+            })?;
         }
 
         if flags.contains(Flags::MORE_COMPONENTS) {
-            self.parse_composite_outline(s.tail(), builder);
+            self.parse_composite_outline(s.tail()?, builder)?;
         }
+
+        Ok(())
     }
 }
 
@@ -380,7 +388,7 @@ impl Transform {
     }
 
     fn is_default(&self) -> bool {
-        // A direct float comparison is fine in out case.
+        // A direct float comparison is fine in our case.
            self.a == 1.0
         && self.b == 0.0
         && self.c == 0.0
@@ -434,9 +442,9 @@ impl<'a> Iterator for GlyphPoints<'a> {
         }
 
         if self.flag_repeats == 0 {
-            self.last_flags = Flags::from_bits_truncate(self.flags.read());
+            self.last_flags = Flags::from_bits_truncate(self.flags.read().ok()?);
             if self.last_flags.contains(Flags::REPEAT_FLAG) {
-                self.flag_repeats = self.flags.read();
+                self.flag_repeats = self.flags.read().ok()?;
             }
         } else {
             self.flag_repeats -= 1;
@@ -447,14 +455,14 @@ impl<'a> Iterator for GlyphPoints<'a> {
             Flags::X_SHORT_VECTOR,
             Flags::X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR,
             &mut self.x_coords,
-        );
+        ).ok()?;
 
         self.y += get_glyph_coord(
             self.last_flags,
             Flags::Y_SHORT_VECTOR,
             Flags::Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR,
             &mut self.y_coords,
-        );
+        ).ok()?;
 
         self.points_left -= 1;
 
@@ -471,27 +479,27 @@ fn get_glyph_coord(
     short_vector: SimpleGlyphFlags,
     is_same_or_positive_short_vector: SimpleGlyphFlags,
     coords: &mut Stream,
-) -> i16 {
+) -> Result<i16> {
     let flags = (
         flags.contains(short_vector),
         flags.contains(is_same_or_positive_short_vector),
     );
 
-    match flags {
+    Ok(match flags {
         (true, true) => {
-            coords.read::<u8>() as i16
+            coords.read::<u8>()? as i16
         }
         (true, false) => {
-            -(coords.read::<u8>() as i16)
+            -(coords.read::<u8>()? as i16)
         }
         (false, true) => {
             // Keep previous coordinate.
             0
         }
         (false, false) => {
-            coords.read()
+            coords.read()?
         }
-    }
+    })
 }
 
 

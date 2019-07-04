@@ -36,7 +36,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [number_of_glyphs()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.number_of_glyphs
 [names()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.names
 [family_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.family_name
-[post_script_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.post_stript_name
+[post_script_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.post_script_name
 [underline_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.underline_metrics
 [units_per_em()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.units_per_em
 [ascender()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.ascender
@@ -79,21 +79,21 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```text
-test outline_cff  ... bench:   2,506,071 ns/iter (+/- 1,719)
-test outline_glyf ... bench:   1,078,679 ns/iter (+/- 3,865)
+test outline_cff  ... bench:   2,528,662 ns/iter (+/- 2,362)
+test outline_glyf ... bench:   1,171,966 ns/iter (+/- 1,642)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:       1,620 ns/iter (+/- 77)
-test outline_glyph_8_from_cff    ... bench:         963 ns/iter (+/- 49)
-test outline_glyph_276_from_glyf ... bench:         902 ns/iter (+/- 34)
-test outline_glyph_8_from_glyf   ... bench:         377 ns/iter (+/- 8)
-test family_name                 ... bench:         451 ns/iter (+/- 3)
-test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
-test glyph_2_hor_metrics         ... bench:          15 ns/iter (+/- 0)
-test width                       ... bench:           8 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,649 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         965 ns/iter (+/- 1)
+test outline_glyph_276_from_glyf ... bench:         950 ns/iter (+/- 7)
+test family_name                 ... bench:         429 ns/iter (+/- 7)
+test outline_glyph_8_from_glyf   ... bench:         394 ns/iter (+/- 11)
+test glyph_index_u41             ... bench:          33 ns/iter (+/- 1)
+test width                       ... bench:          24 ns/iter (+/- 1)
+test glyph_2_hor_metrics         ... bench:          18 ns/iter (+/- 0)
 test units_per_em                ... bench:           6 ns/iter (+/- 0)
 ```
 
@@ -104,9 +104,7 @@ is stored as UTF-16 BE.
 
 ## Safety
 
-- The library relies heavily on Rust's bounds checking and assumes that font is well-formed.
-  You can invoke a checksums checking manually.
-- The library uses per table slices, so it can't read data outside the specified TrueType table.
+- The library must not panic. Any panic considered as a critical bug and should be reported.
 - The library forbids `unsafe` code.
 */
 
@@ -134,7 +132,7 @@ mod post;
 mod vhea;
 mod vmtx;
 
-use parser::{Stream, FromData, LazyArray};
+use parser::{Stream, FromData, SafeStream, LazyArray};
 pub use cff::CFFError;
 pub use glyf::*;
 pub use name::*;
@@ -147,7 +145,7 @@ pub struct GlyphId(pub u16);
 
 impl FromData for GlyphId {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
+    fn parse(s: &mut SafeStream) -> Self {
         GlyphId(s.read())
     }
 }
@@ -168,6 +166,9 @@ pub enum Error {
     /// An invalid table checksum.
     InvalidTableChecksum(TableName),
 
+    /// An attempt to read out of bounds.
+    ReadOutOfBounds(usize, usize),
+
     /// Font doesn't have such glyph ID.
     NoGlyph,
 
@@ -179,6 +180,12 @@ pub enum Error {
 
     /// An invalid font width.
     InvalidFontWidth(u16),
+
+    /// No horizontal metrics for this glyph.
+    NoHorizontalMetrics,
+
+    /// No vertical metrics for this glyph.
+    NoVerticalMetrics,
 
     /// An unsupported table version.
     UnsupportedTableVersion(TableName, u8),
@@ -202,6 +209,9 @@ impl std::fmt::Display for Error {
             Error::InvalidTableChecksum(name) => {
                 write!(f, "table {:?} has an invalid checksum", name)
             }
+            Error::ReadOutOfBounds(index, len) => {
+                write!(f, "index out of bounds: the len is {} but the index is {}", len, index)
+            }
             Error::NoGlyph => {
                 write!(f, "font doesn't have such glyph ID")
             }
@@ -213,6 +223,12 @@ impl std::fmt::Display for Error {
             }
             Error::InvalidFontWidth(n) => {
                 write!(f, "{} is not a valid font width", n)
+            }
+            Error::NoHorizontalMetrics => {
+                write!(f, "glyph has no horizontal metrics")
+            }
+            Error::NoVerticalMetrics => {
+                write!(f, "glyph has no vertical metrics")
             }
             Error::UnsupportedTableVersion(name, version) => {
                 write!(f, "table {:?} with version {} is not supported", name, version)
@@ -298,9 +314,8 @@ impl std::fmt::Display for Tag {
 
 impl FromData for Tag {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
-        let data = s.tail();
-        let tag = [data[0], data[1], data[2], data[3]];
+    fn parse(s: &mut SafeStream) -> Self {
+        let tag = [s.read(), s.read(), s.read(), s.read()];
         Tag { tag }
     }
 }
@@ -329,6 +344,15 @@ pub struct HorizontalMetrics {
     pub left_side_bearing: i16,
 }
 
+impl FromData for HorizontalMetrics {
+    fn parse(s: &mut SafeStream) -> Self {
+        HorizontalMetrics {
+            advance: s.read(),
+            left_side_bearing: s.read(),
+        }
+    }
+}
+
 
 /// A vertical metrics of a glyph.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -341,7 +365,7 @@ pub struct VerticalMetrics {
 }
 
 impl FromData for VerticalMetrics {
-    fn parse(s: &mut Stream) -> Self {
+    fn parse(s: &mut SafeStream) -> Self {
         VerticalMetrics {
             advance: s.read(),
             top_side_bearing: s.read(),
@@ -442,7 +466,7 @@ impl RawTable {
 }
 
 impl FromData for RawTable {
-    fn parse(s: &mut Stream) -> Self {
+    fn parse(s: &mut SafeStream) -> Self {
         RawTable {
             tag: s.read(),
             checksum: s.read(),
@@ -493,7 +517,7 @@ impl<'a> Font<'a> {
                 const OFFSET_32_SIZE: usize = 4;
 
                 let offset = OFFSETS_TABLE_OFFSET + OFFSET_32_SIZE * index as usize;
-                let font_offset: u32 = Stream::read_at(data, offset);
+                let font_offset: u32 = Stream::read_at(data, offset)?;
                 &data[font_offset as usize ..]
             } else {
                 return Err(Error::FontIndexOutOfBounds);
@@ -512,12 +536,12 @@ impl<'a> Font<'a> {
 
         let mut s = Stream::new(table_data);
 
-        let sfnt_version: u32 = s.read();
+        let sfnt_version: u32 = s.read()?;
         if let SFNT_VERSION_TRUE_TYPE | SFNT_VERSION_OPEN_TYPE = sfnt_version {} else {
             return Err(Error::NotATrueType);
         }
 
-        let num_tables: u16 = s.read();
+        let num_tables: u16 = s.read()?;
         s.skip::<u16>(); // searchRange
         s.skip::<u16>(); // entrySelector
         s.skip::<u16>(); // rangeShift
@@ -530,7 +554,7 @@ impl<'a> Font<'a> {
 
         let mut number_of_glyphs = GlyphId(0);
 
-        let raw_tables: LazyArray<RawTable> = s.read_array(num_tables);
+        let raw_tables: LazyArray<RawTable> = s.read_array(num_tables)?;
 
         let mut i = 0;
         for table in raw_tables {
@@ -546,7 +570,7 @@ impl<'a> Font<'a> {
             };
 
             if name == TableName::MaximumProfile {
-                number_of_glyphs = Self::parse_number_of_glyphs(&data[table.range()]);
+                number_of_glyphs = Self::parse_number_of_glyphs(&data[table.range()])?;
             }
 
             i += 1;
@@ -580,6 +604,11 @@ impl<'a> Font<'a> {
         Ok(info.data)
     }
 
+    #[inline(never)]
+    pub(crate) fn table_stream(&self, name: TableName) -> Result<Stream> {
+        Ok(Stream::new(self.table_data(name)?))
+    }
+
     /// Returns a total number of glyphs in the font.
     ///
     /// The value was already parsed, so this function doesn't involve any parsing.
@@ -589,9 +618,9 @@ impl<'a> Font<'a> {
     }
 
     /// Parses a total number of glyphs in the font.
-    fn parse_number_of_glyphs(data: &[u8]) -> GlyphId {
+    fn parse_number_of_glyphs(data: &[u8]) -> Result<GlyphId> {
         const NUM_GLYPHS_OFFSET: usize = 4;
-        GlyphId(Stream::read_at(data, NUM_GLYPHS_OFFSET))
+        Ok(GlyphId(Stream::read_at(data, NUM_GLYPHS_OFFSET)?))
     }
 
     pub(crate) fn check_glyph_id(&self, glyph_id: GlyphId) -> Result<()> {
@@ -614,7 +643,7 @@ impl<'a> Font<'a> {
                 continue;
             }
 
-            let sum = calc_checksum(table.data);
+            let sum = calc_checksum(table.data)?;
             if sum != table.checksum {
                 return Err(Error::InvalidTableChecksum(table.name));
             }
@@ -678,17 +707,17 @@ impl<'a> Font<'a> {
     }
 }
 
-fn calc_checksum(data: &[u8]) -> u32 {
+fn calc_checksum(data: &[u8]) -> Result<u32> {
     // TODO: speed up
 
     // 'Table checksums are the unsigned sum of the uint32 units of a given table.'
     let mut sum: u32 = 0;
-    let numbers: LazyArray<u32> = Stream::new(data).read_array(data.len() as u32 / 4);
+    let numbers: LazyArray<u32> = Stream::new(data).read_array(data.len() as u32 / 4)?;
     for n in numbers {
         sum = sum.wrapping_add(n);
     }
 
-    sum
+    Ok(sum)
 }
 
 /// Checks that provided data is a TrueType font collection.
@@ -711,5 +740,5 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
         return None;
     }
 
-    Some(Stream::read_at(data, NUM_FONTS_OFFSET))
+    Stream::read_at(data, NUM_FONTS_OFFSET).ok()
 }

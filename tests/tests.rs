@@ -158,21 +158,21 @@ fn units_per_em_invalid() {
 fn ascender() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.ascender(), 900);
+    assert_eq!(font.ascender().unwrap(), 900);
 }
 
 #[test]
 fn descender() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.descender(), -300);
+    assert_eq!(font.descender().unwrap(), -300);
 }
 
 #[test]
 fn line_gap() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.line_gap(), 200);
+    assert_eq!(font.line_gap().unwrap(), 200);
 }
 
 #[test]
@@ -208,14 +208,14 @@ fn invalid_width() {
 fn x_height() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.x_height().unwrap(), 536);
+    assert_eq!(font.x_height().unwrap().unwrap(), 536);
 }
 
 #[test]
 fn no_x_height() {
     let data = fs::read("tests/fonts/os2-v0.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert!(font.x_height().is_none());
+    assert!(font.x_height().unwrap().is_none());
 }
 
 #[test]
@@ -230,35 +230,35 @@ fn strikeout_metrics() {
 fn is_regular() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_regular(), true);
+    assert_eq!(font.is_regular().unwrap(), true);
 }
 
 #[test]
 fn is_italic() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_italic(), false);
+    assert_eq!(font.is_italic().unwrap(), false);
 }
 
 #[test]
 fn os2_is_bold() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_bold(), false);
+    assert_eq!(font.is_bold().unwrap(), false);
 }
 
 #[test]
 fn is_oblique() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_oblique(), false);
+    assert_eq!(font.is_oblique().unwrap(), false);
 }
 
 #[test]
 fn no_is_oblique() {
     let data = fs::read("tests/fonts/os2-v0.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_oblique(), false);
+    assert_eq!(font.is_oblique().unwrap(), false);
 }
 
 #[test]
@@ -280,6 +280,8 @@ fn superscript_metrics() {
         ttf::ScriptMetrics { x_size: 550, y_size: 800, x_offset: 100, y_offset: 350 },
     );
 }
+
+// TODO: hmtx
 
 #[test]
 fn glyph_ver_metrics_1() {

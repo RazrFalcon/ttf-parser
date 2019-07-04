@@ -3,7 +3,7 @@
 // http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5177.Type2.pdf
 // https://github.com/opentypejs/opentype.js/blob/master/src/tables/cff.js
 
-use crate::parser::{Stream, TryFromData};
+use crate::parser::{Stream, TryFromData, SafeStream};
 use crate::{Font, GlyphId, TableName, OutlineBuilder, Result, Error};
 
 
@@ -97,9 +97,9 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(data);
 
         // Parse Header.
-        let major: u8 = s.read();
+        let major: u8 = s.read()?;
         s.skip::<u8>(); // minor
-        let header_size: u8 = s.read();
+        let header_size: u8 = s.read()?;
         s.skip::<u8>(); // Absolute offset
 
         if major != 1 {
@@ -269,7 +269,7 @@ fn _parse_char_string(
     let mut s = Stream::new(char_string);
 
     while !s.at_end() {
-        let op: u8 = s.read();
+        let op: u8 = s.read()?;
         match op {
             0 | 2 | 9 | 13 | 15 | 16 | 17 => {
                 // Reserved.
@@ -417,7 +417,7 @@ fn _parse_char_string(
             }
             TWO_BYTE_OPERATOR_MARK => {
                 // flex
-                let op2: u8 = s.read();
+                let op2: u8 = s.read()?;
                 match op2 {
                     34 => {
                         // |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |-
@@ -719,8 +719,8 @@ fn _parse_char_string(
                 stack.clear();
             }
             28 => {
-                let b1 = s.read::<u8>() as i32;
-                let b2 = s.read::<u8>() as i32;
+                let b1 = s.read::<u8>()? as i32;
+                let b2 = s.read::<u8>()? as i32;
                 let n = ((b1 << 24) | (b2 << 16)) >> 16;
                 debug_assert!((-32768..=32767).contains(&n));
                 stack.push(n as f32)?;
@@ -821,23 +821,19 @@ fn _parse_char_string(
                 stack.push(n as f32)?;
             }
             247...250 => {
-                let b1 = s.read::<u8>() as i32;
+                let b1 = s.read::<u8>()? as i32;
                 let n = (op as i32 - 247) * 256 + b1 + 108;
                 debug_assert!((108..=1131).contains(&n));
                 stack.push(n as f32)?;
             }
             251...254 => {
-                let b1 = s.read::<u8>() as i32;
+                let b1 = s.read::<u8>()? as i32;
                 let n = -(op as i32 - 251) * 256 - b1 - 108;
                 debug_assert!((-1131..=-108).contains(&n));
                 stack.push(n as f32)?;
             }
             255 => {
-                let b1 = s.read::<u8>() as i32;
-                let b2 = s.read::<u8>() as i32;
-                let b3 = s.read::<u8>() as i32;
-                let b4 = s.read::<u8>() as i32;
-                let n = ((b1 << 24) | (b2 << 16) | (b3 << 8) | b4) as f32 / 65536.0;
+                let n = s.read::<u32>()? as i32 as f32 / 65536.0;
                 stack.push(n)?;
             }
         }
@@ -859,12 +855,12 @@ fn calc_subroutine_bias(len: u16) -> u16 {
 }
 
 fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
-    let count: u16 = s.read();
+    let count: u16 = s.read()?;
     if count != 0 {
         let offset_size: OffsetSize = s.try_read()?;
-        let offsets = parse_var_offsets(s, count + 1, offset_size);
+        let offsets = parse_var_offsets(s, count + 1, offset_size)?;
         let last_offset = offsets.last();
-        let data = s.read_bytes(last_offset);
+        let data = s.read_bytes(last_offset)?;
         Ok(DataIndex { data, offsets })
     } else {
         Ok(DataIndex::create_empty())
@@ -872,10 +868,10 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
 }
 
 fn skip_index(s: &mut Stream) -> Result<()> {
-    let count: u16 = s.read();
+    let count: u16 = s.read()?;
     if count != 0 {
         let offset_size: OffsetSize = s.try_read()?;
-        let offsets = parse_var_offsets(s, count + 1, offset_size);
+        let offsets = parse_var_offsets(s, count + 1, offset_size)?;
         let last_offset = offsets.last();
         s.skip_len(last_offset)
     }
@@ -887,12 +883,12 @@ fn parse_var_offsets<'a>(
     s: &mut Stream<'a>,
     count: u16,
     offset_size: OffsetSize,
-) -> VarOffsets<'a> {
+) -> Result<VarOffsets<'a>> {
     let offsets_len = count as u32 * offset_size as u32;
-    VarOffsets {
-        data: &s.read_bytes(offsets_len),
+    Ok(VarOffsets {
+        data: &s.read_bytes(offsets_len)?,
         offset_size,
-    }
+    })
 }
 
 
@@ -913,7 +909,7 @@ impl<'a> VarOffsets<'a> {
             let start = index as usize * self.offset_size as usize;
             let end = start + self.offset_size as usize;
 
-            let mut s = Stream::new(&self.data[start..end]);
+            let mut s = SafeStream::new(&self.data[start..end]);
             let n = match self.offset_size {
                 OffsetSize::Size1 => s.read::<u8>() as u32,
                 OffsetSize::Size2 => s.read::<u16>() as u32,
@@ -1016,7 +1012,7 @@ enum OffsetSize {
 
 impl TryFromData for OffsetSize {
     #[inline]
-    fn try_parse(s: &mut Stream) -> Result<Self> {
+    fn try_parse(s: &mut SafeStream) -> Result<Self> {
         let n: u8 = s.read();
         match n {
             1 => Ok(OffsetSize::Size1),
@@ -1056,7 +1052,7 @@ impl<'a> DictionaryParser<'a> {
     fn parse_next(&mut self) -> Option<Result<Operator>> {
         self.operands_len = 0;
         while !self.stream.at_end() {
-            let b: u8 = self.stream.read();
+            let b: u8 = self.stream.read().ok()?;
             // 0..=21 bytes are operators.
             if b <= 21 {
                 let mut operator = b as u16;
@@ -1065,7 +1061,7 @@ impl<'a> DictionaryParser<'a> {
                 if b == TWO_BYTE_OPERATOR_MARK {
                     // Use a 1200 'prefix' to make two byte operators more readable.
                     // 12 3 => 1203
-                    operator = 1200 + self.stream.read::<u8>() as u16;
+                    operator = 1200 + self.stream.read::<u8>().ok()? as u16;
                 }
 
                 return Some(Ok(Operator(operator)));
@@ -1097,17 +1093,11 @@ impl<'a> DictionaryParser<'a> {
 fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
     match b0 {
         28 => {
-            let b1 = s.read::<u8>() as i32;
-            let b2 = s.read::<u8>() as i32;
-            let n = b1 << 8 | b2;
+            let n = s.read::<u16>()? as i32;
             Ok(Number::Integer(n))
         }
         29 => {
-            let b1 = s.read::<u8>() as i32;
-            let b2 = s.read::<u8>() as i32;
-            let b3 = s.read::<u8>() as i32;
-            let b4 = s.read::<u8>() as i32;
-            let n = b1 << 24 | b2 << 16 | b3 << 8 | b4;
+            let n = s.read::<u32>()? as i32;
             Ok(Number::Integer(n))
         }
         30 => {
@@ -1118,12 +1108,12 @@ fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
             Ok(Number::Integer(n))
         }
         247...250 => {
-            let b1 = s.read::<u8>() as i32;
+            let b1 = s.read::<u8>()? as i32;
             let n = (b0 as i32 - 247) * 256 + b1 + 108;
             Ok(Number::Integer(n))
         }
         251...254 => {
-            let b1 = s.read::<u8>() as i32;
+            let b1 = s.read::<u8>()? as i32;
             let n = -(b0 as i32 - 251) * 256 - b1 - 108;
             Ok(Number::Integer(n))
         }
@@ -1170,7 +1160,7 @@ fn parse_float(s: &mut Stream) -> Result<Number> {
     };
 
     loop {
-        let b1: u8 = s.read();
+        let b1: u8 = s.read()?;
         let nibble1 = b1 >> 4;
         let nibble2 = b1 & 15;
 

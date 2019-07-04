@@ -21,9 +21,9 @@ fn process() -> Result<(), Box<std::error::Error>> {
     println!("Family name: {:?}", font.family_name());
     println!("PostScript name: {:?}", font.post_script_name());
     println!("Units per EM: {:?}", font.units_per_em());
-    println!("Ascender: {}", font.ascender());
-    println!("Descender: {}", font.descender());
-    println!("Line gap: {}", font.line_gap());
+    println!("Ascender: {:?}", font.ascender());
+    println!("Descender: {:?}", font.descender());
+    println!("Line gap: {:?}", font.line_gap());
     println!("Number of glyphs: {:?}", font.number_of_glyphs());
     println!("Underline: {:?}", font.underline_metrics());
     println!("X height: {:?}", font.x_height());

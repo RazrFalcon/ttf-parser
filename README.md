@@ -26,7 +26,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`maxp`) Retrieving a total number of glyphs using [number_of_glyphs()] method.
 - (`name`) Listing all name records using [names()] method.
 - (`name`) Retrieving a font's family name using [family_name()] method.
-- (`name`) Retrieving a font's PostScript name using [post_stript_name()] method.
+- (`name`) Retrieving a font's PostScript name using [post_script_name()] method.
 - (`post`) Retrieving a font's underline metrics name using [underline_metrics()] method.
 - (`head`) Retrieving a font's units per EM value using [units_per_em()] method.
 - (`hhea`) Retrieving a generic font info using: [ascender()], [descender()], [height()]
@@ -40,7 +40,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [number_of_glyphs()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.number_of_glyphs
 [names()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.names
 [family_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.family_name
-[post_stript_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.post_stript_name
+[post_script_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.post_script_name
 [underline_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.underline_metrics
 [units_per_em()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.units_per_em
 [ascender()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.ascender
@@ -83,21 +83,21 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```
-test outline_cff  ... bench:   2,506,071 ns/iter (+/- 1,719)
-test outline_glyf ... bench:   1,078,679 ns/iter (+/- 3,865)
+test outline_cff  ... bench:   2,528,662 ns/iter (+/- 2,362)
+test outline_glyf ... bench:   1,171,966 ns/iter (+/- 1,642)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:       1,620 ns/iter (+/- 77)
-test outline_glyph_8_from_cff    ... bench:         963 ns/iter (+/- 49)
-test outline_glyph_276_from_glyf ... bench:         902 ns/iter (+/- 34)
-test outline_glyph_8_from_glyf   ... bench:         377 ns/iter (+/- 8)
-test family_name                 ... bench:         451 ns/iter (+/- 3)
-test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
-test glyph_2_hor_metrics         ... bench:          15 ns/iter (+/- 0)
-test width                       ... bench:           8 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,649 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         965 ns/iter (+/- 1)
+test outline_glyph_276_from_glyf ... bench:         950 ns/iter (+/- 7)
+test family_name                 ... bench:         429 ns/iter (+/- 7)
+test outline_glyph_8_from_glyf   ... bench:         394 ns/iter (+/- 11)
+test glyph_index_u41             ... bench:          33 ns/iter (+/- 1)
+test width                       ... bench:          24 ns/iter (+/- 1)
+test glyph_2_hor_metrics         ... bench:          18 ns/iter (+/- 0)
 test units_per_em                ... bench:           6 ns/iter (+/- 0)
 ```
 
@@ -108,9 +108,7 @@ is stored as UTF-16 BE.
 
 ### Safety
 
-- The library relies heavily on Rust's bounds checking and assumes that font is well-formed.
-  You can invoke a checksums checking manually.
-- The library uses per table slices, so it can't read data outside the specified TrueType table.
+- The library must not panic. Any panic considered as a critical bug and should be reported.
 - The library forbids `unsafe` code.
 
 ### Alternatives

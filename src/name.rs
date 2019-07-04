@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::parser::Stream;
-use crate::{Font, TableName};
+use crate::{Font, TableName, Result, Error};
 
 
 /// A [platform ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids).
@@ -18,7 +18,7 @@ pub enum PlatformId {
 impl TryFrom<u16> for PlatformId {
     type Error = &'static str;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
             0 => Ok(PlatformId::Unicode),
             1 => Ok(PlatformId::Macintosh),
@@ -65,7 +65,7 @@ pub enum NameId {
 impl TryFrom<u16> for NameId {
     type Error = &'static str;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
             0 => Ok(NameId::CopyrightNotice),
             1 => Ok(NameId::Family),
@@ -191,12 +191,12 @@ impl<'a> Iterator for Names<'a> {
             return None;
         }
 
-        let platform_id = PlatformId::try_from(self.stream.read::<u16>());
-        let encoding_id: u16 = self.stream.read();
-        let language_id: u16 = self.stream.read();
-        let name_id = NameId::try_from(self.stream.read::<u16>());
-        let length = self.stream.read::<u16>() as usize;
-        let offset = self.stream.read::<u16>() as usize;
+        let platform_id = PlatformId::try_from(self.stream.read::<u16>().ok()?);
+        let encoding_id: u16 = self.stream.read().ok()?;
+        let language_id: u16 = self.stream.read().ok()?;
+        let name_id = NameId::try_from(self.stream.read::<u16>().ok()?);
+        let length = self.stream.read::<u16>().ok()? as usize;
+        let offset = self.stream.read::<u16>().ok()? as usize;
 
         let platform_id = match platform_id {
             Ok(v) => v,
@@ -224,39 +224,44 @@ impl<'a> Font<'a> {
     ///
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
     pub fn names(&self) -> Names {
+        match self._names() {
+            Ok(v) => v,
+            Err(_) => Names { stream: Stream::new(&[]), storage: &[] },
+        }
+    }
+
+    fn _names(&self) -> Result<Names> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
         const NAME_RECORD_SIZE: u16 = 12;
 
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
         const LANG_TAG_RECORD_SIZE: u16 = 4;
 
-        let data = match self.table_data(TableName::Naming) {
-            Ok(data) => data,
-            Err(_) => return Names { stream: Stream::new(&[]), storage: &[] },
-        };
+        let data = self.table_data(TableName::Naming)?;
 
         let mut s = Stream::new(data);
-        let format: u16 = s.read();
-        let count: u16 = s.read();
+        let format: u16 = s.read()?;
+        let count: u16 = s.read()?;
         s.skip::<u16>(); // offset
         let name_record_len = count * NAME_RECORD_SIZE;
-        let name_records_data = s.read_bytes(name_record_len);
+        let name_records_data = s.read_bytes(name_record_len)?;
 
         if format == 0 {
-            Names {
+            Ok(Names {
                 stream: Stream::new(name_records_data),
-                storage: s.tail(),
-            }
+                storage: s.tail()?,
+            })
         } else if format == 1 {
-            let lang_tag_count: u16 = s.read();
+            let lang_tag_count: u16 = s.read()?;
             s.skip_len(lang_tag_count * LANG_TAG_RECORD_SIZE); // langTagRecords
-            Names {
+            Ok(Names {
                 stream: Stream::new(name_records_data),
-                storage: s.tail(),
-            }
+                storage: s.tail()?,
+            })
         } else {
             // Invalid format.
-            Names { stream: Stream::new(&[]), storage: &[] }
+            // The error type doesn't matter, since we will ignore it anyway.
+            Err(Error::NotATrueType)
         }
     }
 

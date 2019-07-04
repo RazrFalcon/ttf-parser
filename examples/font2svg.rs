@@ -22,7 +22,7 @@ fn process() -> Result<(), Box<std::error::Error>> {
     let units_per_em = font.units_per_em().ok_or("invalid units per em")?;
     let scale = FONT_SIZE / units_per_em as f64;
 
-    let cell_size = font.height() as f64 * FONT_SIZE / units_per_em as f64;
+    let cell_size = font.height().unwrap() as f64 * FONT_SIZE / units_per_em as f64;
     let rows = (font.number_of_glyphs() as f64 / COLUMNS as f64).ceil() as u32;
 
     let mut output = String::new();
@@ -128,7 +128,7 @@ fn glyph_to_path(
     let dx = (cell_size - font.glyph_hor_metrics(glyph_id).unwrap().advance as f64 * scale) / 2.0;
 
     let mut ts = svgtypes::Transform::default();
-    ts.translate(x + dx, y + font.height() as f64 * scale + font.descender() as f64 * scale);
+    ts.translate(x + dx, y + font.height().unwrap() as f64 * scale + font.descender().unwrap() as f64 * scale);
     ts.scale(1.0, -1.0);
     ts.scale(scale, scale);
 

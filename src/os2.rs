@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::parser::{Stream, FromData};
+use crate::parser::{Stream, FromData, SafeStream};
 use crate::{Font, TableName, LineMetrics, Result, Error};
 
 
@@ -137,7 +137,7 @@ pub struct ScriptMetrics {
 }
 
 impl FromData for ScriptMetrics {
-    fn parse(s: &mut Stream) -> Self {
+    fn parse(s: &mut SafeStream) -> Self {
         ScriptMetrics {
             x_size: s.read(),
             y_size: s.read(),
@@ -154,7 +154,7 @@ impl<'a> Font<'a> {
         const US_WEIGHT_CLASS_OFFSET: usize = 4;
 
         let data = self.table_data(TableName::WindowsMetrics)?;
-        let n: u16 = Stream::read_at(data, US_WEIGHT_CLASS_OFFSET);
+        let n: u16 = Stream::read_at(data, US_WEIGHT_CLASS_OFFSET)?;
         Ok(Weight::from(n))
     }
 
@@ -163,70 +163,68 @@ impl<'a> Font<'a> {
         const US_WIDTH_CLASS_OFFSET: usize = 6;
 
         let data = self.table_data(TableName::WindowsMetrics)?;
-        let n: u16 = Stream::read_at(data, US_WIDTH_CLASS_OFFSET);
+        let n: u16 = Stream::read_at(data, US_WIDTH_CLASS_OFFSET)?;
         Width::try_from(n)
     }
 
     /// Checks that font is marked as *Regular*.
-    pub fn is_regular(&self) -> bool {
+    pub fn is_regular(&self) -> Result<bool> {
         const REGULAR_FLAG: u16 = 6;
-        (self.get_fs_selection() >> REGULAR_FLAG) & 1 == 1
+        Ok((self.get_fs_selection()? >> REGULAR_FLAG) & 1 == 1)
     }
 
     /// Checks that font is marked as *Italic*.
-    pub fn is_italic(&self) -> bool {
+    pub fn is_italic(&self) -> Result<bool> {
         const ITALIC_FLAG: u16 = 0;
-        (self.get_fs_selection() >> ITALIC_FLAG) & 1 == 1
+        Ok((self.get_fs_selection()? >> ITALIC_FLAG) & 1 == 1)
     }
 
     /// Checks that font is marked as *Bold*.
-    pub fn is_bold(&self) -> bool {
+    pub fn is_bold(&self) -> Result<bool> {
         const BOLD_FLAG: u16 = 5;
-        (self.get_fs_selection() >> BOLD_FLAG) & 1 == 1
+        Ok((self.get_fs_selection()? >> BOLD_FLAG) & 1 == 1)
     }
 
     /// Checks that font is marked as *Oblique*.
     ///
     /// Available only in OS/2 table version >= 4.
-    pub fn is_oblique(&self) -> bool {
+    pub fn is_oblique(&self) -> Result<bool> {
         const VERSION_OFFSET: usize = 0;
 
         let data = match self.table_data(TableName::WindowsMetrics) {
             Ok(data) => data,
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         };
 
-        let version: u16 = Stream::read_at(data, VERSION_OFFSET);
+        let version: u16 = Stream::read_at(data, VERSION_OFFSET)?;
         if version < 4 {
-            return false;
+            return Ok(false);
         }
 
         const OBLIQUE_FLAG: u16 = 9;
-        (self.get_fs_selection() >> OBLIQUE_FLAG) & 1 == 1
+        Ok((self.get_fs_selection()? >> OBLIQUE_FLAG) & 1 == 1)
     }
 
-    fn get_fs_selection(&self) -> u16 {
+    fn get_fs_selection(&self) -> Result<u16> {
         const FS_SELECTION_OFFSET: usize = 62;
-        match self.table_data(TableName::WindowsMetrics) {
-            Ok(data) => Stream::read_at(data, FS_SELECTION_OFFSET),
-            Err(_) => 0,
-        }
+        let data = self.table_data(TableName::WindowsMetrics)?;
+        Stream::read_at(data, FS_SELECTION_OFFSET)
     }
 
     /// Parses font's X height.
     ///
     /// Available only in OS/2 table version >= 2.
-    pub fn x_height(&self) -> Option<i16> {
+    pub fn x_height(&self) -> Result<Option<i16>> {
         const VERSION_OFFSET: usize = 0;
         const SX_HEIGHT_OFFSET: usize = 86;
 
-        let data = self.table_data(TableName::WindowsMetrics).ok()?;
-        let version: u16 = Stream::read_at(data, VERSION_OFFSET);
+        let data = self.table_data(TableName::WindowsMetrics)?;
+        let version: u16 = Stream::read_at(data, VERSION_OFFSET)?;
         if version < 2 {
-            return None;
+            return Ok(None);
         }
 
-        Some(Stream::read_at(data, SX_HEIGHT_OFFSET))
+        Ok(Stream::read_at(data, SX_HEIGHT_OFFSET).ok())
     }
 
     /// Parses font's strikeout metrics.
@@ -236,8 +234,8 @@ impl<'a> Font<'a> {
 
         let data = self.table_data(TableName::WindowsMetrics)?;
         Ok(LineMetrics {
-            position:  Stream::read_at(data, Y_STRIKEOUT_POSITION_OFFSET),
-            thickness: Stream::read_at(data, Y_STRIKEOUT_SIZE_OFFSET),
+            position:  Stream::read_at(data, Y_STRIKEOUT_POSITION_OFFSET)?,
+            thickness: Stream::read_at(data, Y_STRIKEOUT_SIZE_OFFSET)?,
         })
     }
 
@@ -245,13 +243,13 @@ impl<'a> Font<'a> {
     pub fn subscript_metrics(&self) -> Result<ScriptMetrics> {
         const Y_SUBSCRIPT_XSIZE_OFFSET: usize = 10;
         let data = self.table_data(TableName::WindowsMetrics)?;
-        Ok(Stream::read_at(data, Y_SUBSCRIPT_XSIZE_OFFSET))
+        Stream::read_at(data, Y_SUBSCRIPT_XSIZE_OFFSET)
     }
 
     /// Parses font's superscript metrics.
     pub fn superscript_metrics(&self) -> Result<ScriptMetrics> {
         const Y_SUPERSCRIPT_XSIZE_OFFSET: usize = 18;
         let data = self.table_data(TableName::WindowsMetrics)?;
-        Ok(Stream::read_at(data, Y_SUPERSCRIPT_XSIZE_OFFSET))
+        Stream::read_at(data, Y_SUPERSCRIPT_XSIZE_OFFSET)
     }
 }

@@ -10,8 +10,8 @@ impl<'a> Font<'a> {
 
         let data = self.table_data(TableName::PostScript)?;
         Ok(LineMetrics {
-            position:  Stream::read_at(data, UNDERLINE_POSITION_OFFSET),
-            thickness: Stream::read_at(data, UNDERLINE_THICKNESS_OFFSET),
+            position:  Stream::read_at(data, UNDERLINE_POSITION_OFFSET)?,
+            thickness: Stream::read_at(data, UNDERLINE_THICKNESS_OFFSET)?,
         })
     }
 }

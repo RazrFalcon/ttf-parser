@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Unicode Variation Sequences (14) `cmap` subtable support.
 - Vertical metrics querying from the `vmtx` table.
 - OpenType fonts are allowed now.
-- `no_std` compatibility.
 
 ### Changed
 - A major rewrite. TrueType tables are no longer public.
@@ -21,7 +20,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `GDEF` table parsing.
 
 ### Fixed
-
 - Panic during a glyph outlining when contour has only one point.
 
 [Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.1.0...HEAD

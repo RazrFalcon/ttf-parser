@@ -1,9 +1,12 @@
-use crate::Result;
+use std::ops::Range;
 
+use crate::{Error, Result};
 
 pub trait FromData: Sized {
     /// Parses an object from a raw data.
-    fn parse(s: &mut Stream) -> Self;
+    ///
+    /// This method **must** not panic and **must** not read past the bounds.
+    fn parse(s: &mut SafeStream) -> Self;
 
     /// Returns an object size in raw data.
     ///
@@ -19,46 +22,46 @@ pub trait FromData: Sized {
 
 impl FromData for u8 {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
-        s.tail()[0]
+    fn parse(s: &mut SafeStream) -> Self {
+        s.data[0]
     }
 }
 
 impl FromData for i8 {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
-        s.tail()[0] as i8
+    fn parse(s: &mut SafeStream) -> Self {
+        s.data[0] as i8
     }
 }
 
 impl FromData for u16 {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
-        let data = s.tail();
-        (data[0] as u16) << 8 | data[1] as u16
+    fn parse(s: &mut SafeStream) -> Self {
+        let d = s.data;
+        (d[0] as u16) << 8 | d[1] as u16
     }
 }
 
 impl FromData for i16 {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
-        let data = s.tail();
-        ((data[0] as u16) << 8 | data[1] as u16) as i16
+    fn parse(s: &mut SafeStream) -> Self {
+        let d = s.data;
+        ((d[0] as u16) << 8 | d[1] as u16) as i16
     }
 }
 
 impl FromData for u32 {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
-        let data = s.tail();
-        (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
+    fn parse(s: &mut SafeStream) -> Self {
+        let d = s.data;
+        (d[0] as u32) << 24 | (d[1] as u32) << 16 | (d[2] as u32) << 8 | d[3] as u32
     }
 }
 
 
 pub trait TryFromData: Sized {
     /// Parses an object from a raw data.
-    fn try_parse(s: &mut Stream) -> Result<Self>;
+    fn try_parse(s: &mut SafeStream) -> Result<Self>;
 
     /// Returns an object size in raw data.
     ///
@@ -89,7 +92,6 @@ impl FSize for u32 {
 }
 
 
-
 #[derive(Clone, Copy)]
 pub struct LazyArray<'a, T> {
     data: &'a [u8],
@@ -99,24 +101,24 @@ pub struct LazyArray<'a, T> {
 impl<'a, T: FromData> LazyArray<'a, T> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
-        assert_eq!(data.len() % T::raw_size(), 0);
-
         LazyArray {
             data,
             phantom: std::marker::PhantomData,
         }
     }
 
-    #[inline]
     pub fn at<L: FSize>(&self, index: L) -> T {
-        self.get(index).unwrap()
+        let start = index.to_usize() * T::raw_size();
+        let end = start + T::raw_size();
+        let mut s = SafeStream::new(&self.data[start..end]);
+        T::parse(&mut s)
     }
 
     pub fn get<L: FSize>(&self, index: L) -> Option<T> {
         if index.to_usize() < self.len() {
             let start = index.to_usize() * T::raw_size();
             let end = start + T::raw_size();
-            let mut s = Stream::new(&self.data[start..end]);
+            let mut s = SafeStream::new(&self.data[start..end]);
             Some(T::parse(&mut s))
         } else {
             None
@@ -124,13 +126,22 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 
     #[inline]
-    pub fn last(&self) -> T {
-        self.at(self.len() as u32 - 1)
+    pub fn last(&self) -> Option<T> {
+        if !self.is_empty() {
+            self.get(self.len() as u32 - 1)
+        } else {
+            None
+        }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
         self.data.len() / T::raw_size()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     #[inline]
@@ -165,15 +176,9 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 }
 
-impl<'a, T: FromData + std::fmt::Debug> std::fmt::Debug for LazyArray<'a, T> {
+impl<'a, T: FromData + std::fmt::Debug + Copy> std::fmt::Debug for LazyArray<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let array: LazyArrayIter<T> = LazyArrayIter {
-            data: self.data,
-            offset: 0,
-            phantom: std::marker::PhantomData,
-        };
-
-        f.debug_list().entries(array).finish()
+        f.debug_list().entries(self.into_iter()).finish()
     }
 }
 
@@ -184,18 +189,16 @@ impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         LazyArrayIter {
-            data: self.data,
+            data: self,
             offset: 0,
-            phantom: std::marker::PhantomData,
         }
     }
 }
 
 
 pub struct LazyArrayIter<'a, T> {
-    data: &'a [u8],
-    offset: usize,
-    phantom: std::marker::PhantomData<T>,
+    data: LazyArray<'a, T>,
+    offset: u32,
 }
 
 impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
@@ -203,13 +206,13 @@ impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let offset = self.offset;
-        if offset == self.data.len() {
+        if self.offset as usize == self.data.len() {
             return None;
         }
 
-        self.offset += T::raw_size();
-        Some(Stream::read_at(self.data, offset))
+        let index = self.offset;
+        self.offset += 1;
+        self.data.get(index)
     }
 }
 
@@ -230,6 +233,12 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
+    fn get_data(&self, range: Range<usize>) -> Result<&'a [u8]> {
+        self.data.get(range.clone())
+            .ok_or_else(|| Error::ReadOutOfBounds(range.end, self.data.len()))
+    }
+
+    #[inline]
     pub fn at_end(&self) -> bool {
         self.offset == self.data.len()
     }
@@ -245,8 +254,8 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn tail(&self) -> &'a [u8] {
-        &self.data[self.offset..]
+    pub fn tail(&self) -> Result<&'a [u8]> {
+        self.get_data(self.offset..self.data.len())
     }
 
     #[inline]
@@ -260,42 +269,98 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn read<T: FromData>(&mut self) -> T {
-        let item = Self::read_at(self.data, self.offset);
+    pub fn read<T: FromData>(&mut self) -> Result<T> {
+        let start = self.offset;
         self.offset += T::raw_size();
-        item
+        let end = self.offset;
+
+        let data = self.get_data(start..end)?;
+        let mut s = SafeStream::new(data);
+        Ok(T::parse(&mut s))
     }
 
     #[inline]
     pub fn try_read<T: TryFromData>(&mut self) -> Result<T> {
         let start = self.offset;
         self.offset += T::raw_size();
-        let end = start + T::raw_size();
-        let mut s = Stream::new(&self.data[start..end]);
+        let end = self.offset;
+
+        let data = self.get_data(start..end)?;
+        let mut s = SafeStream::new(data);
         T::try_parse(&mut s)
     }
 
     #[inline]
-    pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> T {
+    pub fn read_at<T: FromData>(data: &[u8], mut offset: usize) -> Result<T> {
         let start = offset;
-        let end = start + T::raw_size();
-        let mut s = Stream::new(&data[start..end]);
-        T::parse(&mut s)
+        offset += T::raw_size();
+        let end = offset;
+
+        let data = data.get(start..end)
+            .ok_or_else(|| Error::ReadOutOfBounds(end, data.len()))?;
+
+        let mut s = SafeStream::new(data);
+        Ok(T::parse(&mut s))
     }
 
     #[inline]
-    pub fn read_bytes<L: FSize>(&mut self, len: L) -> &'a [u8] {
+    pub fn read_bytes<L: FSize>(&mut self, len: L) -> Result<&'a [u8]> {
         let offset = self.offset;
         self.offset += len.to_usize();
-        &self.data[offset..(offset + len.to_usize())]
+        self.get_data(offset..(offset + len.to_usize()))
     }
 
     #[inline]
-    pub fn read_array<T: FromData, L: FSize>(&mut self, len: L) -> LazyArray<'a, T> {
+    pub fn read_array<T: FromData, L: FSize>(&mut self, len: L) -> Result<LazyArray<'a, T>> {
         let len = len.to_usize() * T::raw_size();
-        let array = LazyArray::new(&self.data[self.offset..(self.offset + len)]);
-        self.offset += len;
-        array
+        let data = self.read_bytes(len as u32)?;
+        Ok(LazyArray::new(data))
+    }
+
+    pub fn read_f2_14(&mut self) -> Result<f32> {
+        Ok(self.read::<i16>()? as f32 / 16384.0)
+    }
+}
+
+
+/// A "safe" stream.
+///
+/// Unlike `Stream`, `SafeStream` doesn't perform bounds checking on each read.
+/// It leverages the type system, so we can sort of guarantee that
+/// we do not read past the bounds.
+///
+/// For example, if we are iterating a `LazyArray` we already checked it's size
+/// and we can't read past the bounds, so we can remove useless checks.
+///
+/// It's still not 100% guarantee, but it makes code easier to read and a bit faster.
+/// And we still backed by the Rust's bounds checking.
+#[derive(Clone, Copy)]
+pub struct SafeStream<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> SafeStream<'a> {
+    #[inline]
+    pub fn new(data: &'a [u8]) -> Self {
+        SafeStream {
+            data,
+            offset: 0,
+        }
+    }
+
+    #[inline]
+    pub fn skip<T: FromData>(&mut self) {
+        self.offset += T::raw_size();
+    }
+
+    #[inline]
+    pub fn read<T: FromData>(&mut self) -> T {
+        let start = self.offset;
+        self.offset += T::raw_size();
+        let end = self.offset;
+        let mut s = SafeStream::new(&self.data[start..end]);
+        T::parse(&mut s)
     }
 
     #[inline]
@@ -305,10 +370,6 @@ impl<'a> Stream<'a> {
         self.offset += 3;
         n
     }
-
-    pub fn read_f2_14(&mut self) -> f32 {
-        self.read::<i16>() as f32 / 16384.0
-    }
 }
 
 
@@ -317,14 +378,14 @@ pub struct Offset32(pub u32);
 
 impl FromData for Offset32 {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
+    fn parse(s: &mut SafeStream) -> Self {
         Offset32(s.read())
     }
 }
 
 impl FromData for Option<Offset32> {
     #[inline]
-    fn parse(s: &mut Stream) -> Self {
+    fn parse(s: &mut SafeStream) -> Self {
         let offset: Offset32 = s.read();
         if offset.0 != 0 { Some(offset) } else { None }
     }

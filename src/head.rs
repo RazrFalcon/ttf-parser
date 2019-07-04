@@ -11,8 +11,8 @@ impl<'a> Font<'a> {
     pub(crate) fn index_to_location_format(&self) -> Option<IndexToLocationFormat> {
         const INDEX_TO_LOC_FORMAT_OFFSET: usize = 50;
 
-        let data = self.table_data(TableName::Header).expect("required table");
-        let num: i16 = Stream::read_at(data, INDEX_TO_LOC_FORMAT_OFFSET);
+        let data = self.table_data(TableName::Header).ok()?;
+        let num: i16 = Stream::read_at(data, INDEX_TO_LOC_FORMAT_OFFSET).ok()?;
         match num {
             0 => Some(IndexToLocationFormat::Short),
             1 => Some(IndexToLocationFormat::Long),
@@ -26,8 +26,8 @@ impl<'a> Font<'a> {
     pub fn units_per_em(&self) -> Option<u16> {
         const UNITS_PER_EM_OFFSET: usize = 18;
 
-        let data = self.table_data(TableName::Header).expect("required table");
-        let num: u16 = Stream::read_at(data, UNITS_PER_EM_OFFSET);
+        let data = self.table_data(TableName::Header).ok()?;
+        let num: u16 = Stream::read_at(data, UNITS_PER_EM_OFFSET).ok()?;
         if num >= 16 && num <= 16384 {
             Some(num)
         } else {

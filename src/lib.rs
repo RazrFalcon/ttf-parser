@@ -117,6 +117,7 @@ is stored as UTF-16 BE.
 
 
 use std::convert::TryFrom;
+use std::ops::Range;
 
 mod cff;
 mod cmap;
@@ -166,9 +167,6 @@ pub enum Error {
     /// An invalid table checksum.
     InvalidTableChecksum(TableName),
 
-    /// An attempt to read out of bounds.
-    ReadOutOfBounds(usize, usize),
-
     /// Font doesn't have such glyph ID.
     NoGlyph,
 
@@ -191,7 +189,18 @@ pub enum Error {
     UnsupportedTableVersion(TableName, u8),
 
     /// A CFF table parsing error.
-    CFFError(CFFError)
+    CFFError(CFFError),
+
+    /// An attempt to slice a raw data out of bounds.
+    ///
+    /// This may be caused by a bug in the library or by a malformed font.
+    #[allow(missing_docs)]
+    SliceOutOfBounds {
+        // u32 is enough, since fonts are usually times smaller.
+        start: u32,
+        end: u32,
+        origin_len: u32,
+    },
 }
 
 impl std::fmt::Display for Error {
@@ -209,8 +218,8 @@ impl std::fmt::Display for Error {
             Error::InvalidTableChecksum(name) => {
                 write!(f, "table {:?} has an invalid checksum", name)
             }
-            Error::ReadOutOfBounds(index, len) => {
-                write!(f, "index out of bounds: the len is {} but the index is {}", len, index)
+            Error::SliceOutOfBounds { start, end, origin_len } => {
+                write!(f, "an attempt to slice {}..{} on 0..{}", start, end, origin_len)
             }
             Error::NoGlyph => {
                 write!(f, "font doesn't have such glyph ID")
@@ -453,15 +462,20 @@ struct RawTable {
 }
 
 impl RawTable {
-    fn range(&self) -> std::ops::Range<usize> {
+    fn range(&self) -> Option<Range<usize>> {
         // 'The length of a table must be a multiple of four bytes.'
         // But Table Record stores an actual table length.
         // So we have to expand it.
         //
         // This is mainly for checksum code.
-        let length = (self.length + 3) & !3;
 
-        self.offset as usize .. (self.offset as usize + length as usize)
+        // Check for overflow.
+        let length = self.length.checked_add(3)?;
+        let length = length & !3;
+
+        let start = self.offset as usize;
+        let range = start..(start + length as usize);
+        Some(range)
     }
 }
 
@@ -563,7 +577,12 @@ impl<'a> Font<'a> {
                 Err(_) => continue,
             };
 
-            let data = match data.get(table.range()) {
+            let range = match table.range() {
+                Some(range) => range,
+                None => continue,
+            };
+
+            let data = match data.get(range) {
                 Some(data) => data,
                 None => continue,
             };

@@ -1,0 +1,13 @@
+[package]
+name = "ttf-fuzz"
+version = "0.1.0"
+authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
+edition = "2018"
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[dependencies]
+afl = "0.4"
+ttf-parser = { path = "../.." }

@@ -217,6 +217,23 @@ impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
 }
 
 
+pub trait TrySlice<'a> {
+    fn try_slice(&self, range: Range<usize>) -> Result<&'a [u8]>;
+}
+
+impl<'a> TrySlice<'a> for &'a [u8] {
+    #[inline]
+    fn try_slice(&self, range: Range<usize>) -> Result<&'a [u8]> {
+        self.get(range.clone())
+            .ok_or_else(|| Error::SliceOutOfBounds {
+                start: range.start as u32,
+                end: range.end as u32,
+                origin_len: self.len() as u32,
+            })
+    }
+}
+
+
 #[derive(Clone, Copy)]
 pub struct Stream<'a> {
     data: &'a [u8],
@@ -230,12 +247,6 @@ impl<'a> Stream<'a> {
             data,
             offset: 0,
         }
-    }
-
-    #[inline]
-    fn get_data(&self, range: Range<usize>) -> Result<&'a [u8]> {
-        self.data.get(range.clone())
-            .ok_or_else(|| Error::ReadOutOfBounds(range.end, self.data.len()))
     }
 
     #[inline]
@@ -255,7 +266,7 @@ impl<'a> Stream<'a> {
 
     #[inline]
     pub fn tail(&self) -> Result<&'a [u8]> {
-        self.get_data(self.offset..self.data.len())
+        self.data.try_slice(self.offset..self.data.len())
     }
 
     #[inline]
@@ -274,7 +285,7 @@ impl<'a> Stream<'a> {
         self.offset += T::raw_size();
         let end = self.offset;
 
-        let data = self.get_data(start..end)?;
+        let data = self.data.try_slice(start..end)?;
         let mut s = SafeStream::new(data);
         Ok(T::parse(&mut s))
     }
@@ -285,7 +296,7 @@ impl<'a> Stream<'a> {
         self.offset += T::raw_size();
         let end = self.offset;
 
-        let data = self.get_data(start..end)?;
+        let data = self.data.try_slice(start..end)?;
         let mut s = SafeStream::new(data);
         T::try_parse(&mut s)
     }
@@ -296,9 +307,7 @@ impl<'a> Stream<'a> {
         offset += T::raw_size();
         let end = offset;
 
-        let data = data.get(start..end)
-            .ok_or_else(|| Error::ReadOutOfBounds(end, data.len()))?;
-
+        let data = data.try_slice(start..end)?;
         let mut s = SafeStream::new(data);
         Ok(T::parse(&mut s))
     }
@@ -307,7 +316,7 @@ impl<'a> Stream<'a> {
     pub fn read_bytes<L: FSize>(&mut self, len: L) -> Result<&'a [u8]> {
         let offset = self.offset;
         self.offset += len.to_usize();
-        self.get_data(offset..(offset + len.to_usize()))
+        self.data.try_slice(offset..(offset + len.to_usize()))
     }
 
     #[inline]

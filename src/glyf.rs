@@ -1,6 +1,6 @@
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
-use crate::parser::{Stream, LazyArray};
+use crate::parser::{Stream, LazyArray, TrySlice};
 use crate::{Font, GlyphId, OutlineBuilder, TableName, Result};
 
 
@@ -102,6 +102,8 @@ fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
     val
 }
 
+// It's not defined in the spec, so we are using our own value.
+const MAX_COMPONENTS: u8 = 32;
 
 impl<'a> Font<'a> {
     pub(crate) fn glyf_glyph_outline(
@@ -116,20 +118,25 @@ impl<'a> Font<'a> {
         };
 
         let glyph_data = self.glyph_data(glyph_id)?;
-        self.outline_impl(glyph_data, &mut b)
+        self.outline_impl(glyph_data, 0, &mut b)
     }
 
     fn glyph_data(&self, glyph_id: GlyphId) -> Result<&[u8]> {
         let range = self.glyph_range(glyph_id)?;
         let data = self.table_data(TableName::GlyphData)?;
-        Ok(&data[range])
+        data.try_slice(range)
     }
 
     fn outline_impl<T: OutlineBuilder>(
         &self,
         data: &[u8],
+        depth: u8,
         builder: &mut Builder<T>,
     ) -> Result<()> {
+        if depth >= MAX_COMPONENTS {
+            return Ok(());
+        }
+
         let mut s = Stream::new(data);
 
         let number_of_contours: i16 = s.read()?;
@@ -138,7 +145,7 @@ impl<'a> Font<'a> {
         if number_of_contours > 0 {
             Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)
         } else if number_of_contours < 0 {
-            self.parse_composite_outline(s.tail()?, builder)
+            self.parse_composite_outline(s.tail()?, depth, builder)
         } else {
             // An empty glyph.
             Ok(())
@@ -151,12 +158,19 @@ impl<'a> Font<'a> {
         number_of_contours: u16,
         builder: &mut Builder<T>,
     ) -> Result<()> {
-        debug_assert!(number_of_contours > 0);
-
         let mut s = Stream::new(glyph_data);
         let endpoints: LazyArray<u16> = s.read_array(number_of_contours)?;
-        // Unwrap is safe, because it's guarantee that array has at least one value.
-        let points_total = endpoints.last().unwrap() + 1;
+
+        let points_total = {
+            // Unwrap is safe, because it's guarantee that array has at least one value.
+            let last_point = endpoints.last().unwrap();
+            // Prevent overflow.
+            if last_point == std::u16::MAX {
+                return Ok(());
+            }
+
+            last_point + 1
+        };
 
         let instructions_len: u16 = s.read()?;
         s.skip_len(instructions_len);
@@ -167,9 +181,9 @@ impl<'a> Font<'a> {
         let y_coords_offset = x_coords_offset + x_coords_len as usize;
 
         let mut points = GlyphPoints {
-            flags: Stream::new(&glyph_data[flags_offset..x_coords_offset]),
-            x_coords: Stream::new(&glyph_data[x_coords_offset..y_coords_offset]),
-            y_coords: Stream::new(&glyph_data[y_coords_offset..]),
+            flags: Stream::new(glyph_data.try_slice(flags_offset..x_coords_offset)?),
+            x_coords: Stream::new(glyph_data.try_slice(x_coords_offset..y_coords_offset)?),
+            y_coords: Stream::new(glyph_data.try_slice(y_coords_offset..glyph_data.len())?),
             points_left: points_total,
             flag_repeats: 0,
             last_flags: SimpleGlyphFlags::empty(),
@@ -178,7 +192,19 @@ impl<'a> Font<'a> {
         };
 
         let mut total = 0u16;
+        let mut last = 0u16;
         for n in endpoints {
+            if n < last {
+                // Endpoints must be in increasing order.
+                break;
+            }
+            last = n;
+
+            // Check for overflow.
+            if n == std::u16::MAX {
+                break;
+            }
+
             let n = n + 1 - total;
 
             // Contour must have at least 2 points.
@@ -223,7 +249,13 @@ impl<'a> Font<'a> {
                 }
             }
 
-            flags_left -= repeats;
+            // Check for overflow.
+            if repeats > flags_left {
+                // Not sure what should be done in this case.
+                flags_left = 0;
+            } else {
+                flags_left -= repeats;
+            }
         }
 
         Ok(x_coords_len)
@@ -284,18 +316,21 @@ impl<'a> Font<'a> {
                     builder.push_quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
                 }
                 (Some(offcurve1), None) => {
-                    let p = first_oncurve.unwrap();
-                    builder.push_quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
+                    if let Some(p) = first_oncurve {
+                        builder.push_quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
+                    }
                     break;
                 }
                 (None, Some(offcurve2)) => {
-                    let p = first_oncurve.unwrap();
-                    builder.push_quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
+                    if let Some(p) = first_oncurve {
+                        builder.push_quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
+                    }
                     break;
                 }
                 (None, None) => {
-                    let p = first_oncurve.unwrap();
-                    builder.push_line_to(p.x, p.y);
+                    if let Some(p) = first_oncurve {
+                        builder.push_line_to(p.x, p.y);
+                    }
                     break;
                 }
             }
@@ -308,6 +343,7 @@ impl<'a> Font<'a> {
     fn parse_composite_outline<T: OutlineBuilder>(
         &self,
         glyph_data: &[u8],
+        depth: u8,
         builder: &mut Builder<T>,
     ) -> Result<()> {
         type Flags = CompositeGlyphFlags;
@@ -326,8 +362,6 @@ impl<'a> Font<'a> {
                 ts.e = s.read::<i8>()? as f32;
                 ts.f = s.read::<i8>()? as f32;
             }
-        } else {
-            debug_assert!(false, "unsupported");
         }
 
         if flags.contains(Flags::WE_HAVE_A_TWO_BY_TWO) {
@@ -345,15 +379,19 @@ impl<'a> Font<'a> {
 
         if let Ok(glyph_data) = self.glyph_data(glyph_id) {
             let transform = Transform::combine(builder.transform, ts);
-            self.outline_impl(glyph_data, &mut Builder {
+            let mut b = Builder {
                 builder: builder.builder,
                 transform,
                 is_default_ts: transform.is_default(),
-            })?;
+            };
+
+            self.outline_impl(glyph_data, depth + 1, &mut b)?;
         }
 
         if flags.contains(Flags::MORE_COMPONENTS) {
-            self.parse_composite_outline(s.tail()?, builder)?;
+            if depth <= MAX_COMPONENTS {
+                self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
+            }
         }
 
         Ok(())
@@ -449,19 +487,21 @@ impl<'a> Iterator for GlyphPoints<'a> {
             self.flag_repeats -= 1;
         }
 
-        self.x += get_glyph_coord(
+        let x = get_glyph_coord(
             self.last_flags,
             Flags::X_SHORT_VECTOR,
             Flags::X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR,
             &mut self.x_coords,
         ).ok()?;
+        self.x = self.x.wrapping_add(x);
 
-        self.y += get_glyph_coord(
+        let y = get_glyph_coord(
             self.last_flags,
             Flags::Y_SHORT_VECTOR,
             Flags::Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR,
             &mut self.y_coords,
         ).ok()?;
+        self.y = self.y.wrapping_add(y);
 
         self.points_left -= 1;
 

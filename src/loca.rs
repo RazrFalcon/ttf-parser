@@ -9,11 +9,20 @@ impl<'a> Font<'a> {
     pub(crate) fn glyph_range(&self, glyph_id: GlyphId) -> Result<Range<usize>> {
         use crate::head::IndexToLocationFormat as Format;
 
+        // Check for overflow.
+        if self.number_of_glyphs() == std::u16::MAX {
+            return Err(Error::NoGlyph);
+        }
+
         let glyph_id = glyph_id.0;
+        if glyph_id == std::u16::MAX {
+            return Err(Error::NoGlyph);
+        }
+
         let total = self.number_of_glyphs() + 1;
 
         // Glyph ID must be smaller than total number of values in a `loca` array.
-        if glyph_id >= total {
+        if glyph_id + 1 >= total {
             return Err(Error::NoGlyph);
         }
 

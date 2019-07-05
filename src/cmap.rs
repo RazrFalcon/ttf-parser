@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream};
+use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream, TrySlice};
 use crate::{Font, GlyphId, TableName, Result, Error};
 
 
@@ -11,13 +11,13 @@ impl<'a> Font<'a> {
     ///
     /// All subtable formats except Mixed Coverage (8) are supported.
     pub fn glyph_index(&self, c: char) -> Result<GlyphId> {
-        let cmap_data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
-        let mut s = Stream::new(cmap_data);
+        let data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
+        let mut s = Stream::new(data);
         s.skip::<u16>(); // version
         let num_tables: u16 = s.read()?;
         let records: LazyArray<EncodingRecord> = s.read_array(num_tables)?;
         for record in records {
-            let subtable_data = &cmap_data[record.offset as usize..];
+            let subtable_data = data.try_slice(record.offset as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
@@ -70,13 +70,13 @@ impl<'a> Font<'a> {
     ///
     /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
     pub fn glyph_variation_index(&self, c: char, variation: char) -> Result<GlyphId> {
-        let cmap_data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
-        let mut s = Stream::new(cmap_data);
+        let data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
+        let mut s = Stream::new(data);
         s.skip::<u16>(); // version
         let num_tables: u16 = s.read()?;
         let records: LazyArray<EncodingRecord> = s.read_array(num_tables)?;
         for record in records {
-            let subtable_data = &cmap_data[record.offset as usize..];
+            let subtable_data = data.try_slice(record.offset as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
@@ -110,7 +110,8 @@ impl<'a> Font<'a> {
         let record = records.binary_search_by(|v| v.variation.cmp(&variation)).ok_or(Error::NoGlyph)?;
 
         if let Some(offset) = record.default_uvs_offset {
-            let mut s = Stream::new(&data[offset.0 as usize..]);
+            let data = data.try_slice(offset.0 as usize..data.len())?;
+            let mut s = Stream::new(data);
             let count: u32 = s.read()?; // numUnicodeValueRanges
             let ranges: LazyArray<UnicodeRangeRecord> = s.read_array(count)?;
             for range in ranges {
@@ -122,7 +123,8 @@ impl<'a> Font<'a> {
         }
 
         if let Some(offset) = record.non_default_uvs_offset {
-            let mut s = Stream::new(&data[offset.0 as usize..]);
+            let data = data.try_slice(offset.0 as usize..data.len())?;
+            let mut s = Stream::new(data);
             let count: u32 = s.read()?; // numUVSMappings
             let uvs_mappings: LazyArray<UVSMappingRecord> = s.read_array(count)?;
             if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&cp)) {

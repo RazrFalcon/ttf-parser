@@ -577,6 +577,11 @@ impl<'a> Font<'a> {
                 Err(_) => continue,
             };
 
+            // Check for duplicates.
+            if name != TableName::MaximumProfile && tables.iter().any(|t| t.name == name) {
+                continue;
+            }
+
             let range = match table.range() {
                 Some(range) => range,
                 None => continue,

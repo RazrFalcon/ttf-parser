@@ -3,7 +3,9 @@
 // http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5177.Type2.pdf
 // https://github.com/opentypejs/opentype.js/blob/master/src/tables/cff.js
 
-use crate::parser::{Stream, TryFromData, SafeStream};
+use std::ops::Range;
+
+use crate::parser::{Stream, TryFromData, SafeStream, TrySlice};
 use crate::{Font, GlyphId, TableName, OutlineBuilder, Result, Error};
 
 
@@ -107,18 +109,19 @@ impl<'a> Font<'a> {
         }
 
         // Jump to Name INDEX. It's not necessarily right after the header.
-        s.skip_len(s.offset() as u32 - header_size as u32);
+        if header_size > s.offset() as u8 {
+            s.skip_len(header_size as u32 - s.offset() as u32);
+        }
 
         // Skip Name INDEX.
         skip_index(&mut s)?;
 
         let top_dict = parse_top_dict(&mut s)?;
 
-        let private_dict = match (top_dict.private_dict_offset, top_dict.private_dict_size) {
-            (Some(offset), Some(size)) => {
-                let start = offset as usize;
-                let end = (offset + size) as usize;
-                let mut s = Stream::new(&data[start..end]);
+        let private_dict = match top_dict.private_dict_range.clone() {
+            Some(range) => {
+                let range = range.start as usize .. range.end as usize;
+                let mut s = Stream::new(data.try_slice(range)?);
                 parse_private_dict(&mut s)?
             }
             _ => {
@@ -132,23 +135,23 @@ impl<'a> Font<'a> {
         // Parse Global Subroutines INDEX.
         let global_subrs = parse_index(&mut s)?;
 
-        let local_subrs = match (top_dict.private_dict_offset, private_dict.subroutines_offset) {
-            (Some(private_dict_offset), Some(subroutines_offset)) => {
+        let mut local_subrs = DataIndex::create_empty();
+        match (top_dict.private_dict_range, private_dict.subroutines_offset) {
+            (Some(private_dict_range), Some(subroutines_offset)) => {
                 // 'The local subroutines offset is relative to the beginning
                 // of the Private DICT data.'
-                let start = (private_dict_offset + subroutines_offset) as usize;
-                let mut s = Stream::new(&data[start..]);
-                parse_index(&mut s)?
+                if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
+                    let data = data.try_slice(start as usize..data.len())?;
+                    let mut s = Stream::new(data);
+                    local_subrs = parse_index(&mut s)?;
+                }
             }
-            _ => {
-                // The local subroutines can be empty.
-                DataIndex::create_empty()
-            }
-        };
+            _ => {}
+        }
 
         if let Some(offset) = top_dict.char_strings_offset {
             let start = offset as usize;
-            let mut s = Stream::new(&data[start..]);
+            let mut s = Stream::new(data.try_slice(start..data.len())?);
             parse_char_string(global_subrs, local_subrs, glyph_id, &mut s, builder)
         } else {
             Err(Error::NoGlyph)
@@ -156,11 +159,10 @@ impl<'a> Font<'a> {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct TopDict {
     char_strings_offset: Option<u32>,
-    private_dict_offset: Option<u32>,
-    private_dict_size: Option<u32>,
+    private_dict_range: Option<Range<u32>>,
 }
 
 fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
@@ -182,14 +184,18 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
 
         // Adobe Technical Note #5176, Table 9 Top DICT Operator Entries
         match operator.value() {
-            17 => {
+            17 if operands.len() == 1 => {
                 dict.char_strings_offset = Some(operands[0].as_i32() as u32);
             }
-            18 => {
-                dict.private_dict_offset = Some(operands[1].as_i32() as u32);
-                dict.private_dict_size = Some(operands[0].as_i32() as u32);
+            18 if operands.len() == 2 => {
+                let start = operands[1].as_i32() as u32;
+                let len = operands[0].as_i32() as u32;
+
+                if let Some(end) = start.checked_add(len) {
+                    dict.private_dict_range = Some(start..end);
+                }
             }
-            1206 => { // CharstringType
+            1206 if operands.len() == 1 => { // CharstringType
                 // Check that `charstring` type is set to 2. We do not support other formats.
                 // Usually, it will not be set at all, therefore defaults to 2.
                 if operands[0].as_i32() != 2 {
@@ -217,7 +223,7 @@ fn parse_private_dict<'a>(s: &'a mut Stream<'a>) -> Result<PrivateDict> {
         let operands = dict_parser.operands();
 
         // Adobe Technical Note #5176, Table 23 Private DICT Operators
-        if operator.value() == 19 {
+        if operator.value() == 19 && operands.len() == 1 {
             dict.subroutines_offset = Some(operands[0].as_i32() as u32);
             break;
         }
@@ -318,6 +324,10 @@ fn _parse_char_string(
             }
             5 => {
                 // |- {dxa dya}+ rlineto (5) |-
+
+                if stack.len().is_odd() {
+                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                }
 
                 let mut i = 0;
                 while i < stack.len() {
@@ -753,6 +763,10 @@ fn _parse_char_string(
 
                 stack.reverse();
                 while !stack.is_empty() {
+                    if stack.len() < 4 {
+                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                    }
+
                     let x1 = x;
                     let y1 = y + stack.pop();
                     let x2 = x1 + stack.pop();
@@ -789,6 +803,10 @@ fn _parse_char_string(
 
                 stack.reverse();
                 while !stack.is_empty() {
+                    if stack.len() < 4 {
+                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                    }
+
                     let x1 = x + stack.pop();
                     let y1 = y;
                     let x2 = x1 + stack.pop();
@@ -856,12 +874,18 @@ fn calc_subroutine_bias(len: u16) -> u16 {
 
 fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
     let count: u16 = s.read()?;
-    if count != 0 {
+    if count != 0 && count != std::u16::MAX {
         let offset_size: OffsetSize = s.try_read()?;
         let offsets = parse_var_offsets(s, count + 1, offset_size)?;
-        let last_offset = offsets.last();
-        let data = s.read_bytes(last_offset)?;
-        Ok(DataIndex { data, offsets })
+        match offsets.last() {
+            Some(last_offset) => {
+                let data = s.read_bytes(last_offset)?;
+                Ok(DataIndex { data, offsets })
+            }
+            None => {
+                Ok(DataIndex::create_empty())
+            }
+        }
     } else {
         Ok(DataIndex::create_empty())
     }
@@ -869,11 +893,12 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
 
 fn skip_index(s: &mut Stream) -> Result<()> {
     let count: u16 = s.read()?;
-    if count != 0 {
+    if count != 0 && count != std::u16::MAX {
         let offset_size: OffsetSize = s.try_read()?;
         let offsets = parse_var_offsets(s, count + 1, offset_size)?;
-        let last_offset = offsets.last();
-        s.skip_len(last_offset)
+        if let Some(last_offset) = offsets.last() {
+            s.skip_len(last_offset);
+        }
     }
 
     Ok(())
@@ -899,17 +924,13 @@ struct VarOffsets<'a> {
 }
 
 impl<'a> VarOffsets<'a> {
-    #[inline]
-    fn at(&self, index: u16) -> u32 {
-        self.get(index).unwrap()
-    }
-
     fn get(&self, index: u16) -> Option<u32> {
         if index < self.len() {
             let start = index as usize * self.offset_size as usize;
             let end = start + self.offset_size as usize;
+            let data = self.data.try_slice(start..end).ok()?;
 
-            let mut s = SafeStream::new(&self.data[start..end]);
+            let mut s = SafeStream::new(data);
             let n = match self.offset_size {
                 OffsetSize::Size1 => s.read::<u8>() as u32,
                 OffsetSize::Size2 => s.read::<u16>() as u32,
@@ -917,7 +938,10 @@ impl<'a> VarOffsets<'a> {
                 OffsetSize::Size4 => s.read::<u32>(),
             };
 
-            debug_assert!(n > 0);
+            // Offset must be positive.
+            if n == 0 {
+                return None;
+            }
 
             // Offsets are offset by one byte in the font,
             // so we have to shift them back.
@@ -928,13 +952,22 @@ impl<'a> VarOffsets<'a> {
     }
 
     #[inline]
-    fn last(&self) -> u32 {
-        self.at(self.len() as u16 - 1)
+    fn last(&self) -> Option<u32> {
+        if self.len() != 0 {
+            self.get(self.len() - 1)
+        } else {
+            None
+        }
     }
 
     #[inline]
     fn len(&self) -> u16 {
         self.data.len() as u16 / self.offset_size as u16
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -955,16 +988,24 @@ impl<'a> DataIndex<'a> {
 
     #[inline]
     fn len(&self) -> u16 {
-        // Last offset points to the byte after the `Object data`.
-        // We should skip it.
-        self.offsets.len() - 1
+        if !self.offsets.is_empty() {
+            // Last offset points to the byte after the `Object data`.
+            // We should skip it.
+            self.offsets.len() - 1
+        } else {
+            0
+        }
     }
 
     fn get(&self, index: u16) -> Option<&'a [u8]> {
-        if index < self.len() {
-            let start = self.offsets.at(index) as usize;
-            let end = self.offsets.at(index + 1) as usize;
-            Some(&self.data[start..end])
+        // Check for overflow first.
+        if index == std::u16::MAX {
+            None
+        } else if index + 1 < self.offsets.len() {
+            let start = self.offsets.get(index)? as usize;
+            let end = self.offsets.get(index + 1)? as usize;
+            let data = self.data.try_slice(start..end).ok()?;
+            Some(data)
         } else {
             None
         }
@@ -1078,6 +1119,10 @@ impl<'a> DictionaryParser<'a> {
 
                 self.operands[self.operands_len as usize] = op;
                 self.operands_len += 1;
+
+                if self.operands_len >= MAX_OPERANDS_LEN as u8 {
+                    break;
+                }
             }
         }
 
@@ -1122,13 +1167,18 @@ fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
 }
 
 fn parse_float(s: &mut Stream) -> Result<Number> {
+    const STACK_LEN: usize = 64;
     const END_OF_NUMBER: u8 = 0xf;
 
-    let mut data = [0u8; 64];
+    let mut data = [0u8; STACK_LEN];
     let mut idx = 0;
 
     // Adobe Technical Note #5176, Table 5 Nibble Definitions
     let mut lookup = |n: u8| -> Result<()> {
+        if idx == STACK_LEN {
+            return Err(CFFError::InvalidFloat.into());
+        }
+
         match n {
             0...9 => {
                 data[idx] = b'0' + n;
@@ -1140,6 +1190,10 @@ fn parse_float(s: &mut Stream) -> Result<Number> {
                 data[idx] = b'E';
             }
             12 => {
+                if idx + 1 == STACK_LEN {
+                    return Err(CFFError::InvalidFloat.into());
+                }
+
                 data[idx] = b'E';
                 idx += 1;
                 data[idx] = b'-';
@@ -1236,7 +1290,6 @@ impl ArgumentsStack {
 
     #[inline]
     fn at(&self, index: usize) -> f32 {
-        debug_assert!(index < self.len);
         self.data[index]
     }
 

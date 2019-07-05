@@ -42,7 +42,8 @@ fn process() -> Result<(), Box<std::error::Error>> {
     for id in 0..font.number_of_glyphs() {
         glyph_to_path(
             column as f64 * cell_size,
-            row as f64 * cell_size + dy,
+            row as f64 * cell_size,
+            dy,
             &font,
             ttf::GlyphId(id),
             cell_size,
@@ -102,6 +103,7 @@ fn draw_grid(
 fn glyph_to_path(
     x: f64,
     y: f64,
+    dy: f64,
     font: &ttf::Font,
     glyph_id: ttf::GlyphId,
     cell_size: f64,
@@ -137,7 +139,7 @@ fn glyph_to_path(
     let dx = (cell_size - metrics.advance as f64 * scale) / 2.0;
 
     let mut ts = svgtypes::Transform::default();
-    ts.translate(x + dx, y);
+    ts.translate(x + dx, y + dy);
     ts.scale(1.0, -1.0);
     ts.scale(scale, scale);
 

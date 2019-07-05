@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::parser::Stream;
+use crate::parser::{Stream, FromData, SafeStream, LazyArray};
 use crate::{Font, TableName, Result, Error};
 
 
@@ -147,8 +147,6 @@ impl<'a> Name<'a> {
     }
 
     fn name_from_utf16_be(&self) -> Option<String> {
-        use crate::parser::LazyArray;
-
         let mut name: Vec<u16> = Vec::new();
         for c in LazyArray::new(self.name) {
             name.push(c);
@@ -175,44 +173,73 @@ impl<'a> std::fmt::Debug for Name<'a> {
 }
 
 
+#[derive(Clone, Copy)]
+struct NameRecord {
+    platform_id: u16,
+    encoding_id: u16,
+    language_id: u16,
+    name_id: u16,
+    length: u16,
+    offset: u16,
+}
+
+impl FromData for NameRecord {
+    fn parse(s: &mut SafeStream) -> Self {
+        NameRecord {
+            platform_id: s.read(),
+            encoding_id: s.read(),
+            language_id: s.read(),
+            name_id: s.read(),
+            length: s.read(),
+            offset: s.read(),
+        }
+    }
+}
+
+
 /// An iterator over font's names.
 #[derive(Clone, Copy)]
 #[allow(missing_debug_implementations)]
 pub struct Names<'a> {
-    stream: Stream<'a>,
+    names: LazyArray<'a, NameRecord>,
     storage: &'a [u8],
+    index: u16,
 }
 
 impl<'a> Iterator for Names<'a> {
     type Item = Name<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.stream.at_end() {
+        if self.index as usize == self.names.len() {
             return None;
         }
 
-        let platform_id = PlatformId::try_from(self.stream.read::<u16>().ok()?);
-        let encoding_id: u16 = self.stream.read().ok()?;
-        let language_id: u16 = self.stream.read().ok()?;
-        let name_id = NameId::try_from(self.stream.read::<u16>().ok()?);
-        let length = self.stream.read::<u16>().ok()? as usize;
-        let offset = self.stream.read::<u16>().ok()? as usize;
+        let index = self.index;
+        self.index += 1;
+        let name = self.names.get(index)?;
 
-        let platform_id = match platform_id {
+        let platform_id = match PlatformId::try_from(name.platform_id) {
             Ok(v) => v,
             Err(_) => return self.next(),
         };
 
-        let name_id = match name_id {
+        let name_id = match NameId::try_from(name.name_id) {
             Ok(v) => v,
             Err(_) => return self.next(),
+        };
+
+        let start = name.offset as usize;
+        let end = start + name.length as usize;
+        let data = match self.storage.get(start..end) {
+            Some(data) => data,
+            None => return self.next(),
         };
 
         Some(Name {
-            name: &self.storage[offset..(offset + length)],
+            name: data,
             platform_id,
-            encoding_id,
-            language_id,
+            encoding_id: name.encoding_id,
+            language_id: name.language_id,
             name_id,
         })
     }
@@ -226,14 +253,11 @@ impl<'a> Font<'a> {
     pub fn names(&self) -> Names {
         match self._names() {
             Ok(v) => v,
-            Err(_) => Names { stream: Stream::new(&[]), storage: &[] },
+            Err(_) => Names { names: LazyArray::new(&[]), storage: &[], index: 0 },
         }
     }
 
     fn _names(&self) -> Result<Names> {
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
-        const NAME_RECORD_SIZE: u16 = 12;
-
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
         const LANG_TAG_RECORD_SIZE: u16 = 4;
 
@@ -243,20 +267,25 @@ impl<'a> Font<'a> {
         let format: u16 = s.read()?;
         let count: u16 = s.read()?;
         s.skip::<u16>(); // offset
-        let name_record_len = count * NAME_RECORD_SIZE;
-        let name_records_data = s.read_bytes(name_record_len)?;
+        let names = s.read_array(count)?;
 
         if format == 0 {
             Ok(Names {
-                stream: Stream::new(name_records_data),
+                names,
                 storage: s.tail()?,
+                index: 0,
             })
         } else if format == 1 {
             let lang_tag_count: u16 = s.read()?;
-            s.skip_len(lang_tag_count * LANG_TAG_RECORD_SIZE); // langTagRecords
+            let lang_tag_len = lang_tag_count
+                .checked_mul(LANG_TAG_RECORD_SIZE)
+                .ok_or_else(|| Error::NotATrueType)?;
+
+            s.skip_len(lang_tag_len); // langTagRecords
             Ok(Names {
-                stream: Stream::new(name_records_data),
+                names,
                 storage: s.tail()?,
+                index: 0,
             })
         } else {
             // Invalid format.

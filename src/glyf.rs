@@ -1,7 +1,7 @@
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
 use crate::parser::{Stream, LazyArray, TrySlice};
-use crate::{Font, GlyphId, OutlineBuilder, TableName, Result};
+use crate::{Font, GlyphId, OutlineBuilder, TableName, Result, Error};
 
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
@@ -176,7 +176,8 @@ impl<'a> Font<'a> {
         s.skip_len(instructions_len);
 
         let flags_offset = s.offset();
-        let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)?;
+        let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)
+            .ok_or_else(|| Error::NoOutline)?;
         let x_coords_offset = s.offset();
         let y_coords_offset = x_coords_offset + x_coords_len as usize;
 
@@ -224,41 +225,43 @@ impl<'a> Font<'a> {
     fn resolve_x_coords_len(
         s: &mut Stream,
         points_total: u16,
-    ) -> Result<u16> {
+    ) -> Option<u16> {
         type Flags = SimpleGlyphFlags;
 
         let mut flags_left = points_total;
-        let mut x_coords_len = 0;
+        let mut x_coords_len = 0u16;
         while flags_left > 0 {
-            let flags = Flags::from_bits_truncate(s.read()?);
+            let flags: u8 = s.read().ok()?;
+            let flags = Flags::from_bits_truncate(flags);
 
             // The number of times a glyph point repeats.
             let repeats = if flags.contains(Flags::REPEAT_FLAG) {
-                s.read::<u8>()? as u16 + 1
+                let repeats: u8 = s.read().ok()?;
+                repeats as u16 + 1
             } else {
                 1
             };
 
             if flags.contains(Flags::X_SHORT_VECTOR) {
                 // Coordinate is 1 byte long.
-                x_coords_len += repeats;
+                x_coords_len = x_coords_len.checked_add(repeats)?;
             } else {
                 if !flags.contains(Flags::X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR) {
                     // Coordinate is 2 bytes long.
-                    x_coords_len += repeats * 2;
+                    x_coords_len = x_coords_len.checked_add(repeats * 2)?;
                 }
             }
 
             // Check for overflow.
-            if repeats > flags_left {
-                // Not sure what should be done in this case.
-                flags_left = 0;
-            } else {
+            // Do not use checked_sub, because it's very slow for some reasons.
+            if repeats <= flags_left {
                 flags_left -= repeats;
+            } else {
+                return None;
             }
         }
 
-        Ok(x_coords_len)
+        Some(x_coords_len)
     }
 
     fn parse_contour<T: OutlineBuilder>(

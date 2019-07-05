@@ -273,64 +273,23 @@ impl std::error::Error for Error {}
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 
-/// A TrueType's `Tag` data type.
-#[derive(Clone, Copy, PartialEq)]
-pub struct Tag {
+#[derive(Clone, Copy)]
+struct Tag {
     tag: [u8; Tag::LENGTH],
 }
 
 impl Tag {
     const LENGTH: usize = 4;
 
-    /// Creates a `Tag` object from bytes.
-    #[inline]
-    pub const fn new(c1: u8, c2: u8, c3: u8, c4: u8) -> Self {
-        Tag { tag: [c1, c2, c3, c4] }
-    }
-
-    /// Creates a `Tag` object from a slice.
-    ///
-    /// Will panic if data length != 4.
-    pub fn from_slice(data: &[u8]) -> Self {
-        assert_eq!(data.len(), Tag::LENGTH);
-        Tag { tag: [data[0], data[1], data[2], data[3]] }
-    }
-
     const fn make_u32(data: &[u8]) -> u32 {
         (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
-    }
-
-    fn to_ascii(self) -> [char; Tag::LENGTH] {
-        let mut tag2 = [' '; Tag::LENGTH];
-        for i in 0..Tag::LENGTH {
-            if self.tag[i].is_ascii() {
-                tag2[i] = self.tag[i] as char;
-            }
-        }
-
-        tag2
-    }
-}
-
-impl std::ops::Deref for Tag {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        &self.tag
     }
 }
 
 impl std::fmt::Debug for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let tag = self.to_ascii();
-        write!(f, "Tag({}{}{}{})", tag[0], tag[1], tag[2], tag[3])
-    }
-}
-
-impl std::fmt::Display for Tag {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let tag = self.to_ascii();
-        write!(f, "{}{}{}{}", tag[0], tag[1], tag[2], tag[3])
+        let d = self.tag;
+        write!(f, "Tag({}{}{}{})", d[0] as char, d[1] as char, d[2] as char, d[3] as char)
     }
 }
 
@@ -445,7 +404,7 @@ impl TryFrom<Tag> for TableName {
 
     fn try_from(value: Tag) -> std::result::Result<Self, Self::Error> {
         // TODO: Rust doesn't support `const fn` in patterns yet
-        match &*value {
+        match &value.tag {
             b"CFF " => Ok(TableName::CompactFontFormat),
             b"cmap" => Ok(TableName::CharacterToGlyphIndexMapping),
             b"glyf" => Ok(TableName::GlyphData),

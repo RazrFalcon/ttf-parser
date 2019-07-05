@@ -125,6 +125,7 @@ mod glyf;
 mod head;
 mod hhea;
 mod hmtx;
+mod kern;
 mod loca;
 mod name;
 mod os2;
@@ -136,6 +137,7 @@ mod vmtx;
 use parser::{Stream, FromData, SafeStream, LazyArray};
 pub use cff::CFFError;
 pub use glyf::*;
+pub use kern::*;
 pub use name::*;
 pub use os2::*;
 
@@ -185,8 +187,11 @@ pub enum Error {
     /// No vertical metrics for this glyph.
     NoVerticalMetrics,
 
+    /// No kerning for this glyph.
+    NoKerning,
+
     /// An unsupported table version.
-    UnsupportedTableVersion(TableName, u8),
+    UnsupportedTableVersion(TableName, u16),
 
     /// A CFF table parsing error.
     CFFError(CFFError),
@@ -199,7 +204,7 @@ pub enum Error {
         // u32 is enough, since fonts are usually times smaller.
         start: u32,
         end: u32,
-        origin_len: u32,
+        data_len: u32,
     },
 }
 
@@ -218,8 +223,8 @@ impl std::fmt::Display for Error {
             Error::InvalidTableChecksum(name) => {
                 write!(f, "table {:?} has an invalid checksum", name)
             }
-            Error::SliceOutOfBounds { start, end, origin_len } => {
-                write!(f, "an attempt to slice {}..{} on 0..{}", start, end, origin_len)
+            Error::SliceOutOfBounds { start, end, data_len } => {
+                write!(f, "an attempt to slice {}..{} on 0..{}", start, end, data_len)
             }
             Error::NoGlyph => {
                 write!(f, "font doesn't have such glyph ID")
@@ -238,6 +243,9 @@ impl std::fmt::Display for Error {
             }
             Error::NoVerticalMetrics => {
                 write!(f, "glyph has no vertical metrics")
+            }
+            Error::NoKerning => {
+                write!(f, "glyph has no kerning")
             }
             Error::UnsupportedTableVersion(name, version) => {
                 write!(f, "table {:?} with version {} is not supported", name, version)
@@ -418,6 +426,7 @@ pub enum TableName {
     HorizontalHeader                = Tag::make_u32(b"hhea"),
     HorizontalMetrics               = Tag::make_u32(b"hmtx"),
     IndexToLocation                 = Tag::make_u32(b"loca"),
+    Kerning                         = Tag::make_u32(b"kern"),
     MaximumProfile                  = Tag::make_u32(b"maxp"),
     Naming                          = Tag::make_u32(b"name"),
     PostScript                      = Tag::make_u32(b"post"),
@@ -436,9 +445,9 @@ impl TryFrom<Tag> for TableName {
             b"cmap" => Ok(TableName::CharacterToGlyphIndexMapping),
             b"glyf" => Ok(TableName::GlyphData),
             b"head" => Ok(TableName::Header),
-            b"head" => Ok(TableName::HorizontalMetrics),
             b"hhea" => Ok(TableName::HorizontalHeader),
             b"hmtx" => Ok(TableName::HorizontalMetrics),
+            b"kern" => Ok(TableName::Kerning),
             b"loca" => Ok(TableName::IndexToLocation),
             b"maxp" => Ok(TableName::MaximumProfile),
             b"name" => Ok(TableName::Naming),
@@ -451,7 +460,7 @@ impl TryFrom<Tag> for TableName {
     }
 }
 
-const MAX_NUMBER_OF_TABLES: usize = 12;
+const MAX_NUMBER_OF_TABLES: usize = 16;
 
 
 struct RawTable {

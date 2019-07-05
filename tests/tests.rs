@@ -384,3 +384,28 @@ fn glyph_variation_index_01() {
     assert_eq!(font.glyph_variation_index('芦', '\u{E0101}').unwrap(), GlyphId(2));
 }
 
+#[test]
+fn glyphs_kerning_01() {
+    let data = fs::read("tests/fonts/TestKERNOne.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+
+    let t_id = font.glyph_index('T').unwrap();
+    let u_id = font.glyph_index('u').unwrap();
+    let dotless_i_id = font.glyph_index('\u{131}').unwrap();
+
+    assert_eq!(font.glyphs_kerning(t_id, dotless_i_id).unwrap(), -200);
+    assert_eq!(font.glyphs_kerning(t_id, u_id).unwrap(), -200);
+    assert_eq!(font.glyphs_kerning(dotless_i_id, t_id).unwrap(), -200);
+    assert_eq!(font.glyphs_kerning(dotless_i_id, dotless_i_id).unwrap(), 500);
+    assert_eq!(font.glyphs_kerning(u_id, t_id).unwrap(), -200);
+}
+
+#[test]
+fn glyphs_kerning_02() {
+    let data = fs::read("tests/fonts/TestKERNOne.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+
+    // Random GID's.
+    assert!(font.glyphs_kerning(GlyphId(0), GlyphId(0)).is_err());
+    assert!(font.glyphs_kerning(GlyphId(0), GlyphId(100)).is_err());
+}

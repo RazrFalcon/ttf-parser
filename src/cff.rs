@@ -105,7 +105,7 @@ impl<'a> Font<'a> {
         s.skip::<u8>(); // Absolute offset
 
         if major != 1 {
-            return Err(Error::UnsupportedTableVersion(TableName::CompactFontFormat, major));
+            return Err(Error::UnsupportedTableVersion(TableName::CompactFontFormat, major as u16));
         }
 
         // Jump to Name INDEX. It's not necessarily right after the header.

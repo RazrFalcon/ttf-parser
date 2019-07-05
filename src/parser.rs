@@ -228,7 +228,7 @@ impl<'a> TrySlice<'a> for &'a [u8] {
             .ok_or_else(|| Error::SliceOutOfBounds {
                 start: range.start as u32,
                 end: range.end as u32,
-                origin_len: self.len() as u32,
+                data_len: self.len() as u32,
             })
     }
 }

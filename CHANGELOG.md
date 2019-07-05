@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - CFF support.
+- Basic kerning support.
 - High Byte Mapping Through Table (2) `cmap` subtable support.
 - Unicode Variation Sequences (14) `cmap` subtable support.
 - Vertical metrics querying from the `vmtx` table.

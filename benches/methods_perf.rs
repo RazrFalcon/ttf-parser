@@ -73,6 +73,14 @@ fn glyph_2_hor_metrics(bencher: &mut bencher::Bencher) {
     })
 }
 
+fn is_valid(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        bencher::black_box(font.is_valid().unwrap());
+    })
+}
+
 struct Builder(usize);
 
 impl ttf_parser::OutlineBuilder for Builder {
@@ -111,6 +119,7 @@ bencher::benchmark_group!(perf,
     family_name,
     units_per_em,
     width,
-    glyph_2_hor_metrics
+    glyph_2_hor_metrics,
+    is_valid
 );
 bencher::benchmark_main!(perf);

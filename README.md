@@ -23,6 +23,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`glyf`) Glyph outlining using [outline_glyph()] method.
 - (`hmtx`) Retrieving a glyph's horizontal metrics using [glyph_hor_metrics()] method.
 - (`vmtx`) Retrieving a glyph's vertical metrics using [glyph_ver_metrics()] method.
+- (`kern`) Retrieving a glyphs pair kerning using [glyphs_kerning()] method.
 - (`maxp`) Retrieving a total number of glyphs using [number_of_glyphs()] method.
 - (`name`) Listing all name records using [names()] method.
 - (`name`) Retrieving a font's family name using [family_name()] method.
@@ -37,6 +38,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [outline_glyph()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.outline_glyph
 [glyph_hor_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_hor_metrics
 [glyph_ver_metrics()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyph_ver_metrics
+[glyphs_kerning()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.glyphs_kerning
 [number_of_glyphs()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.number_of_glyphs
 [names()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.names
 [family_name()]: https://docs.rs/ttf-parser/0.1.0/ttf_parser/struct.Font.html#method.family_name

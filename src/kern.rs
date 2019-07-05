@@ -3,7 +3,7 @@ use crate::{Font, GlyphId, TableName, Result, Error};
 
 
 impl<'a> Font<'a> {
-    /// Returns a spacing between two glyphs.
+    /// Returns a glyphs pair kerning.
     ///
     /// Only horizontal kerning is supported.
     pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Result<i16> {

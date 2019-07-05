@@ -578,7 +578,7 @@ impl<'a> Font<'a> {
             };
 
             // Check for duplicates.
-            if name != TableName::MaximumProfile && tables.iter().any(|t| t.name == name) {
+            if tables.iter().take(i).any(|t| t.name == name) {
                 continue;
             }
 

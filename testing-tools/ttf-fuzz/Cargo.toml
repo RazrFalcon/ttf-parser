@@ -11,3 +11,11 @@ members = ["."]
 [dependencies]
 afl = "0.4"
 ttf-parser = { path = "../.." }
+
+[[bin]]
+name = "fuzz-outline"
+path = "src/fuzz-outline.rs"
+
+[[bin]]
+name = "fuzz-cmap"
+path = "src/fuzz-cmap.rs"

@@ -189,7 +189,9 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
     s.skip::<u16>(); // language
     let sub_header_keys: LazyArray<u16> = s.read_array(256_u32)?;
     // The maximum index in a sub_header_keys is a sub_headers count.
-    let sub_headers_count = sub_header_keys.into_iter().map(|n| n / 8).max().ok_or_else(|| Error::NoGlyph)? + 1;
+    let sub_headers_count = sub_header_keys.into_iter().map(|n| n / 8).max()
+        .ok_or_else(|| Error::NoGlyph)? + 1;
+
     // Remember sub_headers offset before reading. Will be used later.
     let sub_headers_offset = s.offset();
     let sub_headers: LazyArray<SubHeaderRecord> = s.read_array(sub_headers_count)?;
@@ -247,6 +249,10 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
     let mut s = Stream::new(data);
     s.skip_len(6 as u32); // format + length + language
     let seg_count_x2: u16 = s.read()?;
+    if seg_count_x2 < 2 {
+        return Err(Error::NoGlyph);
+    }
+
     let seg_count = seg_count_x2 / 2;
     s.skip_len(6 as u32); // searchRange + entrySelector + rangeShift
     let end_codes: LazyArray<u16> = s.read_array(seg_count)?;
@@ -273,9 +279,17 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
                     return Ok(code_point.wrapping_add(id_delta as u16));
                 }
 
-                let delta = (code_point - start_value) * 2;
+                let delta = (code_point as u32 - start_value as u32) * 2;
+                // Check for overflow.
+                if delta > std::u16::MAX as u32 {
+                    return Err(Error::NoGlyph);
+                }
+                // `delta` must be u16.
+                let delta = delta as u16;
+
                 let id_range_offset_pos = (id_range_offset_pos + index as usize * 2) as u16;
-                let pos = id_range_offset_pos.wrapping_add(delta) + id_range_offset;
+                let pos = id_range_offset_pos.wrapping_add(delta);
+                let pos = pos.wrapping_add(id_range_offset);
                 let glyph_array_value: u16 = Stream::read_at(data, pos as usize)?;
                 if glyph_array_value == 0 {
                     return Err(Error::NoGlyph);
@@ -408,7 +422,6 @@ impl FromData for SubHeaderRecord {
 
 
 // Also, the same as ConstantMapGroup.
-#[derive(Debug)]
 struct SequentialMapGroup {
     char_code_range: Range<u32>,
     start_glyph_id: u32,
@@ -416,9 +429,16 @@ struct SequentialMapGroup {
 
 impl FromData for SequentialMapGroup {
     fn parse(s: &mut SafeStream) -> Self {
-        SequentialMapGroup {
+        let start: u32 = s.read();
+        let mut end: u32 = s.read();
+
+        if end != std::u32::MAX {
             // +1 makes the upper bound inclusive.
-            char_code_range: s.read()..(s.read::<u32>() + 1),
+            end += 1;
+        }
+
+        SequentialMapGroup {
+            char_code_range: start..end,
             start_glyph_id: s.read(),
         }
     }

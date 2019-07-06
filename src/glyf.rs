@@ -149,7 +149,7 @@ impl<'a> Font<'a> {
         if number_of_contours > 0 {
             Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)?;
         } else if number_of_contours < 0 {
-            self.parse_composite_outline(s.tail()?, depth, builder)?;
+            self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
         } else {
             // An empty glyph.
             return Ok(Rect::zero());
@@ -357,6 +357,10 @@ impl<'a> Font<'a> {
     ) -> Result<()> {
         type Flags = CompositeGlyphFlags;
 
+        if depth >= MAX_COMPONENTS {
+            return Ok(());
+        }
+
         let mut s = Stream::new(glyph_data);
         let flags = Flags::from_bits_truncate(s.read()?);
         let glyph_id: GlyphId = s.read()?;
@@ -398,7 +402,7 @@ impl<'a> Font<'a> {
         }
 
         if flags.contains(Flags::MORE_COMPONENTS) {
-            if depth <= MAX_COMPONENTS {
+            if depth < MAX_COMPONENTS {
                 self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
             }
         }

@@ -85,20 +85,20 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```
-test outline_cff  ... bench:   2,528,662 ns/iter (+/- 2,362)
-test outline_glyf ... bench:   1,171,966 ns/iter (+/- 1,642)
+test outline_cff  ... bench:   2,771,375 ns/iter (+/- 2,146)
+test outline_glyf ... bench:   1,225,525 ns/iter (+/- 2,215)
 ```
 
 Here is some methods benchmarks:
 
 ```
 test is_valid                    ... bench:      36,910 ns/iter (+/- 85)
-test outline_glyph_276_from_cff  ... bench:       1,649 ns/iter (+/- 3)
-test outline_glyph_8_from_cff    ... bench:         965 ns/iter (+/- 1)
-test outline_glyph_276_from_glyf ... bench:         950 ns/iter (+/- 7)
+test outline_glyph_276_from_cff  ... bench:       1,857 ns/iter (+/- 5)
+test outline_glyph_276_from_glyf ... bench:       1,037 ns/iter (+/- 86)
+test outline_glyph_8_from_cff    ... bench:       1,081 ns/iter (+/- 1)
 test family_name                 ... bench:         502 ns/iter (+/- 7)
-test outline_glyph_8_from_glyf   ... bench:         394 ns/iter (+/- 11)
-test glyph_index_u41             ... bench:          33 ns/iter (+/- 1)
+test outline_glyph_8_from_glyf   ... bench:         435 ns/iter (+/- 2
+test glyph_index_u41             ... bench:          28 ns/iter (+/- 1)
 test glyph_2_hor_metrics         ... bench:          18 ns/iter (+/- 0)
 test width                       ... bench:          13 ns/iter (+/- 1)
 test units_per_em                ... bench:           6 ns/iter (+/- 0)

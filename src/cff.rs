@@ -6,7 +6,7 @@
 use std::ops::Range;
 
 use crate::parser::{Stream, TryFromData, SafeStream, TrySlice};
-use crate::{Font, GlyphId, TableName, OutlineBuilder, Result, Error};
+use crate::{Font, GlyphId, TableName, OutlineBuilder, Rect, Result, Error};
 
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
@@ -94,7 +94,7 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         builder: &mut impl OutlineBuilder,
-    ) -> Result<()> {
+    ) -> Result<Rect> {
         let data = self.table_data(TableName::CompactFontFormat)?;
         let mut s = Stream::new(data);
 
@@ -246,7 +246,7 @@ fn parse_char_string(
     glyph_id: GlyphId,
     s: &mut Stream,
     builder: &mut impl OutlineBuilder,
-) -> Result<()> {
+) -> Result<Rect> {
     let char_strings = parse_index(s)?;
     let data = char_strings.get(glyph_id.0).ok_or(Error::NoGlyph)?;
 
@@ -258,19 +258,94 @@ fn parse_char_string(
         stems_len: 0,
     };
 
+    let mut inner_builder = Builder {
+        builder,
+        bbox: RectF {
+            x_min: std::f32::MAX,
+            y_min: std::f32::MAX,
+            x_max: std::f32::MIN,
+            y_max: std::f32::MIN,
+        }
+    };
+
     let mut stack = ArgumentsStack::new();
-    let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, builder)?;
-    Ok(())
+    let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, &mut inner_builder)?;
+
+    let bbox = inner_builder.bbox;
+    Ok(Rect {
+        x_min: bbox.x_min as i16,
+        y_min: bbox.y_min as i16,
+        x_max: bbox.x_max as i16,
+        y_max: bbox.y_max as i16,
+    })
 }
 
-fn _parse_char_string(
+
+struct RectF {
+    pub x_min: f32,
+    pub y_min: f32,
+    pub x_max: f32,
+    pub y_max: f32,
+}
+
+trait OutlineBuilderInner {
+    fn update_bbox(&mut self, x: f32, y: f32);
+    fn move_to(&mut self, x: f32, y: f32);
+    fn line_to(&mut self, x: f32, y: f32);
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32);
+    fn close(&mut self);
+}
+
+struct Builder<'a, T: OutlineBuilder> {
+    builder: &'a mut T,
+    bbox: RectF,
+}
+
+impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
+    #[inline]
+    fn update_bbox(&mut self, x: f32, y: f32) {
+        self.bbox.x_min = self.bbox.x_min.min(x);
+        self.bbox.y_min = self.bbox.y_min.min(y);
+
+        self.bbox.x_max = self.bbox.x_max.max(x);
+        self.bbox.y_max = self.bbox.y_max.max(y);
+    }
+
+    #[inline]
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.update_bbox(x, y);
+        self.builder.move_to(x, y);
+    }
+
+    #[inline]
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.update_bbox(x, y);
+        self.builder.line_to(x, y);
+    }
+
+    #[inline]
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.update_bbox(x1, y1);
+        self.update_bbox(x2, y2);
+        self.update_bbox(x, y);
+        self.builder.curve_to(x1, y1, x2, y2, x, y);
+    }
+
+    #[inline]
+    fn close(&mut self) {
+        self.builder.close();
+    }
+}
+
+
+fn _parse_char_string<T: OutlineBuilder>(
     ctx: &mut CharStringParserContext,
     char_string: &[u8],
     mut x: f32,
     mut y: f32,
     stack: &mut ArgumentsStack,
     depth: u8,
-    builder: &mut impl OutlineBuilder,
+    builder: &mut Builder<T>,
 ) -> Result<(f32, f32)> {
     let mut s = Stream::new(char_string);
 

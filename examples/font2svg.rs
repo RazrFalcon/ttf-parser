@@ -35,15 +35,12 @@ fn process() -> Result<(), Box<std::error::Error>> {
 
     draw_grid(font.number_of_glyphs(), cell_size, &mut output);
 
-    let dy = font.height()? as f64 * scale + font.descender()? as f64 * scale;
-
     let mut row = 0;
     let mut column = 0;
     for id in 0..font.number_of_glyphs() {
         glyph_to_path(
             column as f64 * cell_size,
             row as f64 * cell_size,
-            dy,
             &font,
             ttf::GlyphId(id),
             cell_size,
@@ -103,7 +100,6 @@ fn draw_grid(
 fn glyph_to_path(
     x: f64,
     y: f64,
-    dy: f64,
     font: &ttf::Font,
     glyph_id: ttf::GlyphId,
     cell_size: f64,
@@ -116,7 +112,7 @@ fn glyph_to_path(
     )).unwrap();
 
     let mut builder = Builder(svgtypes::Path::new());
-    match font.outline_glyph(glyph_id, &mut builder) {
+    let bbox = match font.outline_glyph(glyph_id, &mut builder) {
         Ok(v) => v,
         Err(ttf::Error::NoOutline) => return,
         Err(ttf::Error::NoGlyph) => return,
@@ -124,7 +120,7 @@ fn glyph_to_path(
             eprintln!("Warning (glyph {}): {}.", glyph_id.0, e);
             return;
         }
-    }
+    };
 
     let path = builder.0;
     if path.is_empty() {
@@ -137,9 +133,22 @@ fn glyph_to_path(
     };
 
     let dx = (cell_size - metrics.advance as f64 * scale) / 2.0;
+    let y = y + cell_size + font.descender().unwrap() as f64 * scale;
+
+    {
+        let bbox_w = (bbox.x_max as f64 - bbox.x_min as f64) * scale;
+        let bbox_h = (bbox.y_max as f64 - bbox.y_min as f64) * scale;
+        let bbox_x = x + dx + bbox.x_min as f64 * scale;
+        let bbox_y = y - bbox.y_min as f64 * scale - bbox_h;
+
+        output.write_fmt(format_args!(
+            "<rect x='{}' y='{}' width='{}' height='{}' fill='none' stroke='green'/>\n",
+            bbox_x, bbox_y, bbox_w, bbox_h
+        )).unwrap();
+    }
 
     let mut ts = svgtypes::Transform::default();
-    ts.translate(x + dx, y + dy);
+    ts.translate(x + dx, y);
     ts.scale(1.0, -1.0);
     ts.scale(scale, scale);
 

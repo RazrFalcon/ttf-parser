@@ -353,6 +353,39 @@ impl FromData for VerticalMetrics {
 }
 
 
+/// Rectangle.
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[allow(missing_docs)]
+pub struct Rect {
+    pub x_min: i16,
+    pub y_min: i16,
+    pub x_max: i16,
+    pub y_max: i16,
+}
+
+impl Rect {
+    pub(crate) fn zero() -> Self {
+        Rect {
+            x_min: 0,
+            y_min: 0,
+            x_max: 0,
+            y_max: 0,
+        }
+    }
+}
+
+impl FromData for Rect {
+    fn parse(s: &mut SafeStream) -> Self {
+        Rect {
+            x_min: s.read(),
+            y_min: s.read(),
+            x_max: s.read(),
+            y_max: s.read(),
+        }
+    }
+}
+
+
 /// A trait for glyph outline construction.
 pub trait OutlineBuilder {
     /// Appends a MoveTo segment.
@@ -656,7 +689,7 @@ impl<'a> Font<'a> {
         Ok(())
     }
 
-    /// Outlines a glyph.
+    /// Outlines a glyph. Returns a tight glyph bounding box.
     ///
     /// This method support both `glyf` and `CFF` tables.
     ///
@@ -700,7 +733,7 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         builder: &mut impl OutlineBuilder,
-    ) -> Result<()> {
+    ) -> Result<Rect> {
         if self.has_table(TableName::GlyphData) {
             self.glyf_glyph_outline(glyph_id, builder)
         } else if self.has_table(TableName::CompactFontFormat) {

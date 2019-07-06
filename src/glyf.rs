@@ -1,15 +1,15 @@
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
 use crate::parser::{Stream, LazyArray, TrySlice};
-use crate::{Font, GlyphId, OutlineBuilder, TableName, Result, Error};
+use crate::{Font, GlyphId, OutlineBuilder, TableName, Rect, Result, Error};
 
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
 trait OutlineBuilderInner {
-    fn push_move_to(&mut self, x: f32, y: f32);
-    fn push_line_to(&mut self, x: f32, y: f32);
-    fn push_quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32);
-    fn push_close(&mut self);
+    fn move_to(&mut self, x: f32, y: f32);
+    fn line_to(&mut self, x: f32, y: f32);
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32);
+    fn close(&mut self);
 }
 
 struct Builder<'a, T: OutlineBuilder> {
@@ -19,7 +19,8 @@ struct Builder<'a, T: OutlineBuilder> {
 }
 
 impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
-    fn push_move_to(&mut self, mut x: f32, mut y: f32) {
+    #[inline]
+    fn move_to(&mut self, mut x: f32, mut y: f32) {
         if !self.is_default_ts {
             self.transform.apply_to(&mut x, &mut y);
         }
@@ -27,7 +28,8 @@ impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
         self.builder.move_to(x, y);
     }
 
-    fn push_line_to(&mut self, mut x: f32, mut y: f32) {
+    #[inline]
+    fn line_to(&mut self, mut x: f32, mut y: f32) {
         if !self.is_default_ts {
             self.transform.apply_to(&mut x, &mut y);
         }
@@ -35,7 +37,8 @@ impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
         self.builder.line_to(x, y);
     }
 
-    fn push_quad_to(&mut self, mut x1: f32, mut y1: f32, mut x: f32, mut y: f32) {
+    #[inline]
+    fn quad_to(&mut self, mut x1: f32, mut y1: f32, mut x: f32, mut y: f32) {
         if !self.is_default_ts {
             self.transform.apply_to(&mut x1, &mut y1);
             self.transform.apply_to(&mut x, &mut y);
@@ -44,7 +47,8 @@ impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
         self.builder.quad_to(x1, y1, x, y);
     }
 
-    fn push_close(&mut self) {
+    #[inline]
+    fn close(&mut self) {
         self.builder.close();
     }
 }
@@ -110,7 +114,7 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         builder: &mut impl OutlineBuilder,
-    ) -> Result<()> {
+    ) -> Result<Rect> {
         let mut b = Builder {
             builder,
             transform: Transform::default(),
@@ -132,24 +136,26 @@ impl<'a> Font<'a> {
         data: &[u8],
         depth: u8,
         builder: &mut Builder<T>,
-    ) -> Result<()> {
+    ) -> Result<Rect> {
         if depth >= MAX_COMPONENTS {
-            return Ok(());
+            return Ok(Rect::zero());
         }
 
         let mut s = Stream::new(data);
 
         let number_of_contours: i16 = s.read()?;
-        s.skip_len(8_u32); // skip bbox
+        let rect: Rect = s.read()?;
 
         if number_of_contours > 0 {
-            Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)
+            Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)?;
         } else if number_of_contours < 0 {
-            self.parse_composite_outline(s.tail()?, depth, builder)
+            self.parse_composite_outline(s.tail()?, depth, builder)?;
         } else {
             // An empty glyph.
-            Ok(())
+            return Ok(Rect::zero());
         }
+
+        Ok(rect)
     }
 
     #[inline(never)]
@@ -276,14 +282,14 @@ impl<'a> Font<'a> {
             if first_oncurve.is_none() {
                 if point.on_curve_point {
                     first_oncurve = Some(p);
-                    builder.push_move_to(p.x, p.y);
+                    builder.move_to(p.x, p.y);
                 } else {
                     match first_offcurve {
                         Some(offcurve) => {
                             let mid = offcurve.lerp(p, 0.5);
                             first_oncurve = Some(mid);
                             last_offcurve = Some(p);
-                            builder.push_move_to(mid.x, mid.y);
+                            builder.move_to(mid.x, mid.y);
                         }
                         None => {
                             first_offcurve = Some(p);
@@ -294,15 +300,15 @@ impl<'a> Font<'a> {
                 match (last_offcurve, point.on_curve_point) {
                     (Some(offcurve), true) => {
                         last_offcurve = None;
-                        builder.push_quad_to(offcurve.x, offcurve.y, p.x, p.y);
+                        builder.quad_to(offcurve.x, offcurve.y, p.x, p.y);
                     }
                     (Some(offcurve), false) => {
                         last_offcurve = Some(p);
                         let mid = offcurve.lerp(p, 0.5);
-                        builder.push_quad_to(offcurve.x, offcurve.y, mid.x, mid.y);
+                        builder.quad_to(offcurve.x, offcurve.y, mid.x, mid.y);
                     }
                     (None, true) => {
-                        builder.push_line_to(p.x, p.y);
+                        builder.line_to(p.x, p.y);
                     }
                     (None, false) => {
                         last_offcurve = Some(p);
@@ -316,30 +322,30 @@ impl<'a> Font<'a> {
                 (Some(offcurve1), Some(offcurve2)) => {
                     last_offcurve = None;
                     let mid = offcurve2.lerp(offcurve1, 0.5);
-                    builder.push_quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
+                    builder.quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
                 }
                 (Some(offcurve1), None) => {
                     if let Some(p) = first_oncurve {
-                        builder.push_quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
+                        builder.quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
                     }
                     break;
                 }
                 (None, Some(offcurve2)) => {
                     if let Some(p) = first_oncurve {
-                        builder.push_quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
+                        builder.quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
                     }
                     break;
                 }
                 (None, None) => {
                     if let Some(p) = first_oncurve {
-                        builder.push_line_to(p.x, p.y);
+                        builder.line_to(p.x, p.y);
                     }
                     break;
                 }
             }
         }
 
-        builder.push_close();
+        builder.close();
     }
 
     #[inline(never)]

@@ -17,7 +17,7 @@ pub enum Weight {
     Bold,
     ExtraBold,
     Black,
-    Other(u16), // TODO: do we really need this?
+    Other(u16),
 }
 
 impl Weight {
@@ -191,10 +191,7 @@ impl<'a> Font<'a> {
     pub fn is_oblique(&self) -> Result<bool> {
         const VERSION_OFFSET: usize = 0;
 
-        let data = match self.table_data(TableName::WindowsMetrics) {
-            Ok(data) => data,
-            Err(_) => return Ok(false),
-        };
+        let data = self.table_data(TableName::WindowsMetrics)?;
 
         let version: u16 = Stream::read_at(data, VERSION_OFFSET)?;
         if version < 4 {

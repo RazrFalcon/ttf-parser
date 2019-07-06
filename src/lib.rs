@@ -141,8 +141,6 @@ mod vmtx;
 
 use parser::{Stream, FromData, SafeStream, LazyArray};
 pub use cff::CFFError;
-pub use glyf::*;
-pub use kern::*;
 pub use name::*;
 pub use os2::*;
 

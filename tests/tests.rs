@@ -134,13 +134,6 @@ fn outline_glyph_cff_1() {
 }
 
 #[test]
-fn checksum() {
-    let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert!(font.is_valid().is_ok());
-}
-
-#[test]
 fn units_per_em() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();

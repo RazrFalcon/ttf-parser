@@ -88,21 +88,18 @@ test outline_glyf ... bench:   1,225,525 ns/iter (+/- 2,215)
 Here is some methods benchmarks:
 
 ```text
-test is_valid                    ... bench:      36,910 ns/iter (+/- 85)
-test outline_glyph_276_from_cff  ... bench:       1,857 ns/iter (+/- 5)
-test outline_glyph_276_from_glyf ... bench:       1,037 ns/iter (+/- 86)
-test outline_glyph_8_from_cff    ... bench:       1,081 ns/iter (+/- 1)
-test family_name                 ... bench:         502 ns/iter (+/- 7)
-test outline_glyph_8_from_glyf   ... bench:         435 ns/iter (+/- 2
-test glyph_index_u41             ... bench:          28 ns/iter (+/- 1)
-test glyph_2_hor_metrics         ... bench:          18 ns/iter (+/- 0)
-test width                       ... bench:          13 ns/iter (+/- 1)
-test units_per_em                ... bench:           6 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,853 ns/iter (+/- 13)
+test outline_glyph_276_from_glyf ... bench:       1,038 ns/iter (+/- 8)
+test outline_glyph_8_from_cff    ... bench:       1,096 ns/iter (+/- 10)
+test family_name                 ... bench:         493 ns/iter (+/- 3)
+test outline_glyph_8_from_glyf   ... bench:         440 ns/iter (+/- 84)
+test glyph_index_u41             ... bench:          29 ns/iter (+/- 1)
+test glyph_2_hor_metrics         ... bench:          13 ns/iter (+/- 0)
+test width                       ... bench:           5 ns/iter (+/- 0)
+test units_per_em                ... bench:           5 ns/iter (+/- 0)
 ```
 
 All other methods are essentially free. All they do is read a value at a specified offset.
-
-`is_valid` validates tables checksum, which is pretty expensive at the moment.
 
 `family_name` is expensive, because it allocates a `String` and the original data
 is stored as UTF-16 BE.
@@ -121,7 +118,6 @@ is stored as UTF-16 BE.
 #![warn(missing_debug_implementations)]
 
 
-use std::convert::TryFrom;
 use std::ops::Range;
 
 mod cff;
@@ -139,7 +135,7 @@ mod post;
 mod vhea;
 mod vmtx;
 
-use parser::{Stream, FromData, SafeStream, LazyArray};
+use parser::{Stream, FromData, SafeStream, LazyArray, TrySlice};
 pub use cff::CFFError;
 pub use name::*;
 pub use os2::*;
@@ -171,9 +167,6 @@ pub enum Error {
 
     /// Table has an invalid size.
     InvalidTableSize(TableName),
-
-    /// An invalid table checksum.
-    InvalidTableChecksum(TableName),
 
     /// Font doesn't have such glyph ID.
     NoGlyph,
@@ -229,9 +222,6 @@ impl std::fmt::Display for Error {
             Error::InvalidTableSize(name) => {
                 write!(f, "table {:?} has an invalid size", name)
             }
-            Error::InvalidTableChecksum(name) => {
-                write!(f, "table {:?} has an invalid checksum", name)
-            }
             Error::SliceOutOfBounds { start, end, data_len } => {
                 write!(f, "an attempt to slice {}..{} on 0..{}", start, end, data_len)
             }
@@ -284,10 +274,6 @@ struct Tag {
 
 impl Tag {
     const LENGTH: usize = 4;
-
-    const fn make_u32(data: &[u8]) -> u32 {
-        (data[0] as u32) << 24 | (data[1] as u32) << 16 | (data[2] as u32) << 8 | data[3] as u32
-    }
 }
 
 impl std::fmt::Debug for Tag {
@@ -421,54 +407,27 @@ pub trait OutlineBuilder {
 /// A table name.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
-#[repr(u32)]
 pub enum TableName {
-    CharacterToGlyphIndexMapping    = Tag::make_u32(b"cmap"),
-    CompactFontFormat               = Tag::make_u32(b"CFF "),
-    GlyphData                       = Tag::make_u32(b"glyf"),
-    Header                          = Tag::make_u32(b"head"),
-    HorizontalHeader                = Tag::make_u32(b"hhea"),
-    HorizontalMetrics               = Tag::make_u32(b"hmtx"),
-    IndexToLocation                 = Tag::make_u32(b"loca"),
-    Kerning                         = Tag::make_u32(b"kern"),
-    MaximumProfile                  = Tag::make_u32(b"maxp"),
-    Naming                          = Tag::make_u32(b"name"),
-    PostScript                      = Tag::make_u32(b"post"),
-    VerticalHeader                  = Tag::make_u32(b"vhea"),
-    VerticalMetrics                 = Tag::make_u32(b"vmtx"),
-    WindowsMetrics                  = Tag::make_u32(b"OS/2"),
+    CharacterToGlyphIndexMapping,
+    CompactFontFormat,
+    GlyphData,
+    Header,
+    HorizontalHeader,
+    HorizontalMetrics,
+    IndexToLocation,
+    Kerning,
+    MaximumProfile,
+    Naming,
+    PostScript,
+    VerticalHeader,
+    VerticalMetrics,
+    WindowsMetrics,
 }
-
-impl TryFrom<Tag> for TableName {
-    type Error = ();
-
-    fn try_from(value: Tag) -> std::result::Result<Self, Self::Error> {
-        // TODO: Rust doesn't support `const fn` in patterns yet
-        match &value.tag {
-            b"CFF " => Ok(TableName::CompactFontFormat),
-            b"cmap" => Ok(TableName::CharacterToGlyphIndexMapping),
-            b"glyf" => Ok(TableName::GlyphData),
-            b"head" => Ok(TableName::Header),
-            b"hhea" => Ok(TableName::HorizontalHeader),
-            b"hmtx" => Ok(TableName::HorizontalMetrics),
-            b"kern" => Ok(TableName::Kerning),
-            b"loca" => Ok(TableName::IndexToLocation),
-            b"maxp" => Ok(TableName::MaximumProfile),
-            b"name" => Ok(TableName::Naming),
-            b"OS/2" => Ok(TableName::WindowsMetrics),
-            b"post" => Ok(TableName::PostScript),
-            b"vhea" => Ok(TableName::VerticalHeader),
-            b"vmtx" => Ok(TableName::VerticalMetrics),
-            _ => Err(()),
-        }
-    }
-}
-
-const MAX_NUMBER_OF_TABLES: usize = 16;
 
 
 struct RawTable {
     tag: Tag,
+    #[allow(dead_code)]
     checksum: u32,
     offset: u32,
     length: u32,
@@ -504,14 +463,6 @@ impl FromData for RawTable {
 }
 
 
-#[derive(Clone, Copy)]
-struct TableInfo<'a> {
-    name: TableName,
-    checksum: u32,
-    data: &'a [u8],
-}
-
-
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
 const OFFSET_TABLE_SIZE: usize = 12;
 
@@ -523,7 +474,19 @@ const MIN_TTC_SIZE: usize = 12 + OFFSET_TABLE_SIZE;
 #[derive(Clone)]
 #[allow(missing_debug_implementations)]
 pub struct Font<'a> {
-    tables: [TableInfo<'a>; MAX_NUMBER_OF_TABLES],
+    head: &'a [u8],
+    hhea: &'a [u8],
+    cff_: Option<&'a [u8]>,
+    cmap: Option<&'a [u8]>,
+    glyf: Option<&'a [u8]>,
+    hmtx: Option<&'a [u8]>,
+    kern: Option<&'a [u8]>,
+    loca: Option<&'a [u8]>,
+    name: Option<&'a [u8]>,
+    os_2: Option<&'a [u8]>,
+    post: Option<&'a [u8]>,
+    vhea: Option<&'a [u8]>,
+    vmtx: Option<&'a [u8]>,
     number_of_glyphs: GlyphId,
 }
 
@@ -572,56 +535,60 @@ impl<'a> Font<'a> {
         s.skip::<u16>(); // searchRange
         s.skip::<u16>(); // entrySelector
         s.skip::<u16>(); // rangeShift
-
-        let mut tables = [TableInfo {
-            name: TableName::MaximumProfile, // dummy
-            checksum: 0,
-            data: b"",
-        }; MAX_NUMBER_OF_TABLES];
-
-        let mut number_of_glyphs = GlyphId(0);
-
         let raw_tables: LazyArray<RawTable> = s.read_array(num_tables)?;
 
-        let mut i = 0;
+        let mut font = Font {
+            head: &[],
+            hhea: &[],
+            cff_: None,
+            cmap: None,
+            glyf: None,
+            hmtx: None,
+            kern: None,
+            loca: None,
+            name: None,
+            os_2: None,
+            post: None,
+            vhea: None,
+            vmtx: None,
+            number_of_glyphs: GlyphId(0),
+        };
+
         for table in raw_tables {
-            let name = match TableName::try_from(table.tag) {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-
-            // Check for duplicates.
-            if tables.iter().take(i).any(|t| t.name == name) {
-                continue;
-            }
-
             let range = match table.range() {
                 Some(range) => range,
                 None => continue,
             };
 
-            let data = match data.get(range) {
-                Some(data) => data,
-                None => continue,
-            };
+            match &table.tag.tag {
+                b"head" => font.head = data.try_slice(range)?,
+                b"hhea" => font.hhea = data.try_slice(range)?,
+                b"maxp" => {
+                    const NUM_GLYPHS_OFFSET: usize = 4;
+                    const MAXP_TABLE_MIN_SIZE: usize = 6;
 
-            tables[i] = TableInfo {
-                name,
-                checksum: table.checksum,
-                data,
-            };
+                    let data = data.try_slice(range)?;
 
-            if name == TableName::MaximumProfile {
-                number_of_glyphs = Self::parse_number_of_glyphs(data)?;
+                    if data.len() < MAXP_TABLE_MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::MaximumProfile));
+                    }
+
+                    font.number_of_glyphs = Stream::read_at(data, NUM_GLYPHS_OFFSET).unwrap();
+                }
+                b"CFF " => font.cff_ = data.get(range),
+                b"cmap" => font.cmap = data.get(range),
+                b"glyf" => font.glyf = data.get(range),
+                b"hmtx" => font.hmtx = data.get(range),
+                b"kern" => font.kern = data.get(range),
+                b"loca" => font.loca = data.get(range),
+                b"name" => font.name = data.get(range),
+                b"OS/2" => font.os_2 = data.get(range),
+                b"post" => font.post = data.get(range),
+                b"vhea" => font.vhea = data.get(range),
+                b"vmtx" => font.vmtx = data.get(range),
+                _ => {},
             }
-
-            i += 1;
         }
-
-        let font = Font {
-            tables,
-            number_of_glyphs,
-        };
 
         // Check for mandatory tables.
 
@@ -629,35 +596,55 @@ impl<'a> Font<'a> {
         const HEAD_TABLE_SIZE: usize = 56;
         const HHEA_TABLE_SIZE: usize = 36;
 
-        let check_size = |name, size| {
-            if font.table_data(name)?.len() == size {
-                Ok(())
-            } else {
-                Err(Error::InvalidTableSize(name))
-            }
-        };
+        if font.head.len() != HEAD_TABLE_SIZE {
+            return Err(Error::InvalidTableSize(TableName::Header));
+        }
 
-        check_size(TableName::Header, HEAD_TABLE_SIZE)?;
-        check_size(TableName::HorizontalHeader, HHEA_TABLE_SIZE)?;
-
-        font.table_data(TableName::MaximumProfile)?;
+        if font.hhea.len() != HHEA_TABLE_SIZE {
+            return Err(Error::InvalidTableSize(TableName::HorizontalHeader));
+        }
 
         Ok(font)
     }
 
     /// Checks that font has a specified table.
     pub fn has_table(&self, name: TableName) -> bool {
-        self.tables.iter().any(|t| t.name == name)
+        match name {
+            TableName::Header                       => true,
+            TableName::HorizontalHeader             => true,
+            TableName::MaximumProfile               => true,
+            TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
+            TableName::CompactFontFormat            => self.cff_.is_some(),
+            TableName::GlyphData                    => self.glyf.is_some(),
+            TableName::HorizontalMetrics            => self.hmtx.is_some(),
+            TableName::IndexToLocation              => self.loca.is_some(),
+            TableName::Kerning                      => self.kern.is_some(),
+            TableName::Naming                       => self.name.is_some(),
+            TableName::PostScript                   => self.post.is_some(),
+            TableName::VerticalHeader               => self.vhea.is_some(),
+            TableName::VerticalMetrics              => self.vmtx.is_some(),
+            TableName::WindowsMetrics               => self.os_2.is_some(),
+        }
     }
 
     #[inline(never)]
     pub(crate) fn table_data(&self, name: TableName) -> Result<&[u8]> {
-        let info = self.tables
-            .iter()
-            .find(|t| t.name == name)
-            .ok_or_else(|| Error::TableMissing(name))?;
-
-        Ok(info.data)
+        match name {
+            TableName::Header                       => Ok(self.head),
+            TableName::HorizontalHeader             => Ok(self.hhea),
+            TableName::MaximumProfile               => unreachable!(),
+            TableName::CharacterToGlyphIndexMapping => self.cmap.ok_or_else(|| Error::TableMissing(name)),
+            TableName::CompactFontFormat            => self.cff_.ok_or_else(|| Error::TableMissing(name)),
+            TableName::GlyphData                    => self.glyf.ok_or_else(|| Error::TableMissing(name)),
+            TableName::HorizontalMetrics            => self.hmtx.ok_or_else(|| Error::TableMissing(name)),
+            TableName::IndexToLocation              => self.loca.ok_or_else(|| Error::TableMissing(name)),
+            TableName::Kerning                      => self.kern.ok_or_else(|| Error::TableMissing(name)),
+            TableName::Naming                       => self.name.ok_or_else(|| Error::TableMissing(name)),
+            TableName::PostScript                   => self.post.ok_or_else(|| Error::TableMissing(name)),
+            TableName::VerticalHeader               => self.vhea.ok_or_else(|| Error::TableMissing(name)),
+            TableName::VerticalMetrics              => self.vmtx.ok_or_else(|| Error::TableMissing(name)),
+            TableName::WindowsMetrics               => self.os_2.ok_or_else(|| Error::TableMissing(name)),
+        }
     }
 
     #[inline(never)]
@@ -673,43 +660,12 @@ impl<'a> Font<'a> {
         self.number_of_glyphs.0
     }
 
-    /// Parses a total number of glyphs in the font.
-    fn parse_number_of_glyphs(data: &[u8]) -> Result<GlyphId> {
-        const NUM_GLYPHS_OFFSET: usize = 4;
-        Ok(GlyphId(Stream::read_at(data, NUM_GLYPHS_OFFSET)?))
-    }
-
     pub(crate) fn check_glyph_id(&self, glyph_id: GlyphId) -> Result<()> {
         if glyph_id < self.number_of_glyphs {
             Ok(())
         } else {
             Err(Error::NoGlyph)
         }
-    }
-
-    /// Checks tables [checksum](https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums).
-    ///
-    /// Checks only used tables.
-    pub fn is_valid(&self) -> Result<()> {
-        for table in &self.tables {
-            if table.data.is_empty() {
-                continue;
-            }
-
-            if table.name == TableName::Header {
-                // We are ignoring the `head` table, because to calculate it's checksum
-                // we have to modify an original data. And we can't, since it's read-only.
-                // TODO: write a custom `calc_checksum` for `head`.
-                continue;
-            }
-
-            let sum = calc_checksum(table.data)?;
-            if sum != table.checksum {
-                return Err(Error::InvalidTableChecksum(table.name));
-            }
-        }
-
-        Ok(())
     }
 
     /// Outlines a glyph. Returns a tight glyph bounding box.
@@ -765,19 +721,6 @@ impl<'a> Font<'a> {
             Err(Error::NoGlyph)
         }
     }
-}
-
-fn calc_checksum(data: &[u8]) -> Result<u32> {
-    // TODO: speed up
-
-    // 'Table checksums are the unsigned sum of the uint32 units of a given table.'
-    let mut sum: u32 = 0;
-    let numbers: LazyArray<u32> = Stream::new(data).read_array(data.len() as u32 / 4)?;
-    for n in numbers {
-        sum = sum.wrapping_add(n);
-    }
-
-    Ok(sum)
 }
 
 /// Checks that provided data is a TrueType font collection.

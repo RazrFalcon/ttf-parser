@@ -36,7 +36,6 @@ fn process() -> Result<(), Box<std::error::Error>> {
     println!("Strikeout: {:?}", font.strikeout_metrics());
     println!("Subscript: {:?}", font.subscript_metrics());
     println!("Superscript: {:?}", font.superscript_metrics());
-    println!("Valid: {:?}", font.is_valid());
 
     let end = time::precise_time_ns();
     println!("Elapsed: {:.6}s", (end - start) as f64 / 1_000_000_000.0);

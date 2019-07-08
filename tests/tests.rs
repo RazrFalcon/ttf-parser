@@ -187,35 +187,35 @@ fn underline_metrics() {
 fn weight() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.weight().unwrap(), ttf::Weight::SemiBold);
+    assert_eq!(font.weight(), ttf::Weight::SemiBold);
 }
 
 #[test]
 fn width() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.width().unwrap(), ttf::Width::Expanded);
+    assert_eq!(font.width(), ttf::Width::Expanded);
 }
 
 #[test]
 fn invalid_width() {
     let data = fs::read("tests/fonts/os2-invalid-width.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert!(font.width().is_err());
+    assert_eq!(font.width(), ttf::Width::default());
 }
 
 #[test]
 fn x_height() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.x_height().unwrap().unwrap(), 536);
+    assert_eq!(font.x_height().unwrap(), 536);
 }
 
 #[test]
 fn no_x_height() {
     let data = fs::read("tests/fonts/os2-v0.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert!(font.x_height().unwrap().is_none());
+    assert!(font.x_height().is_none());
 }
 
 #[test]
@@ -230,35 +230,35 @@ fn strikeout_metrics() {
 fn is_regular() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_regular().unwrap(), true);
+    assert_eq!(font.is_regular(), true);
 }
 
 #[test]
 fn is_italic() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_italic().unwrap(), false);
+    assert_eq!(font.is_italic(), false);
 }
 
 #[test]
 fn os2_is_bold() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_bold().unwrap(), false);
+    assert_eq!(font.is_bold(), false);
 }
 
 #[test]
 fn is_oblique() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_oblique().unwrap(), false);
+    assert_eq!(font.is_oblique(), false);
 }
 
 #[test]
 fn no_is_oblique() {
     let data = fs::read("tests/fonts/os2-v0.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.is_oblique().unwrap(), false);
+    assert_eq!(font.is_oblique(), false);
 }
 
 #[test]

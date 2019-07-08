@@ -312,6 +312,9 @@ pub struct LineMetrics {
     pub thickness: i16,
 }
 
+// We cannot implement FromData for LineMetrics, because order of values in
+// `post` and OS/2 tables are inverted.
+
 
 /// A horizontal metrics of a glyph.
 #[derive(Clone, Copy, PartialEq, Debug)]

@@ -20,7 +20,4 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-### Fixed
-- Panic during a glyph outlining when contour has only one point.
-
 [Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.1.0...HEAD

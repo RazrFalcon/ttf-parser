@@ -4,6 +4,16 @@ use crate::parser::{Stream, FromData, SafeStream};
 use crate::{Font, TableName, LineMetrics, Result, Error};
 
 
+macro_rules! try_or {
+    ($value:expr, $ret:expr) => {
+        match $value {
+            Ok(v) => v,
+            Err(_) => return $ret,
+        }
+    };
+}
+
+
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
@@ -56,6 +66,7 @@ impl From<u16> for Weight {
 }
 
 impl Default for Weight {
+    #[inline]
     fn default() -> Self {
         Weight::Normal
     }
@@ -114,6 +125,7 @@ impl TryFrom<u16> for Width {
 }
 
 impl Default for Width {
+    #[inline]
     fn default() -> Self {
         Width::Normal
     }
@@ -150,81 +162,91 @@ impl FromData for ScriptMetrics {
 
 impl<'a> Font<'a> {
     /// Parses font's weight.
-    pub fn weight(&self) -> Result<Weight> {
+    ///
+    /// Returns `Weight::Normal` when OS/2 table is not present.
+    pub fn weight(&self) -> Weight {
         const US_WEIGHT_CLASS_OFFSET: usize = 4;
-
-        let data = self.table_data(TableName::WindowsMetrics)?;
-        let n: u16 = Stream::read_at(data, US_WEIGHT_CLASS_OFFSET)?;
-        Ok(Weight::from(n))
+        let data = try_or!(self.table_data(TableName::WindowsMetrics), Weight::default());
+        let n: u16 = try_or!(Stream::read_at(data, US_WEIGHT_CLASS_OFFSET), Weight::default());
+        Weight::from(n)
     }
 
     /// Parses font's width.
-    pub fn width(&self) -> Result<Width> {
+    ///
+    /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
+    pub fn width(&self) -> Width {
         const US_WIDTH_CLASS_OFFSET: usize = 6;
-
-        let data = self.table_data(TableName::WindowsMetrics)?;
-        let n: u16 = Stream::read_at(data, US_WIDTH_CLASS_OFFSET)?;
-        Width::try_from(n)
+        let data = try_or!(self.table_data(TableName::WindowsMetrics), Width::default());
+        let n: u16 = try_or!(Stream::read_at(data, US_WIDTH_CLASS_OFFSET), Width::default());
+        Width::try_from(n).unwrap_or_default()
     }
 
     /// Checks that font is marked as *Regular*.
-    pub fn is_regular(&self) -> Result<bool> {
+    ///
+    /// Returns `false` when OS/2 table is not present.
+    pub fn is_regular(&self) -> bool {
         const REGULAR_FLAG: u16 = 6;
-        Ok((self.get_fs_selection()? >> REGULAR_FLAG) & 1 == 1)
+        self.get_fs_selection(REGULAR_FLAG)
     }
 
     /// Checks that font is marked as *Italic*.
-    pub fn is_italic(&self) -> Result<bool> {
+    ///
+    /// Returns `false` when OS/2 table is not present.
+    pub fn is_italic(&self) -> bool {
         const ITALIC_FLAG: u16 = 0;
-        Ok((self.get_fs_selection()? >> ITALIC_FLAG) & 1 == 1)
+        self.get_fs_selection(ITALIC_FLAG)
     }
 
     /// Checks that font is marked as *Bold*.
-    pub fn is_bold(&self) -> Result<bool> {
+    ///
+    /// Returns `false` when OS/2 table is not present.
+    pub fn is_bold(&self) -> bool {
         const BOLD_FLAG: u16 = 5;
-        Ok((self.get_fs_selection()? >> BOLD_FLAG) & 1 == 1)
+        self.get_fs_selection(BOLD_FLAG)
     }
 
     /// Checks that font is marked as *Oblique*.
     ///
-    /// Available only in OS/2 table version >= 4.
-    pub fn is_oblique(&self) -> Result<bool> {
+    /// Returns `None` when OS/2 table is not present or when its version is < 4.
+    pub fn is_oblique(&self) -> bool {
         const VERSION_OFFSET: usize = 0;
 
-        let data = self.table_data(TableName::WindowsMetrics)?;
-
-        let version: u16 = Stream::read_at(data, VERSION_OFFSET)?;
+        let data = try_or!(self.table_data(TableName::WindowsMetrics), false);
+        let version: u16 = try_or!(Stream::read_at(data, VERSION_OFFSET), false);
         if version < 4 {
-            return Ok(false);
+            return false;
         }
 
         const OBLIQUE_FLAG: u16 = 9;
-        Ok((self.get_fs_selection()? >> OBLIQUE_FLAG) & 1 == 1)
+        self.get_fs_selection(OBLIQUE_FLAG)
     }
 
-    fn get_fs_selection(&self) -> Result<u16> {
+    fn get_fs_selection(&self, bit: u16) -> bool {
         const FS_SELECTION_OFFSET: usize = 62;
-        let data = self.table_data(TableName::WindowsMetrics)?;
-        Stream::read_at(data, FS_SELECTION_OFFSET)
+        let data = try_or!(self.table_data(TableName::WindowsMetrics), false);
+        let n: u16 = try_or!(Stream::read_at(data, FS_SELECTION_OFFSET), false);
+        (n >> bit) & 1 == 1
     }
 
     /// Parses font's X height.
     ///
-    /// Available only in OS/2 table version >= 2.
-    pub fn x_height(&self) -> Result<Option<i16>> {
+    /// Returns `None` when OS/2 table is not present or when its version is < 2.
+    pub fn x_height(&self) -> Option<i16> {
         const VERSION_OFFSET: usize = 0;
         const SX_HEIGHT_OFFSET: usize = 86;
 
-        let data = self.table_data(TableName::WindowsMetrics)?;
-        let version: u16 = Stream::read_at(data, VERSION_OFFSET)?;
+        let data = self.table_data(TableName::WindowsMetrics).ok()?;
+        let version: u16 = Stream::read_at(data, VERSION_OFFSET).ok()?;
         if version < 2 {
-            return Ok(None);
+            return None;
         }
 
-        Ok(Stream::read_at(data, SX_HEIGHT_OFFSET).ok())
+        Stream::read_at(data, SX_HEIGHT_OFFSET).ok()
     }
 
     /// Parses font's strikeout metrics.
+    ///
+    /// Returns `None` when OS/2 table is not present.
     pub fn strikeout_metrics(&self) -> Result<LineMetrics> {
         const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
         const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;

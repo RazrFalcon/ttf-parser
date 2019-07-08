@@ -3,7 +3,6 @@
 use crate::parser::Stream;
 use crate::{Font, TableName, LineMetrics, Result};
 
-
 impl<'a> Font<'a> {
     /// Parses font's underline metrics set in the `post` table.
     pub fn underline_metrics(&self) -> Result<LineMetrics> {

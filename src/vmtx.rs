@@ -3,7 +3,6 @@
 use crate::parser::LazyArray;
 use crate::{Font, GlyphId, VerticalMetrics, TableName, Result, Error};
 
-
 impl<'a> Font<'a> {
     /// Returns glyph's vertical metrics.
     pub fn glyph_ver_metrics(&self, glyph_id: GlyphId) -> Result<VerticalMetrics> {

@@ -5,7 +5,6 @@ use std::ops::Range;
 use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream, TrySlice};
 use crate::{Font, GlyphId, TableName, Result, Error};
 
-
 impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
     ///

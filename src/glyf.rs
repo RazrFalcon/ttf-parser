@@ -5,7 +5,6 @@
 use crate::parser::{Stream, LazyArray, TrySlice};
 use crate::{Font, GlyphId, OutlineBuilder, TableName, Rect, Result, Error};
 
-
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
 trait OutlineBuilderInner {
     fn move_to(&mut self, x: f32, y: f32);

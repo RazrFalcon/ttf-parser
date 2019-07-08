@@ -5,7 +5,6 @@ use std::ops::Range;
 use crate::parser::{Stream, LazyArray};
 use crate::{Font, GlyphId, TableName, Result, Error};
 
-
 impl<'a> Font<'a> {
     /// https://docs.microsoft.com/en-us/typography/opentype/spec/loca
     pub(crate) fn glyph_range(&self, glyph_id: GlyphId) -> Result<Range<usize>> {

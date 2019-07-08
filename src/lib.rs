@@ -169,6 +169,9 @@ pub enum Error {
     /// One of the required tables is missing.
     TableMissing(TableName),
 
+    /// Table has an invalid size.
+    InvalidTableSize(TableName),
+
     /// An invalid table checksum.
     InvalidTableChecksum(TableName),
 
@@ -222,6 +225,9 @@ impl std::fmt::Display for Error {
             }
             Error::TableMissing(name) => {
                 write!(f, "font doesn't have a {:?} table", name)
+            }
+            Error::InvalidTableSize(name) => {
+                write!(f, "table {:?} has an invalid size", name)
             }
             Error::InvalidTableChecksum(name) => {
                 write!(f, "table {:?} has an invalid checksum", name)
@@ -522,7 +528,7 @@ pub struct Font<'a> {
 }
 
 impl<'a> Font<'a> {
-    /// Creates a `Font` object from raw data.
+    /// Creates a `Font` object from a raw data.
     ///
     /// You can set `index` in case of font collections.
     /// For simple `ttf` fonts set `index` to 0.
@@ -618,8 +624,22 @@ impl<'a> Font<'a> {
         };
 
         // Check for mandatory tables.
-        font.table_data(TableName::Header)?;
-        font.table_data(TableName::HorizontalHeader)?;
+
+        // All sizes are multiple of four bytes.
+        const HEAD_TABLE_SIZE: usize = 56;
+        const HHEA_TABLE_SIZE: usize = 36;
+
+        let check_size = |name, size| {
+            if font.table_data(name)?.len() == size {
+                Ok(())
+            } else {
+                Err(Error::InvalidTableSize(name))
+            }
+        };
+
+        check_size(TableName::Header, HEAD_TABLE_SIZE)?;
+        check_size(TableName::HorizontalHeader, HHEA_TABLE_SIZE)?;
+
         font.table_data(TableName::MaximumProfile)?;
 
         Ok(font)

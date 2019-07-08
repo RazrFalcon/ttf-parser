@@ -3,7 +3,6 @@
 use crate::parser::{Stream, FromData, SafeStream, LazyArray};
 use crate::{Font, GlyphId, TableName, Result, Error};
 
-
 impl<'a> Font<'a> {
     /// Returns a glyphs pair kerning.
     ///

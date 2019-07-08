@@ -3,14 +3,13 @@
 use crate::parser::LazyArray;
 use crate::{Font, TableName, GlyphId, HorizontalMetrics, Result, Error};
 
-
 impl<'a> Font<'a> {
     /// Returns glyph's horizontal metrics.
     pub fn glyph_hor_metrics(&self, glyph_id: GlyphId) -> Result<HorizontalMetrics> {
         self.check_glyph_id(glyph_id)?;
         let mut s = self.table_stream(TableName::HorizontalMetrics)?;
 
-        let number_of_hmetrics = self.number_of_hmetrics()?;
+        let number_of_hmetrics = self.number_of_hmetrics();
         if number_of_hmetrics == 0 {
             return Err(Error::NoHorizontalMetrics);
         }

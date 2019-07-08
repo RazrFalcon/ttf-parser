@@ -8,7 +8,6 @@ use std::ops::Range;
 use crate::parser::{Stream, TryFromData, SafeStream, TrySlice};
 use crate::{Font, GlyphId, TableName, OutlineBuilder, Rect, Result, Error};
 
-
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: usize = 48;
 

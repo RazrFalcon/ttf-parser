@@ -24,7 +24,7 @@ fn process() -> Result<(), Box<std::error::Error>> {
     let units_per_em = font.units_per_em().ok_or("invalid units per em")?;
     let scale = FONT_SIZE / units_per_em as f64;
 
-    let cell_size = font.height().unwrap() as f64 * FONT_SIZE / units_per_em as f64;
+    let cell_size = font.height() as f64 * FONT_SIZE / units_per_em as f64;
     let rows = (font.number_of_glyphs() as f64 / COLUMNS as f64).ceil() as u32;
 
     let mut output = String::new();
@@ -133,7 +133,7 @@ fn glyph_to_path(
     };
 
     let dx = (cell_size - metrics.advance as f64 * scale) / 2.0;
-    let y = y + cell_size + font.descender().unwrap() as f64 * scale;
+    let y = y + cell_size + font.descender() as f64 * scale;
 
     {
         let bbox_w = (bbox.x_max as f64 - bbox.x_min as f64) * scale;

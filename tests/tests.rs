@@ -158,21 +158,21 @@ fn units_per_em_invalid() {
 fn ascender() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.ascender().unwrap(), 900);
+    assert_eq!(font.ascender(), 900);
 }
 
 #[test]
 fn descender() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.descender().unwrap(), -300);
+    assert_eq!(font.descender(), -300);
 }
 
 #[test]
 fn line_gap() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.line_gap().unwrap(), 200);
+    assert_eq!(font.line_gap(), 200);
 }
 
 #[test]

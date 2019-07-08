@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/loca
+
 use std::ops::Range;
 
 use crate::parser::{Stream, LazyArray};

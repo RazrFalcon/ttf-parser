@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
+
 use std::ops::Range;
 
 use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream, TrySlice};

@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/kern
+
 use crate::parser::{Stream, FromData, SafeStream, LazyArray};
 use crate::{Font, GlyphId, TableName, Result, Error};
 

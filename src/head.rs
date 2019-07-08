@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/head
+
 use crate::parser::Stream;
 use crate::{Font, TableName};
 

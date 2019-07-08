@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/name
+
 use std::convert::TryFrom;
 
 use crate::parser::{Stream, FromData, SafeStream, LazyArray};

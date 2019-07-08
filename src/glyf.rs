@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf
+
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
 use crate::parser::{Stream, LazyArray, TrySlice};

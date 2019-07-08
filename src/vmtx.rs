@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx
+
 use crate::parser::LazyArray;
 use crate::{Font, GlyphId, VerticalMetrics, TableName, Result, Error};
 

@@ -1,3 +1,5 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx
+
 use crate::parser::LazyArray;
 use crate::{Font, TableName, GlyphId, HorizontalMetrics, Result, Error};
 

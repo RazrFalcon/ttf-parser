@@ -257,6 +257,7 @@ impl std::fmt::Display for Error {
 }
 
 impl From<CFFError> for Error {
+    #[inline]
     fn from(e: CFFError) -> Self {
         Error::CFFError(e)
     }

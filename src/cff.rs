@@ -955,7 +955,12 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
     let count: u16 = s.read()?;
     if count != 0 && count != std::u16::MAX {
         let offset_size: OffsetSize = s.try_read()?;
-        let offsets = parse_var_offsets(s, count + 1, offset_size)?;
+        let offsets_len = (count + 1) as u32 * offset_size as u32;
+        let offsets = VarOffsets {
+            data: &s.read_bytes(offsets_len)?,
+            offset_size,
+        };
+
         match offsets.last() {
             Some(last_offset) => {
                 let data = s.read_bytes(last_offset)?;
@@ -974,25 +979,18 @@ fn skip_index(s: &mut Stream) -> Result<()> {
     let count: u16 = s.read()?;
     if count != 0 && count != std::u16::MAX {
         let offset_size: OffsetSize = s.try_read()?;
-        let offsets = parse_var_offsets(s, count + 1, offset_size)?;
+        let offsets_len = (count + 1) as u32 * offset_size as u32;
+        let offsets = VarOffsets {
+            data: &s.read_bytes(offsets_len)?,
+            offset_size,
+        };
+
         if let Some(last_offset) = offsets.last() {
             s.skip_len(last_offset);
         }
     }
 
     Ok(())
-}
-
-fn parse_var_offsets<'a>(
-    s: &mut Stream<'a>,
-    count: u16,
-    offset_size: OffsetSize,
-) -> Result<VarOffsets<'a>> {
-    let offsets_len = count as u32 * offset_size as u32;
-    Ok(VarOffsets {
-        data: &s.read_bytes(offsets_len)?,
-        offset_size,
-    })
 }
 
 

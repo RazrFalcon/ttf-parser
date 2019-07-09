@@ -257,13 +257,16 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn at_end(&self) -> bool {
-        self.offset == self.data.len()
+    pub fn new_at(data: &'a [u8], offset: usize) -> Self {
+        Stream {
+            data,
+            offset,
+        }
     }
 
     #[inline]
-    pub fn jump_to_end(&mut self) {
-        self.offset = self.data.len();
+    pub fn at_end(&self) -> bool {
+        self.offset == self.data.len()
     }
 
     #[inline]

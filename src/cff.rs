@@ -120,8 +120,7 @@ impl<'a> Font<'a> {
         let private_dict = match top_dict.private_dict_range.clone() {
             Some(range) => {
                 let range = range.start as usize .. range.end as usize;
-                let mut s = Stream::new(data.try_slice(range)?);
-                parse_private_dict(&mut s)?
+                parse_private_dict(data.try_slice(range)?)?
             }
             _ => {
                 return Err(Error::NoGlyph);
@@ -175,45 +174,35 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
         None => return Ok(dict),
     };
 
-    let mut i = 0;
-    let mut s = Stream::new(data);
-    let mut dict_parser = DictionaryParser::new(&mut s);
-    while let Some(result) = dict_parser.parse_next() {
-        let operator = result?;
-        let operands = dict_parser.operands();
-
+    let mut dict_parser = DictionaryParser::new(data);
+    while let Some(operator) = dict_parser.parse_next() {
         // Adobe Technical Note #5176, Table 9 Top DICT Operator Entries
         match operator.value() {
-            17 if operands.len() == 1 => {
-                dict.char_strings_offset = Some(operands[0].as_i32() as u32);
+            17 => {
+                dict_parser.parse_operands()?;
+                let operands = dict_parser.operands();
 
-                i += 1;
-            }
-            18 if operands.len() == 2 => {
-                let start = operands[1].as_i32() as u32;
-                let len = operands[0].as_i32() as u32;
-
-                if let Some(end) = start.checked_add(len) {
-                    dict.private_dict_range = Some(start..end);
+                if operands.len() == 1 {
+                    dict.char_strings_offset = Some(operands[0].as_i32() as u32);
                 }
-
-                i += 1;
             }
-            1206 if operands.len() == 1 => { // CharstringType
-                // Check that `charstring` type is set to 2. We do not support other formats.
-                // Usually, it will not be set at all, therefore defaults to 2.
-                if operands[0].as_i32() != 2 {
-                    return Err(Error::NoGlyph);
-                }
+            18 => {
+                dict_parser.parse_operands()?;
+                let operands = dict_parser.operands();
 
-                i += 1;
+                if operands.len() == 2 {
+                    let start = operands[1].as_i32() as u32;
+                    let len = operands[0].as_i32() as u32;
+
+                    if let Some(end) = start.checked_add(len) {
+                        dict.private_dict_range = Some(start..end);
+                    }
+                }
             }
             _ => {}
         }
 
-        // Stop parsing as soon as all required values are parsed.
-        // We assume that there are no duplicates.
-        if i == 3 {
+        if dict.char_strings_offset.is_some() && dict.private_dict_range.is_some() {
             break;
         }
     }
@@ -226,17 +215,20 @@ struct PrivateDict {
     subroutines_offset: Option<u32>,
 }
 
-fn parse_private_dict<'a>(s: &'a mut Stream<'a>) -> Result<PrivateDict> {
+fn parse_private_dict(data: &[u8]) -> Result<PrivateDict> {
     let mut dict = PrivateDict::default();
 
-    let mut dict_parser = DictionaryParser::new(s);
-    while let Some(result) = dict_parser.parse_next() {
-        let operator = result?;
-        let operands = dict_parser.operands();
-
+    let mut dict_parser = DictionaryParser::new(data);
+    while let Some(operator) = dict_parser.parse_next() {
         // Adobe Technical Note #5176, Table 23 Private DICT Operators
-        if operator.value() == 19 && operands.len() == 1 {
-            dict.subroutines_offset = Some(operands[0].as_i32() as u32);
+        if operator.value() == 19 {
+            dict_parser.parse_operands()?;
+            let operands = dict_parser.operands();
+
+            if operands.len() == 1 {
+                dict.subroutines_offset = Some(operands[0].as_i32() as u32);
+            }
+
             break;
         }
     }
@@ -1164,24 +1156,33 @@ impl Operator {
 
 
 struct DictionaryParser<'a> {
-    stream: &'a mut Stream<'a>,
+    data: &'a [u8],
+    // The current offset.
+    offset: usize,
+    // Offset to the last operands start.
+    operands_offset: usize,
+    // Actual operands.
     operands: [Number; MAX_OPERANDS_LEN], // 192B
+    // An amount of operands in the `operands` array.
     operands_len: u8,
 }
 
 impl<'a> DictionaryParser<'a> {
-    fn new(stream: &'a mut Stream<'a>) -> Self {
+    fn new(data: &'a [u8]) -> Self {
         DictionaryParser {
-            stream,
+            data,
+            offset: 0,
+            operands_offset: 0,
             operands: [Number::Integer(0); MAX_OPERANDS_LEN],
             operands_len: 0,
         }
     }
 
-    fn parse_next(&mut self) -> Option<Result<Operator>> {
-        self.operands_len = 0;
-        while !self.stream.at_end() {
-            let b: u8 = self.stream.read().ok()?;
+    fn parse_next(&mut self) -> Option<Operator> {
+        let mut s = Stream::new_at(self.data, self.offset);
+        self.operands_offset = self.offset;
+        while !s.at_end() {
+            let b: u8 = s.read().ok()?;
             // 0..=21 bytes are operators.
             if b <= 21 {
                 let mut operator = b as u16;
@@ -1190,21 +1191,39 @@ impl<'a> DictionaryParser<'a> {
                 if b == TWO_BYTE_OPERATOR_MARK {
                     // Use a 1200 'prefix' to make two byte operators more readable.
                     // 12 3 => 1203
-                    operator = 1200 + self.stream.read::<u8>().ok()? as u16;
+                    operator = 1200 + s.read::<u8>().ok()? as u16;
                 }
 
-                return Some(Ok(Operator(operator)));
+                self.offset = s.offset();
+                return Some(Operator(operator));
             } else {
-                let op = match parse_number(b, &mut self.stream) {
-                    Ok(op) => op,
-                    Err(e) => {
-                        // Jump to the end of the stream,
-                        // so the next `parse_next()` will return `None`.
-                        self.stream.jump_to_end();
-                        return Some(Err(e));
-                    }
-                };
+                skip_number(b, &mut s)?;
+            }
+        }
 
+        None
+    }
+
+    /// Parses operands of the current operator.
+    ///
+    /// In the DICT structure, operands are defined before an operator.
+    /// So we are trying to find an operator first and the we can actually parse the operands.
+    ///
+    /// Since this methods is pretty expensive and we do not care about most of the operators,
+    /// we can speed up parsing by parsing operands only for required operators.
+    ///
+    /// We still have to "skip" operands during operators search (see `skip_number()`),
+    /// but it's still faster that a naive method.
+    fn parse_operands(&mut self) -> Result<()> {
+        let mut s = Stream::new_at(self.data, self.operands_offset);
+        self.operands_len = 0;
+        while !s.at_end() {
+            let b: u8 = s.read()?;
+            // 0..=21 bytes are operators.
+            if b <= 21 {
+                break;
+            } else {
+                let op = parse_number(b, &mut s)?;
                 self.operands[self.operands_len as usize] = op;
                 self.operands_len += 1;
 
@@ -1214,7 +1233,7 @@ impl<'a> DictionaryParser<'a> {
             }
         }
 
-        None
+        Ok(())
     }
 
     fn operands(&self) -> &[Number] {
@@ -1255,10 +1274,9 @@ fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
 }
 
 const FLOAT_STACK_LEN: usize = 64;
+const END_OF_FLOAT_FLAG: u8 = 0xf;
 
 fn parse_float(s: &mut Stream) -> Result<Number> {
-    const END_OF_NUMBER: u8 = 0xf;
-
     let mut data = [0u8; FLOAT_STACK_LEN];
     let mut idx = 0;
 
@@ -1267,13 +1285,13 @@ fn parse_float(s: &mut Stream) -> Result<Number> {
         let nibble1 = b1 >> 4;
         let nibble2 = b1 & 15;
 
-        if nibble1 == END_OF_NUMBER {
+        if nibble1 == END_OF_FLOAT_FLAG {
             break;
         }
 
         idx = parse_float_nibble(nibble1, idx, &mut data)?;
 
-        if nibble2 == END_OF_NUMBER {
+        if nibble2 == END_OF_FLOAT_FLAG {
             break;
         }
 
@@ -1323,6 +1341,30 @@ fn parse_float_nibble(nibble: u8, mut idx: usize, data: &mut [u8]) -> Result<usi
 
     idx += 1;
     Ok(idx)
+}
+
+// Just like `parse_number`, but doesn't actually parses the data.
+fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
+    match b0 {
+        28 => s.skip::<u16>(),
+        29 => s.skip::<u32>(),
+        30 => {
+            while !s.at_end() {
+                let b1: u8 = s.read().ok()?;
+                let nibble1 = b1 >> 4;
+                let nibble2 = b1 & 15;
+                if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {
+                    break;
+                }
+            }
+        }
+        32...246 => {}
+        247...250 => s.skip::<u8>(),
+        251...254 => s.skip::<u8>(),
+        _ => return None,
+    }
+
+    Some(())
 }
 
 

@@ -81,15 +81,15 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```text
-test outline_cff  ... bench:   2,614,448 ns/iter (+/- 1,945)
+test outline_cff  ... bench:   2,277,435 ns/iter (+/- 1,558)
 test outline_glyf ... bench:     977,046 ns/iter (+/- 4,973)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:       1,774 ns/iter (+/- 5)
-test outline_glyph_8_from_cff    ... bench:       1,014 ns/iter (+/- 7)
+test outline_glyph_276_from_cff  ... bench:       1,599 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         858 ns/iter (+/- 2)
 test outline_glyph_276_from_glyf ... bench:         805 ns/iter (+/- 25)
 test family_name                 ... bench:         356 ns/iter (+/- 12)
 test outline_glyph_8_from_glyf   ... bench:         409 ns/iter (+/- 1)

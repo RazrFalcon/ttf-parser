@@ -129,6 +129,7 @@ impl<'a> Name<'a> {
     /// Supports:
     /// - Unicode Platform ID
     /// - Windows Platform ID + Unicode BMP
+    #[inline(never)]
     pub fn to_string(&self) -> Option<String> {
         if self.is_supported_encoding() {
             self.name_from_utf16_be()
@@ -137,6 +138,7 @@ impl<'a> Name<'a> {
         }
     }
 
+    #[inline]
     fn is_supported_encoding(&self) -> bool {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
         const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
@@ -148,6 +150,7 @@ impl<'a> Name<'a> {
         }
     }
 
+    #[inline(never)]
     fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
         for c in LazyArray::new(self.name) {
@@ -259,6 +262,7 @@ impl<'a> Font<'a> {
         }
     }
 
+    #[inline(never)]
     fn _names(&self) -> Result<Names> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
         const LANG_TAG_RECORD_SIZE: u16 = 4;

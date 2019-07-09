@@ -608,6 +608,7 @@ impl<'a> Font<'a> {
     }
 
     /// Checks that font has a specified table.
+    #[inline]
     pub fn has_table(&self, name: TableName) -> bool {
         match name {
             TableName::Header                       => true,
@@ -627,12 +628,12 @@ impl<'a> Font<'a> {
         }
     }
 
-    #[inline(never)]
+    #[inline]
     pub(crate) fn table_data(&self, name: TableName) -> Result<&[u8]> {
         match name {
             TableName::Header                       => Ok(self.head),
             TableName::HorizontalHeader             => Ok(self.hhea),
-            TableName::MaximumProfile               => unreachable!(),
+            TableName::MaximumProfile               => unreachable!(), // We do not store this table.
             TableName::CharacterToGlyphIndexMapping => self.cmap.ok_or_else(|| Error::TableMissing(name)),
             TableName::CompactFontFormat            => self.cff_.ok_or_else(|| Error::TableMissing(name)),
             TableName::GlyphData                    => self.glyf.ok_or_else(|| Error::TableMissing(name)),
@@ -647,7 +648,7 @@ impl<'a> Font<'a> {
         }
     }
 
-    #[inline(never)]
+    #[inline]
     pub(crate) fn table_stream(&self, name: TableName) -> Result<Stream> {
         Ok(Stream::new(self.table_data(name)?))
     }

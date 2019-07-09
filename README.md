@@ -86,7 +86,7 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 
 ```
 test outline_cff  ... bench:   2,688,404 ns/iter (+/- 1,678)
-test outline_glyf ... bench:   1,144,718 ns/iter (+/- 1,035)
+test outline_glyf ... bench:     977,046 ns/iter (+/- 4,973)
 ```
 
 Here is some methods benchmarks:
@@ -94,8 +94,8 @@ Here is some methods benchmarks:
 ```
 test outline_glyph_276_from_cff  ... bench:       1,834 ns/iter (+/- 3)
 test outline_glyph_8_from_cff    ... bench:       1,092 ns/iter (+/- 13)
-test outline_glyph_276_from_glyf ... bench:         970 ns/iter (+/- 118)
-test family_name                 ... bench:         452 ns/iter (+/- 2)
+test outline_glyph_276_from_glyf ... bench:         805 ns/iter (+/- 25)
+test family_name                 ... bench:         356 ns/iter (+/- 12)
 test outline_glyph_8_from_glyf   ... bench:         409 ns/iter (+/- 1)
 test from_data                   ... bench:         133 ns/iter (+/- 0)
 ```

@@ -420,6 +420,7 @@ struct Transform {
 }
 
 impl Transform {
+    #[inline]
     fn combine(ts1: Self, ts2: Self) -> Self {
         Transform {
             a: ts1.a * ts2.a + ts1.c * ts2.b,
@@ -431,6 +432,7 @@ impl Transform {
         }
     }
 
+    #[inline]
     fn apply_to(&self, x: &mut f32, y: &mut f32) {
         let tx = *x;
         let ty = *y;
@@ -438,6 +440,7 @@ impl Transform {
         *y = self.b * tx + self.d * ty + self.f;
     }
 
+    #[inline]
     fn is_default(&self) -> bool {
         // A direct float comparison is fine in our case.
            self.a == 1.0

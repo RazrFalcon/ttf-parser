@@ -93,7 +93,7 @@ test outline_glyph_8_from_cff    ... bench:       1,092 ns/iter (+/- 13)
 test outline_glyph_276_from_glyf ... bench:         970 ns/iter (+/- 118)
 test family_name                 ... bench:         452 ns/iter (+/- 2)
 test outline_glyph_8_from_glyf   ... bench:         409 ns/iter (+/- 1)
-test from_data                   ... bench:         274 ns/iter (+/- 0)
+test from_data                   ... bench:         133 ns/iter (+/- 0)
 ```
 
 Some methods are too fast, so we execute them **1000 times** to get better measurements.
@@ -126,8 +126,6 @@ is stored as UTF-16 BE.
 #![warn(missing_debug_implementations)]
 
 
-use std::ops::Range;
-
 mod cff;
 mod cmap;
 mod glyf;
@@ -143,7 +141,7 @@ mod post;
 mod vhea;
 mod vmtx;
 
-use parser::{Stream, FromData, SafeStream, LazyArray, TrySlice};
+use parser::{Stream, FromData, SafeStream, TrySlice};
 pub use cff::CFFError;
 pub use name::*;
 pub use os2::*;
@@ -288,8 +286,7 @@ impl std::fmt::Debug for Tag {
 impl FromData for Tag {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
-        let tag = [s.read(), s.read(), s.read(), s.read()];
-        Tag { tag }
+        Tag { tag: [s.read(), s.read(), s.read(), s.read()] }
     }
 }
 
@@ -431,51 +428,6 @@ pub enum TableName {
 }
 
 
-struct RawTable {
-    tag: Tag,
-    #[allow(dead_code)]
-    checksum: u32,
-    offset: u32,
-    length: u32,
-}
-
-impl RawTable {
-    fn range(&self) -> Option<Range<usize>> {
-        // 'The length of a table must be a multiple of four bytes.'
-        // But Table Record stores an actual table length.
-        // So we have to expand it.
-        //
-        // This is mainly for checksum code.
-
-        // Check for overflow.
-        let length = self.length.checked_add(3)?;
-        let length = length & !3;
-
-        let start = self.offset as usize;
-        let range = start..(start + length as usize);
-        Some(range)
-    }
-}
-
-impl FromData for RawTable {
-    fn parse(s: &mut SafeStream) -> Self {
-        RawTable {
-            tag: s.read(),
-            checksum: s.read(),
-            offset: s.read(),
-            length: s.read(),
-        }
-    }
-}
-
-
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
-const OFFSET_TABLE_SIZE: usize = 12;
-
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
-const MIN_TTC_SIZE: usize = 12 + OFFSET_TABLE_SIZE;
-
-
 /// A font data handle.
 #[derive(Clone)]
 #[allow(missing_debug_implementations)]
@@ -514,7 +466,7 @@ impl<'a> Font<'a> {
 
                 let offset = OFFSETS_TABLE_OFFSET + OFFSET_32_SIZE * index as usize;
                 let font_offset: u32 = Stream::read_at(data, offset)?;
-                &data[font_offset as usize ..]
+                data.try_slice(font_offset as usize .. data.len())?
             } else {
                 return Err(Error::FontIndexOutOfBounds);
             }
@@ -522,6 +474,8 @@ impl<'a> Font<'a> {
             data
         };
 
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
+        const OFFSET_TABLE_SIZE: usize = 12;
         if data.len() < OFFSET_TABLE_SIZE {
             return Err(Error::NotATrueType);
         }
@@ -538,10 +492,11 @@ impl<'a> Font<'a> {
         }
 
         let num_tables: u16 = s.read()?;
-        s.skip::<u16>(); // searchRange
-        s.skip::<u16>(); // entrySelector
-        s.skip::<u16>(); // rangeShift
-        let raw_tables: LazyArray<RawTable> = s.read_array(num_tables)?;
+        s.skip_len(6u32); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
+
+        const OFFSET_RECORD_SIZE: u32 = 16;
+        // `as u32` required to prevent overflow
+        let mut s = SafeStream::new(s.read_bytes(num_tables as u32 * OFFSET_RECORD_SIZE)?);
 
         let mut font = Font {
             head: &[],
@@ -560,18 +515,17 @@ impl<'a> Font<'a> {
             number_of_glyphs: GlyphId(0),
         };
 
-        for table in raw_tables {
-            let range = match table.range() {
-                Some(range) => range,
-                None => continue,
-            };
+        for _ in 0..num_tables {
+            let tag: Tag = s.read();
+            s.skip::<u32>(); // checksum
+            let offset = s.read::<u32>() as usize;
+            let length = s.read::<u32>() as usize;
+            let range = offset..(offset + length);
 
-            let table_len = range.end - range.start;
-
-            match &table.tag.tag {
+            match &tag.tag {
                 b"head" => {
-                    const HEAD_TABLE_SIZE: usize = 56;
-                    if table_len < HEAD_TABLE_SIZE {
+                    const HEAD_TABLE_SIZE: usize = 54;
+                    if length < HEAD_TABLE_SIZE {
                         return Err(Error::InvalidTableSize(TableName::Header));
                     }
 
@@ -579,7 +533,7 @@ impl<'a> Font<'a> {
                 }
                 b"hhea" => {
                     const HHEA_TABLE_SIZE: usize = 36;
-                    if table_len < HHEA_TABLE_SIZE {
+                    if length < HHEA_TABLE_SIZE {
                         return Err(Error::InvalidTableSize(TableName::HorizontalHeader));
                     }
 
@@ -588,8 +542,7 @@ impl<'a> Font<'a> {
                 b"maxp" => {
                     const MAXP_TABLE_MIN_SIZE: usize = 6;
                     const NUM_GLYPHS_OFFSET: usize = 4;
-
-                    if table_len < MAXP_TABLE_MIN_SIZE {
+                    if length < MAXP_TABLE_MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::MaximumProfile));
                     }
 
@@ -597,8 +550,8 @@ impl<'a> Font<'a> {
                     font.number_of_glyphs = SafeStream::read_at(data, NUM_GLYPHS_OFFSET);
                 }
                 b"OS/2" => {
-                    const OS_2_TABLE_MIN_SIZE: usize = 80;
-                    if table_len < OS_2_TABLE_MIN_SIZE {
+                    const OS_2_TABLE_MIN_SIZE: usize = 78;
+                    if length < OS_2_TABLE_MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::WindowsMetrics));
                     }
 
@@ -606,7 +559,7 @@ impl<'a> Font<'a> {
                 }
                 b"post" => {
                     const POST_TABLE_MIN_SIZE: usize = 16;
-                    if table_len < POST_TABLE_MIN_SIZE {
+                    if length < POST_TABLE_MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::PostScript));
                     }
 
@@ -614,7 +567,7 @@ impl<'a> Font<'a> {
                 }
                 b"vhea" => {
                     const VHEA_TABLE_MIN_SIZE: usize = 36;
-                    if table_len < VHEA_TABLE_MIN_SIZE {
+                    if length < VHEA_TABLE_MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::VerticalHeader));
                     }
 
@@ -628,7 +581,7 @@ impl<'a> Font<'a> {
                 b"loca" => font.loca = data.get(range),
                 b"name" => font.name = data.get(range),
                 b"vmtx" => font.vmtx = data.get(range),
-                _ => {},
+                _ => {}
             }
         }
 
@@ -740,7 +693,7 @@ impl<'a> Font<'a> {
 /// Checks that provided data is a TrueType font collection.
 #[inline]
 fn is_collection(data: &[u8]) -> bool {
-    data.len() >= Tag::LENGTH && &data[0..Tag::LENGTH] == b"ttcf"
+    data.get(0..Tag::LENGTH) == Some(b"ttcf")
 }
 
 /// Returns a number of fonts stored in a TrueType font collection.
@@ -748,16 +701,11 @@ fn is_collection(data: &[u8]) -> bool {
 /// Returns `None` if a provided data is not a TrueType font collection.
 #[inline]
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
-    if data.len() < MIN_TTC_SIZE {
+    if !is_collection(data) {
         return None;
     }
 
     // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
     const NUM_FONTS_OFFSET: usize = 8;
-
-    if !is_collection(data) {
-        return None;
-    }
-
     Stream::read_at(data, NUM_FONTS_OFFSET).ok()
 }

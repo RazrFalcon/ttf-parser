@@ -629,31 +629,6 @@ impl<'a> Font<'a> {
         }
     }
 
-    #[inline]
-    pub(crate) fn table_data(&self, name: TableName) -> Result<&[u8]> {
-        match name {
-            TableName::Header                       => Ok(self.head),
-            TableName::HorizontalHeader             => Ok(self.hhea),
-            TableName::MaximumProfile               => unreachable!(), // We do not store this table.
-            TableName::CharacterToGlyphIndexMapping => self.cmap.ok_or_else(|| Error::TableMissing(name)),
-            TableName::CompactFontFormat            => self.cff_.ok_or_else(|| Error::TableMissing(name)),
-            TableName::GlyphData                    => self.glyf.ok_or_else(|| Error::TableMissing(name)),
-            TableName::HorizontalMetrics            => self.hmtx.ok_or_else(|| Error::TableMissing(name)),
-            TableName::IndexToLocation              => self.loca.ok_or_else(|| Error::TableMissing(name)),
-            TableName::Kerning                      => self.kern.ok_or_else(|| Error::TableMissing(name)),
-            TableName::Naming                       => self.name.ok_or_else(|| Error::TableMissing(name)),
-            TableName::PostScript                   => self.post.ok_or_else(|| Error::TableMissing(name)),
-            TableName::VerticalHeader               => self.vhea.ok_or_else(|| Error::TableMissing(name)),
-            TableName::VerticalMetrics              => self.vmtx.ok_or_else(|| Error::TableMissing(name)),
-            TableName::WindowsMetrics               => self.os_2.ok_or_else(|| Error::TableMissing(name)),
-        }
-    }
-
-    #[inline]
-    pub(crate) fn table_stream(&self, name: TableName) -> Result<Stream> {
-        Ok(Stream::new(self.table_data(name)?))
-    }
-
     /// Returns a total number of glyphs in the font.
     ///
     /// The value was already parsed, so this function doesn't involve any parsing.

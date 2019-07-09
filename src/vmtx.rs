@@ -1,13 +1,14 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx
 
-use crate::parser::LazyArray;
+use crate::parser::{Stream, LazyArray};
 use crate::{Font, GlyphId, VerticalMetrics, TableName, Result, Error};
 
 impl<'a> Font<'a> {
     /// Returns glyph's vertical metrics.
     pub fn glyph_ver_metrics(&self, glyph_id: GlyphId) -> Result<VerticalMetrics> {
         self.check_glyph_id(glyph_id)?;
-        let mut s = self.table_stream(TableName::VerticalMetrics)?;
+        let data = self.vmtx.ok_or_else(|| Error::TableMissing(TableName::VerticalMetrics))?;
+        let mut s = Stream::new(data);
 
         let number_of_vmetrics = self.number_of_vmetrics()?;
         if number_of_vmetrics == 0 {

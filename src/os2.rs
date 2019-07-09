@@ -6,6 +6,15 @@ use crate::parser::{Stream, FromData, SafeStream};
 use crate::{Font, TableName, LineMetrics, Result, Error};
 
 
+macro_rules! try_opt_or {
+    ($value:expr, $ret:expr) => {
+        match $value {
+            Some(v) => v,
+            None => return $ret,
+        }
+    };
+}
+
 macro_rules! try_or {
     ($value:expr, $ret:expr) => {
         match $value {
@@ -168,7 +177,7 @@ impl<'a> Font<'a> {
     /// Returns `Weight::Normal` when OS/2 table is not present.
     pub fn weight(&self) -> Weight {
         const US_WEIGHT_CLASS_OFFSET: usize = 4;
-        let data = try_or!(self.table_data(TableName::WindowsMetrics), Weight::default());
+        let data = try_opt_or!(self.os_2, Weight::default());
         let n: u16 = try_or!(Stream::read_at(data, US_WEIGHT_CLASS_OFFSET), Weight::default());
         Weight::from(n)
     }
@@ -178,7 +187,7 @@ impl<'a> Font<'a> {
     /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
     pub fn width(&self) -> Width {
         const US_WIDTH_CLASS_OFFSET: usize = 6;
-        let data = try_or!(self.table_data(TableName::WindowsMetrics), Width::default());
+        let data = try_opt_or!(self.os_2, Width::default());
         let n: u16 = try_or!(Stream::read_at(data, US_WIDTH_CLASS_OFFSET), Width::default());
         Width::try_from(n).unwrap_or_default()
     }
@@ -213,7 +222,7 @@ impl<'a> Font<'a> {
     pub fn is_oblique(&self) -> bool {
         const VERSION_OFFSET: usize = 0;
 
-        let data = try_or!(self.table_data(TableName::WindowsMetrics), false);
+        let data = try_opt_or!(self.os_2, false);
         let version: u16 = try_or!(Stream::read_at(data, VERSION_OFFSET), false);
         if version < 4 {
             return false;
@@ -225,7 +234,7 @@ impl<'a> Font<'a> {
 
     fn get_fs_selection(&self, bit: u16) -> bool {
         const FS_SELECTION_OFFSET: usize = 62;
-        let data = try_or!(self.table_data(TableName::WindowsMetrics), false);
+        let data = try_opt_or!(self.os_2, false);
         let n: u16 = try_or!(Stream::read_at(data, FS_SELECTION_OFFSET), false);
         (n >> bit) & 1 == 1
     }
@@ -237,7 +246,7 @@ impl<'a> Font<'a> {
         const VERSION_OFFSET: usize = 0;
         const SX_HEIGHT_OFFSET: usize = 86;
 
-        let data = self.table_data(TableName::WindowsMetrics).ok()?;
+        let data = self.os_2?;
         let version: u16 = Stream::read_at(data, VERSION_OFFSET).ok()?;
         if version < 2 {
             return None;
@@ -247,13 +256,11 @@ impl<'a> Font<'a> {
     }
 
     /// Parses font's strikeout metrics.
-    ///
-    /// Returns `None` when OS/2 table is not present.
     pub fn strikeout_metrics(&self) -> Result<LineMetrics> {
         const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
         const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
 
-        let data = self.table_data(TableName::WindowsMetrics)?;
+        let data = self.os_2.ok_or_else(|| Error::TableMissing(TableName::WindowsMetrics))?;
         Ok(LineMetrics {
             position:  Stream::read_at(data, Y_STRIKEOUT_POSITION_OFFSET)?,
             thickness: Stream::read_at(data, Y_STRIKEOUT_SIZE_OFFSET)?,
@@ -263,14 +270,14 @@ impl<'a> Font<'a> {
     /// Parses font's subscript metrics.
     pub fn subscript_metrics(&self) -> Result<ScriptMetrics> {
         const Y_SUBSCRIPT_XSIZE_OFFSET: usize = 10;
-        let data = self.table_data(TableName::WindowsMetrics)?;
+        let data = self.os_2.ok_or_else(|| Error::TableMissing(TableName::WindowsMetrics))?;
         Stream::read_at(data, Y_SUBSCRIPT_XSIZE_OFFSET)
     }
 
     /// Parses font's superscript metrics.
     pub fn superscript_metrics(&self) -> Result<ScriptMetrics> {
         const Y_SUPERSCRIPT_XSIZE_OFFSET: usize = 18;
-        let data = self.table_data(TableName::WindowsMetrics)?;
+        let data = self.os_2.ok_or_else(|| Error::TableMissing(TableName::WindowsMetrics))?;
         Stream::read_at(data, Y_SUPERSCRIPT_XSIZE_OFFSET)
     }
 }

@@ -128,7 +128,7 @@ impl<'a> Font<'a> {
 
     fn glyph_data(&self, glyph_id: GlyphId) -> Result<&[u8]> {
         let range = self.glyph_range(glyph_id)?;
-        let data = self.table_data(TableName::GlyphData)?;
+        let data = self.glyf.ok_or_else(|| Error::TableMissing(TableName::GlyphData))?;
         data.try_slice(range)
     }
 

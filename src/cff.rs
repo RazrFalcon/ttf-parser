@@ -94,7 +94,7 @@ impl<'a> Font<'a> {
         glyph_id: GlyphId,
         builder: &mut impl OutlineBuilder,
     ) -> Result<Rect> {
-        let data = self.table_data(TableName::CompactFontFormat)?;
+        let data = self.cff_.ok_or_else(|| Error::TableMissing(TableName::CompactFontFormat))?;
         let mut s = Stream::new(data);
 
         // Parse Header.

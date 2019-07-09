@@ -12,7 +12,7 @@ impl<'a> Font<'a> {
     ///
     /// All subtable formats except Mixed Coverage (8) are supported.
     pub fn glyph_index(&self, c: char) -> Result<GlyphId> {
-        let data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
+        let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
         let num_tables: u16 = s.read()?;
@@ -71,7 +71,7 @@ impl<'a> Font<'a> {
     ///
     /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
     pub fn glyph_variation_index(&self, c: char, variation: char) -> Result<GlyphId> {
-        let data = self.table_data(TableName::CharacterToGlyphIndexMapping)?;
+        let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
         let num_tables: u16 = s.read()?;

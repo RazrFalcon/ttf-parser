@@ -1,13 +1,14 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx
 
-use crate::parser::LazyArray;
+use crate::parser::{Stream, LazyArray};
 use crate::{Font, TableName, GlyphId, HorizontalMetrics, Result, Error};
 
 impl<'a> Font<'a> {
     /// Returns glyph's horizontal metrics.
     pub fn glyph_hor_metrics(&self, glyph_id: GlyphId) -> Result<HorizontalMetrics> {
         self.check_glyph_id(glyph_id)?;
-        let mut s = self.table_stream(TableName::HorizontalMetrics)?;
+        let data = self.hmtx.ok_or_else(|| Error::TableMissing(TableName::HorizontalMetrics))?;
+        let mut s = Stream::new(data);
 
         let number_of_hmetrics = self.number_of_hmetrics();
         if number_of_hmetrics == 0 {

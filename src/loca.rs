@@ -28,7 +28,7 @@ impl<'a> Font<'a> {
         }
 
         let format = self.index_to_location_format().ok_or(Error::NoGlyph)?;
-        let data = self.table_data(TableName::IndexToLocation)?;
+        let data = self.loca.ok_or_else(|| Error::TableMissing(TableName::IndexToLocation))?;
 
         let mut s = Stream::new(data);
         let range = match format {

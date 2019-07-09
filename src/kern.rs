@@ -10,7 +10,7 @@ impl<'a> Font<'a> {
     pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Result<i16> {
         self.check_glyph_id(glyph_id1)?;
         self.check_glyph_id(glyph_id2)?;
-        let data = self.table_data(TableName::Kerning)?;
+        let data = self.kern.ok_or_else(|| Error::TableMissing(TableName::Kerning))?;
 
         let mut s = Stream::new(data);
         let version: u16 = s.read()?;

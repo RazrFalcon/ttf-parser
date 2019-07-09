@@ -1092,35 +1092,6 @@ impl<'a> DataIndex<'a> {
     }
 }
 
-impl<'a> IntoIterator for DataIndex<'a> {
-    type Item = &'a [u8];
-    type IntoIter = DataIndexIter<'a>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        DataIndexIter {
-            data: self,
-            index: 0,
-        }
-    }
-}
-
-struct DataIndexIter<'a> {
-    data: DataIndex<'a>,
-    index: u16,
-}
-
-impl<'a> Iterator for DataIndexIter<'a> {
-    type Item = &'a [u8];
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let index = self.index;
-        self.index += 1;
-        self.data.get(index)
-    }
-}
-
 
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]

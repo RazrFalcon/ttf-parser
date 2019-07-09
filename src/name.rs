@@ -20,6 +20,7 @@ pub enum PlatformId {
 impl TryFrom<u16> for PlatformId {
     type Error = &'static str;
 
+    #[inline]
     fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
             0 => Ok(PlatformId::Unicode),
@@ -67,6 +68,7 @@ pub enum NameId {
 impl TryFrom<u16> for NameId {
     type Error = &'static str;
 
+    #[inline]
     fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
             0 => Ok(NameId::CopyrightNotice),
@@ -189,6 +191,7 @@ struct NameRecord {
 }
 
 impl FromData for NameRecord {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         NameRecord {
             platform_id: s.read(),

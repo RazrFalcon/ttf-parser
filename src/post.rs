@@ -1,18 +1,24 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
-use crate::parser::Stream;
-use crate::{Font, TableName, LineMetrics, Result, Error};
+use crate::parser::SafeStream;
+use crate::{Font, LineMetrics};
+
+// We already checked that `post` table has a valid length,
+// so it's safe to use `SafeStream`.
 
 impl<'a> Font<'a> {
-    /// Parses font's underline metrics set in the `post` table.
-    pub fn underline_metrics(&self) -> Result<LineMetrics> {
+    /// Parses font's underline metrics.
+    ///
+    /// Returns `None` when `post` table is not present.
+    #[inline]
+    pub fn underline_metrics(&self) -> Option<LineMetrics> {
         const UNDERLINE_POSITION_OFFSET: usize = 8;
-        const UNDERLINE_THICKNESS_OFFSET: usize = 10;
+        let mut s = SafeStream::new_at(self.post?, UNDERLINE_POSITION_OFFSET);
 
-        let data = self.post.ok_or_else(|| Error::TableMissing(TableName::PostScript))?;
-        Ok(LineMetrics {
-            position:  Stream::read_at(data, UNDERLINE_POSITION_OFFSET)?,
-            thickness: Stream::read_at(data, UNDERLINE_THICKNESS_OFFSET)?,
+        // Do not change the order. In the `post` table, line position is set before thickness.
+        Some(LineMetrics {
+            position: s.read(),
+            thickness: s.read(),
         })
     }
 }

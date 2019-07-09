@@ -366,6 +366,14 @@ impl<'a> SafeStream<'a> {
     }
 
     #[inline]
+    pub fn new_at(data: &'a [u8], offset: usize) -> Self {
+        SafeStream {
+            data,
+            offset,
+        }
+    }
+
+    #[inline]
     pub fn skip<T: FromData>(&mut self) {
         self.offset += T::raw_size();
     }

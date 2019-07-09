@@ -85,26 +85,33 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```
-test outline_cff  ... bench:   2,694,360 ns/iter (+/- 3,437)
-test outline_glyf ... bench:   1,155,789 ns/iter (+/- 1,518)
+test outline_cff  ... bench:   2,688,404 ns/iter (+/- 1,678)
+test outline_glyf ... bench:   1,144,718 ns/iter (+/- 1,035)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:       1,823 ns/iter (+/- 20)
-test outline_glyph_8_from_cff    ... bench:       1,085 ns/iter (+/- 10)
-test outline_glyph_276_from_glyf ... bench:         981 ns/iter (+/- 20)
-test family_name                 ... bench:         493 ns/iter (+/- 3)
-test outline_glyph_8_from_glyf   ... bench:         422 ns/iter (+/- 32)
-test glyph_index_u41             ... bench:          29 ns/iter (+/- 1)
-test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
-test width                       ... bench:           3 ns/iter (+/- 0)
-test ascender                    ... bench:           2 ns/iter (+/- 0)
-test units_per_em                ... bench:           2 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,834 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:       1,092 ns/iter (+/- 13)
+test outline_glyph_276_from_glyf ... bench:         970 ns/iter (+/- 118)
+test family_name                 ... bench:         452 ns/iter (+/- 2)
+test outline_glyph_8_from_glyf   ... bench:         409 ns/iter (+/- 1)
+test from_data                   ... bench:         206 ns/iter (+/- 0)
 ```
 
-All other methods are essentially free. All they do is read a value at a specified offset.
+Some methods are too fast, so we execute them **1000 times** to get better measurements.
+
+```
+test glyph_index_u41     ... bench:      25,200 ns/iter (+/- 230)
+test glyph_2_hor_metrics ... bench:       8,421 ns/iter (+/- 18)
+test units_per_em        ... bench:         564 ns/iter (+/- 2)
+test x_height            ... bench:         568 ns/iter (+/- 1)
+test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)
+test width               ... bench:         422 ns/iter (+/- 0)
+test ascender            ... bench:         279 ns/iter (+/- 1)
+test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
+```
 
 `family_name` is expensive, because it allocates a `String` and the original data
 is stored as UTF-16 BE.

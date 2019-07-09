@@ -1,12 +1,15 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vhea
 
-use crate::parser::Stream;
-use crate::{Font, TableName, Result, Error};
+use crate::parser::SafeStream;
+use crate::Font;
+
+// We already checked that `vhea` table has a valid length,
+// so it's safe to use `SafeStream`.
 
 impl<'a> Font<'a> {
-    pub(crate) fn number_of_vmetrics(&self) -> Result<u16> {
+    #[inline]
+    pub(crate) fn number_of_vmetrics(&self) -> Option<u16> {
         const NUMBER_OF_VMETRICS_OFFSET: usize = 34;
-        let data = self.vhea.ok_or_else(|| Error::TableMissing(TableName::VerticalHeader))?;
-        Stream::read_at(data, NUMBER_OF_VMETRICS_OFFSET)
+        Some(SafeStream::read_at(self.vhea?, NUMBER_OF_VMETRICS_OFFSET))
     }
 }

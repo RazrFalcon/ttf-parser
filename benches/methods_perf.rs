@@ -1,5 +1,12 @@
 use ttf_parser as ttf;
 
+fn from_data(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    bencher.iter(|| {
+        bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
+    })
+}
+
 fn outline_glyph_8_from_glyf(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = ttf::Font::from_data(&font_data, 0).unwrap();
@@ -33,51 +40,11 @@ fn outline_glyph_276_from_cff(bencher: &mut bencher::Bencher) {
     })
 }
 
-fn glyph_index_u41(bencher: &mut bencher::Bencher) {
-    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
-    bencher.iter(|| {
-        bencher::black_box(font.glyph_index('A'))
-    })
-}
-
 fn family_name(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = ttf::Font::from_data(&font_data, 0).unwrap();
     bencher.iter(|| {
-        bencher::black_box(font.family_name())
-    })
-}
-
-fn units_per_em(bencher: &mut bencher::Bencher) {
-    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
-    bencher.iter(|| {
-        bencher::black_box(font.units_per_em())
-    })
-}
-
-fn width(bencher: &mut bencher::Bencher) {
-    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
-    bencher.iter(|| {
-        bencher::black_box(font.width())
-    })
-}
-
-fn glyph_2_hor_metrics(bencher: &mut bencher::Bencher) {
-    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
-    bencher.iter(|| {
-        bencher::black_box(font.glyph_hor_metrics(ttf::GlyphId(2)).unwrap());
-    })
-}
-
-fn ascender(bencher: &mut bencher::Bencher) {
-    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
-    bencher.iter(|| {
-        bencher::black_box(font.ascender());
+        bencher::black_box(font.family_name());
     })
 }
 
@@ -111,15 +78,11 @@ impl ttf_parser::OutlineBuilder for Builder {
 }
 
 bencher::benchmark_group!(perf,
+    from_data,
     outline_glyph_8_from_glyf,
     outline_glyph_276_from_glyf,
     outline_glyph_8_from_cff,
     outline_glyph_276_from_cff,
-    glyph_index_u41,
-    family_name,
-    units_per_em,
-    width,
-    glyph_2_hor_metrics,
-    ascender
+    family_name
 );
 bencher::benchmark_main!(perf);

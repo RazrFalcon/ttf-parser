@@ -10,7 +10,9 @@ impl<'a> Font<'a> {
         let data = self.vmtx.ok_or_else(|| Error::TableMissing(TableName::VerticalMetrics))?;
         let mut s = Stream::new(data);
 
-        let number_of_vmetrics = self.number_of_vmetrics()?;
+        let number_of_vmetrics = self.number_of_vmetrics()
+            .ok_or_else(|| Error::NoHorizontalMetrics)?;
+
         if number_of_vmetrics == 0 {
             return Err(Error::NoHorizontalMetrics);
         }

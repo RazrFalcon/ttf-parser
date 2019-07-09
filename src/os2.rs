@@ -1,9 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/os2
 
-use std::convert::TryFrom;
-
 use crate::parser::{Stream, FromData, SafeStream};
-use crate::{Font, TableName, LineMetrics, Result, Error};
+use crate::{Font, LineMetrics};
 
 
 macro_rules! try_opt_or {
@@ -11,15 +9,6 @@ macro_rules! try_opt_or {
         match $value {
             Some(v) => v,
             None => return $ret,
-        }
-    };
-}
-
-macro_rules! try_or {
-    ($value:expr, $ret:expr) => {
-        match $value {
-            Ok(v) => v,
-            Err(_) => return $ret,
         }
     };
 }
@@ -43,6 +32,7 @@ pub enum Weight {
 
 impl Weight {
     /// Returns a numeric representation of a weight.
+    #[inline]
     pub fn to_number(&self) -> u16 {
         match self {
             Weight::Thin        => 100,
@@ -60,6 +50,7 @@ impl Weight {
 }
 
 impl From<u16> for Weight {
+    #[inline]
     fn from(value: u16) -> Self {
         match value {
             100 => Weight::Thin,
@@ -101,6 +92,7 @@ pub enum Width {
 
 impl Width {
     /// Returns a numeric representation of a width.
+    #[inline]
     pub fn to_number(&self) -> u16 {
         match self {
             Width::UltraCondensed   => 1,
@@ -112,25 +104,6 @@ impl Width {
             Width::Expanded         => 7,
             Width::ExtraExpanded    => 8,
             Width::UltraExpanded    => 9,
-        }
-    }
-}
-
-impl TryFrom<u16> for Width {
-    type Error = Error;
-
-    fn try_from(value: u16) -> Result<Self> {
-        match value {
-            1 => Ok(Width::UltraCondensed),
-            2 => Ok(Width::ExtraCondensed),
-            3 => Ok(Width::Condensed),
-            4 => Ok(Width::SemiCondensed),
-            5 => Ok(Width::Normal),
-            6 => Ok(Width::SemiExpanded),
-            7 => Ok(Width::Expanded),
-            8 => Ok(Width::ExtraExpanded),
-            9 => Ok(Width::UltraExpanded),
-            _ => Err(Error::InvalidFontWidth(value)),
         }
     }
 }
@@ -160,6 +133,7 @@ pub struct ScriptMetrics {
 }
 
 impl FromData for ScriptMetrics {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         ScriptMetrics {
             x_size: s.read(),
@@ -170,31 +144,47 @@ impl FromData for ScriptMetrics {
     }
 }
 
+// We already checked that OS/2 table has a valid length,
+// so it's safe to use `SafeStream`.
 
 impl<'a> Font<'a> {
     /// Parses font's weight.
     ///
     /// Returns `Weight::Normal` when OS/2 table is not present.
+    #[inline]
     pub fn weight(&self) -> Weight {
         const US_WEIGHT_CLASS_OFFSET: usize = 4;
         let data = try_opt_or!(self.os_2, Weight::default());
-        let n: u16 = try_or!(Stream::read_at(data, US_WEIGHT_CLASS_OFFSET), Weight::default());
+        let n: u16 = SafeStream::read_at(data, US_WEIGHT_CLASS_OFFSET);
         Weight::from(n)
     }
 
     /// Parses font's width.
     ///
     /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
+    #[inline]
     pub fn width(&self) -> Width {
         const US_WIDTH_CLASS_OFFSET: usize = 6;
         let data = try_opt_or!(self.os_2, Width::default());
-        let n: u16 = try_or!(Stream::read_at(data, US_WIDTH_CLASS_OFFSET), Width::default());
-        Width::try_from(n).unwrap_or_default()
+        let n: u16 = SafeStream::read_at(data, US_WIDTH_CLASS_OFFSET);
+        match n {
+            1 => Width::UltraCondensed,
+            2 => Width::ExtraCondensed,
+            3 => Width::Condensed,
+            4 => Width::SemiCondensed,
+            5 => Width::Normal,
+            6 => Width::SemiExpanded,
+            7 => Width::Expanded,
+            8 => Width::ExtraExpanded,
+            9 => Width::UltraExpanded,
+            _ => Width::Normal,
+        }
     }
 
     /// Checks that font is marked as *Regular*.
     ///
     /// Returns `false` when OS/2 table is not present.
+    #[inline]
     pub fn is_regular(&self) -> bool {
         const REGULAR_FLAG: u16 = 6;
         self.get_fs_selection(REGULAR_FLAG)
@@ -203,6 +193,7 @@ impl<'a> Font<'a> {
     /// Checks that font is marked as *Italic*.
     ///
     /// Returns `false` when OS/2 table is not present.
+    #[inline]
     pub fn is_italic(&self) -> bool {
         const ITALIC_FLAG: u16 = 0;
         self.get_fs_selection(ITALIC_FLAG)
@@ -211,6 +202,7 @@ impl<'a> Font<'a> {
     /// Checks that font is marked as *Bold*.
     ///
     /// Returns `false` when OS/2 table is not present.
+    #[inline]
     pub fn is_bold(&self) -> bool {
         const BOLD_FLAG: u16 = 5;
         self.get_fs_selection(BOLD_FLAG)
@@ -219,11 +211,12 @@ impl<'a> Font<'a> {
     /// Checks that font is marked as *Oblique*.
     ///
     /// Returns `None` when OS/2 table is not present or when its version is < 4.
+    #[inline]
     pub fn is_oblique(&self) -> bool {
         const VERSION_OFFSET: usize = 0;
 
         let data = try_opt_or!(self.os_2, false);
-        let version: u16 = try_or!(Stream::read_at(data, VERSION_OFFSET), false);
+        let version: u16 = SafeStream::read_at(data, VERSION_OFFSET);
         if version < 4 {
             return false;
         }
@@ -232,52 +225,62 @@ impl<'a> Font<'a> {
         self.get_fs_selection(OBLIQUE_FLAG)
     }
 
+    #[inline]
     fn get_fs_selection(&self, bit: u16) -> bool {
         const FS_SELECTION_OFFSET: usize = 62;
         let data = try_opt_or!(self.os_2, false);
-        let n: u16 = try_or!(Stream::read_at(data, FS_SELECTION_OFFSET), false);
+        let n: u16 = SafeStream::read_at(data, FS_SELECTION_OFFSET);
         (n >> bit) & 1 == 1
     }
 
     /// Parses font's X height.
     ///
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
+    #[inline]
     pub fn x_height(&self) -> Option<i16> {
         const VERSION_OFFSET: usize = 0;
         const SX_HEIGHT_OFFSET: usize = 86;
 
         let data = self.os_2?;
-        let version: u16 = Stream::read_at(data, VERSION_OFFSET).ok()?;
+        let version: u16 = SafeStream::read_at(data, VERSION_OFFSET);
         if version < 2 {
             return None;
         }
 
+        // We cannot use SafeStream here, because X height is an optional data.
         Stream::read_at(data, SX_HEIGHT_OFFSET).ok()
     }
 
     /// Parses font's strikeout metrics.
-    pub fn strikeout_metrics(&self) -> Result<LineMetrics> {
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
         const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
-        const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
+        let mut s = SafeStream::new_at(self.os_2?, Y_STRIKEOUT_SIZE_OFFSET);
 
-        let data = self.os_2.ok_or_else(|| Error::TableMissing(TableName::WindowsMetrics))?;
-        Ok(LineMetrics {
-            position:  Stream::read_at(data, Y_STRIKEOUT_POSITION_OFFSET)?,
-            thickness: Stream::read_at(data, Y_STRIKEOUT_SIZE_OFFSET)?,
+        // Do not change the order. In the OS/2 table, line thickness is set before position.
+        Some(LineMetrics {
+            thickness: s.read(),
+            position: s.read(),
         })
     }
 
     /// Parses font's subscript metrics.
-    pub fn subscript_metrics(&self) -> Result<ScriptMetrics> {
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
         const Y_SUBSCRIPT_XSIZE_OFFSET: usize = 10;
-        let data = self.os_2.ok_or_else(|| Error::TableMissing(TableName::WindowsMetrics))?;
-        Stream::read_at(data, Y_SUBSCRIPT_XSIZE_OFFSET)
+        Some(SafeStream::read_at(self.os_2?, Y_SUBSCRIPT_XSIZE_OFFSET))
     }
 
     /// Parses font's superscript metrics.
-    pub fn superscript_metrics(&self) -> Result<ScriptMetrics> {
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
         const Y_SUPERSCRIPT_XSIZE_OFFSET: usize = 18;
-        let data = self.os_2.ok_or_else(|| Error::TableMissing(TableName::WindowsMetrics))?;
-        Stream::read_at(data, Y_SUPERSCRIPT_XSIZE_OFFSET)
+        Some(SafeStream::read_at(self.os_2?, Y_SUPERSCRIPT_XSIZE_OFFSET))
     }
 }

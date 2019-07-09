@@ -81,26 +81,33 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```text
-test outline_cff  ... bench:   2,694,360 ns/iter (+/- 3,437)
-test outline_glyf ... bench:   1,155,789 ns/iter (+/- 1,518)
+test outline_cff  ... bench:   2,688,404 ns/iter (+/- 1,678)
+test outline_glyf ... bench:   1,144,718 ns/iter (+/- 1,035)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:       1,823 ns/iter (+/- 20)
-test outline_glyph_8_from_cff    ... bench:       1,085 ns/iter (+/- 10)
-test outline_glyph_276_from_glyf ... bench:         981 ns/iter (+/- 20)
-test family_name                 ... bench:         493 ns/iter (+/- 3)
-test outline_glyph_8_from_glyf   ... bench:         422 ns/iter (+/- 32)
-test glyph_index_u41             ... bench:          29 ns/iter (+/- 1)
-test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
-test width                       ... bench:           3 ns/iter (+/- 0)
-test ascender                    ... bench:           2 ns/iter (+/- 0)
-test units_per_em                ... bench:           2 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,834 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:       1,092 ns/iter (+/- 13)
+test outline_glyph_276_from_glyf ... bench:         970 ns/iter (+/- 118)
+test family_name                 ... bench:         452 ns/iter (+/- 2)
+test outline_glyph_8_from_glyf   ... bench:         409 ns/iter (+/- 1)
+test from_data                   ... bench:         206 ns/iter (+/- 0)
 ```
 
-All other methods are essentially free. All they do is read a value at a specified offset.
+Some methods are too fast, so we execute them **1000 times** to get better measurements.
+
+```text
+test glyph_index_u41     ... bench:      25,200 ns/iter (+/- 230)
+test glyph_2_hor_metrics ... bench:       8,421 ns/iter (+/- 18)
+test units_per_em        ... bench:         564 ns/iter (+/- 2)
+test x_height            ... bench:         568 ns/iter (+/- 1)
+test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)
+test width               ... bench:         422 ns/iter (+/- 0)
+test ascender            ... bench:         279 ns/iter (+/- 1)
+test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
+```
 
 `family_name` is expensive, because it allocates a `String` and the original data
 is stored as UTF-16 BE.
@@ -178,9 +185,6 @@ pub enum Error {
     /// An invalid glyph class.
     InvalidGlyphClass(u16),
 
-    /// An invalid font width.
-    InvalidFontWidth(u16),
-
     /// No horizontal metrics for this glyph.
     NoHorizontalMetrics,
 
@@ -234,9 +238,6 @@ impl std::fmt::Display for Error {
             }
             Error::InvalidGlyphClass(n) => {
                 write!(f, "{} is not a valid glyph class", n)
-            }
-            Error::InvalidFontWidth(n) => {
-                write!(f, "{} is not a valid font width", n)
             }
             Error::NoHorizontalMetrics => {
                 write!(f, "glyph has no horizontal metrics")
@@ -320,6 +321,7 @@ pub struct HorizontalMetrics {
 }
 
 impl FromData for HorizontalMetrics {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         HorizontalMetrics {
             advance: s.read(),
@@ -340,6 +342,7 @@ pub struct VerticalMetrics {
 }
 
 impl FromData for VerticalMetrics {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         VerticalMetrics {
             advance: s.read(),
@@ -360,6 +363,7 @@ pub struct Rect {
 }
 
 impl Rect {
+    #[inline]
     pub(crate) fn zero() -> Self {
         Rect {
             x_min: 0,
@@ -371,6 +375,7 @@ impl Rect {
 }
 
 impl FromData for Rect {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         Rect {
             x_min: s.read(),
@@ -561,20 +566,59 @@ impl<'a> Font<'a> {
                 None => continue,
             };
 
+            let table_len = range.end - range.start;
+
             match &table.tag.tag {
-                b"head" => font.head = data.try_slice(range)?,
-                b"hhea" => font.hhea = data.try_slice(range)?,
+                b"head" => {
+                    const HEAD_TABLE_SIZE: usize = 56;
+                    if table_len < HEAD_TABLE_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::Header));
+                    }
+
+                    font.head = data.try_slice(range)?;
+                }
+                b"hhea" => {
+                    const HHEA_TABLE_SIZE: usize = 36;
+                    if table_len < HHEA_TABLE_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::HorizontalHeader));
+                    }
+
+                    font.hhea = data.try_slice(range)?;
+                }
                 b"maxp" => {
-                    const NUM_GLYPHS_OFFSET: usize = 4;
                     const MAXP_TABLE_MIN_SIZE: usize = 6;
+                    const NUM_GLYPHS_OFFSET: usize = 4;
 
-                    let data = data.try_slice(range)?;
-
-                    if data.len() < MAXP_TABLE_MIN_SIZE {
+                    if table_len < MAXP_TABLE_MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::MaximumProfile));
                     }
 
+                    let data = data.try_slice(range)?;
                     font.number_of_glyphs = SafeStream::read_at(data, NUM_GLYPHS_OFFSET);
+                }
+                b"OS/2" => {
+                    const OS_2_TABLE_MIN_SIZE: usize = 80;
+                    if table_len < OS_2_TABLE_MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::WindowsMetrics));
+                    }
+
+                    font.os_2 = data.get(range);
+                }
+                b"post" => {
+                    const POST_TABLE_MIN_SIZE: usize = 16;
+                    if table_len < POST_TABLE_MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::PostScript));
+                    }
+
+                    font.post = data.get(range);
+                }
+                b"vhea" => {
+                    const VHEA_TABLE_MIN_SIZE: usize = 36;
+                    if table_len < VHEA_TABLE_MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::VerticalHeader));
+                    }
+
+                    font.vhea = data.get(range);
                 }
                 b"CFF " => font.cff_ = data.get(range),
                 b"cmap" => font.cmap = data.get(range),
@@ -583,26 +627,18 @@ impl<'a> Font<'a> {
                 b"kern" => font.kern = data.get(range),
                 b"loca" => font.loca = data.get(range),
                 b"name" => font.name = data.get(range),
-                b"OS/2" => font.os_2 = data.get(range),
-                b"post" => font.post = data.get(range),
-                b"vhea" => font.vhea = data.get(range),
                 b"vmtx" => font.vmtx = data.get(range),
                 _ => {},
             }
         }
 
         // Check for mandatory tables.
-
-        // All sizes are multiple of four bytes.
-        const HEAD_TABLE_SIZE: usize = 56;
-        const HHEA_TABLE_SIZE: usize = 36;
-
-        if font.head.len() != HEAD_TABLE_SIZE {
-            return Err(Error::InvalidTableSize(TableName::Header));
+        if font.head.is_empty() {
+            return Err(Error::TableMissing(TableName::Header));
         }
 
-        if font.hhea.len() != HHEA_TABLE_SIZE {
-            return Err(Error::InvalidTableSize(TableName::HorizontalHeader));
+        if font.hhea.is_empty() {
+            return Err(Error::TableMissing(TableName::HorizontalHeader));
         }
 
         Ok(font)
@@ -637,6 +673,7 @@ impl<'a> Font<'a> {
         self.number_of_glyphs.0
     }
 
+    #[inline]
     pub(crate) fn check_glyph_id(&self, glyph_id: GlyphId) -> Result<()> {
         if glyph_id < self.number_of_glyphs {
             Ok(())
@@ -701,6 +738,7 @@ impl<'a> Font<'a> {
 }
 
 /// Checks that provided data is a TrueType font collection.
+#[inline]
 fn is_collection(data: &[u8]) -> bool {
     data.len() >= Tag::LENGTH && &data[0..Tag::LENGTH] == b"ttcf"
 }
@@ -708,6 +746,7 @@ fn is_collection(data: &[u8]) -> bool {
 /// Returns a number of fonts stored in a TrueType font collection.
 ///
 /// Returns `None` if a provided data is not a TrueType font collection.
+#[inline]
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     if data.len() < MIN_TTC_SIZE {
         return None;

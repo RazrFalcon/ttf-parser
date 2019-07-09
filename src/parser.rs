@@ -23,14 +23,14 @@ pub trait FromData: Sized {
 impl FromData for u8 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
-        s.data[0]
+        s.data[s.offset]
     }
 }
 
 impl FromData for i8 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
-        s.data[0] as i8
+        s.data[s.offset] as i8
     }
 }
 
@@ -38,7 +38,8 @@ impl FromData for u16 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         let d = s.data;
-        (d[0] as u16) << 8 | d[1] as u16
+        let i = s.offset;
+        (d[i + 0] as u16) << 8 | d[i + 1] as u16
     }
 }
 
@@ -46,7 +47,8 @@ impl FromData for i16 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         let d = s.data;
-        ((d[0] as u16) << 8 | d[1] as u16) as i16
+        let i = s.offset;
+        ((d[i + 0] as u16) << 8 | d[i + 1] as u16) as i16
     }
 }
 
@@ -54,7 +56,12 @@ impl FromData for u32 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         let d = s.data;
-        (d[0] as u32) << 24 | (d[1] as u32) << 16 | (d[2] as u32) << 8 | d[3] as u32
+        let i = s.offset;
+
+          (d[i + 0] as u32) << 24
+        | (d[i + 1] as u32) << 16
+        | (d[i + 2] as u32) << 8
+        |  d[i + 3] as u32
     }
 }
 
@@ -378,6 +385,12 @@ impl<'a> SafeStream<'a> {
         let n = 0 << 24 | (d[0] as u32) << 16 | (d[1] as u32) << 8 | d[2] as u32;
         self.offset += 3;
         n
+    }
+
+    #[inline]
+    pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> T {
+        let mut s = SafeStream { data, offset };
+        T::parse(&mut s)
     }
 }
 

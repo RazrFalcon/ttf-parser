@@ -81,22 +81,23 @@ Currently, it takes almost 2.5x times longer to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```text
-test outline_cff  ... bench:   2,771,375 ns/iter (+/- 2,146)
-test outline_glyf ... bench:   1,225,525 ns/iter (+/- 2,215)
+test outline_cff  ... bench:   2,694,360 ns/iter (+/- 3,437)
+test outline_glyf ... bench:   1,155,789 ns/iter (+/- 1,518)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:       1,853 ns/iter (+/- 13)
-test outline_glyph_276_from_glyf ... bench:       1,038 ns/iter (+/- 8)
-test outline_glyph_8_from_cff    ... bench:       1,096 ns/iter (+/- 10)
+test outline_glyph_276_from_cff  ... bench:       1,823 ns/iter (+/- 20)
+test outline_glyph_8_from_cff    ... bench:       1,085 ns/iter (+/- 10)
+test outline_glyph_276_from_glyf ... bench:         981 ns/iter (+/- 20)
 test family_name                 ... bench:         493 ns/iter (+/- 3)
-test outline_glyph_8_from_glyf   ... bench:         440 ns/iter (+/- 84)
+test outline_glyph_8_from_glyf   ... bench:         422 ns/iter (+/- 32)
 test glyph_index_u41             ... bench:          29 ns/iter (+/- 1)
-test glyph_2_hor_metrics         ... bench:          13 ns/iter (+/- 0)
-test width                       ... bench:           5 ns/iter (+/- 0)
-test units_per_em                ... bench:           5 ns/iter (+/- 0)
+test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
+test width                       ... bench:           3 ns/iter (+/- 0)
+test ascender                    ... bench:           2 ns/iter (+/- 0)
+test units_per_em                ... bench:           2 ns/iter (+/- 0)
 ```
 
 All other methods are essentially free. All they do is read a value at a specified offset.
@@ -573,7 +574,7 @@ impl<'a> Font<'a> {
                         return Err(Error::InvalidTableSize(TableName::MaximumProfile));
                     }
 
-                    font.number_of_glyphs = Stream::read_at(data, NUM_GLYPHS_OFFSET).unwrap();
+                    font.number_of_glyphs = SafeStream::read_at(data, NUM_GLYPHS_OFFSET);
                 }
                 b"CFF " => font.cff_ = data.get(range),
                 b"cmap" => font.cmap = data.get(range),

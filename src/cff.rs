@@ -175,6 +175,7 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
         None => return Ok(dict),
     };
 
+    let mut i = 0;
     let mut s = Stream::new(data);
     let mut dict_parser = DictionaryParser::new(&mut s);
     while let Some(result) = dict_parser.parse_next() {
@@ -185,6 +186,8 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
         match operator.value() {
             17 if operands.len() == 1 => {
                 dict.char_strings_offset = Some(operands[0].as_i32() as u32);
+
+                i += 1;
             }
             18 if operands.len() == 2 => {
                 let start = operands[1].as_i32() as u32;
@@ -193,6 +196,8 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
                 if let Some(end) = start.checked_add(len) {
                     dict.private_dict_range = Some(start..end);
                 }
+
+                i += 1;
             }
             1206 if operands.len() == 1 => { // CharstringType
                 // Check that `charstring` type is set to 2. We do not support other formats.
@@ -200,8 +205,16 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
                 if operands[0].as_i32() != 2 {
                     return Err(Error::NoGlyph);
                 }
+
+                i += 1;
             }
             _ => {}
+        }
+
+        // Stop parsing as soon as all required values are parsed.
+        // We assume that there are no duplicates.
+        if i == 3 {
+            break;
         }
     }
 
@@ -1053,6 +1066,7 @@ struct DataIndex<'a> {
 }
 
 impl<'a> DataIndex<'a> {
+    #[inline]
     fn create_empty() -> Self {
         DataIndex {
             data: b"",
@@ -1240,52 +1254,13 @@ fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
     }
 }
 
+const FLOAT_STACK_LEN: usize = 64;
+
 fn parse_float(s: &mut Stream) -> Result<Number> {
-    const STACK_LEN: usize = 64;
     const END_OF_NUMBER: u8 = 0xf;
 
-    let mut data = [0u8; STACK_LEN];
+    let mut data = [0u8; FLOAT_STACK_LEN];
     let mut idx = 0;
-
-    // Adobe Technical Note #5176, Table 5 Nibble Definitions
-    let mut lookup = |n: u8| -> Result<()> {
-        if idx == STACK_LEN {
-            return Err(CFFError::InvalidFloat.into());
-        }
-
-        match n {
-            0...9 => {
-                data[idx] = b'0' + n;
-            }
-            10 => {
-                data[idx] = b'.';
-            }
-            11 => {
-                data[idx] = b'E';
-            }
-            12 => {
-                if idx + 1 == STACK_LEN {
-                    return Err(CFFError::InvalidFloat.into());
-                }
-
-                data[idx] = b'E';
-                idx += 1;
-                data[idx] = b'-';
-            }
-            13 => {
-                return Err(CFFError::InvalidFloat.into());
-            }
-            14 => {
-                data[idx] = b'-';
-            }
-            _ => {
-                return Err(CFFError::InvalidFloat.into());
-            }
-        }
-
-        idx += 1;
-        Ok(())
-    };
 
     loop {
         let b1: u8 = s.read()?;
@@ -1296,18 +1271,58 @@ fn parse_float(s: &mut Stream) -> Result<Number> {
             break;
         }
 
-        lookup(nibble1)?;
+        idx = parse_float_nibble(nibble1, idx, &mut data)?;
 
         if nibble2 == END_OF_NUMBER {
             break;
         }
 
-        lookup(nibble2)?;
+        idx = parse_float_nibble(nibble2, idx, &mut data)?;
     }
 
     let s = std::str::from_utf8(&data[..idx]).map_err(|_| CFFError::InvalidFloat)?;
     let n = s.parse().map_err(|_| CFFError::InvalidFloat)?;
     Ok(Number::Float(n))
+}
+
+// Adobe Technical Note #5176, Table 5 Nibble Definitions
+fn parse_float_nibble(nibble: u8, mut idx: usize, data: &mut [u8]) -> Result<usize> {
+    if idx == FLOAT_STACK_LEN {
+        return Err(CFFError::InvalidFloat.into());
+    }
+
+    match nibble {
+        0...9 => {
+            data[idx] = b'0' + nibble;
+        }
+        10 => {
+            data[idx] = b'.';
+        }
+        11 => {
+            data[idx] = b'E';
+        }
+        12 => {
+            if idx + 1 == FLOAT_STACK_LEN {
+                return Err(CFFError::InvalidFloat.into());
+            }
+
+            data[idx] = b'E';
+            idx += 1;
+            data[idx] = b'-';
+        }
+        13 => {
+            return Err(CFFError::InvalidFloat.into());
+        }
+        14 => {
+            data[idx] = b'-';
+        }
+        _ => {
+            return Err(CFFError::InvalidFloat.into());
+        }
+    }
+
+    idx += 1;
+    Ok(idx)
 }
 
 
@@ -1334,6 +1349,7 @@ struct ArgumentsStack {
 }
 
 impl ArgumentsStack {
+    #[inline]
     fn new() -> Self {
         ArgumentsStack {
             data: [0.0; MAX_ARGUMENTS_STACK_LEN],

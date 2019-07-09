@@ -381,16 +381,16 @@ impl<'a> SafeStream<'a> {
     #[inline]
     pub fn read<T: FromData>(&mut self) -> T {
         let start = self.offset;
-        self.offset += T::raw_size();
-        let end = self.offset;
-        let mut s = SafeStream::new(&self.data[start..end]);
-        T::parse(&mut s)
+        let v = T::parse(self);
+        self.offset = start + T::raw_size();
+        v
     }
 
     #[inline]
     pub fn read_u24(&mut self) -> u32 {
         let d = self.data;
-        let n = 0 << 24 | (d[0] as u32) << 16 | (d[1] as u32) << 8 | d[2] as u32;
+        let i = self.offset;
+        let n = 0 << 24 | (d[i + 0] as u32) << 16 | (d[i + 1] as u32) << 8 | d[i + 2] as u32;
         self.offset += 3;
         n
     }

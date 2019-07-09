@@ -1004,35 +1004,35 @@ struct VarOffsets<'a> {
 
 impl<'a> VarOffsets<'a> {
     fn get(&self, index: u16) -> Option<u32> {
-        if index < self.len() {
-            let start = index as usize * self.offset_size as usize;
-            let end = start + self.offset_size as usize;
-            let data = self.data.try_slice(start..end).ok()?;
-
-            let mut s = SafeStream::new(data);
-            let n = match self.offset_size {
-                OffsetSize::Size1 => s.read::<u8>() as u32,
-                OffsetSize::Size2 => s.read::<u16>() as u32,
-                OffsetSize::Size3 => s.read_u24(),
-                OffsetSize::Size4 => s.read::<u32>(),
-            };
-
-            // Offset must be positive.
-            if n == 0 {
-                return None;
-            }
-
-            // Offsets are offset by one byte in the font,
-            // so we have to shift them back.
-            Some(n - 1)
-        } else {
-            None
+        if index >= self.len() {
+            return None;
         }
+
+        let start = index as usize * self.offset_size as usize;
+        let end = start + self.offset_size as usize;
+        let data = self.data.try_slice(start..end).ok()?;
+
+        let mut s = SafeStream::new(data);
+        let n: u32 = match self.offset_size {
+            OffsetSize::Size1 => s.read::<u8>() as u32,
+            OffsetSize::Size2 => s.read::<u16>() as u32,
+            OffsetSize::Size3 => s.read_u24(),
+            OffsetSize::Size4 => s.read(),
+        };
+
+        // Offset must be positive.
+        if n == 0 {
+            return None;
+        }
+
+        // Offsets are offset by one byte in the font,
+        // so we have to shift them back.
+        Some(n - 1)
     }
 
     #[inline]
     fn last(&self) -> Option<u32> {
-        if self.len() != 0 {
+        if !self.is_empty() {
             self.get(self.len() - 1)
         } else {
             None
@@ -1139,6 +1139,7 @@ struct DictionaryParser<'a> {
 }
 
 impl<'a> DictionaryParser<'a> {
+    #[inline]
     fn new(data: &'a [u8]) -> Self {
         DictionaryParser {
             data,
@@ -1149,6 +1150,7 @@ impl<'a> DictionaryParser<'a> {
         }
     }
 
+    #[inline(never)]
     fn parse_next(&mut self) -> Option<Operator> {
         let mut s = Stream::new_at(self.data, self.offset);
         self.operands_offset = self.offset;
@@ -1207,6 +1209,7 @@ impl<'a> DictionaryParser<'a> {
         Ok(())
     }
 
+    #[inline]
     fn operands(&self) -> &[Number] {
         &self.operands[..self.operands_len as usize]
     }

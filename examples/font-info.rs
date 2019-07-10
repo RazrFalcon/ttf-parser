@@ -38,7 +38,7 @@ fn process() -> Result<(), Box<std::error::Error>> {
     println!("Superscript: {:?}", font.superscript_metrics());
 
     let end = time::precise_time_ns();
-    println!("Elapsed: {:.6}s", (end - start) as f64 / 1_000_000_000.0);
+    println!("Elapsed: {}us", (end - start) / 1000);
 
     Ok(())
 }

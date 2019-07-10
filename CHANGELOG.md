@@ -5,11 +5,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.2.0] - 2019-07-10
 ### Added
 - CFF support.
 - Basic kerning support.
-- High Byte Mapping Through Table (2) `cmap` subtable support.
-- Unicode Variation Sequences (14) `cmap` subtable support.
+- All `cmap` subtable formats except Mixed Coverage (8) are supported.
 - Vertical metrics querying from the `vmtx` table.
 - OpenType fonts are allowed now.
 
@@ -20,4 +21,5 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.1.0...v0.2.0

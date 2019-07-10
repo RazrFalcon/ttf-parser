@@ -1,7 +1,14 @@
 use ttf_parser as ttf;
 
-fn from_data(bencher: &mut bencher::Bencher) {
+fn from_data_ttf(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    bencher.iter(|| {
+        bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
+    })
+}
+
+fn from_data_otf(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.otf").unwrap();
     bencher.iter(|| {
         bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
     })
@@ -78,7 +85,8 @@ impl ttf_parser::OutlineBuilder for Builder {
 }
 
 bencher::benchmark_group!(perf,
-    from_data,
+    from_data_ttf,
+    from_data_otf,
     outline_glyph_8_from_glyf,
     outline_glyph_276_from_glyf,
     outline_glyph_8_from_cff,

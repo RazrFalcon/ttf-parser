@@ -81,23 +81,24 @@ using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/gly
 and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
-Currently, it takes almost 2.5x times longer to outline all glyphs in
+Currently, it takes 40% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```
-test outline_cff  ... bench:   2,277,435 ns/iter (+/- 1,558)
+test outline_cff  ... bench:   1,651,557 ns/iter (+/- 2,751)
 test outline_glyf ... bench:     977,046 ns/iter (+/- 4,973)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:       1,599 ns/iter (+/- 3)
-test outline_glyph_8_from_cff    ... bench:         858 ns/iter (+/- 2)
-test outline_glyph_276_from_glyf ... bench:         805 ns/iter (+/- 25)
-test family_name                 ... bench:         356 ns/iter (+/- 12)
-test outline_glyph_8_from_glyf   ... bench:         409 ns/iter (+/- 1)
-test from_data                   ... bench:         133 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,247 ns/iter (+/- 2)
+test outline_glyph_276_from_glyf ... bench:         817 ns/iter (+/- 15)
+test outline_glyph_8_from_cff    ... bench:         521 ns/iter (+/- 2)
+test family_name                 ... bench:         445 ns/iter (+/- 4)
+test from_data_otf               ... bench:         435 ns/iter (+/- 1)
+test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
+test from_data_ttf               ... bench:         133 ns/iter (+/- 0)
 ```
 
 Some methods are too fast, so we execute them **1000 times** to get better measurements.

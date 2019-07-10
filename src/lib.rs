@@ -77,23 +77,24 @@ using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/gly
 and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
-Currently, it takes almost 2.5x times longer to outline all glyphs in
+Currently, it takes 40% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```text
-test outline_cff  ... bench:   2,277,435 ns/iter (+/- 1,558)
+test outline_cff  ... bench:   1,651,557 ns/iter (+/- 2,751)
 test outline_glyf ... bench:     977,046 ns/iter (+/- 4,973)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:       1,599 ns/iter (+/- 3)
-test outline_glyph_8_from_cff    ... bench:         858 ns/iter (+/- 2)
-test outline_glyph_276_from_glyf ... bench:         805 ns/iter (+/- 25)
-test family_name                 ... bench:         356 ns/iter (+/- 12)
-test outline_glyph_8_from_glyf   ... bench:         409 ns/iter (+/- 1)
-test from_data                   ... bench:         133 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,247 ns/iter (+/- 2)
+test outline_glyph_276_from_glyf ... bench:         817 ns/iter (+/- 15)
+test outline_glyph_8_from_cff    ... bench:         521 ns/iter (+/- 2)
+test family_name                 ... bench:         445 ns/iter (+/- 4)
+test from_data_otf               ... bench:         435 ns/iter (+/- 1)
+test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
+test from_data_ttf               ... bench:         133 ns/iter (+/- 0)
 ```
 
 Some methods are too fast, so we execute them **1000 times** to get better measurements.
@@ -447,6 +448,7 @@ pub struct Font<'a> {
     vhea: Option<&'a [u8]>,
     vmtx: Option<&'a [u8]>,
     number_of_glyphs: GlyphId,
+    cff_metadata: cff::Metadata,
 }
 
 impl<'a> Font<'a> {
@@ -514,6 +516,7 @@ impl<'a> Font<'a> {
             vhea: None,
             vmtx: None,
             number_of_glyphs: GlyphId(0),
+            cff_metadata: cff::Metadata::default(),
         };
 
         for _ in 0..num_tables {
@@ -574,7 +577,14 @@ impl<'a> Font<'a> {
 
                     font.vhea = data.get(range);
                 }
-                b"CFF " => font.cff_ = data.get(range),
+                b"CFF " => {
+                    if let Some(data) = data.get(range) {
+                        if let Ok(metadata) = cff::parse_metadata(data) {
+                            font.cff_ = Some(data);
+                            font.cff_metadata = metadata;
+                        }
+                    }
+                }
                 b"cmap" => font.cmap = data.get(range),
                 b"glyf" => font.glyf = data.get(range),
                 b"hmtx" => font.hmtx = data.get(range),
@@ -682,9 +692,9 @@ impl<'a> Font<'a> {
         glyph_id: GlyphId,
         builder: &mut impl OutlineBuilder,
     ) -> Result<Rect> {
-        if self.has_table(TableName::GlyphData) {
+        if self.glyf.is_some() {
             self.glyf_glyph_outline(glyph_id, builder)
-        } else if self.has_table(TableName::CompactFontFormat) {
+        } else if self.cff_.is_some() {
             self.cff_glyph_outline(glyph_id, builder)
         } else {
             Err(Error::NoGlyph)

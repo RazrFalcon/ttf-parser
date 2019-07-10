@@ -21,6 +21,9 @@ const TWO_BYTE_OPERATOR_MARK: u8 = 12;
 /// A list of errors that can occur during a CFF table parsing.
 #[derive(Clone, Copy, Debug)]
 pub enum CFFError {
+    /// The CFF table doesn't have any char strings.
+    NoCharStrings,
+
     /// An invalid operand occurred.
     InvalidOperand,
 
@@ -57,6 +60,9 @@ pub enum CFFError {
 impl std::fmt::Display for CFFError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            CFFError::NoCharStrings => {
+                write!(f, "table doesn't have any char strings")
+            }
             CFFError::InvalidOperand => {
                 write!(f, "an invalid operand occurred")
             }
@@ -88,6 +94,55 @@ impl std::fmt::Display for CFFError {
 impl std::error::Error for CFFError {}
 
 
+#[derive(Clone, Default)]
+pub struct Metadata {
+    char_strings_offset: u32,
+    private_dict_range: Option<Range<u32>>,
+    subroutines_offset: Option<u32>,
+    global_subrs_offset: u32,
+}
+
+pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
+    let mut s = Stream::new(data);
+
+    // Parse Header.
+    let major: u8 = s.read()?;
+    s.skip::<u8>(); // minor
+    let header_size: u8 = s.read()?;
+    s.skip::<u8>(); // Absolute offset
+
+    if major != 1 {
+        return Err(Error::UnsupportedTableVersion(TableName::CompactFontFormat, major as u16));
+    }
+
+    // Jump to Name INDEX. It's not necessarily right after the header.
+    if header_size > s.offset() as u8 {
+        s.skip_len(header_size as u32 - s.offset() as u32);
+    }
+
+    let mut metadata = Metadata::default();
+
+    // Skip Name INDEX.
+    skip_index(&mut s)?;
+
+    parse_top_dict(&mut s, &mut metadata)?;
+
+    if let Some(range) = metadata.private_dict_range.clone() {
+        let range = range.start as usize .. range.end as usize;
+        let dict_data = data.try_slice(range)?;
+        parse_private_dict(dict_data, &mut metadata)?;
+    }
+
+    // Skip String INDEX.
+    skip_index(&mut s)?;
+
+    // Global Subroutines INDEX offset.
+    metadata.global_subrs_offset = s.offset() as u32;
+
+    Ok(metadata)
+}
+
+
 impl<'a> Font<'a> {
     pub(crate) fn cff_glyph_outline(
         &self,
@@ -95,46 +150,15 @@ impl<'a> Font<'a> {
         builder: &mut impl OutlineBuilder,
     ) -> Result<Rect> {
         let data = self.cff_.ok_or_else(|| Error::TableMissing(TableName::CompactFontFormat))?;
-        let mut s = Stream::new(data);
-
-        // Parse Header.
-        let major: u8 = s.read()?;
-        s.skip::<u8>(); // minor
-        let header_size: u8 = s.read()?;
-        s.skip::<u8>(); // Absolute offset
-
-        if major != 1 {
-            return Err(Error::UnsupportedTableVersion(TableName::CompactFontFormat, major as u16));
-        }
-
-        // Jump to Name INDEX. It's not necessarily right after the header.
-        if header_size > s.offset() as u8 {
-            s.skip_len(header_size as u32 - s.offset() as u32);
-        }
-
-        // Skip Name INDEX.
-        skip_index(&mut s)?;
-
-        let top_dict = parse_top_dict(&mut s)?;
-
-        let private_dict = match top_dict.private_dict_range.clone() {
-            Some(range) => {
-                let range = range.start as usize .. range.end as usize;
-                parse_private_dict(data.try_slice(range)?)?
-            }
-            _ => {
-                return Err(Error::NoGlyph);
-            }
-        };
-
-        // Skip String INDEX.
-        skip_index(&mut s)?;
+        let mut s = Stream::new_at(data, self.cff_metadata.global_subrs_offset as usize);
 
         // Parse Global Subroutines INDEX.
         let global_subrs = parse_index(&mut s)?;
 
         let mut local_subrs = DataIndex::create_empty();
-        match (top_dict.private_dict_range, private_dict.subroutines_offset) {
+        match (self.cff_metadata.private_dict_range.clone(),
+               self.cff_metadata.subroutines_offset.clone())
+        {
             (Some(private_dict_range), Some(subroutines_offset)) => {
                 // 'The local subroutines offset is relative to the beginning
                 // of the Private DICT data.'
@@ -147,31 +171,19 @@ impl<'a> Font<'a> {
             _ => {}
         }
 
-        if let Some(offset) = top_dict.char_strings_offset {
-            let start = offset as usize;
-            let mut s = Stream::new(data.try_slice(start..data.len())?);
-            parse_char_string(global_subrs, local_subrs, glyph_id, &mut s, builder)
-        } else {
-            Err(Error::NoGlyph)
-        }
+        let start = self.cff_metadata.char_strings_offset as usize;
+        let mut s = Stream::new(data.try_slice(start..data.len())?);
+        parse_char_string(global_subrs, local_subrs, glyph_id, &mut s, builder)
     }
 }
 
-#[derive(Clone, Default)]
-struct TopDict {
-    char_strings_offset: Option<u32>,
-    private_dict_range: Option<Range<u32>>,
-}
-
-fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
-    let mut dict = TopDict::default();
-
+fn parse_top_dict(s: &mut Stream, metadata: &mut Metadata) -> Result<()> {
     let index = parse_index(s)?;
 
     // The Top DICT INDEX should have only one dictionary.
     let data = match index.get(0) {
         Some(v) => v,
-        None => return Ok(dict),
+        None => return Err(CFFError::NoCharStrings.into()),
     };
 
     let mut dict_parser = DictionaryParser::new(data);
@@ -183,7 +195,7 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
                 let operands = dict_parser.operands();
 
                 if operands.len() == 1 {
-                    dict.char_strings_offset = Some(operands[0].as_i32() as u32);
+                    metadata.char_strings_offset = operands[0].as_i32() as u32;
                 }
             }
             18 => {
@@ -195,29 +207,27 @@ fn parse_top_dict(s: &mut Stream) -> Result<TopDict> {
                     let len = operands[0].as_i32() as u32;
 
                     if let Some(end) = start.checked_add(len) {
-                        dict.private_dict_range = Some(start..end);
+                        metadata.private_dict_range = Some(start..end);
                     }
                 }
             }
             _ => {}
         }
 
-        if dict.char_strings_offset.is_some() && dict.private_dict_range.is_some() {
+        if metadata.char_strings_offset != 0 && metadata.private_dict_range.is_some() {
             break;
         }
     }
 
-    Ok(dict)
+    // `char_strings_offset` must be set, otherwise there are nothing to parse.
+    if metadata.char_strings_offset == 0 {
+        return Err(CFFError::NoCharStrings.into());
+    }
+
+    Ok(())
 }
 
-#[derive(Clone, Copy, Default)]
-struct PrivateDict {
-    subroutines_offset: Option<u32>,
-}
-
-fn parse_private_dict(data: &[u8]) -> Result<PrivateDict> {
-    let mut dict = PrivateDict::default();
-
+fn parse_private_dict(data: &[u8], metadata: &mut Metadata) -> Result<()> {
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
         // Adobe Technical Note #5176, Table 23 Private DICT Operators
@@ -226,14 +236,14 @@ fn parse_private_dict(data: &[u8]) -> Result<PrivateDict> {
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                dict.subroutines_offset = Some(operands[0].as_i32() as u32);
+                metadata.subroutines_offset = Some(operands[0].as_i32() as u32);
             }
 
             break;
         }
     }
 
-    Ok(dict)
+    Ok(())
 }
 
 struct CharStringParserContext<'a> {

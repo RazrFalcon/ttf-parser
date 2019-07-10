@@ -8,11 +8,12 @@
 ### Alternatives
 
 - [font-rs](https://crates.io/crates/font-rs) - Mainly a glyph outline extractor.
-  No documentation. Has less features. A lot of magic numbers.
-- [truetype](https://crates.io/crates/truetype) - Isn't allocation free.
-  Does a little postprocessing (parses most of the data as is). Has some **unsafe**.
+  No documentation. Has less features. Doesn't support CFF. Has a lot of magic numbers.
 - [stb_truetype](https://crates.io/crates/stb_truetype) - Mainly a glyph outline extractor.
-  Isn't allocation free. Has less features. Uses `panic` a lot.
+  Isn't allocation free. Has less features. Doesn't support CFF. Has a lot of magic numbers.
+  Uses `panic` a lot.
+- [truetype](https://crates.io/crates/truetype) - Simply maps TrueType data to the Rust structures.
+  Doesn't actually parses the data. Isn't allocation free. Has some **unsafe**.
 
 ### License
 

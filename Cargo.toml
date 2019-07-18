@@ -14,8 +14,9 @@ exclude = ["fonts/**"]
 
 [dev-dependencies]
 bencher = "0.1"
-svgtypes = { version = "0.4.4", default-features = false }
+svgtypes = { git = "https://github.com/RazrFalcon/svgtypes", rev = "e68e205", default-features = false }
 time = "0.1"
+xmlwriter = { git = "https://github.com/RazrFalcon/xmlwriter", rev = "dac292c" }
 
 [[bench]]
 name = "outline"

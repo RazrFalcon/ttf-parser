@@ -37,31 +37,29 @@ impl FromData for i8 {
 impl FromData for u16 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
-        let d = s.data;
-        let i = s.offset;
-        (d[i + 0] as u16) << 8 | d[i + 1] as u16
+        u16::from_be_bytes([
+            s.data[s.offset],
+            s.data[s.offset + 1],
+        ])
     }
 }
 
 impl FromData for i16 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
-        let d = s.data;
-        let i = s.offset;
-        ((d[i + 0] as u16) << 8 | d[i + 1] as u16) as i16
+        i16::from_be_bytes([
+            s.data[s.offset],
+            s.data[s.offset + 1],
+        ])
     }
 }
 
 impl FromData for u32 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
-        let d = s.data;
-        let i = s.offset;
-
-          (d[i + 0] as u32) << 24
-        | (d[i + 1] as u32) << 16
-        | (d[i + 2] as u32) << 8
-        |  d[i + 3] as u32
+        // For u32 it's faster to use TryInto, but for u16/i16 it's faster to index.
+        use std::convert::TryInto;
+        u32::from_be_bytes(s.data[s.offset..s.offset+4].try_into().unwrap())
     }
 }
 

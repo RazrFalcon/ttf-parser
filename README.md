@@ -85,8 +85,8 @@ Currently, it takes 40% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```
-test outline_cff  ... bench:   1,651,557 ns/iter (+/- 2,751)
-test outline_glyf ... bench:     977,046 ns/iter (+/- 4,973)
+test outline_cff  ... bench:   1,652,606 ns/iter (+/- 2,795)
+test outline_glyf ... bench:     966,880 ns/iter (+/- 4,118)
 ```
 
 Here is some methods benchmarks:
@@ -96,16 +96,16 @@ test outline_glyph_276_from_cff  ... bench:       1,247 ns/iter (+/- 2)
 test outline_glyph_276_from_glyf ... bench:         817 ns/iter (+/- 15)
 test outline_glyph_8_from_cff    ... bench:         521 ns/iter (+/- 2)
 test family_name                 ... bench:         445 ns/iter (+/- 4)
-test from_data_otf               ... bench:         435 ns/iter (+/- 1)
+test from_data_otf               ... bench:         394 ns/iter (+/- 5)
 test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
-test from_data_ttf               ... bench:         133 ns/iter (+/- 0)
+test from_data_ttf               ... bench:          96 ns/iter (+/- 3)
 ```
 
 Some methods are too fast, so we execute them **1000 times** to get better measurements.
 
 ```
-test glyph_index_u41     ... bench:      24,648 ns/iter (+/- 256)
-test glyph_2_hor_metrics ... bench:       8,421 ns/iter (+/- 18)
+test glyph_index_u41     ... bench:      23,838 ns/iter (+/- 14)
+test glyph_2_hor_metrics ... bench:       8,315 ns/iter (+/- 179)
 test units_per_em        ... bench:         564 ns/iter (+/- 2)
 test x_height            ... bench:         568 ns/iter (+/- 1)
 test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)

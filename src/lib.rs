@@ -77,7 +77,7 @@ using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/gly
 and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
-Currently, it takes 40% more time to outline all glyphs in
+Currently, it takes 60% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```text
@@ -95,6 +95,8 @@ test family_name                 ... bench:         398 ns/iter (+/- 2)
 test from_data_otf               ... bench:         394 ns/iter (+/- 5)
 test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
 test from_data_ttf               ... bench:          96 ns/iter (+/- 3)
+test glyph_index_u41             ... bench:          27 ns/iter (+/- 0)
+test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data
@@ -103,8 +105,6 @@ is stored as UTF-16 BE.
 Some methods are too fast, so we execute them **1000 times** to get better measurements.
 
 ```text
-test glyph_index_u41     ... bench:      27,492 ns/iter (+/- 716)
-test glyph_2_hor_metrics ... bench:       8,315 ns/iter (+/- 179)
 test x_height            ... bench:         847 ns/iter (+/- 0)
 test units_per_em        ... bench:         564 ns/iter (+/- 2)
 test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)

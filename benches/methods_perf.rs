@@ -55,6 +55,22 @@ fn family_name(bencher: &mut bencher::Bencher) {
     })
 }
 
+fn glyph_index_u41(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        bencher::black_box(font.glyph_index('A').unwrap());
+    })
+}
+
+fn glyph_2_hor_metrics(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        bencher::black_box(font.glyph_hor_metrics(ttf::GlyphId(2)).unwrap());
+    })
+}
+
 struct Builder(usize);
 
 impl ttf_parser::OutlineBuilder for Builder {
@@ -91,6 +107,8 @@ bencher::benchmark_group!(perf,
     outline_glyph_276_from_glyf,
     outline_glyph_8_from_cff,
     outline_glyph_276_from_cff,
-    family_name
+    family_name,
+    glyph_index_u41,
+    glyph_2_hor_metrics
 );
 bencher::benchmark_main!(perf);

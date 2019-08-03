@@ -150,6 +150,7 @@ struct EncodingRecord {
 }
 
 impl FromData for EncodingRecord {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         EncodingRecord {
             // Fallback to `Custom` on error. This isn't that correct,
@@ -160,6 +161,7 @@ impl FromData for EncodingRecord {
         }
     }
 
+    #[inline]
     fn raw_size() -> usize {
         8 // u16 + u16 + u32
     }
@@ -471,6 +473,7 @@ impl FromData for VariationSelectorRecord {
         }
     }
 
+    #[inline]
     fn raw_size() -> usize {
         // variation_selector is u24.
         3 + Offset32::raw_size() + Offset32::raw_size()
@@ -498,6 +501,7 @@ impl FromData for UnicodeRangeRecord {
         }
     }
 
+    #[inline]
     fn raw_size() -> usize {
         // start_unicode_value is u24.
         3 + 1
@@ -518,6 +522,7 @@ impl FromData for UVSMappingRecord {
         }
     }
 
+    #[inline]
     fn raw_size() -> usize {
         // unicode_value is u24.
         3 + GlyphId::raw_size()

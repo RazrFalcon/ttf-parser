@@ -15,6 +15,7 @@ pub trait FromData: Sized {
     /// Reimplement when size of `Self` != size of a raw data.
     /// For example, when you parsing u16, but storing it as u8.
     /// In this case `size_of::<Self>()` == 1, but `FromData::raw_size()` == 2.
+    #[inline]
     fn raw_size() -> usize {
         std::mem::size_of::<Self>()
     }
@@ -75,6 +76,7 @@ pub trait TryFromData: Sized {
     /// Reimplement when size of `Self` != size of a raw data.
     /// For example, when you parsing u16, but storing it as u8.
     /// In this case `size_of::<Self>()` == 1, but `TryFromData::raw_size()` == 2.
+    #[inline]
     fn raw_size() -> usize {
         std::mem::size_of::<Self>()
     }
@@ -421,6 +423,7 @@ impl FromData for Option<Offset32> {
         if offset.0 != 0 { Some(offset) } else { None }
     }
 
+    #[inline]
     fn raw_size() -> usize {
         Offset32::raw_size()
     }

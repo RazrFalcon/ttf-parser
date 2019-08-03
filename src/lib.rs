@@ -82,7 +82,7 @@ Currently, it takes 40% more time to outline all glyphs in
 
 ```text
 test outline_cff  ... bench:   1,652,606 ns/iter (+/- 2,795)
-test outline_glyf ... bench:     966,880 ns/iter (+/- 4,118)
+test outline_glyf ... bench:   1,004,866 ns/iter (+/- 1,545)
 ```
 
 Here is some methods benchmarks:
@@ -91,27 +91,27 @@ Here is some methods benchmarks:
 test outline_glyph_276_from_cff  ... bench:       1,247 ns/iter (+/- 2)
 test outline_glyph_276_from_glyf ... bench:         817 ns/iter (+/- 15)
 test outline_glyph_8_from_cff    ... bench:         521 ns/iter (+/- 2)
-test family_name                 ... bench:         445 ns/iter (+/- 4)
+test family_name                 ... bench:         398 ns/iter (+/- 2)
 test from_data_otf               ... bench:         394 ns/iter (+/- 5)
 test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
 test from_data_ttf               ... bench:          96 ns/iter (+/- 3)
 ```
 
+`family_name` is expensive, because it allocates a `String` and the original data
+is stored as UTF-16 BE.
+
 Some methods are too fast, so we execute them **1000 times** to get better measurements.
 
 ```text
-test glyph_index_u41     ... bench:      23,838 ns/iter (+/- 14)
+test glyph_index_u41     ... bench:      27,492 ns/iter (+/- 716)
 test glyph_2_hor_metrics ... bench:       8,315 ns/iter (+/- 179)
+test x_height            ... bench:         847 ns/iter (+/- 0)
 test units_per_em        ... bench:         564 ns/iter (+/- 2)
-test x_height            ... bench:         568 ns/iter (+/- 1)
 test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)
 test width               ... bench:         422 ns/iter (+/- 0)
 test ascender            ... bench:         279 ns/iter (+/- 1)
 test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 ```
-
-`family_name` is expensive, because it allocates a `String` and the original data
-is stored as UTF-16 BE.
 
 ## Safety
 

@@ -34,6 +34,7 @@ impl TryFrom<u16> for PlatformId {
 }
 
 
+#[inline]
 pub(crate) fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
     const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;

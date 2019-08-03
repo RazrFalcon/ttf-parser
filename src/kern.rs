@@ -62,6 +62,7 @@ struct KerningRecord {
 }
 
 impl FromData for KerningRecord {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         KerningRecord {
             pair: s.read(),
@@ -69,6 +70,7 @@ impl FromData for KerningRecord {
         }
     }
 
+    #[inline]
     fn raw_size() -> usize {
         6
     }
@@ -84,12 +86,14 @@ struct Coverage {
 impl Coverage {
     const HORIZONTAL_BIT: u8 = 0;
 
+    #[inline]
     fn is_horizontal(&self) -> bool {
         (self.coverage >> Coverage::HORIZONTAL_BIT) & 1 == 1
     }
 }
 
 impl FromData for Coverage {
+    #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         Coverage {
             // Reverse order, since we're reading a big-endian u16.

@@ -5,6 +5,10 @@
 
 {{readme}}
 
+### Dependency
+
+[Rust](https://www.rust-lang.org/) >= 1.35
+
 ### Alternatives
 
 - [font-rs](https://crates.io/crates/font-rs) - Mainly a glyph outline extractor.

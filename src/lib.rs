@@ -490,7 +490,7 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(table_data);
 
         let sfnt_version: u32 = s.read()?;
-        if let SFNT_VERSION_TRUE_TYPE | SFNT_VERSION_OPEN_TYPE = sfnt_version {} else {
+        if sfnt_version != SFNT_VERSION_TRUE_TYPE && sfnt_version != SFNT_VERSION_OPEN_TYPE {
             return Err(Error::NotATrueType);
         }
 

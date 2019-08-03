@@ -122,6 +122,10 @@ is stored as UTF-16 BE.
 - The library must not panic. Any panic considered as a critical bug and should be reported.
 - The library forbids `unsafe` code.
 
+### Dependency
+
+[Rust](https://www.rust-lang.org/) >= 1.35
+
 ### Alternatives
 
 - [font-rs](https://crates.io/crates/font-rs) - Mainly a glyph outline extractor.

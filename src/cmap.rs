@@ -1,9 +1,10 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
+use std::convert::TryInto;
 use std::ops::Range;
 
 use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream, TrySlice};
-use crate::{Font, GlyphId, TableName, Result, Error};
+use crate::{Font, GlyphId, TableName, Result, Error, PlatformId};
 
 impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
@@ -18,6 +19,10 @@ impl<'a> Font<'a> {
         let num_tables: u16 = s.read()?;
         let records: LazyArray<EncodingRecord> = s.read_array(num_tables)?;
         for record in records {
+            if !crate::name::is_unicode_encoding(record.platform_id, record.encoding_id) {
+                continue;
+            }
+
             let subtable_data = data.try_slice(record.offset as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
@@ -139,19 +144,24 @@ impl<'a> Font<'a> {
 
 
 struct EncodingRecord {
+    platform_id: PlatformId,
+    encoding_id: u16,
     offset: u32,
 }
 
 impl FromData for EncodingRecord {
     fn parse(s: &mut SafeStream) -> Self {
-        s.skip::<u32>(); // platform_id + encoding_id
         EncodingRecord {
+            // Fallback to `Custom` on error. This isn't that correct,
+            // but since `FromData` can't return an error this is the next best thing.
+            platform_id: s.read::<u16>().try_into().unwrap_or(PlatformId::Custom),
+            encoding_id: s.read(),
             offset: s.read(),
         }
     }
 
     fn raw_size() -> usize {
-        8
+        8 // u16 + u16 + u32
     }
 }
 

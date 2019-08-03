@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- Check that `cmap` subtable encoding is Unicode.
 
 ## [0.2.0] - 2019-07-10
 ### Added

@@ -34,6 +34,18 @@ impl TryFrom<u16> for PlatformId {
 }
 
 
+pub(crate) fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
+    // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
+    const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
+
+    match platform_id {
+        PlatformId::Unicode => true,
+        PlatformId::Windows if encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+        _ => false,
+    }
+}
+
+
 /// A [name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids).
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
@@ -133,7 +145,7 @@ impl<'a> Name<'a> {
     /// - Windows Platform ID + Unicode BMP
     #[inline(never)]
     pub fn to_string(&self) -> Option<String> {
-        if self.is_supported_encoding() {
+        if self.is_unicode() {
             self.name_from_utf16_be()
         } else {
             None
@@ -141,15 +153,8 @@ impl<'a> Name<'a> {
     }
 
     #[inline]
-    fn is_supported_encoding(&self) -> bool {
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
-        const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
-
-        match self.platform_id {
-            PlatformId::Unicode => true,
-            PlatformId::Windows if self.encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
-            _ => false,
-        }
+    fn is_unicode(&self) -> bool {
+        is_unicode_encoding(self.platform_id, self.encoding_id)
     }
 
     #[inline(never)]
@@ -311,7 +316,7 @@ impl<'a> Font<'a> {
         // Prefer Typographic Family name.
 
         let name = self.names()
-            .find(|name| name.name_id == NameId::TypographicFamily && name.is_supported_encoding())
+            .find(|name| name.name_id == NameId::TypographicFamily && name.is_unicode())
             .and_then(|name| name.to_string());
 
         match name {
@@ -320,7 +325,7 @@ impl<'a> Font<'a> {
         }
 
         self.names()
-            .find(|name| name.name_id == NameId::Family && name.is_supported_encoding())
+            .find(|name| name.name_id == NameId::Family && name.is_unicode())
             .and_then(|name| name.to_string())
     }
 
@@ -331,7 +336,7 @@ impl<'a> Font<'a> {
     /// [`names()`]: #method.names
     pub fn post_script_name(&self) -> Option<String> {
         self.names()
-            .find(|name| name.name_id == NameId::PostScriptName && name.is_supported_encoding())
+            .find(|name| name.name_id == NameId::PostScriptName && name.is_unicode())
             .and_then(|name| name.to_string())
     }
 }

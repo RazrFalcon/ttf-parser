@@ -119,7 +119,7 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 - The library forbids `unsafe` code.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.2.1")]
+#![doc(html_root_url = "https://docs.rs/ttf-parser/0.2.2")]
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.2.2] - 2019-08-12
 ### Fixed
 - Allow format 12 subtables with *Unicode full repertoire* in `cmap`.
 
@@ -27,6 +29,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.1.0...v0.2.0

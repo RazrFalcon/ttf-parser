@@ -19,16 +19,16 @@ impl<'a> Font<'a> {
         let num_tables: u16 = s.read()?;
         let records: LazyArray<EncodingRecord> = s.read_array(num_tables)?;
         for record in records {
-            if !crate::name::is_unicode_encoding(record.platform_id, record.encoding_id) {
-                continue;
-            }
-
             let subtable_data = data.try_slice(record.offset as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
                 None => continue,
             };
+
+            if !is_unicode_encoding(format, record.platform_id, record.encoding_id) {
+                continue;
+            }
 
             let c = c as u32;
             let glyph = match format {
@@ -526,5 +526,25 @@ impl FromData for UVSMappingRecord {
     fn raw_size() -> usize {
         // unicode_value is u24.
         3 + GlyphId::raw_size()
+    }
+}
+
+#[inline]
+fn is_unicode_encoding(format: Format, platform_id: PlatformId, encoding_id: u16) -> bool {
+    // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
+    const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
+    const WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID: u16 = 10;
+
+    match platform_id {
+        PlatformId::Unicode => true,
+        PlatformId::Windows if encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+        PlatformId::Windows => {
+            // "Fonts that support Unicode supplementary-plane characters (U+10000 to U+10FFFF)
+            // on the Windows platform must have a format 12 subtable for platform ID 3,
+            // encoding ID 10."
+               encoding_id == WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID
+            && format == Format::SegmentedCoverage
+        }
+        _ => false,
     }
 }

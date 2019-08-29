@@ -2,6 +2,7 @@
 [![Build Status](https://travis-ci.org/RazrFalcon/ttf-parser.svg?branch=master)](https://travis-ci.org/RazrFalcon/ttf-parser)
 [![Crates.io](https://img.shields.io/crates/v/ttf-parser.svg)](https://crates.io/crates/ttf-parser)
 [![Documentation](https://docs.rs/ttf-parser/badge.svg)](https://docs.rs/ttf-parser)
+[![Rust 1.35+](https://img.shields.io/badge/rust-1.35+-orange.svg)](https://www.rust-lang.org)
 
 A high-level, safe, zero-allocation TrueType font parser.
 
@@ -121,10 +122,6 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
 - The library forbids `unsafe` code.
-
-### Dependency
-
-[Rust](https://www.rust-lang.org/) >= 1.35
 
 ### Alternatives
 

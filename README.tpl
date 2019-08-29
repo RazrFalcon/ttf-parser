@@ -2,12 +2,9 @@
 [![Build Status](https://travis-ci.org/RazrFalcon/{{crate}}.svg?branch=master)](https://travis-ci.org/RazrFalcon/{{crate}})
 [![Crates.io](https://img.shields.io/crates/v/{{crate}}.svg)](https://crates.io/crates/{{crate}})
 [![Documentation](https://docs.rs/{{crate}}/badge.svg)](https://docs.rs/{{crate}})
+[![Rust 1.35+](https://img.shields.io/badge/rust-1.35+-orange.svg)](https://www.rust-lang.org)
 
 {{readme}}
-
-### Dependency
-
-[Rust](https://www.rust-lang.org/) >= 1.35
 
 ### Alternatives
 

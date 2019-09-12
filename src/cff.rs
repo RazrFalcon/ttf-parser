@@ -922,18 +922,18 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 debug_assert!(stack.is_empty());
             }
-            32...246 => {
+            32..=246 => {
                 let n = op as i32 - 139;
                 debug_assert!((-107..=107).contains(&n));
                 stack.push(n as f32)?;
             }
-            247...250 => {
+            247..=250 => {
                 let b1 = s.read::<u8>()? as i32;
                 let n = (op as i32 - 247) * 256 + b1 + 108;
                 debug_assert!((108..=1131).contains(&n));
                 stack.push(n as f32)?;
             }
-            251...254 => {
+            251..=254 => {
                 let b1 = s.read::<u8>()? as i32;
                 let n = -(op as i32 - 251) * 256 - b1 - 108;
                 debug_assert!((-1131..=-108).contains(&n));
@@ -1237,16 +1237,16 @@ fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
         30 => {
             parse_float(s)
         }
-        32...246 => {
+        32..=246 => {
             let n = b0 as i32 - 139;
             Ok(Number::Integer(n))
         }
-        247...250 => {
+        247..=250 => {
             let b1 = s.read::<u8>()? as i32;
             let n = (b0 as i32 - 247) * 256 + b1 + 108;
             Ok(Number::Integer(n))
         }
-        251...254 => {
+        251..=254 => {
             let b1 = s.read::<u8>()? as i32;
             let n = -(b0 as i32 - 251) * 256 - b1 - 108;
             Ok(Number::Integer(n))
@@ -1292,7 +1292,7 @@ fn parse_float_nibble(nibble: u8, mut idx: usize, data: &mut [u8]) -> Result<usi
     }
 
     match nibble {
-        0...9 => {
+        0..=9 => {
             data[idx] = b'0' + nibble;
         }
         10 => {
@@ -1340,9 +1340,9 @@ fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
                 }
             }
         }
-        32...246 => {}
-        247...250 => s.skip::<u8>(),
-        251...254 => s.skip::<u8>(),
+        32..=246 => {}
+        247..=250 => s.skip::<u8>(),
+        251..=254 => s.skip::<u8>(),
         _ => return None,
     }
 

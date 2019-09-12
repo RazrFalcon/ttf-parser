@@ -5,7 +5,7 @@ fn main() {
     }
 }
 
-fn process() -> Result<(), Box<std::error::Error>> {
+fn process() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 2 {
         println!("Usage:\n\tfont-info font.ttf");

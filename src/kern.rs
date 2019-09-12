@@ -62,17 +62,14 @@ struct KerningRecord {
 }
 
 impl FromData for KerningRecord {
+    const SIZE: usize = 6; // Override, since `size_of` will be 8 because of padding.
+
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         KerningRecord {
             pair: s.read(),
             value: s.read(),
         }
-    }
-
-    #[inline]
-    fn raw_size() -> usize {
-        6
     }
 }
 

@@ -3,22 +3,19 @@ use std::ops::Range;
 use crate::{Error, Result};
 
 pub trait FromData: Sized {
+    /// Stores an object size in raw data.
+    ///
+    /// `mem::size_of` by default.
+    ///
+    /// Override when size of `Self` != size of a raw data.
+    /// For example, when you are parsing `u16`, but storing it as `u8`.
+    /// In this case `size_of::<Self>()` == 1, but `FromData::SIZE` == 2.
+    const SIZE: usize = std::mem::size_of::<Self>();
+
     /// Parses an object from a raw data.
     ///
     /// This method **must** not panic and **must** not read past the bounds.
     fn parse(s: &mut SafeStream) -> Self;
-
-    /// Returns an object size in raw data.
-    ///
-    /// `mem::size_of` by default.
-    ///
-    /// Reimplement when size of `Self` != size of a raw data.
-    /// For example, when you parsing u16, but storing it as u8.
-    /// In this case `size_of::<Self>()` == 1, but `FromData::raw_size()` == 2.
-    #[inline]
-    fn raw_size() -> usize {
-        std::mem::size_of::<Self>()
-    }
 }
 
 impl FromData for u8 {
@@ -66,20 +63,17 @@ impl FromData for u32 {
 
 
 pub trait TryFromData: Sized {
-    /// Parses an object from a raw data.
-    fn try_parse(s: &mut SafeStream) -> Result<Self>;
-
-    /// Returns an object size in raw data.
+    /// Stores an object size in raw data.
     ///
     /// `mem::size_of` by default.
     ///
-    /// Reimplement when size of `Self` != size of a raw data.
-    /// For example, when you parsing u16, but storing it as u8.
-    /// In this case `size_of::<Self>()` == 1, but `TryFromData::raw_size()` == 2.
-    #[inline]
-    fn raw_size() -> usize {
-        std::mem::size_of::<Self>()
-    }
+    /// Override when size of `Self` != size of a raw data.
+    /// For example, when you are parsing `u16`, but storing it as `u8`.
+    /// In this case `size_of::<Self>()` == 1, but `FromData::SIZE` == 2.
+    const SIZE: usize = std::mem::size_of::<Self>();
+
+    /// Parses an object from a raw data.
+    fn try_parse(s: &mut SafeStream) -> Result<Self>;
 }
 
 
@@ -115,16 +109,16 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 
     pub fn at<L: FSize>(&self, index: L) -> T {
-        let start = index.to_usize() * T::raw_size();
-        let end = start + T::raw_size();
+        let start = index.to_usize() * T::SIZE;
+        let end = start + T::SIZE;
         let mut s = SafeStream::new(&self.data[start..end]);
         T::parse(&mut s)
     }
 
     pub fn get<L: FSize>(&self, index: L) -> Option<T> {
         if index.to_usize() < self.len() {
-            let start = index.to_usize() * T::raw_size();
-            let end = start + T::raw_size();
+            let start = index.to_usize() * T::SIZE;
+            let end = start + T::SIZE;
             let mut s = SafeStream::new(&self.data[start..end]);
             Some(T::parse(&mut s))
         } else {
@@ -143,7 +137,7 @@ impl<'a, T: FromData> LazyArray<'a, T> {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.data.len() / T::raw_size()
+        self.data.len() / T::SIZE
     }
 
     #[inline]
@@ -281,7 +275,7 @@ impl<'a> Stream<'a> {
 
     #[inline]
     pub fn skip<T: FromData>(&mut self) {
-        self.offset += T::raw_size();
+        self.offset += T::SIZE;
     }
 
     #[inline]
@@ -292,7 +286,7 @@ impl<'a> Stream<'a> {
     #[inline]
     pub fn read<T: FromData>(&mut self) -> Result<T> {
         let start = self.offset;
-        self.offset += T::raw_size();
+        self.offset += T::SIZE;
         let end = self.offset;
 
         let data = self.data.try_slice(start..end)?;
@@ -303,7 +297,7 @@ impl<'a> Stream<'a> {
     #[inline]
     pub fn try_read<T: TryFromData>(&mut self) -> Result<T> {
         let start = self.offset;
-        self.offset += T::raw_size();
+        self.offset += T::SIZE;
         let end = self.offset;
 
         let data = self.data.try_slice(start..end)?;
@@ -314,7 +308,7 @@ impl<'a> Stream<'a> {
     #[inline]
     pub fn read_at<T: FromData>(data: &[u8], mut offset: usize) -> Result<T> {
         let start = offset;
-        offset += T::raw_size();
+        offset += T::SIZE;
         let end = offset;
 
         let data = data.try_slice(start..end)?;
@@ -331,7 +325,7 @@ impl<'a> Stream<'a> {
 
     #[inline]
     pub fn read_array<T: FromData, L: FSize>(&mut self, len: L) -> Result<LazyArray<'a, T>> {
-        let len = len.to_usize() * T::raw_size();
+        let len = len.to_usize() * T::SIZE;
         let data = self.read_bytes(len as u32)?;
         Ok(LazyArray::new(data))
     }
@@ -390,14 +384,14 @@ impl<'a> SafeStream<'a> {
 
     #[inline]
     pub fn skip<T: FromData>(&mut self) {
-        self.offset += T::raw_size();
+        self.offset += T::SIZE;
     }
 
     #[inline]
     pub fn read<T: FromData>(&mut self) -> T {
         let start = self.offset;
         let v = T::parse(self);
-        self.offset = start + T::raw_size();
+        self.offset = start + T::SIZE;
         v
     }
 
@@ -429,14 +423,11 @@ impl FromData for Offset32 {
 }
 
 impl FromData for Option<Offset32> {
+    const SIZE: usize = Offset32::SIZE;
+
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         let offset: Offset32 = s.read();
         if offset.0 != 0 { Some(offset) } else { None }
-    }
-
-    #[inline]
-    fn raw_size() -> usize {
-        Offset32::raw_size()
     }
 }

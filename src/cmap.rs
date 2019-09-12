@@ -145,6 +145,8 @@ struct EncodingRecord {
 }
 
 impl FromData for EncodingRecord {
+    const SIZE: usize = 8; // u16 + u16 + u32
+
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         EncodingRecord {
@@ -154,11 +156,6 @@ impl FromData for EncodingRecord {
             encoding_id: s.read(),
             offset: s.read(),
         }
-    }
-
-    #[inline]
-    fn raw_size() -> usize {
-        8 // u16 + u16 + u32
     }
 }
 
@@ -221,16 +218,16 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
 
     // SubHeaderRecord::id_range_offset points to SubHeaderRecord::first_code
     // in the glyphIndexArray. So we have to advance to our code point.
-    let index_offset = (low_byte - sub_header.first_code) as usize * u16::raw_size();
+    let index_offset = (low_byte - sub_header.first_code) as usize * u16::SIZE;
 
     // 'The value of the idRangeOffset is the number of bytes
     // past the actual location of the idRangeOffset'.
     let offset =
           sub_headers_offset
         // Advance to required subheader.
-        + SubHeaderRecord::raw_size() * (i + 1) as usize
+        + SubHeaderRecord::SIZE * (i + 1) as usize
         // Move back to idRangeOffset start.
-        - u16::raw_size()
+        - u16::SIZE
         // Use defined offset.
         + sub_header.id_range_offset as usize
         // Advance to required index in the glyphIndexArray.
@@ -457,18 +454,14 @@ struct VariationSelectorRecord {
 }
 
 impl FromData for VariationSelectorRecord {
+    const SIZE: usize = 3 + Offset32::SIZE + Offset32::SIZE; // variation_selector is u24
+
     fn parse(s: &mut SafeStream) -> Self {
         VariationSelectorRecord {
             variation: s.read_u24(),
             default_uvs_offset: s.read(),
             non_default_uvs_offset: s.read(),
         }
-    }
-
-    #[inline]
-    fn raw_size() -> usize {
-        // variation_selector is u24.
-        3 + Offset32::raw_size() + Offset32::raw_size()
     }
 }
 
@@ -486,17 +479,13 @@ impl UnicodeRangeRecord {
 }
 
 impl FromData for UnicodeRangeRecord {
+    const SIZE: usize = 3 + 1; // start_unicode_value is u24.
+
     fn parse(s: &mut SafeStream) -> Self {
         UnicodeRangeRecord {
             start_unicode_value: s.read_u24(),
             additional_count: s.read(),
         }
-    }
-
-    #[inline]
-    fn raw_size() -> usize {
-        // start_unicode_value is u24.
-        3 + 1
     }
 }
 
@@ -507,17 +496,13 @@ struct UVSMappingRecord {
 }
 
 impl FromData for UVSMappingRecord {
+    const SIZE: usize = 3 + GlyphId::SIZE; // unicode_value is u24
+
     fn parse(s: &mut SafeStream) -> Self {
         UVSMappingRecord {
             unicode_value: s.read_u24(),
             glyph: s.read(),
         }
-    }
-
-    #[inline]
-    fn raw_size() -> usize {
-        // unicode_value is u24.
-        3 + GlyphId::raw_size()
     }
 }
 

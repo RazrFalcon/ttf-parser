@@ -16,8 +16,7 @@ impl<'a> Font<'a> {
         let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
-        let num_tables: u16 = s.read()?;
-        let records: LazyArray<EncodingRecord> = s.read_array(num_tables)?;
+        let records: LazyArray<EncodingRecord> = s.read_array16()?;
         for record in records {
             let subtable_data = data.try_slice(record.offset as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
@@ -79,8 +78,7 @@ impl<'a> Font<'a> {
         let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
-        let num_tables: u16 = s.read()?;
-        let records: LazyArray<EncodingRecord> = s.read_array(num_tables)?;
+        let records: LazyArray<EncodingRecord> = s.read_array16()?;
         for record in records {
             let subtable_data = data.try_slice(record.offset as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
@@ -110,16 +108,14 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(data);
         s.skip::<u16>(); // format
         s.skip::<u32>(); // length
-        let num_var_selector_records: u32 = s.read()?;
-        let records: LazyArray<VariationSelectorRecord> = s.read_array(num_var_selector_records)?;
+        let records: LazyArray<VariationSelectorRecord> = s.read_array32()?;
 
         let record = records.binary_search_by(|v| v.variation.cmp(&variation)).ok_or(Error::NoGlyph)?;
 
         if let Some(offset) = record.default_uvs_offset {
             let data = data.try_slice(offset.0 as usize..data.len())?;
             let mut s = Stream::new(data);
-            let count: u32 = s.read()?; // numUnicodeValueRanges
-            let ranges: LazyArray<UnicodeRangeRecord> = s.read_array(count)?;
+            let ranges: LazyArray<UnicodeRangeRecord> = s.read_array32()?;
             for range in ranges {
                 if range.contains(c) {
                     // This is a default glyph.
@@ -131,8 +127,7 @@ impl<'a> Font<'a> {
         if let Some(offset) = record.non_default_uvs_offset {
             let data = data.try_slice(offset.0 as usize..data.len())?;
             let mut s = Stream::new(data);
-            let count: u32 = s.read()?; // numUVSMappings
-            let uvs_mappings: LazyArray<UVSMappingRecord> = s.read_array(count)?;
+            let uvs_mappings: LazyArray<UVSMappingRecord> = s.read_array32()?;
             if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&cp)) {
                 return Ok(mapping.glyph);
             }
@@ -329,8 +324,7 @@ fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Result<u16> {
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
     let first_code_point: u16 = s.read()?;
-    let count: u16 = s.read()?;
-    let glyphs: LazyArray<u16> = s.read_array(count)?;
+    let glyphs: LazyArray<u16> = s.read_array16()?;
 
     let code_point = code_point as u16;
 
@@ -349,8 +343,7 @@ fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Result<u16> {
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
     let first_code_point: u32 = s.read()?;
-    let count: u32 = s.read()?;
-    let glyphs: LazyArray<u16> = s.read_array(count)?;
+    let glyphs: LazyArray<u16> = s.read_array32()?;
 
     // Check for overflow.
     if code_point < first_code_point {
@@ -368,8 +361,7 @@ fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> 
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
-    let num_groups: u32 = s.read()?;
-    let groups: LazyArray<SequentialMapGroup> = s.read_array(num_groups)?;
+    let groups: LazyArray<SequentialMapGroup> = s.read_array32()?;
     for group in groups {
         if group.char_code_range.contains(&code_point) {
             if format == Format::SegmentedCoverage {

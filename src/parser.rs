@@ -336,6 +336,18 @@ impl<'a> Stream<'a> {
         Ok(LazyArray::new(data))
     }
 
+    #[inline]
+    pub fn read_array16<T: FromData>(&mut self) -> Result<LazyArray<'a, T>> {
+        let count: u16 = self.read()?;
+        self.read_array(count)
+    }
+
+    #[inline]
+    pub fn read_array32<T: FromData>(&mut self) -> Result<LazyArray<'a, T>> {
+        let count: u32 = self.read()?;
+        self.read_array(count)
+    }
+
     pub fn read_f2_14(&mut self) -> Result<f32> {
         Ok(self.read::<i16>()? as f32 / 16384.0)
     }

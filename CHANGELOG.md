@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- 8% faster `family_name()` method.
 
 ## [0.2.2] - 2019-08-12
 ### Fixed

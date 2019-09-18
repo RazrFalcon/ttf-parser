@@ -228,9 +228,12 @@ impl<'a> Iterator for Names<'a> {
             return None;
         }
 
-        let index = self.index;
         self.index += 1;
-        let name = self.names.get(index)?;
+        self.nth(self.index as usize - 1)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let name = self.names.get(n as u16)?;
 
         let platform_id = match PlatformId::try_from(name.platform_id) {
             Ok(v) => v,
@@ -310,24 +313,27 @@ impl<'a> Font<'a> {
 
     /// Returns font's family name.
     ///
+    /// *Typographic Family* is preferred over *Family*.
+    ///
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
     pub fn family_name(&self) -> Option<String> {
-        // Prefer Typographic Family name.
-
-        let name = self.names()
-            .find(|name| name.name_id == NameId::TypographicFamily && name.is_unicode())
-            .and_then(|name| name.to_string());
-
-        match name {
-            Some(name) => return Some(name),
-            None => {}
+        let mut idx = None;
+        let mut iter = self.names();
+        for (i, name) in iter.enumerate() {
+            if name.name_id == NameId::TypographicFamily && name.is_unicode() {
+                // Break the loop as soon as we reached 'Typographic Family'.
+                idx = Some(i);
+                break;
+            } else if name.name_id == NameId::Family && name.is_unicode() {
+                idx = Some(i);
+                // Do not break the loop since 'Typographic Family' can be set later
+                // and it has a higher priority.
+            }
         }
 
-        self.names()
-            .find(|name| name.name_id == NameId::Family && name.is_unicode())
-            .and_then(|name| name.to_string())
+        iter.nth(idx?).and_then(|name| name.name_from_utf16_be())
     }
 
     /// Returns font's PostScript name.
@@ -338,6 +344,6 @@ impl<'a> Font<'a> {
     pub fn post_script_name(&self) -> Option<String> {
         self.names()
             .find(|name| name.name_id == NameId::PostScriptName && name.is_unicode())
-            .and_then(|name| name.to_string())
+            .and_then(|name| name.name_from_utf16_be())
     }
 }

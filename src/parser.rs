@@ -1,4 +1,4 @@
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::{Error, Result};
 
@@ -10,7 +10,7 @@ pub trait FromData: Sized {
     /// Override when size of `Self` != size of a raw data.
     /// For example, when you are parsing `u16`, but storing it as `u8`.
     /// In this case `size_of::<Self>()` == 1, but `FromData::SIZE` == 2.
-    const SIZE: usize = std::mem::size_of::<Self>();
+    const SIZE: usize = core::mem::size_of::<Self>();
 
     /// Parses an object from a raw data.
     ///
@@ -56,7 +56,7 @@ impl FromData for u32 {
     #[inline]
     fn parse(s: &mut SafeStream) -> Self {
         // For u32 it's faster to use TryInto, but for u16/i16 it's faster to index.
-        use std::convert::TryInto;
+        use core::convert::TryInto;
         u32::from_be_bytes(s.data[s.offset..s.offset+4].try_into().unwrap())
     }
 }
@@ -70,7 +70,7 @@ pub trait TryFromData: Sized {
     /// Override when size of `Self` != size of a raw data.
     /// For example, when you are parsing `u16`, but storing it as `u8`.
     /// In this case `size_of::<Self>()` == 1, but `FromData::SIZE` == 2.
-    const SIZE: usize = std::mem::size_of::<Self>();
+    const SIZE: usize = core::mem::size_of::<Self>();
 
     /// Parses an object from a raw data.
     fn try_parse(s: &mut SafeStream) -> Result<Self>;
@@ -96,7 +96,7 @@ impl FSize for u32 {
 #[derive(Clone, Copy)]
 pub struct LazyArray<'a, T> {
     data: &'a [u8],
-    phantom: std::marker::PhantomData<T>,
+    phantom: core::marker::PhantomData<T>,
 }
 
 impl<'a, T: FromData> LazyArray<'a, T> {
@@ -104,7 +104,7 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     pub fn new(data: &'a [u8]) -> Self {
         LazyArray {
             data,
-            phantom: std::marker::PhantomData,
+            phantom: core::marker::PhantomData,
         }
     }
 
@@ -147,11 +147,11 @@ impl<'a, T: FromData> LazyArray<'a, T> {
 
     #[inline]
     pub fn binary_search_by<F>(&self, mut f: F) -> Option<T>
-        where F: FnMut(&T) -> std::cmp::Ordering
+        where F: FnMut(&T) -> core::cmp::Ordering
     {
         // Based on Rust std implementation.
 
-        use std::cmp::Ordering;
+        use core::cmp::Ordering;
 
         let mut size = self.len() as u32;
         if size == 0 {
@@ -177,8 +177,8 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 }
 
-impl<'a, T: FromData + std::fmt::Debug + Copy> std::fmt::Debug for LazyArray<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl<'a, T: FromData + core::fmt::Debug + Copy> core::fmt::Debug for LazyArray<'a, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.debug_list().entries(self.into_iter()).finish()
     }
 }

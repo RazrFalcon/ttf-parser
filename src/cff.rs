@@ -3,7 +3,7 @@
 // http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5177.Type2.pdf
 // https://github.com/opentypejs/opentype.js/blob/master/src/tables/cff.js
 
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::parser::{Stream, TryFromData, SafeStream, TrySlice};
 use crate::{Font, GlyphId, TableName, OutlineBuilder, Rect, Result, Error};
@@ -57,8 +57,8 @@ pub enum CFFError {
     InvalidArgumentsStackLength,
 }
 
-impl std::fmt::Display for CFFError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for CFFError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match *self {
             CFFError::NoCharStrings => {
                 write!(f, "table doesn't have any char strings")
@@ -91,6 +91,7 @@ impl std::fmt::Display for CFFError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for CFFError {}
 
 
@@ -275,10 +276,10 @@ fn parse_char_string(
     let mut inner_builder = Builder {
         builder,
         bbox: RectF {
-            x_min: std::f32::MAX,
-            y_min: std::f32::MAX,
-            x_max: std::f32::MIN,
-            y_max: std::f32::MIN,
+            x_min: core::f32::MAX,
+            y_min: core::f32::MAX,
+            x_max: core::f32::MIN,
+            y_max: core::f32::MIN,
         }
     };
 
@@ -606,7 +607,7 @@ fn _parse_char_string<T: OutlineBuilder>(
                         let dx5 = dx4 + stack.at(8);
                         let dy5 = dy4 + stack.at(9);
 
-                        if (dx5 - x).abs() > (dy5 - y).abs() {
+                        if f32_abs(dx5 - x) > f32_abs(dy5 - y) {
                             x = dx5 + stack.at(10);
                         } else {
                             y = dy5 + stack.at(10);
@@ -963,7 +964,7 @@ fn calc_subroutine_bias(len: u16) -> u16 {
 
 fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
     let count: u16 = s.read()?;
-    if count != 0 && count != std::u16::MAX {
+    if count != 0 && count != core::u16::MAX {
         let offset_size: OffsetSize = s.try_read()?;
         let offsets_len = (count + 1) as u32 * offset_size as u32;
         let offsets = VarOffsets {
@@ -987,7 +988,7 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
 
 fn skip_index(s: &mut Stream) -> Result<()> {
     let count: u16 = s.read()?;
-    if count != 0 && count != std::u16::MAX {
+    if count != 0 && count != core::u16::MAX {
         let offset_size: OffsetSize = s.try_read()?;
         let offsets_len = (count + 1) as u32 * offset_size as u32;
         let offsets = VarOffsets {
@@ -1087,7 +1088,7 @@ impl<'a> DataIndex<'a> {
 
     fn get(&self, index: u16) -> Option<&'a [u8]> {
         // Check for overflow first.
-        if index == std::u16::MAX {
+        if index == core::u16::MAX {
             None
         } else if index + 1 < self.offsets.len() {
             let start = self.offsets.get(index)? as usize;
@@ -1280,7 +1281,7 @@ fn parse_float(s: &mut Stream) -> Result<Number> {
         idx = parse_float_nibble(nibble2, idx, &mut data)?;
     }
 
-    let s = std::str::from_utf8(&data[..idx]).map_err(|_| CFFError::InvalidFloat)?;
+    let s = core::str::from_utf8(&data[..idx]).map_err(|_| CFFError::InvalidFloat)?;
     let n = s.parse().map_err(|_| CFFError::InvalidFloat)?;
     Ok(Number::Float(n))
 }
@@ -1431,8 +1432,8 @@ impl ArgumentsStack {
     }
 }
 
-impl<'a> std::fmt::Debug for ArgumentsStack {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl<'a> core::fmt::Debug for ArgumentsStack {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.debug_list().entries(&self.data[..self.len]).finish()
     }
 }
@@ -1449,4 +1450,18 @@ impl IsEven for usize {
 
     #[inline]
     fn is_odd(&self) -> bool { !self.is_even() }
+}
+
+#[cfg(feature = "std")]
+fn f32_abs(n: f32) -> f32 {
+    n.abs()
+}
+
+#[cfg(not(feature = "std"))]
+fn f32_abs(n: f32) -> f32 {
+    if n.is_sign_negative() {
+        -n
+    } else {
+        n
+    }
 }

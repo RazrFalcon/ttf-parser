@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream, TrySlice};
 use crate::{Font, GlyphId, TableName, Result, Error, PlatformId};
@@ -285,7 +285,7 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
 
                 let delta = (code_point as u32 - start_value as u32) * 2;
                 // Check for overflow.
-                if delta > std::u16::MAX as u32 {
+                if delta > core::u16::MAX as u32 {
                     return Err(Error::NoGlyph);
                 }
                 // `delta` must be u16.
@@ -433,7 +433,7 @@ impl FromData for SequentialMapGroup {
         let start: u32 = s.read();
         let mut end: u32 = s.read();
 
-        if end != std::u32::MAX {
+        if end != core::u32::MAX {
             // +1 makes the upper bound inclusive.
             end += 1;
         }

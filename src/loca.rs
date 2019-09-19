@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/loca
 
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::parser::{Stream, LazyArray};
 use crate::{Font, GlyphId, TableName, Result, Error};
@@ -11,12 +11,12 @@ impl<'a> Font<'a> {
         use crate::head::IndexToLocationFormat as Format;
 
         // Check for overflow.
-        if self.number_of_glyphs() == std::u16::MAX {
+        if self.number_of_glyphs() == core::u16::MAX {
             return Err(Error::NoGlyph);
         }
 
         let glyph_id = glyph_id.0;
-        if glyph_id == std::u16::MAX {
+        if glyph_id == core::u16::MAX {
             return Err(Error::NoGlyph);
         }
 

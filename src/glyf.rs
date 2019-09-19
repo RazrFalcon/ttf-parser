@@ -172,7 +172,7 @@ impl<'a> Font<'a> {
             // Unwrap is safe, because it's guarantee that array has at least one value.
             let last_point = endpoints.last().unwrap();
             // Prevent overflow.
-            if last_point == std::u16::MAX {
+            if last_point == core::u16::MAX {
                 return Ok(());
             }
 
@@ -209,7 +209,7 @@ impl<'a> Font<'a> {
             last = n;
 
             // Check for overflow.
-            if n == std::u16::MAX {
+            if n == core::u16::MAX {
                 break;
             }
 
@@ -272,7 +272,7 @@ impl<'a> Font<'a> {
     }
 
     fn parse_contour<T: OutlineBuilder>(
-        points: std::iter::Take<&mut GlyphPoints>,
+        points: core::iter::Take<&mut GlyphPoints>,
         builder: &mut Builder<T>,
     ) {
         let mut first_oncurve: Option<Point> = None;
@@ -459,8 +459,8 @@ impl Default for Transform {
     }
 }
 
-impl std::fmt::Debug for Transform {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Debug for Transform {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "Transform({} {} {} {} {} {})", self.a, self.b, self.c, self.d, self.e, self.f)
     }
 }

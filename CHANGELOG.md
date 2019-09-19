@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `no_std` compatibility.
+
 ### Changed
 - 35% faster `family_name()` method.
 - The `Name` struct has a new API. Public fields became public functions

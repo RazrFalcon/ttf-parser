@@ -12,6 +12,10 @@ readme = "README.md"
 edition = "2018"
 exclude = ["fonts/**"]
 
+[features]
+default = ["std"]
+std = []
+
 [dev-dependencies]
 bencher = "0.1"
 svgtypes = "0.5"
@@ -29,3 +33,6 @@ harness = false
 [[bench]]
 name = "methods_perf_x1000"
 harness = false
+
+[package.metadata.docs.rs]
+features = ["std"]

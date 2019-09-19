@@ -7,6 +7,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Zero allocations.
 - Zero `unsafe`.
 - Zero dependencies.
+- `no_std` compatible.
 - Fast.
 - Stateless.
 - Simple and maintainable code (no magic numbers).
@@ -121,11 +122,14 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.2.2")]
 
+#![no_std]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
 
+#[cfg(feature = "std")]
+extern crate std;
 
 mod cff;
 mod cmap;
@@ -212,8 +216,8 @@ pub enum Error {
     },
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match *self {
             Error::NotATrueType => {
                 write!(f, "not a TrueType font")
@@ -265,9 +269,10 @@ impl From<CFFError> for Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Result<T> = core::result::Result<T, Error>;
 
 
 #[derive(Clone, Copy)]
@@ -279,8 +284,8 @@ impl Tag {
     const LENGTH: usize = 4;
 }
 
-impl std::fmt::Debug for Tag {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Debug for Tag {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let d = self.tag;
         write!(f, "Tag({}{}{}{})", d[0] as char, d[1] as char, d[2] as char, d[3] as char)
     }

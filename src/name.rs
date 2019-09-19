@@ -1,6 +1,14 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name
 
-use crate::parser::{Stream, LazyArray};
+#[cfg(feature = "std")]
+use std::vec::Vec;
+#[cfg(feature = "std")]
+use std::string::String;
+
+#[cfg(feature = "std")]
+use crate::parser::LazyArray;
+
+use crate::parser::Stream;
 use crate::{Font, TableName, Result, Error};
 use crate::raw::name as raw;
 
@@ -63,6 +71,7 @@ impl PlatformId {
 }
 
 
+#[cfg(feature = "std")]
 #[inline]
 fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
@@ -123,6 +132,7 @@ impl<'a> Name<'a> {
     /// Supports:
     /// - Unicode Platform ID
     /// - Windows Platform ID + Unicode BMP
+    #[cfg(feature = "std")]
     #[inline(never)]
     pub fn name_utf8(&self) -> Option<String> {
         if self.is_unicode() {
@@ -132,11 +142,13 @@ impl<'a> Name<'a> {
         }
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn is_unicode(&self) -> bool {
         is_unicode_encoding(self.platform_id().unwrap(), self.encoding_id())
     }
 
+    #[cfg(feature = "std")]
     #[inline(never)]
     fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
@@ -148,14 +160,28 @@ impl<'a> Name<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for Name<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+#[cfg(feature = "std")]
+impl<'a> core::fmt::Debug for Name<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         // TODO: https://github.com/rust-lang/rust/issues/50264
 
         let name = self.name_utf8();
         f.debug_struct("Name")
-            .field("name", &name.as_ref().map(std::ops::Deref::deref)
+            .field("name", &name.as_ref().map(core::ops::Deref::deref)
                                 .unwrap_or("unsupported encoding"))
+            .field("platform_id", &self.platform_id())
+            .field("encoding_id", &self.encoding_id())
+            .field("language_id", &self.language_id())
+            .field("name_id", &self.name_id())
+            .finish()
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl<'a> core::fmt::Debug for Name<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_struct("Name")
+            .field("name", &self.name())
             .field("platform_id", &self.platform_id())
             .field("encoding_id", &self.encoding_id())
             .field("language_id", &self.language_id())
@@ -257,6 +283,7 @@ impl<'a> Font<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
+    #[cfg(feature = "std")]
     pub fn family_name(&self) -> Option<String> {
         let mut idx = None;
         let mut iter = self.names();
@@ -280,6 +307,7 @@ impl<'a> Font<'a> {
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///
     /// [`names()`]: #method.names
+    #[cfg(feature = "std")]
     pub fn post_script_name(&self) -> Option<String> {
         self.names()
             .find(|name| name.name_id() == name_id::POST_SCRIPT_NAME && name.is_unicode())

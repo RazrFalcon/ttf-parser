@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Changed
-- 8% faster `family_name()` method.
+- 35% faster `family_name()` method.
+- The `Name` struct has a new API. Public fields became public functions
+  and data is parsed on demand and not beforehand.
 
 ## [0.2.2] - 2019-08-12
 ### Fixed

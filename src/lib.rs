@@ -91,7 +91,7 @@ Here is some methods benchmarks:
 test outline_glyph_276_from_cff  ... bench:       1,247 ns/iter (+/- 2)
 test outline_glyph_276_from_glyf ... bench:         817 ns/iter (+/- 15)
 test outline_glyph_8_from_cff    ... bench:         521 ns/iter (+/- 2)
-test family_name                 ... bench:         398 ns/iter (+/- 2)
+test family_name                 ... bench:         258 ns/iter (+/- 3)
 test from_data_otf               ... bench:         394 ns/iter (+/- 5)
 test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
 test from_data_ttf               ... bench:          96 ns/iter (+/- 3)
@@ -139,6 +139,7 @@ mod name;
 mod os2;
 mod parser;
 mod post;
+mod raw;
 mod vhea;
 mod vmtx;
 

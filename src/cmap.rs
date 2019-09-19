@@ -1,6 +1,5 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
-use std::convert::TryInto;
 use std::ops::Range;
 
 use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream, TrySlice};
@@ -152,7 +151,7 @@ impl FromData for EncodingRecord {
         EncodingRecord {
             // Fallback to `Custom` on error. This isn't that correct,
             // but since `FromData` can't return an error this is the next best thing.
-            platform_id: s.read::<u16>().try_into().unwrap_or(PlatformId::Custom),
+            platform_id: PlatformId::from_u16(s.read()).unwrap_or(PlatformId::Custom),
             encoding_id: s.read(),
             offset: s.read(),
         }

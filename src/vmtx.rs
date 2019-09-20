@@ -2,6 +2,7 @@
 
 use crate::parser::{Stream, LazyArray};
 use crate::{Font, GlyphId, VerticalMetrics, TableName, Result, Error};
+use crate::raw::vmtx as raw;
 
 impl<'a> Font<'a> {
     /// Returns glyph's vertical metrics.
@@ -19,12 +20,15 @@ impl<'a> Font<'a> {
 
         let glyph_id = glyph_id.0;
 
-        let array: LazyArray<VerticalMetrics> = s.read_array(number_of_vmetrics)?;
+        let array: LazyArray<raw::VerticalMetrics> = s.read_array(number_of_vmetrics)?;
 
         if let Some(metrics) = array.get(glyph_id) {
-            Ok(metrics)
+            Ok(VerticalMetrics {
+                advance: metrics.advance_height(),
+                top_side_bearing: metrics.top_side_bearing(),
+            })
         } else {
-            let advance = array.last().ok_or_else(|| Error::NoVerticalMetrics)?.advance;
+            let advance = array.last().ok_or_else(|| Error::NoVerticalMetrics)?.advance_height();
 
             // 'The number of entries in this array is calculated by subtracting the value of
             // numOfLongVerMetrics from the number of glyphs in the font.'

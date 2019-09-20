@@ -5,7 +5,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 - A high-level API.
 - Zero allocations.
-- Zero `unsafe`.
 - Zero dependencies.
 - `no_std` compatible.
 - Fast.
@@ -82,21 +81,21 @@ Currently, it takes 60% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```text
-test outline_cff  ... bench:   1,652,606 ns/iter (+/- 2,795)
-test outline_glyf ... bench:   1,004,866 ns/iter (+/- 1,545)
+test outline_cff  ... bench:   1,617,138 ns/iter (+/- 1,261)
+test outline_glyf ... bench:     995,771 ns/iter (+/- 2,801)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:       1,247 ns/iter (+/- 2)
-test outline_glyph_276_from_glyf ... bench:         817 ns/iter (+/- 15)
-test outline_glyph_8_from_cff    ... bench:         521 ns/iter (+/- 2)
-test family_name                 ... bench:         258 ns/iter (+/- 3)
-test from_data_otf               ... bench:         394 ns/iter (+/- 5)
-test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
-test from_data_ttf               ... bench:          96 ns/iter (+/- 3)
-test glyph_index_u41             ... bench:          27 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,203 ns/iter (+/- 4)
+test outline_glyph_276_from_glyf ... bench:         796 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         497 ns/iter (+/- 3)
+test from_data_otf               ... bench:         372 ns/iter (+/- 5)
+test outline_glyph_8_from_glyf   ... bench:         347 ns/iter (+/- 1)
+test family_name                 ... bench:         269 ns/iter (+/- 3)
+test from_data_ttf               ... bench:          76 ns/iter (+/- 2)
+test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
 test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
 ```
 
@@ -109,7 +108,7 @@ Some methods are too fast, so we execute them **1000 times** to get better measu
 test x_height            ... bench:         847 ns/iter (+/- 0)
 test units_per_em        ... bench:         564 ns/iter (+/- 2)
 test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)
-test width               ... bench:         422 ns/iter (+/- 0)
+test width               ... bench:         287 ns/iter (+/- 0)
 test ascender            ... bench:         279 ns/iter (+/- 1)
 test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 ```
@@ -117,13 +116,12 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 ## Safety
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library forbids `unsafe` code.
+- The library has a single `unsafe` block for array slicing.
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.2.2")]
 
 #![no_std]
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
@@ -159,7 +157,8 @@ pub struct GlyphId(pub u16);
 
 impl FromData for GlyphId {
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
+    fn parse(data: &[u8]) -> Self {
+        let mut s = SafeStream::new(data);
         GlyphId(s.read())
     }
 }
@@ -275,30 +274,6 @@ impl std::error::Error for Error {}
 pub(crate) type Result<T> = core::result::Result<T, Error>;
 
 
-#[derive(Clone, Copy)]
-struct Tag {
-    tag: [u8; Tag::LENGTH],
-}
-
-impl Tag {
-    const LENGTH: usize = 4;
-}
-
-impl core::fmt::Debug for Tag {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        let d = self.tag;
-        write!(f, "Tag({}{}{}{})", d[0] as char, d[1] as char, d[2] as char, d[3] as char)
-    }
-}
-
-impl FromData for Tag {
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        Tag { tag: [s.read(), s.read(), s.read(), s.read()] }
-    }
-}
-
-
 /// A line metrics.
 ///
 /// Used for underline and strikeout.
@@ -311,9 +286,6 @@ pub struct LineMetrics {
     pub thickness: i16,
 }
 
-// We cannot implement FromData for LineMetrics, because order of values in
-// `post` and OS/2 tables are inverted.
-
 
 /// A horizontal metrics of a glyph.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -325,16 +297,6 @@ pub struct HorizontalMetrics {
     pub left_side_bearing: i16,
 }
 
-impl FromData for HorizontalMetrics {
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        HorizontalMetrics {
-            advance: s.read(),
-            left_side_bearing: s.read(),
-        }
-    }
-}
-
 
 /// A vertical metrics of a glyph.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -344,16 +306,6 @@ pub struct VerticalMetrics {
 
     /// Top side bearing.
     pub top_side_bearing: i16,
-}
-
-impl FromData for VerticalMetrics {
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        VerticalMetrics {
-            advance: s.read(),
-            top_side_bearing: s.read(),
-        }
-    }
 }
 
 
@@ -375,18 +327,6 @@ impl Rect {
             y_min: 0,
             x_max: 0,
             y_max: 0,
-        }
-    }
-}
-
-impl FromData for Rect {
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        Rect {
-            x_min: s.read(),
-            y_min: s.read(),
-            x_max: s.read(),
-            y_max: s.read(),
         }
     }
 }
@@ -440,8 +380,8 @@ pub enum TableName {
 #[derive(Clone)]
 #[allow(missing_debug_implementations)]
 pub struct Font<'a> {
-    head: &'a [u8],
-    hhea: &'a [u8],
+    head: raw::head::Table<'a>,
+    hhea: raw::hhea::Table<'a>,
     cff_: Option<&'a [u8]>,
     cmap: Option<&'a [u8]>,
     glyf: Option<&'a [u8]>,
@@ -450,8 +390,9 @@ pub struct Font<'a> {
     loca: Option<&'a [u8]>,
     name: Option<&'a [u8]>,
     os_2: Option<&'a [u8]>,
-    post: Option<&'a [u8]>,
-    vhea: Option<&'a [u8]>,
+    os_2_v0: Option<raw::os_2::TableV0<'a>>,
+    post: Option<raw::post::Table<'a>>,
+    vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<&'a [u8]>,
     number_of_glyphs: GlyphId,
     cff_metadata: cff::Metadata,
@@ -467,6 +408,8 @@ impl<'a> Font<'a> {
     ///
     /// Required tables: `head`, `hhea` and `maxp`.
     pub fn from_data(data: &'a [u8], index: u32) -> Result<Self> {
+        use core::convert::TryInto;
+
         let table_data = if let Some(n) = fonts_in_collection(data) {
             if index < n {
                 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
@@ -508,8 +451,8 @@ impl<'a> Font<'a> {
         let mut s = SafeStream::new(s.read_bytes(num_tables as u32 * OFFSET_RECORD_SIZE)?);
 
         let mut font = Font {
-            head: &[],
-            hhea: &[],
+            head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
+            hhea: raw::hhea::Table::new(&[0; raw::hhea::Table::SIZE]),
             cff_: None,
             cmap: None,
             glyf: None,
@@ -518,6 +461,7 @@ impl<'a> Font<'a> {
             loca: None,
             name: None,
             os_2: None,
+            os_2_v0: None,
             post: None,
             vhea: None,
             vmtx: None,
@@ -525,29 +469,35 @@ impl<'a> Font<'a> {
             cff_metadata: cff::Metadata::default(),
         };
 
+        let mut has_head = false;
+        let mut has_hhea = false;
         for _ in 0..num_tables {
-            let tag: Tag = s.read();
+            // It's way faster to compare `[u8; 4]` with `&[u8]`
+            // rather than `&[u8]` with `&[u8]`.
+            //
+            // Unwrap is safe, because an array and a slice have the same size.
+            let tag: [u8; 4] = s.read_bytes(4u32).try_into().unwrap();
             s.skip::<u32>(); // checksum
             let offset = s.read::<u32>() as usize;
             let length = s.read::<u32>() as usize;
             let range = offset..(offset + length);
 
-            match &tag.tag {
+            match &tag {
                 b"head" => {
-                    const HEAD_TABLE_SIZE: usize = 54;
-                    if length < HEAD_TABLE_SIZE {
+                    if length != raw::head::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::Header));
                     }
 
-                    font.head = data.try_slice(range)?;
+                    font.head = raw::head::Table::new(data.try_slice(range)?);
+                    has_head = true;
                 }
                 b"hhea" => {
-                    const HHEA_TABLE_SIZE: usize = 36;
-                    if length < HHEA_TABLE_SIZE {
+                    if length != raw::hhea::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::HorizontalHeader));
                     }
 
-                    font.hhea = data.try_slice(range)?;
+                    font.hhea = raw::hhea::Table::new(data.try_slice(range)?);
+                    has_hhea = true;
                 }
                 b"maxp" => {
                     const MAXP_TABLE_MIN_SIZE: usize = 6;
@@ -560,28 +510,31 @@ impl<'a> Font<'a> {
                     font.number_of_glyphs = SafeStream::read_at(data, NUM_GLYPHS_OFFSET);
                 }
                 b"OS/2" => {
-                    const OS_2_TABLE_MIN_SIZE: usize = 78;
-                    if length < OS_2_TABLE_MIN_SIZE {
+                    if length < raw::os_2::TableV0::SIZE {
                         return Err(Error::InvalidTableSize(TableName::WindowsMetrics));
                     }
 
-                    font.os_2 = data.get(range);
+                    if let Some(data) = data.get(range) {
+                        font.os_2 = Some(data);
+
+                        let data = &data[0..raw::os_2::TableV0::SIZE];
+                        font.os_2_v0 = Some(raw::os_2::TableV0::new(data));
+                    }
                 }
                 b"post" => {
-                    const POST_TABLE_MIN_SIZE: usize = 16;
-                    if length < POST_TABLE_MIN_SIZE {
+                    if length < raw::post::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::PostScript));
                     }
 
-                    font.post = data.get(range);
+                    let data = data.try_slice(offset..(offset + raw::post::Table::SIZE))?;
+                    font.post = Some(raw::post::Table::new(data));
                 }
                 b"vhea" => {
-                    const VHEA_TABLE_MIN_SIZE: usize = 36;
-                    if length < VHEA_TABLE_MIN_SIZE {
+                    if length != raw::vhea::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::VerticalHeader));
                     }
 
-                    font.vhea = data.get(range);
+                    font.vhea = data.get(range).map(raw::vhea::Table::new);
                 }
                 b"CFF " => {
                     if let Some(data) = data.get(range) {
@@ -603,11 +556,11 @@ impl<'a> Font<'a> {
         }
 
         // Check for mandatory tables.
-        if font.head.is_empty() {
+        if !has_head {
             return Err(Error::TableMissing(TableName::Header));
         }
 
-        if font.hhea.is_empty() {
+        if !has_hhea {
             return Err(Error::TableMissing(TableName::HorizontalHeader));
         }
 
@@ -711,7 +664,7 @@ impl<'a> Font<'a> {
 /// Checks that provided data is a TrueType font collection.
 #[inline]
 fn is_collection(data: &[u8]) -> bool {
-    data.get(0..Tag::LENGTH) == Some(b"ttcf")
+    data.get(0..4) == Some(b"ttcf")
 }
 
 /// Returns a number of fonts stored in a TrueType font collection.

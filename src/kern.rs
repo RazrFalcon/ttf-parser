@@ -65,7 +65,8 @@ impl FromData for KerningRecord {
     const SIZE: usize = 6; // Override, since `size_of` will be 8 because of padding.
 
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
+    fn parse(data: &[u8]) -> Self {
+        let mut s = SafeStream::new(data);
         KerningRecord {
             pair: s.read(),
             value: s.read(),
@@ -91,7 +92,8 @@ impl Coverage {
 
 impl FromData for Coverage {
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
+    fn parse(data: &[u8]) -> Self {
+        let mut s = SafeStream::new(data);
         Coverage {
             // Reverse order, since we're reading a big-endian u16.
             format: s.read(),

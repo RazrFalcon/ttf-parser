@@ -15,49 +15,43 @@ pub trait FromData: Sized {
     /// Parses an object from a raw data.
     ///
     /// This method **must** not panic and **must** not read past the bounds.
-    fn parse(s: &mut SafeStream) -> Self;
+    fn parse(data: &[u8]) -> Self;
 }
 
 impl FromData for u8 {
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        s.data[s.offset]
+    fn parse(data: &[u8]) -> Self {
+        data[0]
     }
 }
 
 impl FromData for i8 {
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        s.data[s.offset] as i8
+    fn parse(data: &[u8]) -> Self {
+        data[0] as i8
     }
 }
 
 impl FromData for u16 {
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        u16::from_be_bytes([
-            s.data[s.offset],
-            s.data[s.offset + 1],
-        ])
+    fn parse(data: &[u8]) -> Self {
+        u16::from_be_bytes([data[0], data[1]])
     }
 }
 
 impl FromData for i16 {
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        i16::from_be_bytes([
-            s.data[s.offset],
-            s.data[s.offset + 1],
-        ])
+    fn parse(data: &[u8]) -> Self {
+        i16::from_be_bytes([data[0], data[1]])
     }
 }
 
 impl FromData for u32 {
     #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
+    fn parse(data: &[u8]) -> Self {
         // For u32 it's faster to use TryInto, but for u16/i16 it's faster to index.
         use core::convert::TryInto;
-        u32::from_be_bytes(s.data[s.offset..s.offset+4].try_into().unwrap())
+        u32::from_be_bytes(data.try_into().unwrap())
     }
 }
 
@@ -73,7 +67,7 @@ pub trait TryFromData: Sized {
     const SIZE: usize = core::mem::size_of::<Self>();
 
     /// Parses an object from a raw data.
-    fn try_parse(s: &mut SafeStream) -> Result<Self>;
+    fn try_parse(data: &[u8]) -> Result<Self>;
 }
 
 
@@ -111,16 +105,14 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     pub fn at<L: FSize>(&self, index: L) -> T {
         let start = index.to_usize() * T::SIZE;
         let end = start + T::SIZE;
-        let mut s = SafeStream::new(&self.data[start..end]);
-        T::parse(&mut s)
+        T::parse(&self.data[start..end])
     }
 
     pub fn get<L: FSize>(&self, index: L) -> Option<T> {
         if index.to_usize() < self.len() {
             let start = index.to_usize() * T::SIZE;
             let end = start + T::SIZE;
-            let mut s = SafeStream::new(&self.data[start..end]);
-            Some(T::parse(&mut s))
+            Some(T::parse(&self.data[start..end]))
         } else {
             None
         }
@@ -290,8 +282,7 @@ impl<'a> Stream<'a> {
         let end = self.offset;
 
         let data = self.data.try_slice(start..end)?;
-        let mut s = SafeStream::new(data);
-        Ok(T::parse(&mut s))
+        Ok(T::parse(data))
     }
 
     #[inline]
@@ -301,8 +292,7 @@ impl<'a> Stream<'a> {
         let end = self.offset;
 
         let data = self.data.try_slice(start..end)?;
-        let mut s = SafeStream::new(data);
-        T::try_parse(&mut s)
+        T::try_parse(data)
     }
 
     #[inline]
@@ -312,8 +302,7 @@ impl<'a> Stream<'a> {
         let end = offset;
 
         let data = data.try_slice(start..end)?;
-        let mut s = SafeStream::new(data);
-        Ok(T::parse(&mut s))
+        Ok(T::parse(data))
     }
 
     #[inline]
@@ -375,24 +364,20 @@ impl<'a> SafeStream<'a> {
     }
 
     #[inline]
-    pub fn new_at(data: &'a [u8], offset: usize) -> Self {
-        SafeStream {
-            data,
-            offset,
-        }
-    }
-
-    #[inline]
     pub fn skip<T: FromData>(&mut self) {
         self.offset += T::SIZE;
     }
 
     #[inline]
     pub fn read<T: FromData>(&mut self) -> T {
-        let start = self.offset;
-        let v = T::parse(self);
-        self.offset = start + T::SIZE;
-        v
+        T::parse(self.read_bytes(T::SIZE as u32))
+    }
+
+    #[inline]
+    pub fn read_bytes<L: FSize>(&mut self, len: L) -> &'a [u8] {
+        let offset = self.offset;
+        self.offset += len.to_usize();
+        &self.data[offset..(offset + len.to_usize())]
     }
 
     #[inline]
@@ -406,28 +391,6 @@ impl<'a> SafeStream<'a> {
 
     #[inline]
     pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> T {
-        let mut s = SafeStream { data, offset };
-        T::parse(&mut s)
-    }
-}
-
-
-#[derive(Clone, Copy, Debug)]
-pub struct Offset32(pub u32);
-
-impl FromData for Offset32 {
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        Offset32(s.read())
-    }
-}
-
-impl FromData for Option<Offset32> {
-    const SIZE: usize = Offset32::SIZE;
-
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        let offset: Offset32 = s.read();
-        if offset.0 != 0 { Some(offset) } else { None }
+        T::parse(&data[offset..(offset + T::SIZE)])
     }
 }

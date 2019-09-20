@@ -402,3 +402,24 @@ fn glyphs_kerning_02() {
     assert!(font.glyphs_kerning(GlyphId(0), GlyphId(0)).is_err());
     assert!(font.glyphs_kerning(GlyphId(0), GlyphId(100)).is_err());
 }
+
+// An attempt to check that table slices are still valid after moving.
+#[test]
+fn slicing() {
+    #[inline(never)]
+    fn subslice1(font: &Font) {
+        assert_eq!(font.ascender(), 984);
+    }
+
+    #[inline(never)]
+    fn subslice2(font: Font) {
+        assert_eq!(font.ascender(), 984);
+    }
+
+    let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+
+    subslice1(&font);
+    subslice2(font.clone());
+    subslice2(font);
+}

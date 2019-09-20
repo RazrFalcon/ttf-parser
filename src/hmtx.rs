@@ -2,6 +2,7 @@
 
 use crate::parser::{Stream, LazyArray};
 use crate::{Font, TableName, GlyphId, HorizontalMetrics, Result, Error};
+use crate::raw::hmtx as raw;
 
 impl<'a> Font<'a> {
     /// Returns glyph's horizontal metrics.
@@ -17,10 +18,13 @@ impl<'a> Font<'a> {
 
         let glyph_id = glyph_id.0;
 
-        let array: LazyArray<HorizontalMetrics> = s.read_array(number_of_hmetrics)?;
+        let array: LazyArray<raw::HorizontalMetrics> = s.read_array(number_of_hmetrics)?;
 
         if let Some(metrics) = array.get(glyph_id) {
-            Ok(metrics)
+            Ok(HorizontalMetrics {
+                advance: metrics.advance_width(),
+                left_side_bearing: metrics.lsb(),
+            })
         } else {
             // 'If the number_of_hmetrics is less than the total number of glyphs,
             // then that array is followed by an array for the left side bearing values
@@ -42,7 +46,7 @@ impl<'a> Font<'a> {
             let last_metric = array.last().ok_or_else(|| Error::NoHorizontalMetrics)?;
 
             Ok(HorizontalMetrics {
-                advance: last_metric.advance,
+                advance: last_metric.advance_width(),
                 left_side_bearing,
             })
         }

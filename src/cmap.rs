@@ -1,9 +1,9 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
-use core::ops::Range;
-
-use crate::parser::{Stream, FromData, LazyArray, Offset32, SafeStream, TrySlice};
+use crate::parser::{Stream, LazyArray, TrySlice};
 use crate::{Font, GlyphId, TableName, Result, Error, PlatformId};
+use crate::raw::cmap as raw;
+
 
 impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
@@ -15,16 +15,21 @@ impl<'a> Font<'a> {
         let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
-        let records: LazyArray<EncodingRecord> = s.read_array16()?;
+        let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
         for record in records {
-            let subtable_data = data.try_slice(record.offset as usize..data.len())?;
+            let subtable_data = data.try_slice(record.offset() as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
                 None => continue,
             };
 
-            if !is_unicode_encoding(format, record.platform_id, record.encoding_id) {
+            let platform_id = match PlatformId::from_u16(record.platform_id()) {
+                Some(v) => v,
+                None => continue,
+            };
+
+            if !is_unicode_encoding(format, platform_id, record.encoding_id()) {
                 continue;
             }
 
@@ -77,9 +82,9 @@ impl<'a> Font<'a> {
         let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
-        let records: LazyArray<EncodingRecord> = s.read_array16()?;
+        let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
         for record in records {
-            let subtable_data = data.try_slice(record.offset as usize..data.len())?;
+            let subtable_data = data.try_slice(record.offset() as usize..data.len())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
@@ -107,14 +112,14 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(data);
         s.skip::<u16>(); // format
         s.skip::<u32>(); // length
-        let records: LazyArray<VariationSelectorRecord> = s.read_array32()?;
+        let records: LazyArray<raw::VariationSelectorRecord> = s.read_array32()?;
 
-        let record = records.binary_search_by(|v| v.variation.cmp(&variation)).ok_or(Error::NoGlyph)?;
+        let record = records.binary_search_by(|v| v.var_selector().cmp(&variation)).ok_or(Error::NoGlyph)?;
 
-        if let Some(offset) = record.default_uvs_offset {
-            let data = data.try_slice(offset.0 as usize..data.len())?;
+        if let Some(offset) = record.default_uvs_offset() {
+            let data = data.try_slice(offset as usize..data.len())?;
             let mut s = Stream::new(data);
-            let ranges: LazyArray<UnicodeRangeRecord> = s.read_array32()?;
+            let ranges: LazyArray<raw::UnicodeRangeRecord> = s.read_array32()?;
             for range in ranges {
                 if range.contains(c) {
                     // This is a default glyph.
@@ -123,41 +128,18 @@ impl<'a> Font<'a> {
             }
         }
 
-        if let Some(offset) = record.non_default_uvs_offset {
-            let data = data.try_slice(offset.0 as usize..data.len())?;
+        if let Some(offset) = record.non_default_uvs_offset() {
+            let data = data.try_slice(offset as usize..data.len())?;
             let mut s = Stream::new(data);
-            let uvs_mappings: LazyArray<UVSMappingRecord> = s.read_array32()?;
-            if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&cp)) {
-                return Ok(mapping.glyph);
+            let uvs_mappings: LazyArray<raw::UVSMappingRecord> = s.read_array32()?;
+            if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
+                return Ok(mapping.glyph_id());
             }
         }
 
         Err(Error::NoGlyph)
     }
 }
-
-
-struct EncodingRecord {
-    platform_id: PlatformId,
-    encoding_id: u16,
-    offset: u32,
-}
-
-impl FromData for EncodingRecord {
-    const SIZE: usize = 8; // u16 + u16 + u32
-
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        EncodingRecord {
-            // Fallback to `Custom` on error. This isn't that correct,
-            // but since `FromData` can't return an error this is the next best thing.
-            platform_id: PlatformId::from_u16(s.read()).unwrap_or(PlatformId::Custom),
-            encoding_id: s.read(),
-            offset: s.read(),
-        }
-    }
-}
-
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table
 fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Result<u16> {
@@ -198,7 +180,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
 
     // Remember sub_headers offset before reading. Will be used later.
     let sub_headers_offset = s.offset();
-    let sub_headers: LazyArray<SubHeaderRecord> = s.read_array(sub_headers_count)?;
+    let sub_headers: LazyArray<raw::SubHeaderRecord> = s.read_array(sub_headers_count)?;
 
     let i = if code_point < 0xff {
         // 'SubHeader 0 is special: it is used for single-byte character codes.'
@@ -210,25 +192,26 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
 
     let sub_header = sub_headers.get(i).ok_or_else(|| Error::NoGlyph)?;
 
-    let range_end = sub_header.first_code + sub_header.entry_count;
-    if low_byte < sub_header.first_code || low_byte > range_end {
+    let first_code = sub_header.first_code();
+    let range_end = first_code + sub_header.entry_count();
+    if low_byte < first_code || low_byte > range_end {
         return Err(Error::NoGlyph);
     }
 
     // SubHeaderRecord::id_range_offset points to SubHeaderRecord::first_code
     // in the glyphIndexArray. So we have to advance to our code point.
-    let index_offset = (low_byte - sub_header.first_code) as usize * u16::SIZE;
+    let index_offset = (low_byte - first_code) as usize * core::mem::size_of::<u16>();
 
     // 'The value of the idRangeOffset is the number of bytes
     // past the actual location of the idRangeOffset'.
     let offset =
           sub_headers_offset
         // Advance to required subheader.
-        + SubHeaderRecord::SIZE * (i + 1) as usize
+        + raw::SubHeaderRecord::SIZE * (i + 1) as usize
         // Move back to idRangeOffset start.
-        - u16::SIZE
+        - core::mem::size_of::<u16>()
         // Use defined offset.
-        + sub_header.id_range_offset as usize
+        + sub_header.id_range_offset() as usize
         // Advance to required index in the glyphIndexArray.
         + index_offset;
 
@@ -237,7 +220,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
         return Err(Error::NoGlyph);
     }
 
-    let glyph = ((glyph as i32 + sub_header.id_delta as i32) % 65536) as u16;
+    let glyph = ((glyph as i32 + sub_header.id_delta() as i32) % 65536) as u16;
     Ok(glyph)
 }
 
@@ -357,14 +340,16 @@ fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> 
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
-    let groups: LazyArray<SequentialMapGroup> = s.read_array32()?;
+    let groups: LazyArray<raw::SequentialMapGroup> = s.read_array32()?;
     for group in groups {
-        if group.char_code_range.contains(&code_point) {
+        let start_char_code = group.start_char_code();
+        if code_point >= start_char_code && code_point <= group.end_char_code() {
             if format == Format::SegmentedCoverage {
-                let id = group.start_glyph_id + code_point - group.char_code_range.start;
+                let id = group.start_glyph_id() + code_point - start_char_code;
                 return Ok(id as u16);
             } else {
-                return Ok(group.start_glyph_id as u16);
+                // TODO: what if start_glyph_id is > u16::MAX
+                return Ok(group.start_glyph_id() as u16);
             }
         }
     }
@@ -401,107 +386,11 @@ fn parse_format(v: u16) -> Option<Format> {
     }
 }
 
-
-#[derive(Clone, Copy, Debug)]
-struct SubHeaderRecord {
-    first_code: u16,
-    entry_count: u16,
-    id_delta: i16,
-    id_range_offset: u16,
-}
-
-impl FromData for SubHeaderRecord {
-    fn parse(s: &mut SafeStream) -> Self {
-        SubHeaderRecord {
-            first_code: s.read(),
-            entry_count: s.read(),
-            id_delta: s.read(),
-            id_range_offset: s.read(),
-        }
-    }
-}
-
-
-// Also, the same as ConstantMapGroup.
-struct SequentialMapGroup {
-    char_code_range: Range<u32>,
-    start_glyph_id: u32,
-}
-
-impl FromData for SequentialMapGroup {
-    fn parse(s: &mut SafeStream) -> Self {
-        let start: u32 = s.read();
-        let mut end: u32 = s.read();
-
-        if end != core::u32::MAX {
-            // +1 makes the upper bound inclusive.
-            end += 1;
-        }
-
-        SequentialMapGroup {
-            char_code_range: start..end,
-            start_glyph_id: s.read(),
-        }
-    }
-}
-
-
-struct VariationSelectorRecord {
-    variation: u32,
-    default_uvs_offset: Option<Offset32>,
-    non_default_uvs_offset: Option<Offset32>,
-}
-
-impl FromData for VariationSelectorRecord {
-    const SIZE: usize = 3 + Offset32::SIZE + Offset32::SIZE; // variation_selector is u24
-
-    fn parse(s: &mut SafeStream) -> Self {
-        VariationSelectorRecord {
-            variation: s.read_u24(),
-            default_uvs_offset: s.read(),
-            non_default_uvs_offset: s.read(),
-        }
-    }
-}
-
-
-struct UnicodeRangeRecord {
-    start_unicode_value: u32,
-    additional_count: u8,
-}
-
-impl UnicodeRangeRecord {
+impl raw::UnicodeRangeRecord {
     fn contains(&self, c: char) -> bool {
-        let end = self.start_unicode_value + self.additional_count as u32;
-        self.start_unicode_value >= (c as u32) && (c as u32) < end
-    }
-}
-
-impl FromData for UnicodeRangeRecord {
-    const SIZE: usize = 3 + 1; // start_unicode_value is u24.
-
-    fn parse(s: &mut SafeStream) -> Self {
-        UnicodeRangeRecord {
-            start_unicode_value: s.read_u24(),
-            additional_count: s.read(),
-        }
-    }
-}
-
-
-struct UVSMappingRecord {
-    unicode_value: u32,
-    glyph: GlyphId,
-}
-
-impl FromData for UVSMappingRecord {
-    const SIZE: usize = 3 + GlyphId::SIZE; // unicode_value is u24
-
-    fn parse(s: &mut SafeStream) -> Self {
-        UVSMappingRecord {
-            unicode_value: s.read_u24(),
-            glyph: s.read(),
-        }
+        let start_unicode_value = self.start_unicode_value();
+        let end = start_unicode_value + self.additional_count() as u32;
+        start_unicode_value >= (c as u32) && (c as u32) < end
     }
 }
 

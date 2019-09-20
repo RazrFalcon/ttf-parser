@@ -10,8 +10,8 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 - A high-level API.
 - Zero allocations.
-- Zero `unsafe`.
 - Zero dependencies.
+- `no_std` compatible.
 - Fast.
 - Stateless.
 - Simple and maintainable code (no magic numbers).
@@ -86,21 +86,21 @@ Currently, it takes 60% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
 
 ```
-test outline_cff  ... bench:   1,652,606 ns/iter (+/- 2,795)
-test outline_glyf ... bench:   1,004,866 ns/iter (+/- 1,545)
+test outline_cff  ... bench:   1,617,138 ns/iter (+/- 1,261)
+test outline_glyf ... bench:     995,771 ns/iter (+/- 2,801)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:       1,247 ns/iter (+/- 2)
-test outline_glyph_276_from_glyf ... bench:         817 ns/iter (+/- 15)
-test outline_glyph_8_from_cff    ... bench:         521 ns/iter (+/- 2)
-test family_name                 ... bench:         398 ns/iter (+/- 2)
-test from_data_otf               ... bench:         394 ns/iter (+/- 5)
-test outline_glyph_8_from_glyf   ... bench:         360 ns/iter (+/- 7)
-test from_data_ttf               ... bench:          96 ns/iter (+/- 3)
-test glyph_index_u41             ... bench:          27 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:       1,203 ns/iter (+/- 4)
+test outline_glyph_276_from_glyf ... bench:         796 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         497 ns/iter (+/- 3)
+test from_data_otf               ... bench:         372 ns/iter (+/- 5)
+test outline_glyph_8_from_glyf   ... bench:         347 ns/iter (+/- 1)
+test family_name                 ... bench:         269 ns/iter (+/- 3)
+test from_data_ttf               ... bench:          76 ns/iter (+/- 2)
+test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
 test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
 ```
 
@@ -113,7 +113,7 @@ Some methods are too fast, so we execute them **1000 times** to get better measu
 test x_height            ... bench:         847 ns/iter (+/- 0)
 test units_per_em        ... bench:         564 ns/iter (+/- 2)
 test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)
-test width               ... bench:         422 ns/iter (+/- 0)
+test width               ... bench:         287 ns/iter (+/- 0)
 test ascender            ... bench:         279 ns/iter (+/- 1)
 test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 ```
@@ -121,7 +121,7 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 ### Safety
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library forbids `unsafe` code.
+- The library has a single `unsafe` block for array slicing.
 
 ### Alternatives
 

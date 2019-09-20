@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/os2
 
-use crate::parser::{Stream, FromData, SafeStream};
+use crate::parser::Stream;
 use crate::{Font, LineMetrics};
 
 
@@ -132,17 +132,6 @@ pub struct ScriptMetrics {
     pub y_offset: i16,
 }
 
-impl FromData for ScriptMetrics {
-    #[inline]
-    fn parse(s: &mut SafeStream) -> Self {
-        ScriptMetrics {
-            x_size: s.read(),
-            y_size: s.read(),
-            x_offset: s.read(),
-            y_offset: s.read(),
-        }
-    }
-}
 
 // We already checked that OS/2 table has a valid length,
 // so it's safe to use `SafeStream`.
@@ -153,10 +142,8 @@ impl<'a> Font<'a> {
     /// Returns `Weight::Normal` when OS/2 table is not present.
     #[inline]
     pub fn weight(&self) -> Weight {
-        const US_WEIGHT_CLASS_OFFSET: usize = 4;
-        let data = try_opt_or!(self.os_2, Weight::default());
-        let n: u16 = SafeStream::read_at(data, US_WEIGHT_CLASS_OFFSET);
-        Weight::from(n)
+        let table = try_opt_or!(self.os_2_v0, Weight::default());
+        Weight::from(table.us_weight_class())
     }
 
     /// Parses font's width.
@@ -164,10 +151,8 @@ impl<'a> Font<'a> {
     /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
     #[inline]
     pub fn width(&self) -> Width {
-        const US_WIDTH_CLASS_OFFSET: usize = 6;
-        let data = try_opt_or!(self.os_2, Width::default());
-        let n: u16 = SafeStream::read_at(data, US_WIDTH_CLASS_OFFSET);
-        match n {
+        let table = try_opt_or!(self.os_2_v0, Width::default());
+        match table.us_width_class() {
             1 => Width::UltraCondensed,
             2 => Width::ExtraCondensed,
             3 => Width::Condensed,
@@ -213,11 +198,8 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 4.
     #[inline]
     pub fn is_oblique(&self) -> bool {
-        const VERSION_OFFSET: usize = 0;
-
-        let data = try_opt_or!(self.os_2, false);
-        let version: u16 = SafeStream::read_at(data, VERSION_OFFSET);
-        if version < 4 {
+        let table = try_opt_or!(self.os_2_v0, false);
+        if table.version() < 4 {
             return false;
         }
 
@@ -227,10 +209,8 @@ impl<'a> Font<'a> {
 
     #[inline]
     fn get_fs_selection(&self, bit: u16) -> bool {
-        const FS_SELECTION_OFFSET: usize = 62;
-        let data = try_opt_or!(self.os_2, false);
-        let n: u16 = SafeStream::read_at(data, FS_SELECTION_OFFSET);
-        (n >> bit) & 1 == 1
+        let table = try_opt_or!(self.os_2_v0, false);
+        (table.fs_selection() >> bit) & 1 == 1
     }
 
     /// Parses font's X height.
@@ -238,17 +218,15 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
-        const VERSION_OFFSET: usize = 0;
         const SX_HEIGHT_OFFSET: usize = 86;
 
-        let data = self.os_2?;
-        let version: u16 = SafeStream::read_at(data, VERSION_OFFSET);
-        if version < 2 {
+        let table = self.os_2_v0?;
+        if table.version() < 2 {
             return None;
         }
 
         // We cannot use SafeStream here, because X height is an optional data.
-        Stream::read_at(data, SX_HEIGHT_OFFSET).ok()
+        Stream::read_at(self.os_2?, SX_HEIGHT_OFFSET).ok()
     }
 
     /// Parses font's strikeout metrics.
@@ -256,13 +234,10 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
-        const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
-        let mut s = SafeStream::new_at(self.os_2?, Y_STRIKEOUT_SIZE_OFFSET);
-
-        // Do not change the order. In the OS/2 table, line thickness is set before position.
+        let table = self.os_2_v0?;
         Some(LineMetrics {
-            thickness: s.read(),
-            position: s.read(),
+            thickness: table.y_strikeout_size(),
+            position: table.y_strikeout_position(),
         })
     }
 
@@ -271,8 +246,13 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
-        const Y_SUBSCRIPT_XSIZE_OFFSET: usize = 10;
-        Some(SafeStream::read_at(self.os_2?, Y_SUBSCRIPT_XSIZE_OFFSET))
+        let table = self.os_2_v0?;
+        Some(ScriptMetrics {
+            x_size: table.y_subscript_x_size(),
+            y_size: table.y_subscript_y_size(),
+            x_offset: table.y_subscript_x_offset(),
+            y_offset: table.y_subscript_y_offset(),
+        })
     }
 
     /// Parses font's superscript metrics.
@@ -280,7 +260,12 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
-        const Y_SUPERSCRIPT_XSIZE_OFFSET: usize = 18;
-        Some(SafeStream::read_at(self.os_2?, Y_SUPERSCRIPT_XSIZE_OFFSET))
+        let table = self.os_2_v0?;
+        Some(ScriptMetrics {
+            x_size: table.y_superscript_x_size(),
+            y_size: table.y_superscript_y_size(),
+            x_offset: table.y_superscript_x_offset(),
+            y_offset: table.y_superscript_y_offset(),
+        })
     }
 }

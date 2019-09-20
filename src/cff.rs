@@ -1113,7 +1113,8 @@ enum OffsetSize {
 
 impl TryFromData for OffsetSize {
     #[inline]
-    fn try_parse(s: &mut SafeStream) -> Result<Self> {
+    fn try_parse(data: &[u8]) -> Result<Self> {
+        let mut s = SafeStream::new(data);
         let n: u8 = s.read();
         match n {
             1 => Ok(OffsetSize::Size1),

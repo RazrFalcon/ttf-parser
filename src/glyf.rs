@@ -143,9 +143,14 @@ impl<'a> Font<'a> {
         }
 
         let mut s = Stream::new(data);
-
         let number_of_contours: i16 = s.read()?;
-        let rect: Rect = s.read()?;
+        // It's faster to parse the rect directly, instead of using `FromData`.
+        let rect = Rect {
+            x_min: s.read()?,
+            y_min: s.read()?,
+            x_max: s.read()?,
+            y_max: s.read()?,
+        };
 
         if number_of_contours > 0 {
             Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)?;

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `no_std` compatibility.
 
 ### Changed
+- The library has one `unsafe` block now.
 - 35% faster `family_name()` method.
 - The `Name` struct has a new API. Public fields became public functions
   and data is parsed on demand and not beforehand.

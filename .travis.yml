@@ -8,5 +8,5 @@ script:
   - cargo build --verbose --all
   - cargo test --verbose --all
   - if [ $TRAVIS_RUST_VERSION == "nightly" ]; then
-        env RUSTFLAGS="-Z sanitizer=address" cargo +nightly test --target x86_64-unknown-linux-gnu;
+        env RUSTFLAGS="-Z sanitizer=address" cargo +nightly test --test tests --target x86_64-unknown-linux-gnu;
     fi

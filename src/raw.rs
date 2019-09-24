@@ -42,6 +42,29 @@ pub mod head {
     }
 }
 
+pub mod maxp {
+    #[derive(Clone, Copy)]
+    pub struct Table<'a> {
+        data: &'a [u8; 6],
+    }
+
+    impl<'a> Table<'a> {
+        pub const SIZE: usize = 6;
+
+        #[inline(always)]
+        pub fn new(input: &'a [u8]) -> Self {
+            Table {
+                data: array_ref![input, 6],
+            }
+        }
+
+        #[inline(always)]
+        pub fn num_glyphs(&self) -> u16 {
+            u16::from_be_bytes([self.data[4], self.data[5]])
+        }
+    }
+}
+
 pub mod hhea {
     #[derive(Clone, Copy)]
     pub struct Table<'a> {

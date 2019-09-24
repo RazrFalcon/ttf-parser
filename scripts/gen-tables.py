@@ -325,6 +325,12 @@ CMAP_VARIATION_SELECTOR_RECORD = [
     TableRow(True,  TTF_Optional_Offset32(),    'nonDefaultUVSOffset'),
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/maxp
+MAXP_TABLE = [
+    TableRow(False, TTF_Fixed(),    'version'),
+    TableRow(True,  TTF_UInt16(),   'numGlyphs'),
+]
+
 
 def print_struct(name: str, size: int, owned: bool) -> None:
     print('#[derive(Clone, Copy)]')
@@ -428,6 +434,10 @@ print('}')
 print()
 print('pub mod head {')
 generate_table(HEAD_TABLE, 'Table')
+print('}')
+print()
+print('pub mod maxp {')
+generate_table(MAXP_TABLE, 'Table')
 print('}')
 print()
 print('pub mod hhea {')

@@ -99,7 +99,7 @@ test outline_glyph_8_from_cff    ... bench:         497 ns/iter (+/- 3)
 test from_data_otf               ... bench:         372 ns/iter (+/- 5)
 test outline_glyph_8_from_glyf   ... bench:         347 ns/iter (+/- 1)
 test family_name                 ... bench:         269 ns/iter (+/- 3)
-test from_data_ttf               ... bench:          76 ns/iter (+/- 2)
+test from_data_ttf               ... bench:          72 ns/iter (+/- 3)
 test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
 test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
 ```

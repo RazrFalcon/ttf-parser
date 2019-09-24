@@ -94,7 +94,7 @@ test outline_glyph_8_from_cff    ... bench:         497 ns/iter (+/- 3)
 test from_data_otf               ... bench:         372 ns/iter (+/- 5)
 test outline_glyph_8_from_glyf   ... bench:         347 ns/iter (+/- 1)
 test family_name                 ... bench:         269 ns/iter (+/- 3)
-test from_data_ttf               ... bench:          76 ns/iter (+/- 2)
+test from_data_ttf               ... bench:          72 ns/iter (+/- 3)
 test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
 test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
 ```
@@ -500,14 +500,13 @@ impl<'a> Font<'a> {
                     has_hhea = true;
                 }
                 b"maxp" => {
-                    const MAXP_TABLE_MIN_SIZE: usize = 6;
-                    const NUM_GLYPHS_OFFSET: usize = 4;
-                    if length < MAXP_TABLE_MIN_SIZE {
+                    if length < raw::maxp::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::MaximumProfile));
                     }
 
-                    let data = data.try_slice(range)?;
-                    font.number_of_glyphs = SafeStream::read_at(data, NUM_GLYPHS_OFFSET);
+                    let data = &data[offset..(offset + raw::maxp::Table::SIZE)];
+                    let table = raw::maxp::Table::new(data);
+                    font.number_of_glyphs = GlyphId(table.num_glyphs());
                 }
                 b"OS/2" => {
                     if length < raw::os_2::TableV0::SIZE {

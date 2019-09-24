@@ -388,9 +388,4 @@ impl<'a> SafeStream<'a> {
         self.offset += 3;
         n
     }
-
-    #[inline]
-    pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> T {
-        T::parse(&data[offset..(offset + T::SIZE)])
-    }
 }

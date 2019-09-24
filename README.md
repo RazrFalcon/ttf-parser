@@ -131,7 +131,13 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
   Isn't allocation free. Has less features. Doesn't support CFF. Has a lot of magic numbers.
   Uses `panic` a lot.
 - [truetype](https://crates.io/crates/truetype) - Simply maps TrueType data to the Rust structures.
-  Doesn't actually parses the data. Isn't allocation free. Has some **unsafe**.
+  Doesn't actually parses the data. Isn't allocation free. Has some **unsafe**. Unmaintained.
+- [font](https://github.com/pdf-rs/font) - Very similar to `ttf-parser`, but supports less features.
+  Still an alpha. Isn't allocation free.
+- [fontdue](https://github.com/mooman219/fontdue) - Parser and rasterizer. In alpha state.
+  Allocates all the required data. Doesn't support CFF.
+
+(revised on 2019-09-24)
 
 ### License
 

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - The library has one `unsafe` block now.
 - 35% faster `family_name()` method.
+- 25% faster `from_data()` method for TrueType fonts.
 - The `Name` struct has a new API. Public fields became public functions
   and data is parsed on demand and not beforehand.
 

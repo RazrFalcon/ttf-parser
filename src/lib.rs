@@ -116,7 +116,7 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 ## Safety
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library has a single `unsafe` block for array slicing.
+- The library has a single `unsafe` block for array casting.
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.2.2")]
@@ -128,6 +128,8 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 
 #[cfg(feature = "std")]
 extern crate std;
+
+use core::fmt;
 
 mod cff;
 mod cmap;
@@ -145,7 +147,7 @@ mod raw;
 mod vhea;
 mod vmtx;
 
-use parser::{Stream, FromData, SafeStream, TrySlice};
+use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray};
 pub use cff::CFFError;
 pub use name::*;
 pub use os2::*;
@@ -378,7 +380,6 @@ pub enum TableName {
 
 /// A font data handle.
 #[derive(Clone)]
-#[allow(missing_debug_implementations)]
 pub struct Font<'a> {
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
@@ -406,17 +407,13 @@ impl<'a> Font<'a> {
     ///
     /// This function only parses font tables, so it's relatively light.
     ///
-    /// Required tables: `head`, `hhea` and `maxp`.
+    /// Required tables: `head` and `hhea`.
     pub fn from_data(data: &'a [u8], index: u32) -> Result<Self> {
-        use core::convert::TryInto;
-
         let table_data = if let Some(n) = fonts_in_collection(data) {
             if index < n {
                 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
-                const OFFSETS_TABLE_OFFSET: usize = 12;
                 const OFFSET_32_SIZE: usize = 4;
-
-                let offset = OFFSETS_TABLE_OFFSET + OFFSET_32_SIZE * index as usize;
+                let offset = raw::TTCHeader::SIZE + OFFSET_32_SIZE * index as usize;
                 let font_offset: u32 = Stream::read_at(data, offset)?;
                 data.try_slice(font_offset as usize .. data.len())?
             } else {
@@ -445,10 +442,7 @@ impl<'a> Font<'a> {
 
         let num_tables: u16 = s.read()?;
         s.skip_len(6u32); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
-
-        const OFFSET_RECORD_SIZE: u32 = 16;
-        // `as u32` required to prevent overflow
-        let mut s = SafeStream::new(s.read_bytes(num_tables as u32 * OFFSET_RECORD_SIZE)?);
+        let tables: LazyArray<raw::TableRecord> = s.read_array(num_tables)?;
 
         let mut font = Font {
             head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
@@ -471,18 +465,14 @@ impl<'a> Font<'a> {
 
         let mut has_head = false;
         let mut has_hhea = false;
-        for _ in 0..num_tables {
-            // It's way faster to compare `[u8; 4]` with `&[u8]`
-            // rather than `&[u8]` with `&[u8]`.
-            //
-            // Unwrap is safe, because an array and a slice have the same size.
-            let tag: [u8; 4] = s.read_bytes(4u32).try_into().unwrap();
-            s.skip::<u32>(); // checksum
-            let offset = s.read::<u32>() as usize;
-            let length = s.read::<u32>() as usize;
+        for table in tables {
+            let offset = table.offset() as usize;
+            let length = table.length() as usize;
             let range = offset..(offset + length);
 
-            match &tag {
+            // It's way faster to compare `[u8; 4]` with `&[u8]`
+            // rather than `&[u8]` with `&[u8]`.
+            match &table.table_tag() {
                 b"head" => {
                     if length != raw::head::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::Header));
@@ -660,10 +650,10 @@ impl<'a> Font<'a> {
     }
 }
 
-/// Checks that provided data is a TrueType font collection.
-#[inline]
-fn is_collection(data: &[u8]) -> bool {
-    data.get(0..4) == Some(b"ttcf")
+impl fmt::Debug for Font<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Font()")
+    }
 }
 
 /// Returns a number of fonts stored in a TrueType font collection.
@@ -671,11 +661,11 @@ fn is_collection(data: &[u8]) -> bool {
 /// Returns `None` if a provided data is not a TrueType font collection.
 #[inline]
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
-    if !is_collection(data) {
+    let table = raw::TTCHeader::new(data.get(0..raw::TTCHeader::SIZE)?);
+
+    if &table.ttc_tag() != b"ttcf" {
         return None;
     }
 
-    // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
-    const NUM_FONTS_OFFSET: usize = 8;
-    Stream::read_at(data, NUM_FONTS_OFFSET).ok()
+    Some(table.num_fonts())
 }

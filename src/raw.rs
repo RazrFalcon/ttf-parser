@@ -14,6 +14,77 @@ macro_rules! array_ref {
     }};
 }
 
+use crate::parser::FromData;
+use core::convert::TryInto;
+
+#[derive(Clone, Copy)]
+pub struct TTCHeader<'a> {
+    data: &'a [u8; 12],
+}
+
+impl<'a> TTCHeader<'a> {
+    pub const SIZE: usize = 12;
+
+    #[inline(always)]
+    pub fn new(input: &'a [u8]) -> Self {
+        TTCHeader {
+            data: array_ref![input, 12],
+        }
+    }
+
+    #[inline(always)]
+    pub fn ttc_tag(&self) -> [u8; 4] {
+        // Unwrap is safe, because an array and a slice have the same size.
+        self.data[0..4].try_into().unwrap()
+    }
+
+    #[inline(always)]
+    pub fn num_fonts(&self) -> u32 {
+        u32::from_be_bytes([self.data[8], self.data[9], self.data[10], self.data[11]])
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct TableRecord {
+    data: [u8; 16],
+}
+
+impl TableRecord {
+    pub const SIZE: usize = 16;
+
+    #[inline(always)]
+    pub fn new(input: &[u8]) -> Self {
+        let mut data = [0u8; Self::SIZE];
+        data.clone_from_slice(input);
+        TableRecord { data }
+    }
+
+    #[inline(always)]
+    pub fn table_tag(&self) -> [u8; 4] {
+        // Unwrap is safe, because an array and a slice have the same size.
+        self.data[0..4].try_into().unwrap()
+    }
+
+    #[inline(always)]
+    pub fn offset(&self) -> u32 {
+        u32::from_be_bytes([self.data[8], self.data[9], self.data[10], self.data[11]])
+    }
+
+    #[inline(always)]
+    pub fn length(&self) -> u32 {
+        u32::from_be_bytes([self.data[12], self.data[13], self.data[14], self.data[15]])
+    }
+}
+
+impl FromData for TableRecord {
+    const SIZE: usize = TableRecord::SIZE;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        Self::new(data)
+    }
+}
+
 pub mod head {
     #[derive(Clone, Copy)]
     pub struct Table<'a> {

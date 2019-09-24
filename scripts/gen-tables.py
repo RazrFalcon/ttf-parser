@@ -115,10 +115,16 @@ class TTF_GlyphId(TTFType):
         print(f'GlyphId(u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]))')
 
 
-# unsupported
 class TTF_Tag(TTFType):
+    def to_rust(self) -> str:
+        return '[u8; 4]'
+
     def size(self) -> int:
         return 4
+
+    def print(self, offset: int) -> None:
+        print('// Unwrap is safe, because an array and a slice have the same size.')
+        print(f'self.data[{offset}..{offset + self.size()}].try_into().unwrap()')
 
 
 # unsupported
@@ -150,6 +156,23 @@ class TableRow:
         self.name = name
 
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
+TTC_HEADER = [
+    TableRow(True,  TTF_Tag(),      'ttcTag'),
+    TableRow(False, TTF_UInt16(),   'majorVersion'),
+    TableRow(False, TTF_UInt16(),   'minorVersion'),
+    TableRow(True,  TTF_UInt32(),   'numFonts'),
+    # + offsetTable[numFonts]
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
+TABLE_RECORD = [
+    TableRow(True,  TTF_Tag(),      'tableTag'),
+    TableRow(False, TTF_UInt32(),   'checkSum'),
+    TableRow(True,  TTF_Offset32(), 'offset'),
+    TableRow(True,  TTF_UInt32(),   'length'),
+]
+
 # https://docs.microsoft.com/en-us/typography/opentype/spec/head
 HEAD_TABLE = [
     TableRow(False, TTF_UInt16(),       'majorVersion'),
@@ -170,40 +193,6 @@ HEAD_TABLE = [
     TableRow(False, TTF_Int16(),        'fontDirectionHint'),
     TableRow(True,  TTF_Int16(),        'indexToLocFormat'),
     TableRow(False, TTF_Int16(),        'glyphDataFormat'),
-]
-
-# https://docs.microsoft.com/en-us/typography/opentype/spec/os2#os2-table-formats
-OS_2_TABLE_V0 = [
-    TableRow(True,  TTF_UInt16(),   'version'),
-    TableRow(False, TTF_Int16(),    'xAvgCharWidth'),
-    TableRow(True,  TTF_UInt16(),   'usWeightClass'),
-    TableRow(True,  TTF_UInt16(),   'usWidthClass'),
-    TableRow(False, TTF_UInt16(),   'fsType'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptXSize'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptYSize'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptXOffset'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptYOffset'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptXSize'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptYSize'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptXOffset'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptYOffset'),
-    TableRow(True,  TTF_Int16(),    'yStrikeoutSize'),
-    TableRow(True,  TTF_Int16(),    'yStrikeoutPosition'),
-    TableRow(False, TTF_Int16(),    'sFamilyClass'),
-    TableRow(False, TTF_Panose(),   'panose'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange1'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange2'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange3'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange4'),
-    TableRow(False, TTF_Tag(),      'achVendID'),
-    TableRow(True,  TTF_UInt16(),   'fsSelection'),
-    TableRow(False, TTF_UInt16(),   'usFirstCharIndex'),
-    TableRow(False, TTF_UInt16(),   'usLastCharIndex'),
-    TableRow(False, TTF_Int16(),    'sTypoAscender'),
-    TableRow(False, TTF_Int16(),    'sTypoDescender'),
-    TableRow(False, TTF_Int16(),    'sTypoLineGap'),
-    TableRow(False, TTF_UInt16(),   'usWinAscent'),
-    TableRow(False, TTF_UInt16(),   'usWinDescent'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/hhea
@@ -331,6 +320,40 @@ MAXP_TABLE = [
     TableRow(True,  TTF_UInt16(),   'numGlyphs'),
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/os2#os2-table-formats
+OS_2_TABLE_V0 = [
+    TableRow(True,  TTF_UInt16(),   'version'),
+    TableRow(False, TTF_Int16(),    'xAvgCharWidth'),
+    TableRow(True,  TTF_UInt16(),   'usWeightClass'),
+    TableRow(True,  TTF_UInt16(),   'usWidthClass'),
+    TableRow(False, TTF_UInt16(),   'fsType'),
+    TableRow(True,  TTF_Int16(),    'ySubscriptXSize'),
+    TableRow(True,  TTF_Int16(),    'ySubscriptYSize'),
+    TableRow(True,  TTF_Int16(),    'ySubscriptXOffset'),
+    TableRow(True,  TTF_Int16(),    'ySubscriptYOffset'),
+    TableRow(True,  TTF_Int16(),    'ySuperscriptXSize'),
+    TableRow(True,  TTF_Int16(),    'ySuperscriptYSize'),
+    TableRow(True,  TTF_Int16(),    'ySuperscriptXOffset'),
+    TableRow(True,  TTF_Int16(),    'ySuperscriptYOffset'),
+    TableRow(True,  TTF_Int16(),    'yStrikeoutSize'),
+    TableRow(True,  TTF_Int16(),    'yStrikeoutPosition'),
+    TableRow(False, TTF_Int16(),    'sFamilyClass'),
+    TableRow(False, TTF_Panose(),   'panose'),
+    TableRow(False, TTF_UInt32(),   'ulUnicodeRange1'),
+    TableRow(False, TTF_UInt32(),   'ulUnicodeRange2'),
+    TableRow(False, TTF_UInt32(),   'ulUnicodeRange3'),
+    TableRow(False, TTF_UInt32(),   'ulUnicodeRange4'),
+    TableRow(False, TTF_Tag(),      'achVendID'),
+    TableRow(True,  TTF_UInt16(),   'fsSelection'),
+    TableRow(False, TTF_UInt16(),   'usFirstCharIndex'),
+    TableRow(False, TTF_UInt16(),   'usLastCharIndex'),
+    TableRow(False, TTF_Int16(),    'sTypoAscender'),
+    TableRow(False, TTF_Int16(),    'sTypoDescender'),
+    TableRow(False, TTF_Int16(),    'sTypoLineGap'),
+    TableRow(False, TTF_UInt16(),   'usWinAscent'),
+    TableRow(False, TTF_UInt16(),   'usWinDescent'),
+]
+
 
 def print_struct(name: str, size: int, owned: bool) -> None:
     print('#[derive(Clone, Copy)]')
@@ -431,6 +454,13 @@ print('        assert_eq!($arr.len(), $len);')
 print('        unsafe { &*($arr.as_ptr() as *const [_; $len]) }')
 print('    }}')
 print('}')
+print()
+print('use core::convert::TryInto;')
+print('use crate::parser::FromData;')
+print()
+generate_table(TTC_HEADER, 'TTCHeader')
+print()
+generate_table(TABLE_RECORD, 'TableRecord', owned=True, impl_from_data=True)
 print()
 print('pub mod head {')
 generate_table(HEAD_TABLE, 'Table')

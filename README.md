@@ -121,7 +121,7 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 ### Safety
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library has a single `unsafe` block for array slicing.
+- The library has a single `unsafe` block for array casting.
 
 ### Alternatives
 

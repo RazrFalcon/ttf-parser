@@ -364,11 +364,6 @@ impl<'a> SafeStream<'a> {
     }
 
     #[inline]
-    pub fn skip<T: FromData>(&mut self) {
-        self.offset += T::SIZE;
-    }
-
-    #[inline]
     pub fn read<T: FromData>(&mut self) -> T {
         T::parse(self.read_bytes(T::SIZE as u32))
     }

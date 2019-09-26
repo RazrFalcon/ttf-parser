@@ -119,7 +119,7 @@ test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
 - The library has a single `unsafe` block for array casting.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.2.2")]
+#![doc(html_root_url = "https://docs.rs/ttf-parser/0.3.0")]
 
 #![no_std]
 #![warn(missing_docs)]

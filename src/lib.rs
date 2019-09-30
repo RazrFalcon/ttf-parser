@@ -77,8 +77,9 @@ using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/gly
 and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
-Currently, it takes 60% more time to outline all glyphs in
+Currently, it takes 30% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
+But it heavily depends on a CPU. On older CPU's the difference can be up to 60%.
 
 ```text
 test outline_cff  ... bench:   1,028,376 ns/iter (+/- 6,750)

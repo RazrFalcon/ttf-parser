@@ -82,26 +82,27 @@ using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/gly
 and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
-Currently, it takes 60% more time to outline all glyphs in
+Currently, it takes 30% more time to outline all glyphs in
 *SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
+But it heavily depends on a CPU. On older CPU's the difference can be up to 60%.
 
 ```
-test outline_cff  ... bench:   1,617,138 ns/iter (+/- 1,261)
-test outline_glyf ... bench:     995,771 ns/iter (+/- 2,801)
+test outline_cff  ... bench:   1,028,376 ns/iter (+/- 6,750)
+test outline_glyf ... bench:     740,882 ns/iter (+/- 4,398)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:       1,203 ns/iter (+/- 4)
-test outline_glyph_276_from_glyf ... bench:         796 ns/iter (+/- 3)
-test outline_glyph_8_from_cff    ... bench:         497 ns/iter (+/- 3)
-test from_data_otf               ... bench:         372 ns/iter (+/- 5)
-test outline_glyph_8_from_glyf   ... bench:         347 ns/iter (+/- 1)
-test family_name                 ... bench:         269 ns/iter (+/- 3)
-test from_data_ttf               ... bench:          72 ns/iter (+/- 3)
-test glyph_index_u41             ... bench:          24 ns/iter (+/- 0)
-test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:         590 ns/iter (+/- 8)
+test outline_glyph_276_from_glyf ... bench:         520 ns/iter (+/- 6)
+test outline_glyph_8_from_glyf   ... bench:         234 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         288 ns/iter (+/- 3)
+test from_data_otf               ... bench:         248 ns/iter (+/- 4)
+test family_name                 ... bench:         161 ns/iter (+/- 2)
+test from_data_ttf               ... bench:          43 ns/iter (+/- 0)
+test glyph_index_u41             ... bench:          15 ns/iter (+/- 0)
+test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 1)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data
@@ -110,12 +111,12 @@ is stored as UTF-16 BE.
 Some methods are too fast, so we execute them **1000 times** to get better measurements.
 
 ```
-test x_height            ... bench:         847 ns/iter (+/- 0)
-test units_per_em        ... bench:         564 ns/iter (+/- 2)
-test strikeout_metrics   ... bench:         564 ns/iter (+/- 0)
-test width               ... bench:         287 ns/iter (+/- 0)
-test ascender            ... bench:         279 ns/iter (+/- 1)
-test subscript_metrics   ... bench:         279 ns/iter (+/- 0)
+test x_height            ... bench:         475 ns/iter (+/- 2)
+test strikeout_metrics   ... bench:         471 ns/iter (+/- 5)
+test units_per_em        ... bench:         466 ns/iter (+/- 2)
+test subscript_metrics   ... bench:         237 ns/iter (+/- 1)
+test ascender            ... bench:         236 ns/iter (+/- 0)
+test width               ... bench:         240 ns/iter (+/- 3)
 ```
 
 ### Safety

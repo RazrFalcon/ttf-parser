@@ -1454,11 +1454,13 @@ impl IsEven for usize {
 }
 
 #[cfg(feature = "std")]
+#[inline]
 fn f32_abs(n: f32) -> f32 {
     n.abs()
 }
 
 #[cfg(not(feature = "std"))]
+#[inline]
 fn f32_abs(n: f32) -> f32 {
     if n.is_sign_negative() {
         -n

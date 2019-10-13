@@ -83,15 +83,15 @@ But it heavily depends on a CPU. On older CPU's the difference can be up to 60%.
 
 ```text
 test outline_cff  ... bench:   1,028,376 ns/iter (+/- 6,750)
-test outline_glyf ... bench:     740,882 ns/iter (+/- 4,398)
+test outline_glyf ... bench:     697,515 ns/iter (+/- 4,939)
 ```
 
 Here is some methods benchmarks:
 
 ```text
 test outline_glyph_276_from_cff  ... bench:         590 ns/iter (+/- 8)
-test outline_glyph_276_from_glyf ... bench:         520 ns/iter (+/- 6)
-test outline_glyph_8_from_glyf   ... bench:         234 ns/iter (+/- 3)
+test outline_glyph_276_from_glyf ... bench:         509 ns/iter (+/- 7)
+test outline_glyph_8_from_glyf   ... bench:         226 ns/iter (+/- 5)
 test outline_glyph_8_from_cff    ... bench:         288 ns/iter (+/- 3)
 test from_data_otf               ... bench:         248 ns/iter (+/- 4)
 test family_name                 ... bench:         161 ns/iter (+/- 2)

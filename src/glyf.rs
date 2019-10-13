@@ -2,7 +2,7 @@
 
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
-use crate::parser::{Stream, LazyArray, TrySlice};
+use crate::parser::{Stream, LazyArray, TrySlice, F2DOT14};
 use crate::{Font, GlyphId, OutlineBuilder, TableName, Rect, Result, Error};
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
@@ -384,15 +384,15 @@ impl<'a> Font<'a> {
         }
 
         if flags.contains(Flags::WE_HAVE_A_TWO_BY_TWO) {
-            ts.a = s.read_f2_14()?;
-            ts.b = s.read_f2_14()?;
-            ts.c = s.read_f2_14()?;
-            ts.d = s.read_f2_14()?;
+            ts.a = s.read::<F2DOT14>()?.0;
+            ts.b = s.read::<F2DOT14>()?.0;
+            ts.c = s.read::<F2DOT14>()?.0;
+            ts.d = s.read::<F2DOT14>()?.0;
         } else if flags.contains(Flags::WE_HAVE_AN_X_AND_Y_SCALE) {
-            ts.a = s.read_f2_14()?;
-            ts.d = s.read_f2_14()?;
+            ts.a = s.read::<F2DOT14>()?.0;
+            ts.d = s.read::<F2DOT14>()?.0;
         } else if flags.contains(Flags::WE_HAVE_A_SCALE) {
-            ts.a = f32_bound(-2.0, s.read_f2_14()?, 2.0);
+            ts.a = f32_bound(-2.0, s.read::<F2DOT14>()?.0, 2.0);
             ts.d = ts.a;
         }
 

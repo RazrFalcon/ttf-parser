@@ -56,6 +56,32 @@ impl FromData for u32 {
 }
 
 
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+pub struct U24(pub u32);
+
+impl FromData for U24 {
+    const SIZE: usize = 3;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        U24((data[0] as u32) << 16 | (data[1] as u32) << 8 | data[2] as u32)
+    }
+}
+
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+pub struct F2DOT14(pub f32);
+
+impl FromData for F2DOT14 {
+    const SIZE: usize = 2;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        F2DOT14(i16::parse(data) as f32 / 16384.0)
+    }
+}
+
+
 pub trait TryFromData: Sized {
     /// Stores an object size in raw data.
     ///
@@ -330,10 +356,6 @@ impl<'a> Stream<'a> {
         let count: u32 = self.read()?;
         self.read_array(count)
     }
-
-    pub fn read_f2_14(&mut self) -> Result<f32> {
-        Ok(self.read::<i16>()? as f32 / 16384.0)
-    }
 }
 
 
@@ -373,14 +395,5 @@ impl<'a> SafeStream<'a> {
         let offset = self.offset;
         self.offset += len.to_usize();
         &self.data[offset..(offset + len.to_usize())]
-    }
-
-    #[inline]
-    pub fn read_u24(&mut self) -> u32 {
-        let d = self.data;
-        let i = self.offset;
-        let n = 0 << 24 | (d[i + 0] as u32) << 16 | (d[i + 1] as u32) << 8 | d[i + 2] as u32;
-        self.offset += 3;
-        n
     }
 }

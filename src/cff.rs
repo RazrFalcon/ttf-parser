@@ -5,7 +5,7 @@
 
 use core::ops::Range;
 
-use crate::parser::{Stream, TryFromData, SafeStream, TrySlice};
+use crate::parser::{Stream, TryFromData, SafeStream, TrySlice, U24};
 use crate::{Font, GlyphId, TableName, OutlineBuilder, Rect, Result, Error};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
@@ -1025,7 +1025,7 @@ impl<'a> VarOffsets<'a> {
         let n: u32 = match self.offset_size {
             OffsetSize::Size1 => s.read::<u8>() as u32,
             OffsetSize::Size2 => s.read::<u16>() as u32,
-            OffsetSize::Size3 => s.read_u24(),
+            OffsetSize::Size3 => s.read::<U24>().0,
             OffsetSize::Size4 => s.read(),
         };
 

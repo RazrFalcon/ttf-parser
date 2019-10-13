@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Removed
+- `Error::InvalidGlyphClass`, because unused.
+
 
 ## [0.3.0] - 2019-09-26
 ### Added

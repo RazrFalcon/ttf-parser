@@ -188,9 +188,6 @@ pub enum Error {
     /// Glyph doesn't have an outline.
     NoOutline,
 
-    /// An invalid glyph class.
-    InvalidGlyphClass(u16),
-
     /// No horizontal metrics for this glyph.
     NoHorizontalMetrics,
 
@@ -241,9 +238,6 @@ impl core::fmt::Display for Error {
             }
             Error::NoOutline => {
                 write!(f, "glyph has no outline")
-            }
-            Error::InvalidGlyphClass(n) => {
-                write!(f, "{} is not a valid glyph class", n)
             }
             Error::NoHorizontalMetrics => {
                 write!(f, "glyph has no horizontal metrics")

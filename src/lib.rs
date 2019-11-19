@@ -489,7 +489,7 @@ impl<'a> Font<'a> {
                         return Err(Error::InvalidTableSize(TableName::MaximumProfile));
                     }
 
-                    let data = &data[offset..(offset + raw::maxp::Table::SIZE)];
+                    let data = data.try_slice(offset..(offset + raw::maxp::Table::SIZE))?;
                     let table = raw::maxp::Table::new(data);
                     font.number_of_glyphs = GlyphId(table.num_glyphs());
                 }

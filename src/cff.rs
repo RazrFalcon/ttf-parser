@@ -15,7 +15,55 @@ const MAX_OPERANDS_LEN: usize = 48;
 const STACK_LIMIT: u8 = 10;
 const MAX_ARGUMENTS_STACK_LEN: usize = 48;
 
+const FLOAT_STACK_LEN: usize = 64;
+const END_OF_FLOAT_FLAG: u8 = 0xf;
+
 const TWO_BYTE_OPERATOR_MARK: u8 = 12;
+
+/// Enumerates some operators defined in the Adobe Technical Note #5177.
+mod operator {
+    pub const HORIZONTAL_STEM: u8           = 1;
+    pub const VERTICAL_STEM: u8             = 3;
+    pub const VERTICAL_MOVE_TO: u8          = 4;
+    pub const RELATIVE_LINE_TO: u8          = 5;
+    pub const HORIZONTAL_LINE_TO: u8        = 6;
+    pub const VERTICAL_LINE_TO: u8          = 7;
+    pub const RELATIVE_CURVE_TO: u8         = 8;
+    pub const CALL_LOCAL_SUBROUTINE: u8     = 10;
+    pub const RETURN: u8                    = 11;
+    pub const ENDCHAR: u8                   = 14;
+    pub const HORIZONTAL_STEM_HINT_MASK: u8 = 18;
+    pub const HINT_MASK: u8                 = 19;
+    pub const COUNTER_MASK: u8              = 20;
+    pub const RELATIVE_MOVE_TO: u8          = 21;
+    pub const HORIZONTAL_MOVE_TO: u8        = 22;
+    pub const VERTICAL_STEM_HINT_MASK: u8   = 23;
+    pub const RELATIVE_CURVE_LINE: u8       = 24;
+    pub const RELATIVE_LINE_CURVE: u8       = 25;
+    pub const VV_CURVE_TO: u8               = 26;
+    pub const HH_CURVE_TO: u8               = 27;
+    pub const SHORT_INT: u8                 = 28;
+    pub const CALL_GLOBAL_SUBROUTINE: u8    = 29;
+    pub const VH_CURVE_TO: u8               = 30;
+    pub const HV_CURVE_TO: u8               = 31;
+    pub const HFLEX: u8                     = 34;
+    pub const FLEX: u8                      = 35;
+    pub const HFLEX1: u8                    = 36;
+    pub const FLEX1: u8                     = 37;
+}
+
+/// Enumerates some operators defined in the Adobe Technical Note #5176,
+/// Table 9 Top DICT Operator Entries
+mod top_dict_operator {
+    pub const CHAR_STRINGS_OFFSET: u16          = 17;
+    pub const PRIVATE_DICT_SIZE_AND_OFFSET: u16 = 18;
+}
+
+/// Enumerates some operators defined in the Adobe Technical Note #5176,
+/// Table 23 Private DICT Operators
+mod private_dict_operator {
+    pub const LOCAL_SUBROUTINES_OFFSET: u16 = 19;
+}
 
 
 /// A list of errors that can occur during a CFF table parsing.
@@ -188,9 +236,8 @@ fn parse_top_dict(s: &mut Stream) -> Result<(usize, Option<Range<usize>>)> {
 
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
-        // Adobe Technical Note #5176, Table 9 Top DICT Operator Entries
         match operator.value() {
-            17 => {
+            top_dict_operator::CHAR_STRINGS_OFFSET => {
                 dict_parser.parse_operands()?;
                 let operands = dict_parser.operands();
 
@@ -198,14 +245,13 @@ fn parse_top_dict(s: &mut Stream) -> Result<(usize, Option<Range<usize>>)> {
                     char_strings_offset = operands[0].as_i32() as usize;
                 }
             }
-            18 => {
+            top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET => {
                 dict_parser.parse_operands()?;
                 let operands = dict_parser.operands();
 
                 if operands.len() == 2 {
-                    let start = operands[1].as_i32() as usize;
                     let len = operands[0].as_i32() as usize;
-
+                    let start = operands[1].as_i32() as usize;
                     if let Some(end) = start.checked_add(len) {
                         private_dict_range = Some(start..end);
                     }
@@ -226,8 +272,7 @@ fn parse_private_dict(data: &[u8]) -> Result<Option<usize>> {
     let mut subroutines_offset = None;
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
-        // Adobe Technical Note #5176, Table 23 Private DICT Operators
-        if operator.value() == 19 {
+        if operator.value() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
             dict_parser.parse_operands()?;
             let operands = dict_parser.operands();
 
@@ -347,7 +392,6 @@ impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
     }
 }
 
-
 fn _parse_char_string<T: OutlineBuilder>(
     ctx: &mut CharStringParserContext,
     char_string: &[u8],
@@ -366,11 +410,14 @@ fn _parse_char_string<T: OutlineBuilder>(
                 // Reserved.
                 return Err(CFFError::InvalidOperator.into());
             }
-            1 | 3 | 18 | 23 => {
-                // |- y dy {dya dyb}* hstem (1) |-
-                // |- x dx {dxa dxb}* vstem (3) |-
-                // |- y dy {dya dyb}* hstemhm (18) |-
-                // |- x dx {dxa dxb}* vstemhm (23) |-
+            operator::HORIZONTAL_STEM |
+            operator::VERTICAL_STEM |
+            operator::HORIZONTAL_STEM_HINT_MASK |
+            operator::VERTICAL_STEM_HINT_MASK => {
+                // y dy {dya dyb}* hstem
+                // x dx {dxa dxb}* vstem
+                // y dy {dya dyb}* hstemhm
+                // x dx {dxa dxb}* vstemhm
 
                 // If the stack length is uneven, than the first value is a `width`.
                 let len = if stack.len().is_odd() && !ctx.width_parsed {
@@ -385,8 +432,8 @@ fn _parse_char_string<T: OutlineBuilder>(
                 // We are ignoring the hint operators.
                 stack.clear();
             }
-            4 => {
-                // |- dy1 vmoveto (4) |-
+            operator::VERTICAL_MOVE_TO => {
+                // dy1
 
                 let mut i = 0;
                 if stack.len() == 2 && !ctx.width_parsed {
@@ -407,8 +454,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            5 => {
-                // |- {dxa dya}+ rlineto (5) |-
+            operator::RELATIVE_LINE_TO => {
+                // {dxa dya}+
 
                 if stack.len().is_odd() {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -424,9 +471,9 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            6 => {
-                // |- dx1 {dya dxb}* hlineto (6) |-
-                // |-     {dxa dyb}+ hlineto (6) |-
+            operator::HORIZONTAL_LINE_TO => {
+                // dx1 {dya dxb}*
+                //     {dxa dyb}+
 
                 let mut i = 0;
                 while i < stack.len() {
@@ -445,9 +492,9 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            7 => {
-                // |- dy1 {dxa dyb}* vlineto (7) |-
-                // |-     {dya dxb}+ vlineto (7) |-
+            operator::VERTICAL_LINE_TO => {
+                // dy1 {dxa dyb}*
+                //     {dya dxb}+
 
                 let mut i = 0;
                 while i < stack.len() {
@@ -466,8 +513,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            8 => {
-                // |- {dxa dya dxb dyb dxc dyc}+ rrcurveto (8) |-
+            operator::RELATIVE_CURVE_TO => {
+                // {dxa dya dxb dyb dxc dyc}+
 
                 if stack.len() % 6 != 0 {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -488,9 +535,7 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            10 => {
-                // subr# callsubr (10) –
-
+            operator::CALL_LOCAL_SUBROUTINE => {
                 if stack.is_empty() {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
                 }
@@ -506,16 +551,15 @@ fn _parse_char_string<T: OutlineBuilder>(
                 x = pos.0;
                 y = pos.1;
             }
-            11 => {
-                // – return (11) –
+            operator::RETURN => {
                 break;
             }
             TWO_BYTE_OPERATOR_MARK => {
                 // flex
                 let op2: u8 = s.read()?;
                 match op2 {
-                    34 => {
-                        // |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |-
+                    operator::HFLEX => {
+                        // dx1 dx2 dy2 dx3 dx4 dx5 dx6
 
                         if stack.len() != 7 {
                             return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -537,8 +581,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                         stack.clear();
                     }
-                    35 => {
-                        // |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
+                    operator::FLEX => {
+                        // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd
 
                         if stack.len() != 13 {
                             return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -561,8 +605,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                         stack.clear();
                     }
-                    36 => {
-                        // |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |-
+                    operator::HFLEX1 => {
+                        // dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6
 
                         if stack.len() != 9 {
                             return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -584,8 +628,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                         stack.clear();
                     }
-                    37 => {
-                        // |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
+                    operator::FLEX1 => {
+                        // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6
 
                         if stack.len() != 11 {
                             return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -618,9 +662,7 @@ fn _parse_char_string<T: OutlineBuilder>(
                     }
                 }
             }
-            14 => {
-                // – endchar (14) |–
-
+            operator::ENDCHAR => {
                 if !stack.is_empty() && !ctx.width_parsed {
                     stack.clear();
                     ctx.width_parsed = true;
@@ -631,10 +673,7 @@ fn _parse_char_string<T: OutlineBuilder>(
                     builder.close();
                 }
             }
-            19 | 20 => {
-                // |- hintmask (19 + mask) |-
-                // |- cntrmask (20 + mask) |-
-
+            operator::HINT_MASK | operator::COUNTER_MASK => {
                 let mut len = stack.len();
 
                 // We are ignoring the hint operators.
@@ -650,8 +689,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 s.skip_len((ctx.stems_len + 7) >> 3);
             }
-            21 => {
-                // |- dx1 dy1 rmoveto (21) |-
+            operator::RELATIVE_MOVE_TO => {
+                // dx1 dy1
 
                 let mut i = 0;
                 if stack.len() == 3 && !ctx.width_parsed {
@@ -673,8 +712,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            22 => {
-                // |- dx1 hmoveto (22) |-
+            operator::HORIZONTAL_MOVE_TO => {
+                // dx1
 
                 let mut i = 0;
                 if stack.len() == 2 && !ctx.width_parsed {
@@ -695,8 +734,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            24 => {
-                // |- {dxa dya dxb dyb dxc dyc}+ dxd dyd rcurveline (24) |-
+            operator::RELATIVE_CURVE_LINE => {
+                // {dxa dya dxb dyb dxc dyc}+ dxd dyd
 
                 if stack.len() < 8 {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -725,8 +764,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            25 => {
-                // |- {dxa dya}+ dxb dyb dxc dyc dxd dyd rlinecurve (25) |-
+            operator::RELATIVE_LINE_CURVE => {
+                // {dxa dya}+ dxb dyb dxc dyc dxd dyd
 
                 if stack.len() < 8 {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -755,8 +794,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            26 => {
-                // |- dx1? {dya dxb dyb dyc}+ vvcurveto (26) |-
+            operator::VV_CURVE_TO => {
+                // dx1? {dya dxb dyb dyc}+
 
                 let mut i = 0;
 
@@ -784,8 +823,8 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            27 => {
-                // |- dy1? {dxa dxb dyb dxc}+ hhcurveto (27) |-
+            operator::HH_CURVE_TO => {
+                // dy1? {dxa dxb dyb dxc}+
 
                 let mut i = 0;
 
@@ -813,16 +852,14 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 stack.clear();
             }
-            28 => {
+            operator::SHORT_INT => {
                 let b1 = s.read::<u8>()? as i32;
                 let b2 = s.read::<u8>()? as i32;
                 let n = ((b1 << 24) | (b2 << 16)) >> 16;
                 debug_assert!((-32768..=32767).contains(&n));
                 stack.push(n as f32)?;
             }
-            29 => {
-                // globalsubr# callgsubr (29) –
-
+            operator::CALL_GLOBAL_SUBROUTINE => {
                 if stack.is_empty() {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
                 }
@@ -838,9 +875,9 @@ fn _parse_char_string<T: OutlineBuilder>(
                 x = pos.0;
                 y = pos.1;
             }
-            30 => {
-                // |- dy1 dx2 dy2 dx3 {dxa dxb dyb dyc dyd dxe dye dxf}* dyf? vhcurveto (30) |-
-                // |-                 {dya dxb dyb dxc dxd dxe dye dyf}+ dxf? vhcurveto (30) |-
+            operator::VH_CURVE_TO => {
+                // dy1 dx2 dy2 dx3 {dxa dxb dyb dyc dyd dxe dye dxf}* dyf?
+                //                 {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
 
                 if stack.len() < 4 {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -878,9 +915,9 @@ fn _parse_char_string<T: OutlineBuilder>(
 
                 debug_assert!(stack.is_empty());
             }
-            31 => {
-                // |- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf? hvcurveto (31) |-
-                // |-                 {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
+            operator::HV_CURVE_TO => {
+                // dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
+                //                 {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf?
 
                 if stack.len() < 4 {
                     return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -1249,9 +1286,6 @@ fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
     }
 }
 
-const FLOAT_STACK_LEN: usize = 64;
-const END_OF_FLOAT_FLAG: u8 = 0xf;
-
 fn parse_float(s: &mut Stream) -> Result<Number> {
     let mut data = [0u8; FLOAT_STACK_LEN];
     let mut idx = 0;
@@ -1454,9 +1488,5 @@ fn f32_abs(n: f32) -> f32 {
 #[cfg(not(feature = "std"))]
 #[inline]
 fn f32_abs(n: f32) -> f32 {
-    if n.is_sign_negative() {
-        -n
-    } else {
-        n
-    }
+    if n.is_sign_negative() { -n } else { n }
 }

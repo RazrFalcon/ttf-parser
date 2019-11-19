@@ -29,22 +29,22 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`hhea`) Retrieving a generic font info using: [ascender()], [descender()], [height()]
   and [line_gap()] methods.
 
-[glyph_index()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.glyph_index
-[glyph_variation_index()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.glyph_variation_index
-[outline_glyph()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.outline_glyph
-[glyph_hor_metrics()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.glyph_hor_metrics
-[glyph_ver_metrics()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.glyph_ver_metrics
-[glyphs_kerning()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.glyphs_kerning
-[number_of_glyphs()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.number_of_glyphs
-[names()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.names
-[family_name()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.family_name
-[post_script_name()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.post_script_name
-[underline_metrics()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.underline_metrics
-[units_per_em()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.units_per_em
-[ascender()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.ascender
-[descender()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.descender
-[height()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.height
-[line_gap()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.line_gap
+[glyph_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_index
+[glyph_variation_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_variation_index
+[outline_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.outline_glyph
+[glyph_hor_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_metrics
+[glyph_ver_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_metrics
+[glyphs_kerning()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyphs_kerning
+[number_of_glyphs()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.number_of_glyphs
+[names()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.names
+[family_name()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.family_name
+[post_script_name()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.post_script_name
+[underline_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.underline_metrics
+[units_per_em()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.units_per_em
+[ascender()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.ascender
+[descender()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.descender
+[height()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.height
+[line_gap()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.line_gap
 
 ## Supported OpenType features
 
@@ -58,16 +58,16 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`OS/2`) Retrieving a font's subscript metrics using [subscript_metrics()] method.
 - (`OS/2`) Retrieving a font's superscript metrics using [superscript_metrics()] method.
 
-[is_regular()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.is_regular
-[is_italic()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.is_italic
-[is_bold()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.is_bold
-[is_oblique()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.is_oblique
-[weight()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.weight
-[width()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.width
-[x_height()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.x_height
-[strikeout_metrics()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.strikeout_metrics
-[subscript_metrics()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.subscript_metrics
-[superscript_metrics()]: https://docs.rs/ttf-parser/0.2.0/ttf_parser/struct.Font.html#method.superscript_metrics
+[is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
+[is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
+[is_bold()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_bold
+[is_oblique()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_oblique
+[weight()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.weight
+[width()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.width
+[x_height()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.x_height
+[strikeout_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.strikeout_metrics
+[subscript_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.subscript_metrics
+[superscript_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.superscript_metrics
 
 ## Methods' computational complexity
 
@@ -77,42 +77,34 @@ using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/gly
 and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
-Currently, it takes 30% more time to outline all glyphs in
-*SourceSansPro-Regular.otf* (which uses CFF) rather than in *SourceSansPro-Regular.ttf*.
-But it heavily depends on a CPU. On older CPU's the difference can be up to 60%.
 
 ```text
 test outline_cff  ... bench:   942,644 ns/iter (+/- 9,700)
-test outline_glyf ... bench:   697,515 ns/iter (+/- 4,939)
+test outline_glyf ... bench:   736,156 ns/iter (+/- 5,590)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:         538 ns/iter (+/- 11)
-test outline_glyph_276_from_glyf ... bench:         510 ns/iter (+/- 16)
-test from_data_otf               ... bench:         356 ns/iter (+/- 9)
-test outline_glyph_8_from_cff    ... bench:         251 ns/iter (+/- 5)
-test outline_glyph_8_from_glyf   ... bench:         228 ns/iter (+/- 4)
-test family_name                 ... bench:         161 ns/iter (+/- 5)
-test from_data_ttf               ... bench:          95 ns/iter (+/- 2)
-test glyph_index_u41             ... bench:          14 ns/iter (+/- 1)
-test glyph_2_hor_metrics         ... bench:           7 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:   538.0 ns/iter (+/- 11)
+test outline_glyph_276_from_glyf ... bench:   510.0 ns/iter (+/- 16)
+test from_data_otf               ... bench:   356.0 ns/iter (+/- 9)
+test outline_glyph_8_from_cff    ... bench:   251.0 ns/iter (+/- 5)
+test outline_glyph_8_from_glyf   ... bench:   228.0 ns/iter (+/- 4)
+test family_name                 ... bench:   161.0 ns/iter (+/- 5)
+test from_data_ttf               ... bench:    95.0 ns/iter (+/- 2)
+test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
+test glyph_2_hor_metrics         ... bench:     7.0 ns/iter (+/- 0)
+test x_height                    ... bench:     0.5 ns/iter (+/- 0)
+test strikeout_metrics           ... bench:     0.5 ns/iter (+/- 0)
+test units_per_em                ... bench:     0.5 ns/iter (+/- 0)
+test subscript_metrics           ... bench:     0.2 ns/iter (+/- 0)
+test ascender                    ... bench:     0.2 ns/iter (+/- 0)
+test width                       ... bench:     0.2 ns/iter (+/- 0)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data
 is stored as UTF-16 BE.
-
-Some methods are too fast, so we execute them **1000 times** to get better measurements.
-
-```text
-test x_height            ... bench:         475 ns/iter (+/- 2)
-test strikeout_metrics   ... bench:         471 ns/iter (+/- 5)
-test units_per_em        ... bench:         466 ns/iter (+/- 2)
-test subscript_metrics   ... bench:         237 ns/iter (+/- 1)
-test ascender            ... bench:         236 ns/iter (+/- 0)
-test width               ... bench:         240 ns/iter (+/- 3)
-```
 
 ## Safety
 

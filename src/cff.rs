@@ -5,7 +5,7 @@
 
 use core::ops::Range;
 
-use crate::parser::{Stream, TryFromData, SafeStream, TrySlice, U24};
+use crate::parser::{Stream, TryFromData, TrySlice, U24, FromData};
 use crate::{Font, GlyphId, TableName, OutlineBuilder, Rect, Result, Error};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
@@ -95,12 +95,11 @@ impl core::fmt::Display for CFFError {
 impl std::error::Error for CFFError {}
 
 
-#[derive(Clone, Default)]
-pub struct Metadata {
-    char_strings_offset: u32,
-    private_dict_range: Option<Range<u32>>,
-    subroutines_offset: Option<u32>,
-    global_subrs_offset: u32,
+#[derive(Clone, Copy, Default)]
+pub struct Metadata<'a> {
+    global_subrs: DataIndex<'a>,
+    local_subrs: DataIndex<'a>,
+    char_strings: &'a [u8],
 }
 
 pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
@@ -121,24 +120,43 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
         s.skip_len(header_size as u32 - s.offset() as u32);
     }
 
-    let mut metadata = Metadata::default();
-
     // Skip Name INDEX.
     skip_index(&mut s)?;
 
-    parse_top_dict(&mut s, &mut metadata)?;
+    let (char_strings_offset, private_dict_range) = parse_top_dict(&mut s)?;
 
-    if let Some(range) = metadata.private_dict_range.clone() {
-        let range = range.start as usize .. range.end as usize;
-        let dict_data = data.try_slice(range)?;
-        parse_private_dict(dict_data, &mut metadata)?;
+    // Must be set, otherwise there are nothing to parse.
+    if char_strings_offset == 0 {
+        return Err(CFFError::NoCharStrings.into());
     }
+
+    let subroutines_offset = if let Some(range) = private_dict_range.clone() {
+        parse_private_dict(data.try_slice(range)?)?
+    } else {
+        None
+    };
 
     // Skip String INDEX.
     skip_index(&mut s)?;
 
-    // Global Subroutines INDEX offset.
-    metadata.global_subrs_offset = s.offset() as u32;
+    // Parse Global Subroutines INDEX.
+    let mut metadata = Metadata::default();
+    metadata.global_subrs = parse_index(&mut s)?;
+
+    match (private_dict_range, subroutines_offset) {
+        (Some(private_dict_range), Some(subroutines_offset)) => {
+            // 'The local subroutines offset is relative to the beginning
+            // of the Private DICT data.'
+            if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
+                let data = data.try_slice(start as usize..data.len())?;
+                let mut s = Stream::new(data);
+                metadata.local_subrs = parse_index(&mut s)?;
+            }
+        }
+        _ => {}
+    }
+
+    metadata.char_strings = data.try_slice(char_strings_offset..data.len())?;
 
     Ok(metadata)
 }
@@ -147,38 +165,19 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
 impl<'a> Font<'a> {
     pub(crate) fn cff_glyph_outline(
         &self,
+        metadata: &Metadata,
         glyph_id: GlyphId,
         builder: &mut impl OutlineBuilder,
     ) -> Result<Rect> {
-        let data = self.cff_.ok_or_else(|| Error::TableMissing(TableName::CompactFontFormat))?;
-        let mut s = Stream::new_at(data, self.cff_metadata.global_subrs_offset as usize);
-
-        // Parse Global Subroutines INDEX.
-        let global_subrs = parse_index(&mut s)?;
-
-        let mut local_subrs = DataIndex::create_empty();
-        match (self.cff_metadata.private_dict_range.clone(),
-               self.cff_metadata.subroutines_offset.clone())
-        {
-            (Some(private_dict_range), Some(subroutines_offset)) => {
-                // 'The local subroutines offset is relative to the beginning
-                // of the Private DICT data.'
-                if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
-                    let data = data.try_slice(start as usize..data.len())?;
-                    let mut s = Stream::new(data);
-                    local_subrs = parse_index(&mut s)?;
-                }
-            }
-            _ => {}
-        }
-
-        let start = self.cff_metadata.char_strings_offset as usize;
-        let mut s = Stream::new(data.try_slice(start..data.len())?);
-        parse_char_string(global_subrs, local_subrs, glyph_id, &mut s, builder)
+        let mut s = Stream::new(metadata.char_strings);
+        parse_char_string(metadata.global_subrs, metadata.local_subrs, glyph_id, &mut s, builder)
     }
 }
 
-fn parse_top_dict(s: &mut Stream, metadata: &mut Metadata) -> Result<()> {
+fn parse_top_dict(s: &mut Stream) -> Result<(usize, Option<Range<usize>>)> {
+    let mut char_strings_offset = 0;
+    let mut private_dict_range = None;
+
     let index = parse_index(s)?;
 
     // The Top DICT INDEX should have only one dictionary.
@@ -196,7 +195,7 @@ fn parse_top_dict(s: &mut Stream, metadata: &mut Metadata) -> Result<()> {
                 let operands = dict_parser.operands();
 
                 if operands.len() == 1 {
-                    metadata.char_strings_offset = operands[0].as_i32() as u32;
+                    char_strings_offset = operands[0].as_i32() as usize;
                 }
             }
             18 => {
@@ -204,31 +203,27 @@ fn parse_top_dict(s: &mut Stream, metadata: &mut Metadata) -> Result<()> {
                 let operands = dict_parser.operands();
 
                 if operands.len() == 2 {
-                    let start = operands[1].as_i32() as u32;
-                    let len = operands[0].as_i32() as u32;
+                    let start = operands[1].as_i32() as usize;
+                    let len = operands[0].as_i32() as usize;
 
                     if let Some(end) = start.checked_add(len) {
-                        metadata.private_dict_range = Some(start..end);
+                        private_dict_range = Some(start..end);
                     }
                 }
             }
             _ => {}
         }
 
-        if metadata.char_strings_offset != 0 && metadata.private_dict_range.is_some() {
+        if char_strings_offset != 0 && private_dict_range.is_some() {
             break;
         }
     }
 
-    // `char_strings_offset` must be set, otherwise there are nothing to parse.
-    if metadata.char_strings_offset == 0 {
-        return Err(CFFError::NoCharStrings.into());
-    }
-
-    Ok(())
+    Ok((char_strings_offset, private_dict_range))
 }
 
-fn parse_private_dict(data: &[u8], metadata: &mut Metadata) -> Result<()> {
+fn parse_private_dict(data: &[u8]) -> Result<Option<usize>> {
+    let mut subroutines_offset = None;
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
         // Adobe Technical Note #5176, Table 23 Private DICT Operators
@@ -237,14 +232,14 @@ fn parse_private_dict(data: &[u8], metadata: &mut Metadata) -> Result<()> {
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                metadata.subroutines_offset = Some(operands[0].as_i32() as u32);
+                subroutines_offset = Some(operands[0].as_i32() as usize);
             }
 
             break;
         }
     }
 
-    Ok(())
+    Ok(subroutines_offset)
 }
 
 struct CharStringParserContext<'a> {
@@ -978,11 +973,11 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
                 Ok(DataIndex { data, offsets })
             }
             None => {
-                Ok(DataIndex::create_empty())
+                Ok(DataIndex::default())
             }
         }
     } else {
-        Ok(DataIndex::create_empty())
+        Ok(DataIndex::default())
     }
 }
 
@@ -1020,13 +1015,11 @@ impl<'a> VarOffsets<'a> {
         let start = index as usize * self.offset_size as usize;
         let end = start + self.offset_size as usize;
         let data = self.data.try_slice(start..end).ok()?;
-
-        let mut s = SafeStream::new(data);
         let n: u32 = match self.offset_size {
-            OffsetSize::Size1 => s.read::<u8>() as u32,
-            OffsetSize::Size2 => s.read::<u16>() as u32,
-            OffsetSize::Size3 => s.read::<U24>().0,
-            OffsetSize::Size4 => s.read(),
+            OffsetSize::Size1 => u8::parse(data) as u32,
+            OffsetSize::Size2 => u16::parse(data) as u32,
+            OffsetSize::Size3 => U24::parse(data).0,
+            OffsetSize::Size4 => u32::parse(data),
         };
 
         // Offset must be positive.
@@ -1066,15 +1059,17 @@ struct DataIndex<'a> {
     offsets: VarOffsets<'a>,
 }
 
-impl<'a> DataIndex<'a> {
+impl<'a> Default for DataIndex<'a> {
     #[inline]
-    fn create_empty() -> Self {
+    fn default() -> Self {
         DataIndex {
             data: b"",
             offsets: VarOffsets { data: b"", offset_size: OffsetSize::Size1 },
         }
     }
+}
 
+impl<'a> DataIndex<'a> {
     #[inline]
     fn len(&self) -> u16 {
         if !self.offsets.is_empty() {
@@ -1103,7 +1098,6 @@ impl<'a> DataIndex<'a> {
 
 
 #[derive(Clone, Copy, Debug)]
-#[repr(u8)]
 enum OffsetSize {
     Size1 = 1,
     Size2 = 2,
@@ -1114,9 +1108,7 @@ enum OffsetSize {
 impl TryFromData for OffsetSize {
     #[inline]
     fn try_parse(data: &[u8]) -> Result<Self> {
-        let mut s = SafeStream::new(data);
-        let n: u8 = s.read();
-        match n {
+        match u8::parse(data) {
             1 => Ok(OffsetSize::Size1),
             2 => Ok(OffsetSize::Size2),
             3 => Ok(OffsetSize::Size3),

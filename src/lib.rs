@@ -82,22 +82,22 @@ Currently, it takes 30% more time to outline all glyphs in
 But it heavily depends on a CPU. On older CPU's the difference can be up to 60%.
 
 ```text
-test outline_cff  ... bench:   1,028,376 ns/iter (+/- 6,750)
-test outline_glyf ... bench:     697,515 ns/iter (+/- 4,939)
+test outline_cff  ... bench:   942,644 ns/iter (+/- 9,700)
+test outline_glyf ... bench:   697,515 ns/iter (+/- 4,939)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:         590 ns/iter (+/- 8)
-test outline_glyph_276_from_glyf ... bench:         509 ns/iter (+/- 7)
-test outline_glyph_8_from_glyf   ... bench:         226 ns/iter (+/- 5)
-test outline_glyph_8_from_cff    ... bench:         288 ns/iter (+/- 3)
-test from_data_otf               ... bench:         248 ns/iter (+/- 4)
-test family_name                 ... bench:         161 ns/iter (+/- 2)
-test from_data_ttf               ... bench:          43 ns/iter (+/- 0)
-test glyph_index_u41             ... bench:          15 ns/iter (+/- 0)
-test glyph_2_hor_metrics         ... bench:           8 ns/iter (+/- 1)
+test outline_glyph_276_from_cff  ... bench:         538 ns/iter (+/- 11)
+test outline_glyph_276_from_glyf ... bench:         510 ns/iter (+/- 16)
+test from_data_otf               ... bench:         356 ns/iter (+/- 9)
+test outline_glyph_8_from_cff    ... bench:         251 ns/iter (+/- 5)
+test outline_glyph_8_from_glyf   ... bench:         228 ns/iter (+/- 4)
+test family_name                 ... bench:         161 ns/iter (+/- 5)
+test from_data_ttf               ... bench:          95 ns/iter (+/- 2)
+test glyph_index_u41             ... bench:          14 ns/iter (+/- 1)
+test glyph_2_hor_metrics         ... bench:           7 ns/iter (+/- 0)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data
@@ -128,6 +128,7 @@ test width               ... bench:         240 ns/iter (+/- 3)
 #![warn(missing_debug_implementations)]
 
 #[cfg(feature = "std")]
+#[macro_use]
 extern crate std;
 
 use core::fmt;
@@ -378,7 +379,7 @@ pub enum TableName {
 pub struct Font<'a> {
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
-    cff_: Option<&'a [u8]>,
+    cff_: Option<cff::Metadata<'a>>,
     cmap: Option<&'a [u8]>,
     glyf: Option<&'a [u8]>,
     hmtx: Option<&'a [u8]>,
@@ -391,7 +392,6 @@ pub struct Font<'a> {
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<&'a [u8]>,
     number_of_glyphs: GlyphId,
-    cff_metadata: cff::Metadata,
 }
 
 impl<'a> Font<'a> {
@@ -455,7 +455,6 @@ impl<'a> Font<'a> {
             vhea: None,
             vmtx: None,
             number_of_glyphs: GlyphId(0),
-            cff_metadata: cff::Metadata::default(),
         };
 
         let mut has_head = false;
@@ -522,10 +521,7 @@ impl<'a> Font<'a> {
                 }
                 b"CFF " => {
                     if let Some(data) = data.get(range) {
-                        if let Ok(metadata) = cff::parse_metadata(data) {
-                            font.cff_ = Some(data);
-                            font.cff_metadata = metadata;
-                        }
+                        font.cff_ = Some(cff::parse_metadata(data)?);
                     }
                 }
                 b"cmap" => font.cmap = data.get(range),
@@ -636,12 +632,14 @@ impl<'a> Font<'a> {
         builder: &mut impl OutlineBuilder,
     ) -> Result<Rect> {
         if self.glyf.is_some() {
-            self.glyf_glyph_outline(glyph_id, builder)
-        } else if self.cff_.is_some() {
-            self.cff_glyph_outline(glyph_id, builder)
-        } else {
-            Err(Error::NoGlyph)
+            return self.glyf_glyph_outline(glyph_id, builder);
         }
+
+        if let Some(ref metadata) = self.cff_ {
+            return self.cff_glyph_outline(metadata, glyph_id, builder);
+        }
+
+        Err(Error::NoGlyph)
     }
 }
 

@@ -14,7 +14,7 @@ fn process() -> Result<(), Box<dyn std::error::Error>> {
 
     let font_data = std::fs::read(&args[1])?;
 
-    let start = time::precise_time_ns();
+    let now = std::time::Instant::now();
 
     let font = ttf_parser::Font::from_data(&font_data, 0)?;
 
@@ -37,8 +37,7 @@ fn process() -> Result<(), Box<dyn std::error::Error>> {
     println!("Subscript: {:?}", font.subscript_metrics());
     println!("Superscript: {:?}", font.superscript_metrics());
 
-    let end = time::precise_time_ns();
-    println!("Elapsed: {}us", (end - start) / 1000);
+    println!("Elapsed: {}us", now.elapsed().as_micros());
 
     Ok(())
 }

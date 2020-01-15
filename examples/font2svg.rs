@@ -21,7 +21,7 @@ fn process() -> Result<(), Box<dyn std::error::Error>> {
     let font_data = std::fs::read(&args[1])?;
 
     // Exclude IO operations.
-    let start = time::precise_time_ns();
+    let now = std::time::Instant::now();
 
     let font = ttf::Font::from_data(&font_data, 0)?;
     let units_per_em = font.units_per_em().ok_or("invalid units per em")?;
@@ -65,8 +65,7 @@ fn process() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let end = time::precise_time_ns();
-    println!("Elapsed: {:.2}ms", (end - start) as f64 / 1_000_000.0);
+    println!("Elapsed: {}ms", now.elapsed().as_micros() as f64 / 1000.0);
 
     std::fs::write(&args[2], &svg.end_document())?;
 

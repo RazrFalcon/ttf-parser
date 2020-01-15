@@ -19,7 +19,6 @@ std = []
 [dev-dependencies]
 bencher = "0.1"
 svgtypes = "0.5"
-time = "0.1"
 xmlwriter = "0.1"
 
 [[bench]]

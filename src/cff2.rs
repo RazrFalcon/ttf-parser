@@ -149,7 +149,7 @@ impl<'a> Font<'a> {
         &self,
         metadata: &Metadata,
         glyph_id: GlyphId,
-        builder: &mut impl OutlineBuilder,
+        builder: &mut dyn OutlineBuilder,
     ) -> Result<Rect> {
         parse_char_string(metadata, glyph_id, builder)
     }
@@ -286,7 +286,7 @@ struct CharStringParserContext<'a> {
 fn parse_char_string(
     metadata: &Metadata,
     glyph_id: GlyphId,
-    builder: &mut impl OutlineBuilder,
+    builder: &mut dyn OutlineBuilder,
 ) -> Result<Rect> {
     let data = metadata.char_strings.get(glyph_id.0).ok_or(Error::NoGlyph)?;
 
@@ -330,14 +330,14 @@ fn parse_char_string(
 //       since CFF2 doesn't have advance width as a first (optional) argument.
 //       On the other hand, other small CFF and CFF2 differences may lead
 //       to a more complicated code, so maybe some code duplication would not hurt.
-fn _parse_char_string<T: OutlineBuilder>(
+fn _parse_char_string(
     ctx: &mut CharStringParserContext,
     char_string: &[u8],
     mut x: f32,
     mut y: f32,
     stack: &mut ArgumentsStack,
     depth: u8,
-    builder: &mut Builder<T>,
+    builder: &mut Builder,
 ) -> Result<(f32, f32)> {
     let mut s = Stream::new(char_string);
 

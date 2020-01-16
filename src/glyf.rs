@@ -13,13 +13,13 @@ trait OutlineBuilderInner {
     fn close(&mut self);
 }
 
-struct Builder<'a, T: OutlineBuilder> {
-    builder: &'a mut T,
+struct Builder<'a> {
+    builder: &'a mut dyn OutlineBuilder,
     transform: Transform,
     is_default_ts: bool, // `bool` is faster than `Option` or `is_default`.
 }
 
-impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
+impl<'a> OutlineBuilderInner for Builder<'a> {
     #[inline]
     fn move_to(&mut self, mut x: f32, mut y: f32) {
         if !self.is_default_ts {
@@ -114,7 +114,7 @@ impl<'a> Font<'a> {
     pub(crate) fn glyf_glyph_outline(
         &self,
         glyph_id: GlyphId,
-        builder: &mut impl OutlineBuilder,
+        builder: &mut dyn OutlineBuilder,
     ) -> Result<Rect> {
         let mut b = Builder {
             builder,
@@ -132,11 +132,11 @@ impl<'a> Font<'a> {
         data.try_slice(range)
     }
 
-    fn outline_impl<T: OutlineBuilder>(
+    fn outline_impl(
         &self,
         data: &[u8],
         depth: u8,
-        builder: &mut Builder<T>,
+        builder: &mut Builder,
     ) -> Result<Rect> {
         if depth >= MAX_COMPONENTS {
             return Ok(Rect::zero());
@@ -165,10 +165,10 @@ impl<'a> Font<'a> {
     }
 
     #[inline(never)]
-    fn parse_simple_outline<T: OutlineBuilder>(
+    fn parse_simple_outline(
         glyph_data: &[u8],
         number_of_contours: u16,
-        builder: &mut Builder<T>,
+        builder: &mut Builder,
     ) -> Result<()> {
         let mut s = Stream::new(glyph_data);
         let endpoints: LazyArray<u16> = s.read_array(number_of_contours)?;
@@ -276,9 +276,9 @@ impl<'a> Font<'a> {
         Some(x_coords_len)
     }
 
-    fn parse_contour<T: OutlineBuilder>(
+    fn parse_contour(
         points: core::iter::Take<&mut GlyphPoints>,
-        builder: &mut Builder<T>,
+        builder: &mut Builder,
     ) {
         let mut first_oncurve: Option<Point> = None;
         let mut first_offcurve: Option<Point> = None;
@@ -355,11 +355,11 @@ impl<'a> Font<'a> {
     }
 
     #[inline(never)]
-    fn parse_composite_outline<T: OutlineBuilder>(
+    fn parse_composite_outline(
         &self,
         glyph_data: &[u8],
         depth: u8,
-        builder: &mut Builder<T>,
+        builder: &mut Builder,
     ) -> Result<()> {
         type Flags = CompositeGlyphFlags;
 

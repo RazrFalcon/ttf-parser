@@ -637,7 +637,7 @@ impl<'a> Font<'a> {
     pub fn outline_glyph(
         &self,
         glyph_id: GlyphId,
-        builder: &mut impl OutlineBuilder,
+        builder: &mut dyn OutlineBuilder,
     ) -> Result<Rect> {
         if self.glyf.is_some() {
             return self.glyf_glyph_outline(glyph_id, builder);

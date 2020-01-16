@@ -234,7 +234,7 @@ impl<'a> Font<'a> {
         &self,
         metadata: &Metadata,
         glyph_id: GlyphId,
-        builder: &mut impl OutlineBuilder,
+        builder: &mut dyn OutlineBuilder,
     ) -> Result<Rect> {
         parse_char_string(metadata, glyph_id, builder)
     }
@@ -315,7 +315,7 @@ struct CharStringParserContext<'a> {
 fn parse_char_string(
     metadata: &Metadata,
     glyph_id: GlyphId,
-    builder: &mut impl OutlineBuilder,
+    builder: &mut dyn OutlineBuilder,
 ) -> Result<Rect> {
     let data = metadata.char_strings.get(glyph_id.0).ok_or(Error::NoGlyph)?;
 
@@ -368,12 +368,12 @@ pub trait OutlineBuilderInner {
     fn close(&mut self);
 }
 
-pub struct Builder<'a, T: OutlineBuilder> {
-    pub builder: &'a mut T,
+pub struct Builder<'a> {
+    pub builder: &'a mut dyn OutlineBuilder,
     pub bbox: RectF,
 }
 
-impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
+impl<'a> OutlineBuilderInner for Builder<'a> {
     #[inline]
     fn update_bbox(&mut self, x: f32, y: f32) {
         self.bbox.x_min = self.bbox.x_min.min(x);
@@ -409,14 +409,14 @@ impl<'a, T: OutlineBuilder> OutlineBuilderInner for Builder<'a, T> {
     }
 }
 
-fn _parse_char_string<T: OutlineBuilder>(
+fn _parse_char_string(
     ctx: &mut CharStringParserContext,
     char_string: &[u8],
     mut x: f32,
     mut y: f32,
     stack: &mut ArgumentsStack,
     depth: u8,
-    builder: &mut Builder<T>,
+    builder: &mut Builder,
 ) -> Result<(f32, f32)> {
     let mut s = Stream::new(char_string);
 

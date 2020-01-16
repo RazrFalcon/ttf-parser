@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - Basic CFF2 support.
 
+### Changed
+- `Font::outline_glyph` not accepts `&mut dyn OutlineBuilder` and not `&mut impl OutlineBuilder`.
+
 ### Removed
 - `Error::InvalidGlyphClass`, because unused.
 

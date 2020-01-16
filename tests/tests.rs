@@ -254,6 +254,22 @@ fn outline_glyph_cff_1() {
 }
 
 #[test]
+fn glyf_bbox() {
+    let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.outline_glyph(GlyphId(0), &mut Builder::new()).unwrap(),
+               font.glyph_bounding_box(GlyphId(0)).unwrap());
+}
+
+#[test]
+fn cff_bbox() {
+    let data = fs::read("tests/fonts/cff1_dotsect.nohints.otf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.outline_glyph(GlyphId(1), &mut Builder::new()).unwrap(),
+               font.glyph_bounding_box(GlyphId(1)).unwrap());
+}
+
+#[test]
 fn units_per_em() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();

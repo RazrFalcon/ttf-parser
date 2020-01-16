@@ -126,6 +126,19 @@ impl<'a> Font<'a> {
         self.outline_impl(glyph_data, 0, &mut b)
     }
 
+    pub(crate) fn glyf_glyph_bbox(&self, glyph_id: GlyphId) -> Result<Rect> {
+        let glyph_data = self.glyph_data(glyph_id)?;
+        let mut s = Stream::new(glyph_data);
+        s.skip::<i16>(); // number_of_contours
+        // It's faster to parse the rect directly, instead of using `FromData`.
+        Ok(Rect {
+            x_min: s.read()?,
+            y_min: s.read()?,
+            x_max: s.read()?,
+            y_max: s.read()?,
+        })
+    }
+
     fn glyph_data(&self, glyph_id: GlyphId) -> Result<&[u8]> {
         let range = self.glyph_range(glyph_id)?;
         let data = self.glyf.ok_or_else(|| Error::TableMissing(TableName::GlyphData))?;

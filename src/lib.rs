@@ -653,6 +653,40 @@ impl<'a> Font<'a> {
 
         Err(Error::NoGlyph)
     }
+
+    /// Returns a tight glyph bounding box.
+    ///
+    /// Note that this method's performance depends on a table type the current font is using.
+    /// In case of a `glyf` table, it's basically free, since this table stores
+    /// bounding box separately. In case of `CFF` and `CFF2`, we should actually outline
+    /// a glyph and then calculate its bounding box. So if you need an outline and
+    /// a bounding box and you have an OpenType font (which uses CFF/CFF2)
+    /// then prefer `outline_glyph()` method.
+    #[inline]
+    pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Result<Rect> {
+        struct DummyOutline;
+        impl OutlineBuilder for DummyOutline {
+            fn move_to(&mut self, _: f32, _: f32) {}
+            fn line_to(&mut self, _: f32, _: f32) {}
+            fn quad_to(&mut self, _: f32, _: f32, _: f32, _: f32) {}
+            fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) {}
+            fn close(&mut self) {}
+        }
+
+        if self.glyf.is_some() {
+            return self.glyf_glyph_bbox(glyph_id);
+        }
+
+        if let Some(ref metadata) = self.cff_ {
+            return self.cff_glyph_outline(metadata, glyph_id, &mut DummyOutline);
+        }
+
+        if let Some(ref metadata) = self.cff2 {
+            return self.cff2_glyph_outline(metadata, glyph_id, &mut DummyOutline);
+        }
+
+        Err(Error::NoGlyph)
+    }
 }
 
 impl fmt::Debug for Font<'_> {

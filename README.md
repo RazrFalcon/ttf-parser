@@ -54,6 +54,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 ### Supported OpenType features
 
 - (`CFF `) Glyph outlining using [outline_glyph()] method.
+- (`CFF2`) Glyph outlining using [outline_glyph()] method.
 - (`OS/2`) Retrieving a font kind using [is_regular()], [is_italic()],
   [is_bold()] and [is_oblique()] methods.
 - (`OS/2`) Retrieving a font's weight using [weight()] method.
@@ -84,20 +85,24 @@ The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
 ```
-test outline_cff  ... bench:   942,644 ns/iter (+/- 9,700)
-test outline_glyf ... bench:   736,156 ns/iter (+/- 5,590)
+test outline_cff  ... bench:   1,010,120 ns/iter (+/- 11,517)
+test outline_cff2 ... bench:   1,385,488 ns/iter (+/- 21,411)
+test outline_glyf ... bench:     717,052 ns/iter (+/- 5,907)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:   538.0 ns/iter (+/- 11)
-test outline_glyph_276_from_glyf ... bench:   510.0 ns/iter (+/- 16)
-test from_data_otf               ... bench:   356.0 ns/iter (+/- 9)
-test outline_glyph_8_from_cff    ... bench:   251.0 ns/iter (+/- 5)
-test outline_glyph_8_from_glyf   ... bench:   228.0 ns/iter (+/- 4)
+test outline_glyph_276_from_cff  ... bench:         745 ns/iter (+/- 31)
+test from_data_otf_cff2          ... bench:         673 ns/iter (+/- 9)
+test outline_glyph_276_from_cff2 ... bench:         595 ns/iter (+/- 24)
+test outline_glyph_276_from_glyf ... bench:         564 ns/iter (+/- 6)
+test from_data_otf_cff           ... bench:         485 ns/iter (+/- 11)
+test outline_glyph_8_from_cff2   ... bench:         371 ns/iter (+/- 54)
+test outline_glyph_8_from_glyf   ... bench:         249 ns/iter (+/- 2)
+test outline_glyph_8_from_cff    ... bench:         243 ns/iter (+/- 7)
+test from_data_ttf               ... bench:         200 ns/iter (+/- 3)
 test family_name                 ... bench:   161.0 ns/iter (+/- 5)
-test from_data_ttf               ... bench:    95.0 ns/iter (+/- 2)
 test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
 test glyph_2_hor_metrics         ... bench:     7.0 ns/iter (+/- 0)
 test x_height                    ... bench:     0.5 ns/iter (+/- 0)

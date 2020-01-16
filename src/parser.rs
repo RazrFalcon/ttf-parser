@@ -57,6 +57,7 @@ impl FromData for u32 {
 
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+#[derive(Clone, Copy, Debug)]
 pub struct U24(pub u32);
 
 impl FromData for U24 {
@@ -70,6 +71,7 @@ impl FromData for U24 {
 
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+#[derive(Clone, Copy, Debug)]
 pub struct F2DOT14(pub f32);
 
 impl FromData for F2DOT14 {

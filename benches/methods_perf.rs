@@ -7,8 +7,15 @@ fn from_data_ttf(bencher: &mut bencher::Bencher) {
     })
 }
 
-fn from_data_otf(bencher: &mut bencher::Bencher) {
+fn from_data_otf_cff(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.otf").unwrap();
+    bencher.iter(|| {
+        bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
+    })
+}
+
+fn from_data_otf_cff2(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansVariable-Roman.otf").unwrap();
     bencher.iter(|| {
         bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
     })
@@ -41,6 +48,22 @@ fn outline_glyph_8_from_cff(bencher: &mut bencher::Bencher) {
 
 fn outline_glyph_276_from_cff(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.otf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        font.outline_glyph(ttf::GlyphId(276), &mut Builder(0))
+    })
+}
+
+fn outline_glyph_8_from_cff2(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansVariable-Roman.otf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        font.outline_glyph(ttf::GlyphId(8), &mut Builder(0))
+    })
+}
+
+fn outline_glyph_276_from_cff2(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansVariable-Roman.otf").unwrap();
     let font = ttf::Font::from_data(&font_data, 0).unwrap();
     bencher.iter(|| {
         font.outline_glyph(ttf::GlyphId(276), &mut Builder(0))
@@ -102,11 +125,14 @@ impl ttf_parser::OutlineBuilder for Builder {
 
 bencher::benchmark_group!(perf,
     from_data_ttf,
-    from_data_otf,
+    from_data_otf_cff,
+    from_data_otf_cff2,
     outline_glyph_8_from_glyf,
     outline_glyph_276_from_glyf,
     outline_glyph_8_from_cff,
     outline_glyph_276_from_cff,
+    outline_glyph_8_from_cff2,
+    outline_glyph_276_from_cff2,
     family_name,
     glyph_index_u41,
     glyph_2_hor_metrics

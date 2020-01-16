@@ -49,6 +49,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 ## Supported OpenType features
 
 - (`CFF `) Glyph outlining using [outline_glyph()] method.
+- (`CFF2`) Glyph outlining using [outline_glyph()] method.
 - (`OS/2`) Retrieving a font kind using [is_regular()], [is_italic()],
   [is_bold()] and [is_oblique()] methods.
 - (`OS/2`) Retrieving a font's weight using [weight()] method.
@@ -79,20 +80,24 @@ The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
 ```text
-test outline_cff  ... bench:   942,644 ns/iter (+/- 9,700)
-test outline_glyf ... bench:   736,156 ns/iter (+/- 5,590)
+test outline_cff  ... bench:   1,010,120 ns/iter (+/- 11,517)
+test outline_cff2 ... bench:   1,385,488 ns/iter (+/- 21,411)
+test outline_glyf ... bench:     717,052 ns/iter (+/- 5,907)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:   538.0 ns/iter (+/- 11)
-test outline_glyph_276_from_glyf ... bench:   510.0 ns/iter (+/- 16)
-test from_data_otf               ... bench:   356.0 ns/iter (+/- 9)
-test outline_glyph_8_from_cff    ... bench:   251.0 ns/iter (+/- 5)
-test outline_glyph_8_from_glyf   ... bench:   228.0 ns/iter (+/- 4)
+test outline_glyph_276_from_cff  ... bench:   745.0 ns/iter (+/- 31)
+test from_data_otf_cff2          ... bench:   673.0 ns/iter (+/- 9)
+test outline_glyph_276_from_cff2 ... bench:   595.0 ns/iter (+/- 24)
+test outline_glyph_276_from_glyf ... bench:   564.0 ns/iter (+/- 6)
+test from_data_otf_cff           ... bench:   485.0 ns/iter (+/- 11)
+test outline_glyph_8_from_cff2   ... bench:   371.0 ns/iter (+/- 54)
+test outline_glyph_8_from_glyf   ... bench:   249.0 ns/iter (+/- 2)
+test outline_glyph_8_from_cff    ... bench:   243.0 ns/iter (+/- 7)
+test from_data_ttf               ... bench:   200.0 ns/iter (+/- 3)
 test family_name                 ... bench:   161.0 ns/iter (+/- 5)
-test from_data_ttf               ... bench:    95.0 ns/iter (+/- 2)
 test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
 test glyph_2_hor_metrics         ... bench:     7.0 ns/iter (+/- 0)
 test x_height                    ... bench:     0.5 ns/iter (+/- 0)
@@ -126,6 +131,7 @@ extern crate std;
 use core::fmt;
 
 mod cff;
+mod cff2;
 mod cmap;
 mod glyf;
 mod head;
@@ -193,7 +199,7 @@ pub enum Error {
     /// An unsupported table version.
     UnsupportedTableVersion(TableName, u16),
 
-    /// A CFF table parsing error.
+    /// A CFF/CFF2 table parsing error.
     CFFError(CFFError),
 
     /// An attempt to slice a raw data out of bounds.
@@ -245,7 +251,7 @@ impl core::fmt::Display for Error {
                 write!(f, "table {:?} with version {} is not supported", name, version)
             }
             Error::CFFError(e) => {
-                write!(f, "{:?} table parsing failed cause {}", TableName::CompactFontFormat, e)
+                write!(f, "CFF table parsing failed cause {}", e)
             }
         }
     }
@@ -351,6 +357,7 @@ pub trait OutlineBuilder {
 pub enum TableName {
     CharacterToGlyphIndexMapping,
     CompactFontFormat,
+    CompactFontFormat2,
     GlyphData,
     Header,
     HorizontalHeader,
@@ -372,6 +379,7 @@ pub struct Font<'a> {
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
     cff_: Option<cff::Metadata<'a>>,
+    cff2: Option<cff2::Metadata<'a>>,
     cmap: Option<&'a [u8]>,
     glyf: Option<&'a [u8]>,
     hmtx: Option<&'a [u8]>,
@@ -435,6 +443,7 @@ impl<'a> Font<'a> {
             head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
             hhea: raw::hhea::Table::new(&[0; raw::hhea::Table::SIZE]),
             cff_: None,
+            cff2: None,
             cmap: None,
             glyf: None,
             hmtx: None,
@@ -516,6 +525,11 @@ impl<'a> Font<'a> {
                         font.cff_ = Some(cff::parse_metadata(data)?);
                     }
                 }
+                b"CFF2" => {
+                    if let Some(data) = data.get(range) {
+                        font.cff2 = Some(cff2::parse_metadata(data)?);
+                    }
+                }
                 b"cmap" => font.cmap = data.get(range),
                 b"glyf" => font.glyf = data.get(range),
                 b"hmtx" => font.hmtx = data.get(range),
@@ -548,6 +562,7 @@ impl<'a> Font<'a> {
             TableName::MaximumProfile               => true,
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
             TableName::CompactFontFormat            => self.cff_.is_some(),
+            TableName::CompactFontFormat2           => self.cff2.is_some(),
             TableName::GlyphData                    => self.glyf.is_some(),
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
             TableName::IndexToLocation              => self.loca.is_some(),
@@ -577,9 +592,9 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Outlines a glyph. Returns a tight glyph bounding box.
+    /// Outlines a glyph and returns a tight glyph bounding box.
     ///
-    /// This method support both `glyf` and `CFF` tables.
+    /// This method supports `glyf`, `CFF` and `CFF2` tables.
     ///
     /// # Example
     ///
@@ -614,8 +629,9 @@ impl<'a> Font<'a> {
     /// let data = std::fs::read("tests/fonts/glyphs.ttf").unwrap();
     /// let font = ttf_parser::Font::from_data(&data, 0).unwrap();
     /// let mut builder = Builder(String::new());
-    /// let glyph = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap();
+    /// let bbox = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap();
     /// assert_eq!(builder.0, "M 50 0 L 50 750 L 450 750 L 450 0 L 50 0 Z ");
+    /// assert_eq!(bbox, ttf_parser::Rect { x_min: 50, y_min: 0, x_max: 450, y_max: 750 });
     /// ```
     #[inline]
     pub fn outline_glyph(
@@ -629,6 +645,10 @@ impl<'a> Font<'a> {
 
         if let Some(ref metadata) = self.cff_ {
             return self.cff_glyph_outline(metadata, glyph_id, builder);
+        }
+
+        if let Some(ref metadata) = self.cff2 {
+            return self.cff2_glyph_outline(metadata, glyph_id, builder);
         }
 
         Err(Error::NoGlyph)

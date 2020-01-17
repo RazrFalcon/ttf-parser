@@ -322,8 +322,13 @@ impl<'a> Font<'a> {
                 let len: u8 = s.read().ok()?;
 
                 if i == index {
-                    let name = s.read_bytes(len as u16).ok()?;
-                    return core::str::from_utf8(name).ok();
+                    if len == 0 {
+                        // Empty name is an error.
+                        break;
+                    } else {
+                        let name = s.read_bytes(len as u16).ok()?;
+                        return core::str::from_utf8(name).ok();
+                    }
                 } else {
                     s.skip_len(len as u16);
                 }

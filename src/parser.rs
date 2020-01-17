@@ -55,6 +55,15 @@ impl FromData for u32 {
     }
 }
 
+impl FromData for i32 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        // For i32 it's faster to use TryInto, but for u16/i16 it's faster to index.
+        use core::convert::TryInto;
+        i32::from_be_bytes(data.try_into().unwrap())
+    }
+}
+
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
 #[derive(Clone, Copy, Debug)]
@@ -80,6 +89,20 @@ impl FromData for F2DOT14 {
     #[inline]
     fn parse(data: &[u8]) -> Self {
         F2DOT14(i16::parse(data) as f32 / 16384.0)
+    }
+}
+
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+#[derive(Clone, Copy, Debug)]
+pub struct Fixed(pub f32);
+
+impl FromData for Fixed {
+    const SIZE: usize = 4;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        Fixed(i32::parse(data) as f32 / 65536.0)
     }
 }
 

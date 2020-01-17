@@ -250,19 +250,6 @@ VMTX_METRICS = [
     TableRow(True,  TTF_Int16(),    'topSideBearing'),
 ]
 
-# https://docs.microsoft.com/en-us/typography/opentype/spec/post#header
-POST_TABLE = [
-    TableRow(False, TTF_Fixed(),   'version'),
-    TableRow(False, TTF_Fixed(),   'italicAngle'),
-    TableRow(True,  TTF_FWORD(),   'underlinePosition'),
-    TableRow(True,  TTF_FWORD(),   'underlineThickness'),
-    TableRow(False, TTF_UInt32(),  'isFixedPitch'),
-    TableRow(False, TTF_UInt32(),  'minMemType42'),
-    TableRow(False, TTF_UInt32(),  'maxMemType42'),
-    TableRow(False, TTF_UInt32(),  'minMemType1'),
-    TableRow(False, TTF_UInt32(),  'maxMemType1'),
-]
-
 # https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
 NAME_RECORD_TABLE = [
     TableRow(True,  TTF_UInt16(),   'platformID'),
@@ -488,10 +475,6 @@ print('pub mod vmtx {')
 print('use crate::parser::FromData;')
 print()
 generate_table(VMTX_METRICS, 'VerticalMetrics', owned=True, impl_from_data=True)
-print('}')
-print()
-print('pub mod post {')
-generate_table(POST_TABLE, 'Table')
 print('}')
 print()
 print('pub mod cmap {')

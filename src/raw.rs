@@ -275,34 +275,6 @@ pub mod vmtx {
     }
 }
 
-pub mod post {
-    #[derive(Clone, Copy)]
-    pub struct Table<'a> {
-        data: &'a [u8; 32],
-    }
-
-    impl<'a> Table<'a> {
-        pub const SIZE: usize = 32;
-
-        #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table {
-                data: array_ref![input, 32],
-            }
-        }
-
-        #[inline(always)]
-        pub fn underline_position(&self) -> i16 {
-            i16::from_be_bytes([self.data[8], self.data[9]])
-        }
-
-        #[inline(always)]
-        pub fn underline_thickness(&self) -> i16 {
-            i16::from_be_bytes([self.data[10], self.data[11]])
-        }
-    }
-}
-
 pub mod cmap {
     use crate::parser::FromData;
     use crate::GlyphId;

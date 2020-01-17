@@ -30,6 +30,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`name`) Retrieving a font's family name using [family_name()] method.
 - (`name`) Retrieving a font's PostScript name using [post_script_name()] method.
 - (`post`) Retrieving a font's underline metrics name using [underline_metrics()] method.
+- (`post`) Retrieving a glyph's name using [glyph_name()] method.
 - (`head`) Retrieving a font's units per EM value using [units_per_em()] method.
 - (`hhea`) Retrieving a generic font info using: [ascender()], [descender()], [height()]
   and [line_gap()] methods.
@@ -45,6 +46,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [family_name()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.family_name
 [post_script_name()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.post_script_name
 [underline_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.underline_metrics
+[glyph_name()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_name
 [units_per_em()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.units_per_em
 [ascender()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.ascender
 [descender()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.descender
@@ -101,11 +103,14 @@ test from_data_otf_cff           ... bench:   485.0 ns/iter (+/- 11)
 test outline_glyph_8_from_cff2   ... bench:   371.0 ns/iter (+/- 54)
 test outline_glyph_8_from_glyf   ... bench:   249.0 ns/iter (+/- 2)
 test outline_glyph_8_from_cff    ... bench:   243.0 ns/iter (+/- 7)
+test glyph_name_276              ... bench:   216.0 ns/iter (+/- 0)
 test from_data_ttf               ... bench:   200.0 ns/iter (+/- 3)
 test family_name                 ... bench:   161.0 ns/iter (+/- 5)
 test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
 test glyph_2_hor_metrics         ... bench:     7.0 ns/iter (+/- 0)
+test glyph_name_8                ... bench:     2.0 ns/iter (+/- 0)
 test x_height                    ... bench:     0.5 ns/iter (+/- 0)
+test underline_metrics           ... bench:     0.5 ns/iter (+/- 0)
 test strikeout_metrics           ... bench:     0.5 ns/iter (+/- 0)
 test units_per_em                ... bench:     0.5 ns/iter (+/- 0)
 test subscript_metrics           ... bench:     0.2 ns/iter (+/- 0)
@@ -115,6 +120,9 @@ test width                       ... bench:     0.2 ns/iter (+/- 0)
 
 `family_name` is expensive, because it allocates a `String` and the original data
 is stored as UTF-16 BE.
+
+`glyph_name_8` is faster that `glyph_name_276`, because for glyph indexes lower than 258
+we are using predefined names, so no parsing is involved.
 
 ### Safety
 

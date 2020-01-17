@@ -30,6 +30,16 @@ fn ascender(bencher: &mut bencher::Bencher) {
     })
 }
 
+fn underline_metrics(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        for _ in 0..1000 {
+            bencher::black_box(font.underline_metrics().unwrap());
+        }
+    })
+}
+
 fn strikeout_metrics(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = ttf::Font::from_data(&font_data, 0).unwrap();
@@ -64,6 +74,7 @@ bencher::benchmark_group!(perf,
     units_per_em,
     width,
     ascender,
+    underline_metrics,
     strikeout_metrics,
     subscript_metrics,
     x_height

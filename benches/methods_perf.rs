@@ -78,6 +78,22 @@ fn family_name(bencher: &mut bencher::Bencher) {
     })
 }
 
+fn glyph_name_8(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        bencher::black_box(font.glyph_name(ttf::GlyphId(8)));
+    })
+}
+
+fn glyph_name_276(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        bencher::black_box(font.glyph_name(ttf::GlyphId(276)));
+    })
+}
+
 fn glyph_index_u41(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = ttf::Font::from_data(&font_data, 0).unwrap();
@@ -133,6 +149,8 @@ bencher::benchmark_group!(perf,
     outline_glyph_276_from_cff,
     outline_glyph_8_from_cff2,
     outline_glyph_276_from_cff2,
+    glyph_name_8,
+    glyph_name_276,
     family_name,
     glyph_index_u41,
     glyph_2_hor_metrics

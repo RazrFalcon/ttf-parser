@@ -559,3 +559,14 @@ fn slicing() {
     subslice2(font.clone());
     subslice2(font);
 }
+
+#[test]
+fn glyph_name_01() {
+    let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+
+    assert_eq!(font.glyph_name(GlyphId(0)), Some(".notdef"));
+    assert_eq!(font.glyph_name(GlyphId(59)), Some("Amacron"));
+    assert_eq!(font.glyph_name(GlyphId(285)), Some("uni01050301"));
+    assert_eq!(font.glyph_name(GlyphId(10000)), None);
+}

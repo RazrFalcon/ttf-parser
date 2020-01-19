@@ -31,6 +31,19 @@ class TTF_UInt8(TTFType):
         print(f'self.data[{offset}]')
 
 
+class TTF_Int32(TTFType):
+    def to_rust(self) -> str:
+        return 'i32'
+
+    def size(self) -> int:
+        return 4
+
+    def print(self, offset: int) -> None:
+        print(f'i32::from_be_bytes(['
+              f'    self.data[{offset}], self.data[{offset + 1}], self.data[{offset + 2}], self.data[{offset + 3}]'
+              f'])')
+
+
 class TTF_UInt16(TTFType):
     def to_rust(self) -> str:
         return 'u16'
@@ -86,11 +99,18 @@ class TTF_UFWORD(TTF_UInt16):
     pass
 
 
-class TTF_Offset16(TTF_UInt16):
-    pass
+class TTF_Offset16(TTFType):
+    def to_rust(self) -> str:
+        return 'Offset16'
+
+    def size(self) -> int:
+        return 2
+
+    def print(self, offset: int) -> None:
+        print(f'Offset16(u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]))')
 
 
-class TTF_Optional_Offset16(TTF_UInt16):
+class TTF_Optional_Offset16(TTFType):
     def to_rust(self) -> str:
         return 'Option<Offset16>'
 
@@ -102,11 +122,20 @@ class TTF_Optional_Offset16(TTF_UInt16):
         print('if n != 0 { Some(Offset16(n)) } else { None }')
 
 
-class TTF_Offset32(TTF_UInt32):
-    pass
+class TTF_Offset32(TTFType):
+    def to_rust(self) -> str:
+        return 'Offset32'
+
+    def size(self) -> int:
+        return 4
+
+    def print(self, offset: int) -> None:
+        print(f'Offset32(u32::from_be_bytes(['
+              f'    self.data[{offset}], self.data[{offset + 1}], self.data[{offset + 2}], self.data[{offset + 3}]'
+              f']))')
 
 
-class TTF_Optional_Offset32(TTF_UInt32):
+class TTF_Optional_Offset32(TTFType):
     def to_rust(self) -> str:
         return 'Option<Offset32>'
 
@@ -145,20 +174,27 @@ class TTF_GlyphId_RangeInclusive(TTFType):
 
 class TTF_Tag(TTFType):
     def to_rust(self) -> str:
-        return '[u8; 4]'
+        return 'Tag'
 
     def size(self) -> int:
         return 4
 
     def print(self, offset: int) -> None:
         print('// Unwrap is safe, because an array and a slice have the same size.')
-        print(f'self.data[{offset}..{offset + self.size()}].try_into().unwrap()')
+        print(f'Tag::from_bytes(&self.data[{offset}..{offset + self.size()}].try_into().unwrap())')
 
 
-# unsupported
 class TTF_Fixed(TTFType):
+    def to_rust(self) -> str:
+        return 'f32'
+
     def size(self) -> int:
         return 4
+
+    def print(self, offset: int) -> None:
+        print(f'i32::from_be_bytes(['
+              f'    self.data[{offset}], self.data[{offset + 1}], self.data[{offset + 2}], self.data[{offset + 3}]'
+              f']) as f32 / 65536.0')
 
 
 # unsupported
@@ -171,6 +207,17 @@ class TTF_LONGDATETIME(TTFType):
 class TTF_Panose(TTFType):
     def size(self) -> int:
         return 10
+
+
+class TTF_F2DOT14(TTFType):
+    def to_rust(self) -> str:
+        return 'f32'
+
+    def size(self) -> int:
+        return 2
+
+    def print(self, offset: int) -> None:
+        print(f'i16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]) as f32 / 16384.0')
 
 
 class TableRow:
@@ -403,6 +450,28 @@ GDEF_RANGE_RECORD = [
     TableRow(False, TTF_UInt16(),                   'startCoverageIndex'),
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/fvar
+FVAR_TABLE = [
+    TableRow(False, TTF_UInt16(),   'majorVersion'),
+    TableRow(False, TTF_UInt16(),   'minorVersion'),
+    TableRow(True,  TTF_Offset16(), 'axesArrayOffset'),
+    TableRow(False, TTF_UInt16(),   'reserved'),
+    TableRow(True,  TTF_UInt16(),   'axisCount'),
+    TableRow(False, TTF_UInt16(),   'axisSize'),
+    TableRow(False, TTF_UInt16(),   'instanceCount'),
+    TableRow(False, TTF_UInt16(),   'instanceSize'),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord
+VARIATION_AXIS_RECORD = [
+    TableRow(True, TTF_Tag(),       'axisTag'),
+    TableRow(True, TTF_Int32(),     'minValue'),      # This three values actually have type Fixed,
+    TableRow(True, TTF_Int32(),     'defaultValue'),  # but we need to compare them later,
+    TableRow(True, TTF_Int32(),     'maxValue'),      # and Rust doesn't implement Ord for f32.
+    TableRow(True, TTF_UInt16(),    'flags'),
+    TableRow(True, TTF_UInt16(),    'axisNameID'),
+]
+
 
 def print_struct(name: str, size: int, owned: bool, has_tail: bool) -> None:
     print('#[derive(Clone, Copy)]')
@@ -532,7 +601,9 @@ print('    }}')
 print('}')
 print()
 print('use core::convert::TryInto;')
-print('use crate::parser::FromData;')
+print()
+print('use crate::Tag;')
+print('use crate::parser::{FromData, Offset32};')
 print()
 generate_table(TTC_HEADER, 'TTCHeader')
 print()
@@ -605,5 +676,15 @@ print()
 generate_table(GDEF_CLASS_RANGE_RECORD, 'ClassRangeRecord', owned=True, impl_from_data=True)
 print()
 generate_table(GDEF_RANGE_RECORD, 'RangeRecord', owned=True, impl_from_data=True)
+print('}')
+print()
+print('pub mod fvar {')
+print('use core::convert::TryInto;')
+print('use crate::Tag;')
+print('use crate::parser::{Offset16, FromData};')
+print()
+generate_table(FVAR_TABLE, 'Table', has_tail=True)
+print()
+generate_table(VARIATION_AXIS_RECORD, 'VariationAxisRecord', owned=True, impl_from_data=True)
 print('}')
 print()

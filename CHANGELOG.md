@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::glyph_class`
 - `Font::glyph_mark_attachment_class`
 - `Font::is_mark_glyph`
+- `Font::variation_axes_count`
+- `Font::variation_axis`
+- `Font::map_variation_coordinates`
+- `Tag` type.
 
 ### Changed
 - `Font::outline_glyph` not accepts `&mut dyn OutlineBuilder` and not `&mut impl OutlineBuilder`.

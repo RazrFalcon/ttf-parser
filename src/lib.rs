@@ -63,6 +63,8 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`GDEF`) Retrieving glyph's class using [glyph_class()] method.
 - (`GDEF`) Retrieving glyph's mark attachment class using [glyph_mark_attachment_class()] method.
 - (`GDEF`) Checking that glyph is a mark using [is_mark_glyph()] method.
+- (`avar`) Variation coordinates normalization using [map_variation_coordinates()] method.
+- (`fvar`) Variation axis parsing using [variation_axis()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -77,6 +79,8 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_class
 [glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
 [is_mark_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_mark_glyph
+[map_variation_coordinates()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.map_variation_coordinates
+[variation_axis()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.variation_axis
 
 ## Methods' computational complexity
 
@@ -144,9 +148,11 @@ extern crate std;
 
 use core::fmt;
 
+mod avar;
 mod cff;
 mod cff2;
 mod cmap;
+mod fvar;
 mod gdef;
 mod glyf;
 mod head;
@@ -162,8 +168,9 @@ mod raw;
 mod vhea;
 mod vmtx;
 
-use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray};
+use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray, Offset};
 pub use cff::CFFError;
+pub use fvar::VariationAxis;
 pub use gdef::{Class, GlyphClass};
 pub use name::*;
 pub use os2::*;
@@ -294,6 +301,122 @@ impl std::error::Error for Error {}
 pub(crate) type Result<T> = core::result::Result<T, Error>;
 
 
+/// A 4-byte tag.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Tag(pub u32);
+
+impl Tag {
+    /// Creates a `Tag` from bytes.
+    pub const fn from_bytes(bytes: &[u8; 4]) -> Self {
+        Tag(((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16) |
+            ((bytes[2] as u32) << 8) | (bytes[3] as u32))
+    }
+
+    /// Creates a `Tag` from bytes.
+    ///
+    /// In case of empty data will return `Tag` set to 0.
+    ///
+    /// When `bytes` are shorter than 4, will set missing bytes to ` `.
+    ///
+    /// Data after first 4 bytes is ignored.
+    pub fn from_bytes_lossy(bytes: &[u8]) -> Self {
+        if bytes.is_empty() {
+            return Tag::from_bytes(&[0, 0, 0, 0]);
+        }
+
+        let mut iter = bytes.iter().cloned().chain(core::iter::repeat(b' '));
+        Tag::from_bytes(&[
+            iter.next().unwrap(),
+            iter.next().unwrap(),
+            iter.next().unwrap(),
+            iter.next().unwrap(),
+        ])
+    }
+
+    /// Returns tag as 4-element byte array.
+    pub const fn to_bytes(self) -> [u8; 4] {
+        [
+            (self.0 >> 24 & 0xff) as u8,
+            (self.0 >> 16 & 0xff) as u8,
+            (self.0 >> 8 & 0xff) as u8,
+            (self.0 >> 0 & 0xff) as u8,
+        ]
+    }
+
+    /// Returns tag as 4-element byte array.
+    pub const fn to_chars(self) -> [char; 4] {
+        [
+            (self.0 >> 24 & 0xff) as u8 as char,
+            (self.0 >> 16 & 0xff) as u8 as char,
+            (self.0 >> 8 & 0xff) as u8 as char,
+            (self.0 >> 0 & 0xff) as u8 as char,
+        ]
+    }
+
+    /// Returns tag for a default script.
+    pub const fn default_script() -> Self {
+        Tag::from_bytes(b"DFLT")
+    }
+
+    /// Returns tag for a default language.
+    pub const fn default_language() -> Self {
+        Tag::from_bytes(b"dflt")
+    }
+
+    /// Checks if tag is null / `[0, 0, 0, 0]`.
+    pub const fn is_null(&self) -> bool {
+        self.0 == 0
+    }
+
+    /// Returns tag value as `u32` number.
+    pub const fn as_u32(&self) -> u32 {
+        self.0
+    }
+
+    /// Converts tag to lowercase.
+    pub fn to_lowercase(&self) -> Self {
+        let b = self.to_bytes();
+        Tag::from_bytes(&[
+            b[0].to_ascii_lowercase(),
+            b[1].to_ascii_lowercase(),
+            b[2].to_ascii_lowercase(),
+            b[3].to_ascii_lowercase(),
+        ])
+    }
+
+    /// Converts tag to uppercase.
+    pub fn to_uppercase(&self) -> Self {
+        let b = self.to_bytes();
+        Tag::from_bytes(&[
+            b[0].to_ascii_uppercase(),
+            b[1].to_ascii_uppercase(),
+            b[2].to_ascii_uppercase(),
+            b[3].to_ascii_uppercase(),
+        ])
+    }
+}
+
+impl core::fmt::Debug for Tag {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Tag({})", self)
+    }
+}
+
+impl core::fmt::Display for Tag {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let b = self.to_chars();
+        write!(
+            f,
+            "{}{}{}{}",
+            b.get(0).unwrap_or(&' '),
+            b.get(1).unwrap_or(&' '),
+            b.get(2).unwrap_or(&' '),
+            b.get(3).unwrap_or(&' ')
+        )
+    }
+}
+
+
 /// A line metrics.
 ///
 /// Used for underline and strikeout.
@@ -379,9 +502,11 @@ pub trait OutlineBuilder {
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
 pub enum TableName {
+    AxisVariations,
     CharacterToGlyphIndexMapping,
     CompactFontFormat,
     CompactFontFormat2,
+    FontVariations,
     GlyphData,
     GlyphDefinition,
     Header,
@@ -401,11 +526,13 @@ pub enum TableName {
 /// A font data handle.
 #[derive(Clone)]
 pub struct Font<'a> {
+    avar: Option<&'a [u8]>,
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
     cff_: Option<cff::Metadata<'a>>,
     cff2: Option<cff2::Metadata<'a>>,
     cmap: Option<&'a [u8]>,
+    fvar: Option<raw::fvar::Table<'a>>,
     gdef: Option<raw::gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
     hmtx: Option<&'a [u8]>,
@@ -465,11 +592,13 @@ impl<'a> Font<'a> {
         let tables: LazyArray<raw::TableRecord> = s.read_array(num_tables)?;
 
         let mut font = Font {
+            avar: None,
             head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
             hhea: raw::hhea::Table::new(&[0; raw::hhea::Table::SIZE]),
             cff_: None,
             cff2: None,
             cmap: None,
+            fvar: None,
             gdef: None,
             glyf: None,
             hmtx: None,
@@ -486,13 +615,13 @@ impl<'a> Font<'a> {
         let mut has_head = false;
         let mut has_hhea = false;
         for table in tables {
-            let offset = table.offset() as usize;
+            let offset = table.offset().to_usize();
             let length = table.length() as usize;
             let range = offset..(offset + length);
 
             // It's way faster to compare `[u8; 4]` with `&[u8]`
             // rather than `&[u8]` with `&[u8]`.
-            match &table.table_tag() {
+            match &table.table_tag().to_bytes() {
                 b"head" => {
                     if length != raw::head::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::Header));
@@ -539,6 +668,13 @@ impl<'a> Font<'a> {
 
                     font.gdef = data.get(range).map(raw::gdef::Table::new);
                 }
+                b"fvar" => {
+                    if length < raw::fvar::Table::MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::FontVariations));
+                    }
+
+                    font.fvar = data.get(range).map(raw::fvar::Table::new);
+                }
                 b"CFF " => {
                     if let Some(data) = data.get(range) {
                         font.cff_ = Some(cff::parse_metadata(data)?);
@@ -549,6 +685,7 @@ impl<'a> Font<'a> {
                         font.cff2 = Some(cff2::parse_metadata(data)?);
                     }
                 }
+                b"avar" => font.avar = data.get(range),
                 b"cmap" => font.cmap = data.get(range),
                 b"glyf" => font.glyf = data.get(range),
                 b"hmtx" => font.hmtx = data.get(range),
@@ -580,9 +717,11 @@ impl<'a> Font<'a> {
             TableName::Header                       => true,
             TableName::HorizontalHeader             => true,
             TableName::MaximumProfile               => true,
+            TableName::AxisVariations               => self.avar.is_some(),
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
             TableName::CompactFontFormat            => self.cff_.is_some(),
             TableName::CompactFontFormat2           => self.cff2.is_some(),
+            TableName::FontVariations               => self.fvar.is_some(),
             TableName::GlyphData                    => self.glyf.is_some(),
             TableName::GlyphDefinition              => self.gdef.is_some(),
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
@@ -723,7 +862,7 @@ impl fmt::Debug for Font<'_> {
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     let table = raw::TTCHeader::new(data.get(0..raw::TTCHeader::SIZE)?);
 
-    if &table.ttc_tag() != b"ttcf" {
+    if &table.ttc_tag().to_bytes() != b"ttcf" {
         return None;
     }
 

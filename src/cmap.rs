@@ -17,7 +17,7 @@ impl<'a> Font<'a> {
         s.skip::<u16>(); // version
         let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
         for record in records {
-            let subtable_data = data.try_slice(record.offset() as usize..data.len())?;
+            let subtable_data = data.try_slice_from(record.offset())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
@@ -84,7 +84,7 @@ impl<'a> Font<'a> {
         s.skip::<u16>(); // version
         let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
         for record in records {
-            let subtable_data = data.try_slice(record.offset() as usize..data.len())?;
+            let subtable_data = data.try_slice_from(record.offset())?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,

@@ -14,8 +14,10 @@ macro_rules! array_ref {
     }};
 }
 
-use crate::parser::FromData;
 use core::convert::TryInto;
+
+use crate::parser::{FromData, Offset32};
+use crate::Tag;
 
 #[derive(Clone, Copy)]
 pub struct TTCHeader<'a> {
@@ -33,9 +35,9 @@ impl<'a> TTCHeader<'a> {
     }
 
     #[inline(always)]
-    pub fn ttc_tag(&self) -> [u8; 4] {
+    pub fn ttc_tag(&self) -> Tag {
         // Unwrap is safe, because an array and a slice have the same size.
-        self.data[0..4].try_into().unwrap()
+        Tag::from_bytes(&self.data[0..4].try_into().unwrap())
     }
 
     #[inline(always)]
@@ -60,14 +62,19 @@ impl TableRecord {
     }
 
     #[inline(always)]
-    pub fn table_tag(&self) -> [u8; 4] {
+    pub fn table_tag(&self) -> Tag {
         // Unwrap is safe, because an array and a slice have the same size.
-        self.data[0..4].try_into().unwrap()
+        Tag::from_bytes(&self.data[0..4].try_into().unwrap())
     }
 
     #[inline(always)]
-    pub fn offset(&self) -> u32 {
-        u32::from_be_bytes([self.data[8], self.data[9], self.data[10], self.data[11]])
+    pub fn offset(&self) -> Offset32 {
+        Offset32(u32::from_be_bytes([
+            self.data[8],
+            self.data[9],
+            self.data[10],
+            self.data[11],
+        ]))
     }
 
     #[inline(always)]
@@ -305,8 +312,13 @@ pub mod cmap {
         }
 
         #[inline(always)]
-        pub fn offset(&self) -> u32 {
-            u32::from_be_bytes([self.data[4], self.data[5], self.data[6], self.data[7]])
+        pub fn offset(&self) -> Offset32 {
+            Offset32(u32::from_be_bytes([
+                self.data[4],
+                self.data[5],
+                self.data[6],
+                self.data[7],
+            ]))
         }
     }
 
@@ -772,6 +784,92 @@ pub mod gdef {
 
     impl FromData for RangeRecord {
         const SIZE: usize = RangeRecord::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+}
+
+pub mod fvar {
+    use crate::parser::{FromData, Offset16};
+    use crate::Tag;
+    use core::convert::TryInto;
+
+    #[derive(Clone, Copy)]
+    pub struct Table<'a> {
+        pub data: &'a [u8],
+    }
+
+    impl<'a> Table<'a> {
+        pub const MIN_SIZE: usize = 16;
+
+        #[inline(always)]
+        pub fn new(input: &'a [u8]) -> Self {
+            Table { data: input }
+        }
+
+        #[inline(always)]
+        pub fn axes_array_offset(&self) -> Offset16 {
+            Offset16(u16::from_be_bytes([self.data[4], self.data[5]]))
+        }
+
+        #[inline(always)]
+        pub fn axis_count(&self) -> u16 {
+            u16::from_be_bytes([self.data[8], self.data[9]])
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct VariationAxisRecord {
+        data: [u8; 20],
+    }
+
+    impl VariationAxisRecord {
+        pub const SIZE: usize = 20;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            VariationAxisRecord { data }
+        }
+
+        #[inline(always)]
+        pub fn axis_tag(&self) -> Tag {
+            // Unwrap is safe, because an array and a slice have the same size.
+            Tag::from_bytes(&self.data[0..4].try_into().unwrap())
+        }
+
+        #[inline(always)]
+        pub fn min_value(&self) -> i32 {
+            i32::from_be_bytes([self.data[4], self.data[5], self.data[6], self.data[7]])
+        }
+
+        #[inline(always)]
+        pub fn default_value(&self) -> i32 {
+            i32::from_be_bytes([self.data[8], self.data[9], self.data[10], self.data[11]])
+        }
+
+        #[inline(always)]
+        pub fn max_value(&self) -> i32 {
+            i32::from_be_bytes([self.data[12], self.data[13], self.data[14], self.data[15]])
+        }
+
+        #[inline(always)]
+        pub fn flags(&self) -> u16 {
+            u16::from_be_bytes([self.data[16], self.data[17]])
+        }
+
+        #[inline(always)]
+        pub fn axis_name_id(&self) -> u16 {
+            u16::from_be_bytes([self.data[18], self.data[19]])
+        }
+    }
+
+    impl FromData for VariationAxisRecord {
+        const SIZE: usize = VariationAxisRecord::SIZE;
 
         #[inline]
         fn parse(data: &[u8]) -> Self {

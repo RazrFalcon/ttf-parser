@@ -189,6 +189,13 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 
     #[inline]
+    pub fn binary_search(&self, x: &T) -> Option<T>
+        where T: Ord
+    {
+        self.binary_search_by(|p| p.cmp(x))
+    }
+
+    #[inline]
     pub fn binary_search_by<F>(&self, mut f: F) -> Option<T>
         where F: FnMut(&T) -> core::cmp::Ordering
     {
@@ -234,7 +241,7 @@ impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
     fn into_iter(self) -> Self::IntoIter {
         LazyArrayIter {
             data: self,
-            offset: 0,
+            index: 0,
         }
     }
 }
@@ -242,7 +249,7 @@ impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
 
 pub struct LazyArrayIter<'a, T> {
     data: LazyArray<'a, T>,
-    offset: u32,
+    index: u32,
 }
 
 impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
@@ -250,12 +257,12 @@ impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.offset as usize == self.data.len() {
+        if self.index as usize == self.data.len() {
             return None;
         }
 
-        let index = self.offset;
-        self.offset += 1;
+        let index = self.index;
+        self.index += 1;
         self.data.get(index)
     }
 }
@@ -263,6 +270,7 @@ impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
 
 pub trait TrySlice<'a> {
     fn try_slice(&self, range: Range<usize>) -> Result<&'a [u8]>;
+    fn try_slice_from<T: Offset>(&self, start: T) -> Result<&'a [u8]>;
 }
 
 impl<'a> TrySlice<'a> for &'a [u8] {
@@ -272,6 +280,16 @@ impl<'a> TrySlice<'a> for &'a [u8] {
             .ok_or_else(|| Error::SliceOutOfBounds {
                 start: range.start as u32,
                 end: range.end as u32,
+                data_len: self.len() as u32,
+            })
+    }
+
+    #[inline]
+    fn try_slice_from<T: Offset>(&self, start: T) -> Result<&'a [u8]> {
+        self.get(start.to_usize()..)
+            .ok_or_else(|| Error::SliceOutOfBounds {
+                start: start.to_usize() as u32,
+                end: self.len() as u32,
                 data_len: self.len() as u32,
             })
     }
@@ -421,4 +439,72 @@ impl<'a> SafeStream<'a> {
         self.offset += len.to_usize();
         &self.data[offset..(offset + len.to_usize())]
     }
+}
+
+
+pub trait Offset {
+    fn to_usize(&self) -> usize;
+    fn is_null(&self) -> bool { self.to_usize() == 0 }
+}
+
+
+#[derive(Clone, Copy, Debug)]
+pub struct Offset16(pub u16);
+
+impl Offset for Offset16 {
+    fn to_usize(&self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl FromData for Offset16 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        Offset16(SafeStream::new(data).read())
+    }
+}
+
+impl FromData for Option<Offset16> {
+    const SIZE: usize = Offset16::SIZE;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        let offset = Offset16::parse(data);
+        if offset.0 != 0 { Some(offset) } else { None }
+    }
+}
+
+
+#[derive(Clone, Copy, Debug)]
+pub struct Offset32(pub u32);
+
+impl Offset for Offset32 {
+    fn to_usize(&self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl FromData for Offset32 {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        Offset32(SafeStream::new(data).read())
+    }
+}
+
+impl FromData for Option<Offset32> {
+    const SIZE: usize = Offset32::SIZE;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        let offset = Offset32::parse(data);
+        if offset.0 != 0 { Some(offset) } else { None }
+    }
+}
+
+
+/// Array of offsets from beginning of `data`.
+#[derive(Clone, Copy)]
+pub struct Offsets<'a, T: Offset> {
+    data: &'a [u8],
+    offsets: LazyArray<'a, T>, // [Offset16/Offset32]
 }

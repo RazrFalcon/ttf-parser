@@ -86,13 +86,29 @@ class TTF_UFWORD(TTF_UInt16):
     pass
 
 
+class TTF_Offset16(TTF_UInt16):
+    pass
+
+
+class TTF_Optional_Offset16(TTF_UInt16):
+    def to_rust(self) -> str:
+        return 'Option<Offset16>'
+
+    def size(self) -> int:
+        return 2
+
+    def print(self, offset: int) -> None:
+        print(f'let n = u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]);')
+        print('if n != 0 { Some(Offset16(n)) } else { None }')
+
+
 class TTF_Offset32(TTF_UInt32):
     pass
 
 
 class TTF_Optional_Offset32(TTF_UInt32):
     def to_rust(self) -> str:
-        return 'Option<u32>'
+        return 'Option<Offset32>'
 
     def size(self) -> int:
         return 4
@@ -101,7 +117,7 @@ class TTF_Optional_Offset32(TTF_UInt32):
         print(f'let n = u32::from_be_bytes(['
               f'    self.data[{offset}], self.data[{offset + 1}], self.data[{offset + 2}], self.data[{offset + 3}]'
               f']);')
-        print('if n != 0 { Some(n) } else { None }')
+        print('if n != 0 { Some(Offset32(n)) } else { None }')
 
 
 class TTF_GlyphId(TTFType):
@@ -113,6 +129,18 @@ class TTF_GlyphId(TTFType):
 
     def print(self, offset: int) -> None:
         print(f'GlyphId(u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]))')
+
+
+class TTF_GlyphId_RangeInclusive(TTFType):
+    def to_rust(self) -> str:
+        return 'RangeInclusive<GlyphId>'
+
+    def size(self) -> int:
+        return 4
+
+    def print(self, offset: int) -> None:
+        print(f'GlyphId(u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]))'
+              f'..=GlyphId(u16::from_be_bytes([self.data[{offset+2}], self.data[{offset + 3}]]))')
 
 
 class TTF_Tag(TTFType):
@@ -150,10 +178,11 @@ class TableRow:
     ttf_type: TTFType
     name: str
 
-    def __init__(self, enable: bool, ttf_type: TTFType, name: str):
+    def __init__(self, enable: bool, ttf_type: TTFType, name: str, optional: bool = False):
         self.enable = enable
         self.ttf_type = ttf_type
         self.name = name
+        self.optional = optional
 
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
@@ -308,7 +337,7 @@ MAXP_TABLE = [
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/os2#os2-table-formats
-OS_2_TABLE_V0 = [
+OS_2_TABLE = [
     TableRow(True,  TTF_UInt16(),   'version'),
     TableRow(False, TTF_Int16(),    'xAvgCharWidth'),
     TableRow(True,  TTF_UInt16(),   'usWeightClass'),
@@ -339,24 +368,66 @@ OS_2_TABLE_V0 = [
     TableRow(False, TTF_Int16(),    'sTypoLineGap'),
     TableRow(False, TTF_UInt16(),   'usWinAscent'),
     TableRow(False, TTF_UInt16(),   'usWinDescent'),
+    TableRow(False, TTF_UInt32(),   'ulCodePageRange1', optional=True),
+    TableRow(False, TTF_UInt32(),   'ulCodePageRange2', optional=True),
+    TableRow(False, TTF_Int16(),    'sxHeight', optional=True),
+    TableRow(False, TTF_Int16(),    'sCapHeight', optional=True),
+    TableRow(False, TTF_UInt16(),   'usDefaultChar', optional=True),
+    TableRow(False, TTF_UInt16(),   'usBreakChar', optional=True),
+    TableRow(False, TTF_UInt16(),   'usMaxContext', optional=True),
+    TableRow(False, TTF_UInt16(),   'usLowerOpticalPointSize', optional=True),
+    TableRow(False, TTF_UInt16(),   'usUpperOpticalPointSize', optional=True),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
+GDEF_TABLE = [
+    TableRow(True,  TTF_UInt16(),            'majorVersion'),
+    TableRow(True,  TTF_UInt16(),            'minorVersion'),
+    TableRow(True,  TTF_Optional_Offset16(), 'glyphClassDefOffset'),
+    TableRow(False, TTF_Optional_Offset16(), 'attachListOffset'),
+    TableRow(False, TTF_Optional_Offset16(), 'ligCaretListOffset'),
+    TableRow(True,  TTF_Optional_Offset16(), 'markAttachClassDefOffset'),
+    TableRow(False, TTF_Optional_Offset16(), 'markGlyphSetsDefOffset', optional=True),
+    TableRow(False, TTF_Optional_Offset32(), 'itemVarStoreOffset', optional=True),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table-format-2
+GDEF_CLASS_RANGE_RECORD = [
+    TableRow(True,  TTF_GlyphId_RangeInclusive(),   'range'),
+    TableRow(True,  TTF_UInt16(),                   'class'),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-format-2
+GDEF_RANGE_RECORD = [
+    TableRow(True,  TTF_GlyphId_RangeInclusive(),   'range'),
+    TableRow(False, TTF_UInt16(),                   'startCoverageIndex'),
 ]
 
 
-def print_struct(name: str, size: int, owned: bool) -> None:
+def print_struct(name: str, size: int, owned: bool, has_tail: bool) -> None:
     print('#[derive(Clone, Copy)]')
-    if owned:
+    if has_tail:
+        print(f'pub struct {name}<\'a> {{ pub data: &\'a [u8] }}')
+    elif owned:
         print(f'pub struct {name} {{ data: [u8; {size}] }}')
     else:
         print(f'pub struct {name}<\'a> {{ data: &\'a [u8; {size}] }}')
 
 
-def print_struct_size(size: int) -> None:
-    print(f'pub const SIZE: usize = {size};')
+def print_struct_size(size: int, has_tail: bool) -> None:
+    if has_tail:
+        print(f'pub const MIN_SIZE: usize = {size};')
+    else:
+        print(f'pub const SIZE: usize = {size};')
 
 
-def print_constructor(name: str, size: int, owned: bool) -> None:
+def print_constructor(name: str, size: int, owned: bool, has_tail: bool) -> None:
     print('#[inline(always)]')
-    if owned:
+    if has_tail:
+        print('pub fn new(input: &\'a [u8]) -> Self {')
+        print(f'    {name} {{ data: input }}')
+        print('}')
+    elif owned:
         print('pub fn new(input: &[u8]) -> Self {')
         print('    let mut data = [0u8; Self::SIZE];')
         # Do not use `copy_from_slice`, because it's slower.
@@ -392,24 +463,30 @@ def print_impl_from_data(name: str) -> None:
 
 # Structs smaller than 16 bytes is more efficient to store as owned.
 def generate_table(table: List[TableRow], struct_name: str, owned: bool = False,
-                   impl_from_data: bool = False) -> None:
+                   impl_from_data: bool = False, has_tail: bool = False) -> None:
     struct_size = 0
     for row in table:
-        struct_size += row.ttf_type.size()
+        if row.optional:
+            break
+        else:
+            struct_size += row.ttf_type.size()
 
-    print_struct(struct_name, struct_size, owned)
+    print_struct(struct_name, struct_size, owned, has_tail)
     print()
     if owned:
         print(f'impl {struct_name} {{')
     else:
         print(f'impl<\'a> {struct_name}<\'a> {{')
-    print_struct_size(struct_size)
+    print_struct_size(struct_size, has_tail)
     print()
-    print_constructor(struct_name, struct_size, owned)
+    print_constructor(struct_name, struct_size, owned, has_tail)
     print()
 
     offset = 0
     for row in table:
+        if row.optional:
+            break
+
         if not row.enable:
             offset += row.ttf_type.size()
             continue
@@ -424,6 +501,18 @@ def generate_table(table: List[TableRow], struct_name: str, owned: bool = False,
     if impl_from_data:
         print()
         print_impl_from_data(struct_name)
+
+
+def table_field_offset(table: List[TableRow], field: str) -> None:
+    offset = 0
+    for row in table:
+        if row.name == field:
+            print(f'pub const {to_snake_case(row.name).upper()}_OFFSET: usize = {offset};')
+            return
+
+        offset += row.ttf_type.size()
+
+    raise ValueError('unknown field')
 
 
 print('// This file is autogenerated by scripts/get-tables.py')
@@ -479,7 +568,7 @@ print('}')
 print()
 print('pub mod cmap {')
 print('use crate::GlyphId;')
-print('use crate::parser::FromData;')
+print('use crate::parser::{FromData, Offset32};')
 print()
 generate_table(CMAP_ENCODING_RECORD, 'EncodingRecord', owned=True, impl_from_data=True)
 print()
@@ -495,10 +584,26 @@ generate_table(CMAP_VARIATION_SELECTOR_RECORD, 'VariationSelectorRecord', owned=
 print('}')
 print()
 print('pub mod os_2 {')
-generate_table(OS_2_TABLE_V0, 'TableV0')
+table_field_offset(OS_2_TABLE, 'sxHeight')
+print()
+generate_table(OS_2_TABLE, 'Table', has_tail=True)
 print('}')
 print()
 print('pub mod name {')
 generate_table(NAME_RECORD_TABLE, 'NameRecord', owned=True)
+print('}')
+print()
+print('pub mod gdef {')
+print('use core::ops::RangeInclusive;')
+print('use crate::GlyphId;')
+print('use crate::parser::{Offset16, FromData};')
+print()
+table_field_offset(GDEF_TABLE, 'markGlyphSetsDefOffset')
+print()
+generate_table(GDEF_TABLE, 'Table', has_tail=True)
+print()
+generate_table(GDEF_CLASS_RANGE_RECORD, 'ClassRangeRecord', owned=True, impl_from_data=True)
+print()
+generate_table(GDEF_RANGE_RECORD, 'RangeRecord', owned=True, impl_from_data=True)
 print('}')
 print()

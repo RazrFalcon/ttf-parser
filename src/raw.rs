@@ -276,7 +276,7 @@ pub mod vmtx {
 }
 
 pub mod cmap {
-    use crate::parser::FromData;
+    use crate::parser::{FromData, Offset32};
     use crate::GlyphId;
 
     #[derive(Clone, Copy)]
@@ -495,20 +495,20 @@ pub mod cmap {
         }
 
         #[inline(always)]
-        pub fn default_uvs_offset(&self) -> Option<u32> {
+        pub fn default_uvs_offset(&self) -> Option<Offset32> {
             let n = u32::from_be_bytes([self.data[3], self.data[4], self.data[5], self.data[6]]);
             if n != 0 {
-                Some(n)
+                Some(Offset32(n))
             } else {
                 None
             }
         }
 
         #[inline(always)]
-        pub fn non_default_uvs_offset(&self) -> Option<u32> {
+        pub fn non_default_uvs_offset(&self) -> Option<Offset32> {
             let n = u32::from_be_bytes([self.data[7], self.data[8], self.data[9], self.data[10]]);
             if n != 0 {
-                Some(n)
+                Some(Offset32(n))
             } else {
                 None
             }
@@ -526,19 +526,19 @@ pub mod cmap {
 }
 
 pub mod os_2 {
+    pub const SX_HEIGHT_OFFSET: usize = 86;
+
     #[derive(Clone, Copy)]
-    pub struct TableV0<'a> {
-        data: &'a [u8; 78],
+    pub struct Table<'a> {
+        pub data: &'a [u8],
     }
 
-    impl<'a> TableV0<'a> {
-        pub const SIZE: usize = 78;
+    impl<'a> Table<'a> {
+        pub const MIN_SIZE: usize = 78;
 
         #[inline(always)]
         pub fn new(input: &'a [u8]) -> Self {
-            TableV0 {
-                data: array_ref![input, 78],
-            }
+            Table { data: input }
         }
 
         #[inline(always)]
@@ -657,6 +657,125 @@ pub mod name {
         #[inline(always)]
         pub fn offset(&self) -> u16 {
             u16::from_be_bytes([self.data[10], self.data[11]])
+        }
+    }
+}
+
+pub mod gdef {
+    use crate::parser::{FromData, Offset16};
+    use crate::GlyphId;
+    use core::ops::RangeInclusive;
+
+    pub const MARK_GLYPH_SETS_DEF_OFFSET_OFFSET: usize = 12;
+
+    #[derive(Clone, Copy)]
+    pub struct Table<'a> {
+        pub data: &'a [u8],
+    }
+
+    impl<'a> Table<'a> {
+        pub const MIN_SIZE: usize = 12;
+
+        #[inline(always)]
+        pub fn new(input: &'a [u8]) -> Self {
+            Table { data: input }
+        }
+
+        #[inline(always)]
+        pub fn major_version(&self) -> u16 {
+            u16::from_be_bytes([self.data[0], self.data[1]])
+        }
+
+        #[inline(always)]
+        pub fn minor_version(&self) -> u16 {
+            u16::from_be_bytes([self.data[2], self.data[3]])
+        }
+
+        #[inline(always)]
+        pub fn glyph_class_def_offset(&self) -> Option<Offset16> {
+            let n = u16::from_be_bytes([self.data[4], self.data[5]]);
+            if n != 0 {
+                Some(Offset16(n))
+            } else {
+                None
+            }
+        }
+
+        #[inline(always)]
+        pub fn mark_attach_class_def_offset(&self) -> Option<Offset16> {
+            let n = u16::from_be_bytes([self.data[10], self.data[11]]);
+            if n != 0 {
+                Some(Offset16(n))
+            } else {
+                None
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct ClassRangeRecord {
+        data: [u8; 6],
+    }
+
+    impl ClassRangeRecord {
+        pub const SIZE: usize = 6;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            ClassRangeRecord { data }
+        }
+
+        #[inline(always)]
+        pub fn range(&self) -> RangeInclusive<GlyphId> {
+            GlyphId(u16::from_be_bytes([self.data[0], self.data[1]]))
+                ..=GlyphId(u16::from_be_bytes([self.data[2], self.data[3]]))
+        }
+
+        #[inline(always)]
+        pub fn class(&self) -> u16 {
+            u16::from_be_bytes([self.data[4], self.data[5]])
+        }
+    }
+
+    impl FromData for ClassRangeRecord {
+        const SIZE: usize = ClassRangeRecord::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct RangeRecord {
+        data: [u8; 6],
+    }
+
+    impl RangeRecord {
+        pub const SIZE: usize = 6;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            RangeRecord { data }
+        }
+
+        #[inline(always)]
+        pub fn range(&self) -> RangeInclusive<GlyphId> {
+            GlyphId(u16::from_be_bytes([self.data[0], self.data[1]]))
+                ..=GlyphId(u16::from_be_bytes([self.data[2], self.data[3]]))
+        }
+    }
+
+    impl FromData for RangeRecord {
+        const SIZE: usize = RangeRecord::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
         }
     }
 }

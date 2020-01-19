@@ -117,7 +117,7 @@ impl<'a> Font<'a> {
         let record = records.binary_search_by(|v| v.var_selector().cmp(&variation)).ok_or(Error::NoGlyph)?;
 
         if let Some(offset) = record.default_uvs_offset() {
-            let data = data.try_slice(offset as usize..data.len())?;
+            let data = data.try_slice_from(offset)?;
             let mut s = Stream::new(data);
             let ranges: LazyArray<raw::UnicodeRangeRecord> = s.read_array32()?;
             for range in ranges {
@@ -129,7 +129,7 @@ impl<'a> Font<'a> {
         }
 
         if let Some(offset) = record.non_default_uvs_offset() {
-            let data = data.try_slice(offset as usize..data.len())?;
+            let data = data.try_slice_from(offset)?;
             let mut s = Stream::new(data);
             let uvs_mappings: LazyArray<raw::UVSMappingRecord> = s.read_array32()?;
             if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {

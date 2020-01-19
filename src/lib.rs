@@ -17,17 +17,17 @@ A high-level, safe, zero-allocation TrueType font parser.
   <br/>All subtable formats except Mixed Coverage (8) are supported.
 - (`cmap`) Character variation to glyph index mapping using [glyph_variation_index()] method.
 - (`glyf`) Glyph outlining using [outline_glyph()] method.
-- (`hmtx`) Retrieving a glyph's horizontal metrics using [glyph_hor_metrics()] method.
-- (`vmtx`) Retrieving a glyph's vertical metrics using [glyph_ver_metrics()] method.
-- (`kern`) Retrieving a glyphs pair kerning using [glyphs_kerning()] method.
-- (`maxp`) Retrieving a total number of glyphs using [number_of_glyphs()] method.
+- (`hmtx`) Retrieving glyph's horizontal metrics using [glyph_hor_metrics()] method.
+- (`vmtx`) Retrieving glyph's vertical metrics using [glyph_ver_metrics()] method.
+- (`kern`) Retrieving glyphs pair kerning using [glyphs_kerning()] method.
+- (`maxp`) Retrieving total number of glyphs using [number_of_glyphs()] method.
 - (`name`) Listing all name records using [names()] method.
-- (`name`) Retrieving a font's family name using [family_name()] method.
-- (`name`) Retrieving a font's PostScript name using [post_script_name()] method.
-- (`post`) Retrieving a font's underline metrics name using [underline_metrics()] method.
-- (`post`) Retrieving a glyph's name using [glyph_name()] method.
-- (`head`) Retrieving a font's units per EM value using [units_per_em()] method.
-- (`hhea`) Retrieving a generic font info using: [ascender()], [descender()], [height()]
+- (`name`) Retrieving font's family name using [family_name()] method.
+- (`name`) Retrieving font's PostScript name using [post_script_name()] method.
+- (`post`) Retrieving font's underline metrics name using [underline_metrics()] method.
+- (`post`) Retrieving glyph's name using [glyph_name()] method.
+- (`head`) Retrieving font's units per EM value using [units_per_em()] method.
+- (`hhea`) Retrieving generic font info using: [ascender()], [descender()], [height()]
   and [line_gap()] methods.
 
 [glyph_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_index
@@ -52,14 +52,17 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 - (`CFF `) Glyph outlining using [outline_glyph()] method.
 - (`CFF2`) Glyph outlining using [outline_glyph()] method.
-- (`OS/2`) Retrieving a font kind using [is_regular()], [is_italic()],
+- (`OS/2`) Retrieving font's kind using [is_regular()], [is_italic()],
   [is_bold()] and [is_oblique()] methods.
-- (`OS/2`) Retrieving a font's weight using [weight()] method.
-- (`OS/2`) Retrieving a font's width using [width()] method.
-- (`OS/2`) Retrieving a font's X height using [x_height()] method.
-- (`OS/2`) Retrieving a font's strikeout metrics using [strikeout_metrics()] method.
-- (`OS/2`) Retrieving a font's subscript metrics using [subscript_metrics()] method.
-- (`OS/2`) Retrieving a font's superscript metrics using [superscript_metrics()] method.
+- (`OS/2`) Retrieving font's weight using [weight()] method.
+- (`OS/2`) Retrieving font's width using [width()] method.
+- (`OS/2`) Retrieving font's X height using [x_height()] method.
+- (`OS/2`) Retrieving font's strikeout metrics using [strikeout_metrics()] method.
+- (`OS/2`) Retrieving font's subscript metrics using [subscript_metrics()] method.
+- (`OS/2`) Retrieving font's superscript metrics using [superscript_metrics()] method.
+- (`GDEF`) Retrieving glyph's class using [glyph_class()] method.
+- (`GDEF`) Retrieving glyph's mark attachment class using [glyph_mark_attachment_class()] method.
+- (`GDEF`) Checking that glyph is a mark using [is_mark_glyph()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -71,6 +74,9 @@ A high-level, safe, zero-allocation TrueType font parser.
 [strikeout_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.strikeout_metrics
 [subscript_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.subscript_metrics
 [superscript_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.superscript_metrics
+[glyph_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_class
+[glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
+[is_mark_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_mark_glyph
 
 ## Methods' computational complexity
 
@@ -141,6 +147,7 @@ use core::fmt;
 mod cff;
 mod cff2;
 mod cmap;
+mod gdef;
 mod glyf;
 mod head;
 mod hhea;
@@ -157,6 +164,7 @@ mod vmtx;
 
 use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray};
 pub use cff::CFFError;
+pub use gdef::{Class, GlyphClass};
 pub use name::*;
 pub use os2::*;
 
@@ -207,8 +215,10 @@ pub enum Error {
     /// An unsupported table version.
     UnsupportedTableVersion(TableName, u16),
 
-    /// A CFF/CFF2 table parsing error.
-    CFFError(CFFError),
+    /// An invalid glyph class.
+    ///
+    /// <https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table>
+    InvalidGlyphClass(u16),
 
     /// An attempt to slice a raw data out of bounds.
     ///
@@ -220,6 +230,9 @@ pub enum Error {
         end: u32,
         data_len: u32,
     },
+
+    /// A CFF/CFF2 table parsing error.
+    CFFError(CFFError),
 }
 
 impl core::fmt::Display for Error {
@@ -236,9 +249,6 @@ impl core::fmt::Display for Error {
             }
             Error::InvalidTableSize(name) => {
                 write!(f, "table {:?} has an invalid size", name)
-            }
-            Error::SliceOutOfBounds { start, end, data_len } => {
-                write!(f, "an attempt to slice {}..{} on 0..{}", start, end, data_len)
             }
             Error::NoGlyph => {
                 write!(f, "font doesn't have such glyph ID")
@@ -257,6 +267,12 @@ impl core::fmt::Display for Error {
             }
             Error::UnsupportedTableVersion(name, version) => {
                 write!(f, "table {:?} with version {} is not supported", name, version)
+            }
+            Error::InvalidGlyphClass(value) => {
+                write!(f, "{} is an invalid glyph class", value)
+            }
+            Error::SliceOutOfBounds { start, end, data_len } => {
+                write!(f, "an attempt to slice {}..{} on 0..{}", start, end, data_len)
             }
             Error::CFFError(e) => {
                 write!(f, "CFF table parsing failed cause {}", e)
@@ -367,6 +383,7 @@ pub enum TableName {
     CompactFontFormat,
     CompactFontFormat2,
     GlyphData,
+    GlyphDefinition,
     Header,
     HorizontalHeader,
     HorizontalMetrics,
@@ -389,13 +406,13 @@ pub struct Font<'a> {
     cff_: Option<cff::Metadata<'a>>,
     cff2: Option<cff2::Metadata<'a>>,
     cmap: Option<&'a [u8]>,
+    gdef: Option<raw::gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
     hmtx: Option<&'a [u8]>,
     kern: Option<&'a [u8]>,
     loca: Option<&'a [u8]>,
     name: Option<&'a [u8]>,
-    os_2: Option<&'a [u8]>,
-    os_2_v0: Option<raw::os_2::TableV0<'a>>,
+    os_2: Option<raw::os_2::Table<'a>>,
     post: Option<&'a [u8]>,
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<&'a [u8]>,
@@ -453,13 +470,13 @@ impl<'a> Font<'a> {
             cff_: None,
             cff2: None,
             cmap: None,
+            gdef: None,
             glyf: None,
             hmtx: None,
             kern: None,
             loca: None,
             name: None,
             os_2: None,
-            os_2_v0: None,
             post: None,
             vhea: None,
             vmtx: None,
@@ -502,16 +519,11 @@ impl<'a> Font<'a> {
                     font.number_of_glyphs = GlyphId(table.num_glyphs());
                 }
                 b"OS/2" => {
-                    if length < raw::os_2::TableV0::SIZE {
+                    if length < raw::os_2::Table::MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::WindowsMetrics));
                     }
 
-                    if let Some(data) = data.get(range) {
-                        font.os_2 = Some(data);
-
-                        let data = &data[0..raw::os_2::TableV0::SIZE];
-                        font.os_2_v0 = Some(raw::os_2::TableV0::new(data));
-                    }
+                    font.os_2 = data.get(range).map(raw::os_2::Table::new);
                 }
                 b"vhea" => {
                     if length != raw::vhea::Table::SIZE {
@@ -519,6 +531,13 @@ impl<'a> Font<'a> {
                     }
 
                     font.vhea = data.get(range).map(raw::vhea::Table::new);
+                }
+                b"GDEF" => {
+                    if length < raw::gdef::Table::MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::GlyphDefinition));
+                    }
+
+                    font.gdef = data.get(range).map(raw::gdef::Table::new);
                 }
                 b"CFF " => {
                     if let Some(data) = data.get(range) {
@@ -565,6 +584,7 @@ impl<'a> Font<'a> {
             TableName::CompactFontFormat            => self.cff_.is_some(),
             TableName::CompactFontFormat2           => self.cff2.is_some(),
             TableName::GlyphData                    => self.glyf.is_some(),
+            TableName::GlyphDefinition              => self.gdef.is_some(),
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
             TableName::IndexToLocation              => self.loca.is_some(),
             TableName::Kerning                      => self.kern.is_some(),

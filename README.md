@@ -22,17 +22,17 @@ A high-level, safe, zero-allocation TrueType font parser.
   <br/>All subtable formats except Mixed Coverage (8) are supported.
 - (`cmap`) Character variation to glyph index mapping using [glyph_variation_index()] method.
 - (`glyf`) Glyph outlining using [outline_glyph()] method.
-- (`hmtx`) Retrieving a glyph's horizontal metrics using [glyph_hor_metrics()] method.
-- (`vmtx`) Retrieving a glyph's vertical metrics using [glyph_ver_metrics()] method.
-- (`kern`) Retrieving a glyphs pair kerning using [glyphs_kerning()] method.
-- (`maxp`) Retrieving a total number of glyphs using [number_of_glyphs()] method.
+- (`hmtx`) Retrieving glyph's horizontal metrics using [glyph_hor_metrics()] method.
+- (`vmtx`) Retrieving glyph's vertical metrics using [glyph_ver_metrics()] method.
+- (`kern`) Retrieving glyphs pair kerning using [glyphs_kerning()] method.
+- (`maxp`) Retrieving total number of glyphs using [number_of_glyphs()] method.
 - (`name`) Listing all name records using [names()] method.
-- (`name`) Retrieving a font's family name using [family_name()] method.
-- (`name`) Retrieving a font's PostScript name using [post_script_name()] method.
-- (`post`) Retrieving a font's underline metrics name using [underline_metrics()] method.
-- (`post`) Retrieving a glyph's name using [glyph_name()] method.
-- (`head`) Retrieving a font's units per EM value using [units_per_em()] method.
-- (`hhea`) Retrieving a generic font info using: [ascender()], [descender()], [height()]
+- (`name`) Retrieving font's family name using [family_name()] method.
+- (`name`) Retrieving font's PostScript name using [post_script_name()] method.
+- (`post`) Retrieving font's underline metrics name using [underline_metrics()] method.
+- (`post`) Retrieving glyph's name using [glyph_name()] method.
+- (`head`) Retrieving font's units per EM value using [units_per_em()] method.
+- (`hhea`) Retrieving generic font info using: [ascender()], [descender()], [height()]
   and [line_gap()] methods.
 
 [glyph_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_index
@@ -57,14 +57,17 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 - (`CFF `) Glyph outlining using [outline_glyph()] method.
 - (`CFF2`) Glyph outlining using [outline_glyph()] method.
-- (`OS/2`) Retrieving a font kind using [is_regular()], [is_italic()],
+- (`OS/2`) Retrieving font's kind using [is_regular()], [is_italic()],
   [is_bold()] and [is_oblique()] methods.
-- (`OS/2`) Retrieving a font's weight using [weight()] method.
-- (`OS/2`) Retrieving a font's width using [width()] method.
-- (`OS/2`) Retrieving a font's X height using [x_height()] method.
-- (`OS/2`) Retrieving a font's strikeout metrics using [strikeout_metrics()] method.
-- (`OS/2`) Retrieving a font's subscript metrics using [subscript_metrics()] method.
-- (`OS/2`) Retrieving a font's superscript metrics using [superscript_metrics()] method.
+- (`OS/2`) Retrieving font's weight using [weight()] method.
+- (`OS/2`) Retrieving font's width using [width()] method.
+- (`OS/2`) Retrieving font's X height using [x_height()] method.
+- (`OS/2`) Retrieving font's strikeout metrics using [strikeout_metrics()] method.
+- (`OS/2`) Retrieving font's subscript metrics using [subscript_metrics()] method.
+- (`OS/2`) Retrieving font's superscript metrics using [superscript_metrics()] method.
+- (`GDEF`) Retrieving glyph's class using [glyph_class()] method.
+- (`GDEF`) Retrieving glyph's mark attachment class using [glyph_mark_attachment_class()] method.
+- (`GDEF`) Checking that glyph is a mark using [is_mark_glyph()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -76,6 +79,9 @@ A high-level, safe, zero-allocation TrueType font parser.
 [strikeout_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.strikeout_metrics
 [subscript_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.subscript_metrics
 [superscript_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.superscript_metrics
+[glyph_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_class
+[glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
+[is_mark_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_mark_glyph
 
 ### Methods' computational complexity
 

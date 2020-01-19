@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - Basic CFF2 support.
-- `Font::glyph_bounding_box`.
-- `Font::glyph_name`.
+- `Font::glyph_bounding_box`
+- `Font::glyph_name`
+- `Font::has_glyph_classes`
+- `Font::glyph_class`
+- `Font::glyph_mark_attachment_class`
+- `Font::is_mark_glyph`
 
 ### Changed
 - `Font::outline_glyph` not accepts `&mut dyn OutlineBuilder` and not `&mut impl OutlineBuilder`.

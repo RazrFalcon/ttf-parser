@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
 
 use crate::{Font, Tag};
-use crate::parser::{Stream, LazyArray, FromData, Offset, Offset16, Offset32};
+use crate::parser::{Stream, LazyArray, Offset, Offset16, Offset32};
 use crate::raw::mvar as raw;
 
 
@@ -45,7 +45,7 @@ impl<'a> Font<'a> {
     }
 }
 
-fn parse_item_variation_store(
+pub fn parse_item_variation_store(
     outer_index: u16,
     inner_index: u16,
     coordinates: &[i32],
@@ -85,7 +85,7 @@ fn parse_item_variation_data(
     let short_delta_count = s.read::<u16>().ok()? as u32;
     let region_index_count = s.read::<u16>().ok()? as u32;
     let region_indexes: LazyArray<u16> = s.read_array(region_index_count as u16).ok()?;
-    s.advance((i16::SIZE + i8::SIZE) as u32 * (short_delta_count + region_index_count));
+    s.advance(inner_index as u32 * (short_delta_count + region_index_count));
 
     let mut delta = 0.0;
     let mut i = 0;
@@ -109,17 +109,18 @@ fn evaluate_region(
     coordinates: &[i32],
     mut s: Stream,
 ) -> Option<f32> {
+
     let axis_count: u16 = s.read().ok()?;
     s.skip::<u16>(); // region_count
     s.advance(index as u32 * axis_count as u32 * raw::RegionAxisCoordinatesRecord::SIZE as u32);
-    let record: raw::RegionAxisCoordinatesRecord = s.read().ok()?;
 
     let mut v = 1.0;
     for i in 0..axis_count {
+        let record: raw::RegionAxisCoordinatesRecord = s.read().ok()?;
         let coord = coordinates.get(i as usize).cloned().unwrap_or(0);
         let factor = evaluate_axis(&record, coord);
         if factor == 0.0 {
-            return None;
+            return Some(0.0);
         }
 
         v *= factor;

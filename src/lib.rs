@@ -66,6 +66,11 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`avar`) Variation coordinates normalization using [map_variation_coordinates()] method.
 - (`fvar`) Variation axis parsing using [variation_axis()] method.
 - (`VORG`) Retrieving glyph's vertical origin using [glyph_y_origin()] method.
+- (`MVAR`) Retrieving font's metrics variation using [metrics_variation()] method.
+- (`HVAR`) Retrieving glyph's variation offset for horizontal advance using [glyph_hor_advance_variation()] method.
+- (`HVAR`) Retrieving glyph's variation offset for horizontal side bearing using [glyph_hor_side_bearing_variation()] method.
+- (`VVAR`) Retrieving glyph's variation offset for vertical advance using [glyph_ver_advance_variation()] method.
+- (`VVAR`) Retrieving glyph's variation offset for vertical side bearing using [glyph_ver_side_bearing_variation()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -83,6 +88,11 @@ A high-level, safe, zero-allocation TrueType font parser.
 [map_variation_coordinates()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.map_variation_coordinates
 [variation_axis()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.variation_axis
 [glyph_y_origin()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_y_origin
+[metrics_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.metrics_variation
+[glyph_hor_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_advance_variation
+[glyph_hor_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_side_bearing_variation
+[glyph_ver_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance_variation
+[glyph_ver_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing_variation
 
 ## Methods' computational complexity
 
@@ -160,6 +170,7 @@ mod glyf;
 mod head;
 mod hhea;
 mod hmtx;
+mod hvar;
 mod kern;
 mod loca;
 mod mvar;
@@ -171,6 +182,7 @@ mod raw;
 mod vhea;
 mod vmtx;
 mod vorg;
+mod vvar;
 
 use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray, Offset};
 pub use cff::CFFError;
@@ -516,6 +528,7 @@ pub enum TableName {
     Header,
     HorizontalHeader,
     HorizontalMetrics,
+    HorizontalMetricsVariations,
     IndexToLocation,
     Kerning,
     MaximumProfile,
@@ -524,6 +537,7 @@ pub enum TableName {
     PostScript,
     VerticalHeader,
     VerticalMetrics,
+    VerticalMetricsVariations,
     VerticalOrigin,
     WindowsMetrics,
 }
@@ -542,6 +556,7 @@ pub struct Font<'a> {
     gdef: Option<raw::gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
     hmtx: Option<&'a [u8]>,
+    hvar: Option<&'a [u8]>,
     kern: Option<&'a [u8]>,
     loca: Option<&'a [u8]>,
     mvar: Option<&'a [u8]>,
@@ -551,6 +566,7 @@ pub struct Font<'a> {
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<&'a [u8]>,
     vorg: Option<&'a [u8]>,
+    vvar: Option<&'a [u8]>,
     number_of_glyphs: GlyphId,
 }
 
@@ -610,6 +626,7 @@ impl<'a> Font<'a> {
             gdef: None,
             glyf: None,
             hmtx: None,
+            hvar: None,
             kern: None,
             loca: None,
             mvar: None,
@@ -619,6 +636,7 @@ impl<'a> Font<'a> {
             vhea: None,
             vmtx: None,
             vorg: None,
+            vvar: None,
             number_of_glyphs: GlyphId(0),
         };
 
@@ -706,6 +724,8 @@ impl<'a> Font<'a> {
                 b"vmtx" => font.vmtx = data.get(range),
                 b"VORG" => font.vorg = data.get(range),
                 b"MVAR" => font.mvar = data.get(range),
+                b"HVAR" => font.hvar = data.get(range),
+                b"VVAR" => font.vvar = data.get(range),
                 _ => {}
             }
         }
@@ -737,6 +757,7 @@ impl<'a> Font<'a> {
             TableName::GlyphData                    => self.glyf.is_some(),
             TableName::GlyphDefinition              => self.gdef.is_some(),
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
+            TableName::HorizontalMetricsVariations  => self.hvar.is_some(),
             TableName::IndexToLocation              => self.loca.is_some(),
             TableName::Kerning                      => self.kern.is_some(),
             TableName::MetricsVariations            => self.mvar.is_some(),
@@ -744,6 +765,7 @@ impl<'a> Font<'a> {
             TableName::PostScript                   => self.post.is_some(),
             TableName::VerticalHeader               => self.vhea.is_some(),
             TableName::VerticalMetrics              => self.vmtx.is_some(),
+            TableName::VerticalMetricsVariations    => self.vvar.is_some(),
             TableName::VerticalOrigin               => self.vorg.is_some(),
             TableName::WindowsMetrics               => self.os_2.is_some(),
         }

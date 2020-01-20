@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::map_variation_coordinates`
 - `Font::glyph_y_origin`
 - `Font::metrics_variation`
+- `Font::glyph_hor_advance_variation`
+- `Font::glyph_hor_side_bearing_variation`
+- `Font::glyph_ver_advance_variation`
+- `Font::glyph_ver_side_bearing_variation`
 - `Font::vertical_ascender`
 - `Font::vertical_descender`
 - `Font::vertical_height`

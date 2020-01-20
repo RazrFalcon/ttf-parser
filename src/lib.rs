@@ -162,6 +162,7 @@ mod hhea;
 mod hmtx;
 mod kern;
 mod loca;
+mod mvar;
 mod name;
 mod os2;
 mod parser;
@@ -305,7 +306,7 @@ pub(crate) type Result<T> = core::result::Result<T, Error>;
 
 
 /// A 4-byte tag.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tag(pub u32);
 
 impl Tag {
@@ -518,6 +519,7 @@ pub enum TableName {
     IndexToLocation,
     Kerning,
     MaximumProfile,
+    MetricsVariations,
     Naming,
     PostScript,
     VerticalHeader,
@@ -542,6 +544,7 @@ pub struct Font<'a> {
     hmtx: Option<&'a [u8]>,
     kern: Option<&'a [u8]>,
     loca: Option<&'a [u8]>,
+    mvar: Option<&'a [u8]>,
     name: Option<&'a [u8]>,
     os_2: Option<raw::os_2::Table<'a>>,
     post: Option<&'a [u8]>,
@@ -593,7 +596,7 @@ impl<'a> Font<'a> {
         }
 
         let num_tables: u16 = s.read()?;
-        s.skip_len(6u32); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
+        s.advance(6u32); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
         let tables: LazyArray<raw::TableRecord> = s.read_array(num_tables)?;
 
         let mut font = Font {
@@ -609,6 +612,7 @@ impl<'a> Font<'a> {
             hmtx: None,
             kern: None,
             loca: None,
+            mvar: None,
             name: None,
             os_2: None,
             post: None,
@@ -701,6 +705,7 @@ impl<'a> Font<'a> {
                 b"post" => font.post = data.get(range),
                 b"vmtx" => font.vmtx = data.get(range),
                 b"VORG" => font.vorg = data.get(range),
+                b"MVAR" => font.mvar = data.get(range),
                 _ => {}
             }
         }
@@ -734,6 +739,7 @@ impl<'a> Font<'a> {
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
             TableName::IndexToLocation              => self.loca.is_some(),
             TableName::Kerning                      => self.kern.is_some(),
+            TableName::MetricsVariations            => self.mvar.is_some(),
             TableName::Naming                       => self.name.is_some(),
             TableName::PostScript                   => self.post.is_some(),
             TableName::VerticalHeader               => self.vhea.is_some(),

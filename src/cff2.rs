@@ -99,7 +99,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
 
     // Jump to Top DICT. It's not necessarily right after the header.
     if header_size > s.offset() as u8 {
-        s.skip_len(header_size as u32 - s.offset() as u32);
+        s.advance(header_size as u32 - s.offset() as u32);
     }
 
     let top_dict_data = s.read_bytes(top_dict_length)?;
@@ -633,7 +633,7 @@ fn _parse_char_string(
 
                 ctx.stems_len += stack.len() as u32 >> 1;
 
-                s.skip_len((ctx.stems_len + 7) >> 3);
+                s.advance((ctx.stems_len + 7) >> 3);
             }
             operator::RELATIVE_MOVE_TO => {
                 // dx1 dy1

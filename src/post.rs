@@ -304,7 +304,7 @@ impl<'a> Font<'a> {
             return None;
         }
 
-        s.skip_len(28_u32); // Jump to the end of the base table.
+        s.advance(28_u32); // Jump to the end of the base table.
         let name_indexes: LazyArray<u16> = s.read_array16().ok()?;
         let mut index = name_indexes.get(glyph.0)?;
 
@@ -330,7 +330,7 @@ impl<'a> Font<'a> {
                         return core::str::from_utf8(name).ok();
                     }
                 } else {
-                    s.skip_len(len as u16);
+                    s.advance(len as u16);
                 }
 
                 i += 1;

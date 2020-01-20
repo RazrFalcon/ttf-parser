@@ -17,10 +17,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::variation_axis`
 - `Font::map_variation_coordinates`
 - `Font::glyph_y_origin`
+- `Font::metrics_variation`
+- `Font::vertical_ascender`
+- `Font::vertical_descender`
+- `Font::vertical_height`
+- `Font::vertical_line_gap`
 - `Tag` type.
 
 ### Changed
 - `Font::outline_glyph` not accepts `&mut dyn OutlineBuilder` and not `&mut impl OutlineBuilder`.
+- `Font::ascender`, `Font::descender` and `Font::line_gap` will check `USE_TYPO_METRICS`
+  flag in OS/2 table now.
 
 ### Removed
 - `Error::InvalidGlyphClass`, because unused.

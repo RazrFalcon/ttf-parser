@@ -340,7 +340,7 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn skip_len<L: FSize>(&mut self, len: L) {
+    pub fn advance<L: FSize>(&mut self, len: L) {
         self.offset += len.to_usize();
     }
 

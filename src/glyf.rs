@@ -198,7 +198,7 @@ impl<'a> Font<'a> {
         };
 
         let instructions_len: u16 = s.read()?;
-        s.skip_len(instructions_len);
+        s.advance(instructions_len);
 
         let flags_offset = s.offset();
         let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)

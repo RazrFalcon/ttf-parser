@@ -11,6 +11,8 @@ impl<'a> Font<'a> {
     /// Note: coordinates should be converted from fixed point 2.14 to i32
     /// by multiplying each coordinate by 16384.
     ///
+    /// Number of `coordinates` should be the same as number of variation axes in the font.
+    ///
     /// Returns `false` when `avar` table is not present or invalid.
     pub fn map_variation_coordinates(&self, coordinates: &mut [i32]) -> bool {
         if let Some(data) = self.avar {

@@ -9,7 +9,7 @@ def to_snake_case(name: str) -> str:
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
-class TTFType:
+class TtfType:
     def to_rust(self) -> str:
         raise NotImplementedError()
 
@@ -20,7 +20,7 @@ class TTFType:
         raise NotImplementedError()
 
 
-class TTF_UInt8(TTFType):
+class TtfUInt8(TtfType):
     def to_rust(self) -> str:
         return 'u8'
 
@@ -31,7 +31,7 @@ class TTF_UInt8(TTFType):
         print(f'self.data[{offset}]')
 
 
-class TTF_Int32(TTFType):
+class TtfInt32(TtfType):
     def to_rust(self) -> str:
         return 'i32'
 
@@ -44,7 +44,7 @@ class TTF_Int32(TTFType):
               f'])')
 
 
-class TTF_UInt16(TTFType):
+class TtfUInt16(TtfType):
     def to_rust(self) -> str:
         return 'u16'
 
@@ -55,7 +55,7 @@ class TTF_UInt16(TTFType):
         print(f'u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]])')
 
 
-class TTF_Int16(TTFType):
+class TtfInt16(TtfType):
     def to_rust(self) -> str:
         return 'i16'
 
@@ -66,7 +66,7 @@ class TTF_Int16(TTFType):
         print(f'i16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]])')
 
 
-class TTF_UInt24(TTFType):
+class TtfUInt24(TtfType):
     def to_rust(self) -> str:
         return 'u32'
 
@@ -78,7 +78,7 @@ class TTF_UInt24(TTFType):
               f'| self.data[{offset + 2}] as u32')
 
 
-class TTF_UInt32(TTFType):
+class TtfUInt32(TtfType):
     def to_rust(self) -> str:
         return 'u32'
 
@@ -91,15 +91,15 @@ class TTF_UInt32(TTFType):
               f'])')
 
 
-class TTF_FWORD(TTF_Int16):
+class TtfFWORD(TtfInt16):
     pass
 
 
-class TTF_UFWORD(TTF_UInt16):
+class TtfUFWORD(TtfUInt16):
     pass
 
 
-class TTF_Offset16(TTFType):
+class TtfOffset16(TtfType):
     def to_rust(self) -> str:
         return 'Offset16'
 
@@ -110,7 +110,7 @@ class TTF_Offset16(TTFType):
         print(f'Offset16(u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]))')
 
 
-class TTF_Optional_Offset16(TTFType):
+class TtfOptionalOffset16(TtfType):
     def to_rust(self) -> str:
         return 'Option<Offset16>'
 
@@ -122,7 +122,7 @@ class TTF_Optional_Offset16(TTFType):
         print('if n != 0 { Some(Offset16(n)) } else { None }')
 
 
-class TTF_Offset32(TTFType):
+class TtfOffset32(TtfType):
     def to_rust(self) -> str:
         return 'Offset32'
 
@@ -135,7 +135,7 @@ class TTF_Offset32(TTFType):
               f']))')
 
 
-class TTF_Optional_Offset32(TTFType):
+class TtfOptionalOffset32(TtfType):
     def to_rust(self) -> str:
         return 'Option<Offset32>'
 
@@ -149,7 +149,7 @@ class TTF_Optional_Offset32(TTFType):
         print('if n != 0 { Some(Offset32(n)) } else { None }')
 
 
-class TTF_GlyphId(TTFType):
+class TtfGlyphId(TtfType):
     def to_rust(self) -> str:
         return 'GlyphId'
 
@@ -160,7 +160,7 @@ class TTF_GlyphId(TTFType):
         print(f'GlyphId(u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]))')
 
 
-class TTF_GlyphId_RangeInclusive(TTFType):
+class TtfGlyphIdRangeInclusive(TtfType):
     def to_rust(self) -> str:
         return 'RangeInclusive<GlyphId>'
 
@@ -172,7 +172,7 @@ class TTF_GlyphId_RangeInclusive(TTFType):
               f'..=GlyphId(u16::from_be_bytes([self.data[{offset+2}], self.data[{offset + 3}]]))')
 
 
-class TTF_Tag(TTFType):
+class TtfTag(TtfType):
     def to_rust(self) -> str:
         return 'Tag'
 
@@ -180,11 +180,12 @@ class TTF_Tag(TTFType):
         return 4
 
     def print(self, offset: int) -> None:
+        print('use core::convert::TryInto;')
         print('// Unwrap is safe, because an array and a slice have the same size.')
         print(f'Tag::from_bytes(&self.data[{offset}..{offset + self.size()}].try_into().unwrap())')
 
 
-class TTF_Fixed(TTFType):
+class TtfFixed(TtfType):
     def to_rust(self) -> str:
         return 'f32'
 
@@ -198,18 +199,18 @@ class TTF_Fixed(TTFType):
 
 
 # unsupported
-class TTF_LONGDATETIME(TTFType):
+class TtfLongDateTime(TtfType):
     def size(self) -> int:
         return 8
 
 
 # unsupported
-class TTF_Panose(TTFType):
+class TtfPanose(TtfType):
     def size(self) -> int:
         return 10
 
 
-class TTF_F2DOT14(TTFType):
+class TtfF2DOT14(TtfType):
     def to_rust(self) -> str:
         return 'f32'
 
@@ -222,10 +223,10 @@ class TTF_F2DOT14(TTFType):
 
 class TableRow:
     enable: bool
-    ttf_type: TTFType
+    ttf_type: TtfType
     name: str
 
-    def __init__(self, enable: bool, ttf_type: TTFType, name: str, optional: bool = False):
+    def __init__(self, enable: bool, ttf_type: TtfType, name: str, optional: bool = False):
         self.enable = enable
         self.ttf_type = ttf_type
         self.name = name
@@ -234,248 +235,261 @@ class TableRow:
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
 TTC_HEADER = [
-    TableRow(True,  TTF_Tag(),      'ttcTag'),
-    TableRow(False, TTF_UInt16(),   'majorVersion'),
-    TableRow(False, TTF_UInt16(),   'minorVersion'),
-    TableRow(True,  TTF_UInt32(),   'numFonts'),
-    # + offsetTable[numFonts]
+    TableRow(True,  TtfTag(),      'ttcTag'),
+    TableRow(False, TtfUInt16(),   'majorVersion'),
+    TableRow(False, TtfUInt16(),   'minorVersion'),
+    TableRow(True,  TtfUInt32(),   'numFonts'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
 TABLE_RECORD = [
-    TableRow(True,  TTF_Tag(),      'tableTag'),
-    TableRow(False, TTF_UInt32(),   'checkSum'),
-    TableRow(True,  TTF_Offset32(), 'offset'),
-    TableRow(True,  TTF_UInt32(),   'length'),
+    TableRow(True,  TtfTag(),      'tableTag'),
+    TableRow(False, TtfUInt32(),   'checkSum'),
+    TableRow(True,  TtfOffset32(), 'offset'),
+    TableRow(True,  TtfUInt32(),   'length'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/head
 HEAD_TABLE = [
-    TableRow(False, TTF_UInt16(),       'majorVersion'),
-    TableRow(False, TTF_UInt16(),       'minorVersion'),
-    TableRow(False, TTF_Fixed(),        'fontRevision'),
-    TableRow(False, TTF_UInt32(),       'checkSumAdjustment'),
-    TableRow(False, TTF_UInt32(),       'magicNumber'),
-    TableRow(False, TTF_UInt16(),       'flags'),
-    TableRow(True,  TTF_UInt16(),       'unitsPerEm'),
-    TableRow(False, TTF_LONGDATETIME(), 'created'),
-    TableRow(False, TTF_LONGDATETIME(), 'modified'),
-    TableRow(False, TTF_Int16(),        'xMin'),
-    TableRow(False, TTF_Int16(),        'yMin'),
-    TableRow(False, TTF_Int16(),        'xMax'),
-    TableRow(False, TTF_Int16(),        'yMax'),
-    TableRow(False, TTF_UInt16(),       'macStyle'),
-    TableRow(False, TTF_UInt16(),       'lowestRecPPEM'),
-    TableRow(False, TTF_Int16(),        'fontDirectionHint'),
-    TableRow(True,  TTF_Int16(),        'indexToLocFormat'),
-    TableRow(False, TTF_Int16(),        'glyphDataFormat'),
+    TableRow(False, TtfUInt16(),       'majorVersion'),
+    TableRow(False, TtfUInt16(),       'minorVersion'),
+    TableRow(False, TtfFixed(),        'fontRevision'),
+    TableRow(False, TtfUInt32(),       'checkSumAdjustment'),
+    TableRow(False, TtfUInt32(),       'magicNumber'),
+    TableRow(False, TtfUInt16(),       'flags'),
+    TableRow(True,  TtfUInt16(),       'unitsPerEm'),
+    TableRow(False, TtfLongDateTime(), 'created'),
+    TableRow(False, TtfLongDateTime(), 'modified'),
+    TableRow(False, TtfInt16(),        'xMin'),
+    TableRow(False, TtfInt16(),        'yMin'),
+    TableRow(False, TtfInt16(),        'xMax'),
+    TableRow(False, TtfInt16(),        'yMax'),
+    TableRow(False, TtfUInt16(),       'macStyle'),
+    TableRow(False, TtfUInt16(),       'lowestRecPPEM'),
+    TableRow(False, TtfInt16(),        'fontDirectionHint'),
+    TableRow(True,  TtfInt16(),        'indexToLocFormat'),
+    TableRow(False, TtfInt16(),        'glyphDataFormat'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/hhea
 HHEA_TABLE = [
-    TableRow(False, TTF_UInt16(),  'majorVersion'),
-    TableRow(False, TTF_UInt16(),  'minorVersion'),
-    TableRow(True,  TTF_FWORD(),   'ascender'),
-    TableRow(True,  TTF_FWORD(),   'descender'),
-    TableRow(True,  TTF_FWORD(),   'lineGap'),
-    TableRow(False, TTF_UFWORD(),  'advanceWidthMax'),
-    TableRow(False, TTF_FWORD(),   'minLeftSideBearing'),
-    TableRow(False, TTF_FWORD(),   'minRightSideBearing'),
-    TableRow(False, TTF_FWORD(),   'xMaxExtent'),
-    TableRow(False, TTF_Int16(),   'caretSlopeRise'),
-    TableRow(False, TTF_Int16(),   'caretSlopeRun'),
-    TableRow(False, TTF_Int16(),   'caretOffset'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'metricDataFormat'),
-    TableRow(True,  TTF_UInt16(),  'numberOfHMetrics'),
+    TableRow(False, TtfUInt16(),  'majorVersion'),
+    TableRow(False, TtfUInt16(),  'minorVersion'),
+    TableRow(True,  TtfFWORD(),   'ascender'),
+    TableRow(True,  TtfFWORD(),   'descender'),
+    TableRow(True,  TtfFWORD(),   'lineGap'),
+    TableRow(False, TtfUFWORD(),  'advanceWidthMax'),
+    TableRow(False, TtfFWORD(),   'minLeftSideBearing'),
+    TableRow(False, TtfFWORD(),   'minRightSideBearing'),
+    TableRow(False, TtfFWORD(),   'xMaxExtent'),
+    TableRow(False, TtfInt16(),   'caretSlopeRise'),
+    TableRow(False, TtfInt16(),   'caretSlopeRun'),
+    TableRow(False, TtfInt16(),   'caretOffset'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'metricDataFormat'),
+    TableRow(True,  TtfUInt16(),  'numberOfHMetrics'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx
 HMTX_METRICS = [
-    TableRow(True,  TTF_UInt16(),   'advanceWidth'),
-    TableRow(True,  TTF_Int16(),    'lsb'),
+    TableRow(True,  TtfUInt16(),   'advanceWidth'),
+    TableRow(True,  TtfInt16(),    'lsb'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/vhea#table-format
 VHEA_TABLE = [
-    TableRow(False, TTF_Fixed(),   'version'),
-    TableRow(False, TTF_Int16(),   'ascender'),
-    TableRow(False, TTF_Int16(),   'descender'),
-    TableRow(False, TTF_Int16(),   'lineGap'),
-    TableRow(False, TTF_Int16(),   'advanceHeightMax'),
-    TableRow(False, TTF_Int16(),   'minTopSideBearing'),
-    TableRow(False, TTF_Int16(),   'minBottomSideBearing'),
-    TableRow(False, TTF_Int16(),   'yMaxExtent'),
-    TableRow(False, TTF_Int16(),   'caretSlopeRise'),
-    TableRow(False, TTF_Int16(),   'caretSlopeRun'),
-    TableRow(False, TTF_Int16(),   'caretOffset'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'reserved'),
-    TableRow(False, TTF_Int16(),   'metricDataFormat'),
-    TableRow(True,  TTF_UInt16(),  'numOfLongVerMetrics'),
+    TableRow(False, TtfFixed(),   'version'),
+    TableRow(True,  TtfInt16(),   'ascender'),
+    TableRow(True,  TtfInt16(),   'descender'),
+    TableRow(True,  TtfInt16(),   'lineGap'),
+    TableRow(False, TtfInt16(),   'advanceHeightMax'),
+    TableRow(False, TtfInt16(),   'minTopSideBearing'),
+    TableRow(False, TtfInt16(),   'minBottomSideBearing'),
+    TableRow(False, TtfInt16(),   'yMaxExtent'),
+    TableRow(False, TtfInt16(),   'caretSlopeRise'),
+    TableRow(False, TtfInt16(),   'caretSlopeRun'),
+    TableRow(False, TtfInt16(),   'caretOffset'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'reserved'),
+    TableRow(False, TtfInt16(),   'metricDataFormat'),
+    TableRow(True,  TtfUInt16(),  'numOfLongVerMetrics'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx#vertical-metrics-table-format
 VMTX_METRICS = [
-    TableRow(True,  TTF_UInt16(),   'advanceHeight'),
-    TableRow(True,  TTF_Int16(),    'topSideBearing'),
+    TableRow(True,  TtfUInt16(),   'advanceHeight'),
+    TableRow(True,  TtfInt16(),    'topSideBearing'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
 NAME_RECORD_TABLE = [
-    TableRow(True,  TTF_UInt16(),   'platformID'),
-    TableRow(True,  TTF_UInt16(),   'encodingID'),
-    TableRow(True,  TTF_UInt16(),   'languageID'),
-    TableRow(True,  TTF_UInt16(),   'nameID'),
-    TableRow(True,  TTF_UInt16(),   'length'),
-    TableRow(True,  TTF_UInt16(),   'offset'),
+    TableRow(True,  TtfUInt16(),   'platformID'),
+    TableRow(True,  TtfUInt16(),   'encodingID'),
+    TableRow(True,  TtfUInt16(),   'languageID'),
+    TableRow(True,  TtfUInt16(),   'nameID'),
+    TableRow(True,  TtfUInt16(),   'length'),
+    TableRow(True,  TtfUInt16(),   'offset'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#encoding-records-and-encodings
 CMAP_ENCODING_RECORD = [
-    TableRow(True,  TTF_UInt16(),   'platformID'),
-    TableRow(True,  TTF_UInt16(),   'encodingID'),
-    TableRow(True,  TTF_Offset32(), 'offset'),
+    TableRow(True,  TtfUInt16(),   'platformID'),
+    TableRow(True,  TtfUInt16(),   'encodingID'),
+    TableRow(True,  TtfOffset32(), 'offset'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-2-high-byte-mapping-through-table
 CMAP_SUB_HEADER_RECORD = [
-    TableRow(True,  TTF_UInt16(),   'firstCode'),
-    TableRow(True,  TTF_UInt16(),   'entryCount'),
-    TableRow(True,  TTF_Int16(),    'idDelta'),
-    TableRow(True,  TTF_UInt16(),   'idRangeOffset'),
+    TableRow(True,  TtfUInt16(),   'firstCode'),
+    TableRow(True,  TtfUInt16(),   'entryCount'),
+    TableRow(True,  TtfInt16(),    'idDelta'),
+    TableRow(True,  TtfUInt16(),   'idRangeOffset'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
 CMAP_SEQUENTIAL_MAP_GROUP_RECORD = [
-    TableRow(True,  TTF_UInt32(),   'startCharCode'),
-    TableRow(True,  TTF_UInt32(),   'endCharCode'),
-    TableRow(True,  TTF_UInt32(),   'startGlyphID'),
+    TableRow(True,  TtfUInt32(),   'startCharCode'),
+    TableRow(True,  TtfUInt32(),   'endCharCode'),
+    TableRow(True,  TtfUInt32(),   'startGlyphID'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#default-uvs-table
 CMAP_UNICODE_RANGE_RECORD = [
-    TableRow(True,  TTF_UInt24(),   'startUnicodeValue'),
-    TableRow(True,  TTF_UInt8(),    'additionalCount'),
+    TableRow(True,  TtfUInt24(),   'startUnicodeValue'),
+    TableRow(True,  TtfUInt8(),    'additionalCount'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#non-default-uvs-table
 CMAP_UVS_MAPPING_RECORD = [
-    TableRow(True,  TTF_UInt24(),   'unicodeValue'),
-    TableRow(True,  TTF_GlyphId(),  'glyphID'),
+    TableRow(True,  TtfUInt24(),   'unicodeValue'),
+    TableRow(True,  TtfGlyphId(),  'glyphID'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences
 CMAP_VARIATION_SELECTOR_RECORD = [
-    TableRow(True,  TTF_UInt24(),               'varSelector'),
-    TableRow(True,  TTF_Optional_Offset32(),    'defaultUVSOffset'),
-    TableRow(True,  TTF_Optional_Offset32(),    'nonDefaultUVSOffset'),
+    TableRow(True,  TtfUInt24(),            'varSelector'),
+    TableRow(True,  TtfOptionalOffset32(),  'defaultUVSOffset'),
+    TableRow(True,  TtfOptionalOffset32(),  'nonDefaultUVSOffset'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/maxp
 MAXP_TABLE = [
-    TableRow(False, TTF_Fixed(),    'version'),
-    TableRow(True,  TTF_UInt16(),   'numGlyphs'),
+    TableRow(False, TtfFixed(),    'version'),
+    TableRow(True,  TtfUInt16(),   'numGlyphs'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/os2#os2-table-formats
 OS_2_TABLE = [
-    TableRow(True,  TTF_UInt16(),   'version'),
-    TableRow(False, TTF_Int16(),    'xAvgCharWidth'),
-    TableRow(True,  TTF_UInt16(),   'usWeightClass'),
-    TableRow(True,  TTF_UInt16(),   'usWidthClass'),
-    TableRow(False, TTF_UInt16(),   'fsType'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptXSize'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptYSize'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptXOffset'),
-    TableRow(True,  TTF_Int16(),    'ySubscriptYOffset'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptXSize'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptYSize'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptXOffset'),
-    TableRow(True,  TTF_Int16(),    'ySuperscriptYOffset'),
-    TableRow(True,  TTF_Int16(),    'yStrikeoutSize'),
-    TableRow(True,  TTF_Int16(),    'yStrikeoutPosition'),
-    TableRow(False, TTF_Int16(),    'sFamilyClass'),
-    TableRow(False, TTF_Panose(),   'panose'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange1'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange2'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange3'),
-    TableRow(False, TTF_UInt32(),   'ulUnicodeRange4'),
-    TableRow(False, TTF_Tag(),      'achVendID'),
-    TableRow(True,  TTF_UInt16(),   'fsSelection'),
-    TableRow(False, TTF_UInt16(),   'usFirstCharIndex'),
-    TableRow(False, TTF_UInt16(),   'usLastCharIndex'),
-    TableRow(False, TTF_Int16(),    'sTypoAscender'),
-    TableRow(False, TTF_Int16(),    'sTypoDescender'),
-    TableRow(False, TTF_Int16(),    'sTypoLineGap'),
-    TableRow(False, TTF_UInt16(),   'usWinAscent'),
-    TableRow(False, TTF_UInt16(),   'usWinDescent'),
-    TableRow(False, TTF_UInt32(),   'ulCodePageRange1', optional=True),
-    TableRow(False, TTF_UInt32(),   'ulCodePageRange2', optional=True),
-    TableRow(False, TTF_Int16(),    'sxHeight', optional=True),
-    TableRow(False, TTF_Int16(),    'sCapHeight', optional=True),
-    TableRow(False, TTF_UInt16(),   'usDefaultChar', optional=True),
-    TableRow(False, TTF_UInt16(),   'usBreakChar', optional=True),
-    TableRow(False, TTF_UInt16(),   'usMaxContext', optional=True),
-    TableRow(False, TTF_UInt16(),   'usLowerOpticalPointSize', optional=True),
-    TableRow(False, TTF_UInt16(),   'usUpperOpticalPointSize', optional=True),
+    TableRow(True,  TtfUInt16(),   'version'),
+    TableRow(False, TtfInt16(),    'xAvgCharWidth'),
+    TableRow(True,  TtfUInt16(),   'usWeightClass'),
+    TableRow(True,  TtfUInt16(),   'usWidthClass'),
+    TableRow(False, TtfUInt16(),   'fsType'),
+    TableRow(True,  TtfInt16(),    'ySubscriptXSize'),
+    TableRow(True,  TtfInt16(),    'ySubscriptYSize'),
+    TableRow(True,  TtfInt16(),    'ySubscriptXOffset'),
+    TableRow(True,  TtfInt16(),    'ySubscriptYOffset'),
+    TableRow(True,  TtfInt16(),    'ySuperscriptXSize'),
+    TableRow(True,  TtfInt16(),    'ySuperscriptYSize'),
+    TableRow(True,  TtfInt16(),    'ySuperscriptXOffset'),
+    TableRow(True,  TtfInt16(),    'ySuperscriptYOffset'),
+    TableRow(True,  TtfInt16(),    'yStrikeoutSize'),
+    TableRow(True,  TtfInt16(),    'yStrikeoutPosition'),
+    TableRow(False, TtfInt16(),    'sFamilyClass'),
+    TableRow(False, TtfPanose(),   'panose'),
+    TableRow(False, TtfUInt32(),   'ulUnicodeRange1'),
+    TableRow(False, TtfUInt32(),   'ulUnicodeRange2'),
+    TableRow(False, TtfUInt32(),   'ulUnicodeRange3'),
+    TableRow(False, TtfUInt32(),   'ulUnicodeRange4'),
+    TableRow(False, TtfTag(),      'achVendID'),
+    TableRow(True,  TtfUInt16(),   'fsSelection'),
+    TableRow(False, TtfUInt16(),   'usFirstCharIndex'),
+    TableRow(False, TtfUInt16(),   'usLastCharIndex'),
+    TableRow(True,  TtfInt16(),    'sTypoAscender'),
+    TableRow(True,  TtfInt16(),    'sTypoDescender'),
+    TableRow(True,  TtfInt16(),    'sTypoLineGap'),
+    TableRow(False, TtfUInt16(),   'usWinAscent'),
+    TableRow(False, TtfUInt16(),   'usWinDescent'),
+    TableRow(False, TtfUInt32(),   'ulCodePageRange1', optional=True),
+    TableRow(False, TtfUInt32(),   'ulCodePageRange2', optional=True),
+    TableRow(False, TtfInt16(),    'sxHeight', optional=True),
+    TableRow(False, TtfInt16(),    'sCapHeight', optional=True),
+    TableRow(False, TtfUInt16(),   'usDefaultChar', optional=True),
+    TableRow(False, TtfUInt16(),   'usBreakChar', optional=True),
+    TableRow(False, TtfUInt16(),   'usMaxContext', optional=True),
+    TableRow(False, TtfUInt16(),   'usLowerOpticalPointSize', optional=True),
+    TableRow(False, TtfUInt16(),   'usUpperOpticalPointSize', optional=True),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 GDEF_TABLE = [
-    TableRow(True,  TTF_UInt16(),            'majorVersion'),
-    TableRow(True,  TTF_UInt16(),            'minorVersion'),
-    TableRow(True,  TTF_Optional_Offset16(), 'glyphClassDefOffset'),
-    TableRow(False, TTF_Optional_Offset16(), 'attachListOffset'),
-    TableRow(False, TTF_Optional_Offset16(), 'ligCaretListOffset'),
-    TableRow(True,  TTF_Optional_Offset16(), 'markAttachClassDefOffset'),
-    TableRow(False, TTF_Optional_Offset16(), 'markGlyphSetsDefOffset', optional=True),
-    TableRow(False, TTF_Optional_Offset32(), 'itemVarStoreOffset', optional=True),
+    TableRow(True,  TtfUInt16(),            'majorVersion'),
+    TableRow(True,  TtfUInt16(),            'minorVersion'),
+    TableRow(True,  TtfOptionalOffset16(),  'glyphClassDefOffset'),
+    TableRow(False, TtfOptionalOffset16(),  'attachListOffset'),
+    TableRow(False, TtfOptionalOffset16(),  'ligCaretListOffset'),
+    TableRow(True,  TtfOptionalOffset16(),  'markAttachClassDefOffset'),
+    TableRow(False, TtfOptionalOffset16(),  'markGlyphSetsDefOffset', optional=True),
+    TableRow(False, TtfOptionalOffset32(),  'itemVarStoreOffset', optional=True),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table-format-2
 GDEF_CLASS_RANGE_RECORD = [
-    TableRow(True,  TTF_GlyphId_RangeInclusive(),   'range'),
-    TableRow(True,  TTF_UInt16(),                   'class'),
+    TableRow(True,  TtfGlyphIdRangeInclusive(), 'range'),
+    TableRow(True,  TtfUInt16(),                'class'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-format-2
 GDEF_RANGE_RECORD = [
-    TableRow(True,  TTF_GlyphId_RangeInclusive(),   'range'),
-    TableRow(False, TTF_UInt16(),                   'startCoverageIndex'),
+    TableRow(True,  TtfGlyphIdRangeInclusive(), 'range'),
+    TableRow(False, TtfUInt16(),                'startCoverageIndex'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/fvar
 FVAR_TABLE = [
-    TableRow(False, TTF_UInt16(),   'majorVersion'),
-    TableRow(False, TTF_UInt16(),   'minorVersion'),
-    TableRow(True,  TTF_Offset16(), 'axesArrayOffset'),
-    TableRow(False, TTF_UInt16(),   'reserved'),
-    TableRow(True,  TTF_UInt16(),   'axisCount'),
-    TableRow(False, TTF_UInt16(),   'axisSize'),
-    TableRow(False, TTF_UInt16(),   'instanceCount'),
-    TableRow(False, TTF_UInt16(),   'instanceSize'),
+    TableRow(False, TtfUInt16(),   'majorVersion'),
+    TableRow(False, TtfUInt16(),   'minorVersion'),
+    TableRow(True,  TtfOffset16(), 'axesArrayOffset'),
+    TableRow(False, TtfUInt16(),   'reserved'),
+    TableRow(True,  TtfUInt16(),   'axisCount'),
+    TableRow(False, TtfUInt16(),   'axisSize'),
+    TableRow(False, TtfUInt16(),   'instanceCount'),
+    TableRow(False, TtfUInt16(),   'instanceSize'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord
-VARIATION_AXIS_RECORD = [
-    TableRow(True, TTF_Tag(),       'axisTag'),
-    TableRow(True, TTF_Int32(),     'minValue'),      # This three values actually have type Fixed,
-    TableRow(True, TTF_Int32(),     'defaultValue'),  # but we need to compare them later,
-    TableRow(True, TTF_Int32(),     'maxValue'),      # and Rust doesn't implement Ord for f32.
-    TableRow(True, TTF_UInt16(),    'flags'),
-    TableRow(True, TTF_UInt16(),    'axisNameID'),
+FVAR_VARIATION_AXIS_RECORD = [
+    TableRow(True,  TtfTag(),       'axisTag'),
+    TableRow(True,  TtfInt32(),     'minValue'),      # This three values actually have type Fixed,
+    TableRow(True,  TtfInt32(),     'defaultValue'),  # but we need to compare them later,
+    TableRow(True,  TtfInt32(),     'maxValue'),      # and Rust doesn't implement Ord for f32.
+    TableRow(True,  TtfUInt16(),    'flags'),
+    TableRow(True,  TtfUInt16(),    'axisNameID'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/vorg#vertical-origin-table-format
 VERT_ORIGIN_Y_METRICS = [
-    TableRow(True,  TTF_GlyphId(),  'glyphIndex'),
-    TableRow(True,  TTF_Int16(),    'vertOriginY'),
+    TableRow(True,  TtfGlyphId(),  'glyphIndex'),
+    TableRow(True,  TtfInt16(),    'vertOriginY'),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
+MVAR_VALUE_RECORD = [
+    TableRow(True,  TtfTag(),      'valueTag'),
+    TableRow(True,  TtfUInt16(),   'deltaSetOuterIndex'),
+    TableRow(True,  TtfUInt16(),   'deltaSetInnerIndex'),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#variation-regions
+MVAR_REGION_AXIS_COORDINATES_RECORD = [
+    TableRow(True,  TtfInt16(), 'startCoord'),  #
+    TableRow(True,  TtfInt16(), 'peakCoord'),   # Use i16 instead of F2DOT14 to simplify calculations.
+    TableRow(True,  TtfInt16(), 'endCoord'),    #
 ]
 
 
@@ -515,7 +529,7 @@ def print_constructor(name: str, size: int, owned: bool, has_tail: bool) -> None
         print('}')
 
 
-def print_method(spec_name: str, ttf_type: TTFType, offset: int) -> None:
+def print_method(spec_name: str, ttf_type: TtfType, offset: int) -> None:
     fn_name = to_snake_case(spec_name)
     rust_type = ttf_type.to_rust()
 
@@ -606,8 +620,6 @@ print('        unsafe { &*($arr.as_ptr() as *const [_; $len]) }')
 print('    }}')
 print('}')
 print()
-print('use core::convert::TryInto;')
-print()
 print('use crate::Tag;')
 print('use crate::parser::{FromData, Offset32};')
 print()
@@ -685,13 +697,12 @@ generate_table(GDEF_RANGE_RECORD, 'RangeRecord', owned=True, impl_from_data=True
 print('}')
 print()
 print('pub mod fvar {')
-print('use core::convert::TryInto;')
 print('use crate::Tag;')
 print('use crate::parser::{Offset16, FromData};')
 print()
 generate_table(FVAR_TABLE, 'Table', has_tail=True)
 print()
-generate_table(VARIATION_AXIS_RECORD, 'VariationAxisRecord', owned=True, impl_from_data=True)
+generate_table(FVAR_VARIATION_AXIS_RECORD, 'VariationAxisRecord', owned=True, impl_from_data=True)
 print('}')
 print()
 print('pub mod vorg {')
@@ -699,5 +710,14 @@ print('use crate::GlyphId;')
 print('use crate::parser::FromData;')
 print()
 generate_table(VERT_ORIGIN_Y_METRICS, 'VertOriginYMetrics', owned=True, impl_from_data=True)
+print('}')
+print()
+print('pub mod mvar {')
+print('use crate::Tag;')
+print('use crate::parser::FromData;')
+print()
+generate_table(MVAR_VALUE_RECORD, 'ValueRecord', owned=True, impl_from_data=True)
+print()
+generate_table(MVAR_REGION_AXIS_COORDINATES_RECORD, 'RegionAxisCoordinatesRecord', owned=True, impl_from_data=True)
 print('}')
 print()

@@ -46,7 +46,7 @@ impl<'a> Font<'a> {
 
 fn parse_format1(s: &mut Stream, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Result<i16> {
     let number_of_pairs: u16 = s.read()?;
-    s.skip_len(6u32); // search_range (u16) + entry_selector (u16) + range_shift (u16)
+    s.advance(6u32); // search_range (u16) + entry_selector (u16) + range_shift (u16)
     let pairs: LazyArray<KerningRecord> = s.read_array(number_of_pairs)?;
 
     let needle = (glyph_id1.0 as u32) << 16 | glyph_id2.0 as u32;

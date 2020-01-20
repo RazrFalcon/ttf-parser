@@ -14,8 +14,6 @@ macro_rules! array_ref {
     }};
 }
 
-use core::convert::TryInto;
-
 use crate::parser::{FromData, Offset32};
 use crate::Tag;
 
@@ -36,6 +34,7 @@ impl<'a> TTCHeader<'a> {
 
     #[inline(always)]
     pub fn ttc_tag(&self) -> Tag {
+        use core::convert::TryInto;
         // Unwrap is safe, because an array and a slice have the same size.
         Tag::from_bytes(&self.data[0..4].try_into().unwrap())
     }
@@ -63,6 +62,7 @@ impl TableRecord {
 
     #[inline(always)]
     pub fn table_tag(&self) -> Tag {
+        use core::convert::TryInto;
         // Unwrap is safe, because an array and a slice have the same size.
         Tag::from_bytes(&self.data[0..4].try_into().unwrap())
     }
@@ -234,6 +234,21 @@ pub mod vhea {
             Table {
                 data: array_ref![input, 36],
             }
+        }
+
+        #[inline(always)]
+        pub fn ascender(&self) -> i16 {
+            i16::from_be_bytes([self.data[4], self.data[5]])
+        }
+
+        #[inline(always)]
+        pub fn descender(&self) -> i16 {
+            i16::from_be_bytes([self.data[6], self.data[7]])
+        }
+
+        #[inline(always)]
+        pub fn line_gap(&self) -> i16 {
+            i16::from_be_bytes([self.data[8], self.data[9]])
         }
 
         #[inline(always)]
@@ -622,6 +637,21 @@ pub mod os_2 {
         pub fn fs_selection(&self) -> u16 {
             u16::from_be_bytes([self.data[62], self.data[63]])
         }
+
+        #[inline(always)]
+        pub fn s_typo_ascender(&self) -> i16 {
+            i16::from_be_bytes([self.data[68], self.data[69]])
+        }
+
+        #[inline(always)]
+        pub fn s_typo_descender(&self) -> i16 {
+            i16::from_be_bytes([self.data[70], self.data[71]])
+        }
+
+        #[inline(always)]
+        pub fn s_typo_line_gap(&self) -> i16 {
+            i16::from_be_bytes([self.data[72], self.data[73]])
+        }
     }
 }
 
@@ -795,7 +825,6 @@ pub mod gdef {
 pub mod fvar {
     use crate::parser::{FromData, Offset16};
     use crate::Tag;
-    use core::convert::TryInto;
 
     #[derive(Clone, Copy)]
     pub struct Table<'a> {
@@ -838,6 +867,7 @@ pub mod fvar {
 
         #[inline(always)]
         pub fn axis_tag(&self) -> Tag {
+            use core::convert::TryInto;
             // Unwrap is safe, because an array and a slice have the same size.
             Tag::from_bytes(&self.data[0..4].try_into().unwrap())
         }
@@ -910,6 +940,93 @@ pub mod vorg {
 
     impl FromData for VertOriginYMetrics {
         const SIZE: usize = VertOriginYMetrics::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+}
+
+pub mod mvar {
+    use crate::parser::FromData;
+    use crate::Tag;
+
+    #[derive(Clone, Copy)]
+    pub struct ValueRecord {
+        data: [u8; 8],
+    }
+
+    impl ValueRecord {
+        pub const SIZE: usize = 8;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            ValueRecord { data }
+        }
+
+        #[inline(always)]
+        pub fn value_tag(&self) -> Tag {
+            use core::convert::TryInto;
+            // Unwrap is safe, because an array and a slice have the same size.
+            Tag::from_bytes(&self.data[0..4].try_into().unwrap())
+        }
+
+        #[inline(always)]
+        pub fn delta_set_outer_index(&self) -> u16 {
+            u16::from_be_bytes([self.data[4], self.data[5]])
+        }
+
+        #[inline(always)]
+        pub fn delta_set_inner_index(&self) -> u16 {
+            u16::from_be_bytes([self.data[6], self.data[7]])
+        }
+    }
+
+    impl FromData for ValueRecord {
+        const SIZE: usize = ValueRecord::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct RegionAxisCoordinatesRecord {
+        data: [u8; 6],
+    }
+
+    impl RegionAxisCoordinatesRecord {
+        pub const SIZE: usize = 6;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            RegionAxisCoordinatesRecord { data }
+        }
+
+        #[inline(always)]
+        pub fn start_coord(&self) -> i16 {
+            i16::from_be_bytes([self.data[0], self.data[1]])
+        }
+
+        #[inline(always)]
+        pub fn peak_coord(&self) -> i16 {
+            i16::from_be_bytes([self.data[2], self.data[3]])
+        }
+
+        #[inline(always)]
+        pub fn end_coord(&self) -> i16 {
+            i16::from_be_bytes([self.data[4], self.data[5]])
+        }
+    }
+
+    impl FromData for RegionAxisCoordinatesRecord {
+        const SIZE: usize = RegionAxisCoordinatesRecord::SIZE;
 
         #[inline]
         fn parse(data: &[u8]) -> Self {

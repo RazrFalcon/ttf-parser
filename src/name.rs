@@ -267,7 +267,7 @@ impl<'a> Font<'a> {
                 .checked_mul(LANG_TAG_RECORD_SIZE)
                 .ok_or_else(|| Error::NotATrueType)?;
 
-            s.skip_len(lang_tag_len); // langTagRecords
+            s.advance(lang_tag_len); // langTagRecords
             Ok(Names::new(s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?, s.tail()?))
         } else {
             // Invalid format.

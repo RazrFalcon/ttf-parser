@@ -147,7 +147,7 @@ fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Result<u16> {
     s.skip::<u16>(); // language
 
     if code_point < (length as u32) {
-        s.skip_len(code_point);
+        s.advance(code_point);
         Ok(s.read::<u8>()? as u16)
     } else {
         Err(Error::NoGlyph)
@@ -234,14 +234,14 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
     let code_point = code_point as u16;
 
     let mut s = Stream::new(data);
-    s.skip_len(6 as u32); // format + length + language
+    s.advance(6 as u32); // format + length + language
     let seg_count_x2: u16 = s.read()?;
     if seg_count_x2 < 2 {
         return Err(Error::NoGlyph);
     }
 
     let seg_count = seg_count_x2 / 2;
-    s.skip_len(6 as u32); // searchRange + entrySelector + rangeShift
+    s.advance(6 as u32); // searchRange + entrySelector + rangeShift
     let end_codes: LazyArray<u16> = s.read_array(seg_count)?;
     s.skip::<u16>(); // reservedPad
     let start_codes: LazyArray<u16> = s.read_array(seg_count)?;

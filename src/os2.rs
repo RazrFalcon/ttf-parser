@@ -209,6 +209,17 @@ impl<'a> Font<'a> {
     }
 
     #[inline]
+    pub(crate) fn is_use_typo_metrics(&self) -> bool {
+        let table = try_opt_or!(self.os_2, false);
+        if table.version() < 4 {
+            return false;
+        }
+
+        const USE_TYPO_METRICS: u16 = 7;
+        self.get_fs_selection(USE_TYPO_METRICS)
+    }
+
+    #[inline]
     fn get_fs_selection(&self, bit: u16) -> bool {
         let table = try_opt_or!(self.os_2, false);
         (table.fs_selection() >> bit) & 1 == 1

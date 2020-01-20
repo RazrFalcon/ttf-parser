@@ -181,7 +181,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
 
     // Jump to Name INDEX. It's not necessarily right after the header.
     if header_size > s.offset() as u8 {
-        s.skip_len(header_size as u32 - s.offset() as u32);
+        s.advance(header_size as u32 - s.offset() as u32);
     }
 
     // Skip Name INDEX.
@@ -704,7 +704,7 @@ fn _parse_char_string(
 
                 ctx.stems_len += len as u32 >> 1;
 
-                s.skip_len((ctx.stems_len + 7) >> 3);
+                s.advance((ctx.stems_len + 7) >> 3);
             }
             operator::RELATIVE_MOVE_TO => {
                 // dx1 dy1
@@ -1049,7 +1049,7 @@ fn skip_index(s: &mut Stream) -> Result<()> {
         };
 
         if let Some(last_offset) = offsets.last() {
-            s.skip_len(last_offset);
+            s.advance(last_offset);
         }
     }
 

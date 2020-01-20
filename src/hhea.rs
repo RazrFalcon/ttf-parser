@@ -6,13 +6,23 @@ impl<'a> Font<'a> {
     /// Returns font's ascender value.
     #[inline]
     pub fn ascender(&self) -> i16 {
-        self.hhea.ascender()
+        if self.is_use_typo_metrics() {
+            // Unwrap is safe because we already checked that OS/2 table exists.
+            self.os_2.map(|table| table.s_typo_ascender()).unwrap()
+        } else {
+            self.hhea.ascender()
+        }
     }
 
     /// Returns font's descender value.
     #[inline]
     pub fn descender(&self) -> i16 {
-        self.hhea.descender()
+        if self.is_use_typo_metrics() {
+            // Unwrap is safe because we already checked that OS/2 table exists.
+            self.os_2.map(|table| table.s_typo_descender()).unwrap()
+        } else {
+            self.hhea.descender()
+        }
     }
 
     /// Returns font's height.
@@ -24,7 +34,12 @@ impl<'a> Font<'a> {
     /// Returns font's line gap.
     #[inline]
     pub fn line_gap(&self) -> i16 {
-        self.hhea.line_gap()
+        if self.is_use_typo_metrics() {
+            // Unwrap is safe because we already checked that OS/2 table exists.
+            self.os_2.map(|table| table.s_typo_line_gap()).unwrap()
+        } else {
+            self.hhea.line_gap()
+        }
     }
 
     #[inline]

@@ -70,6 +70,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`GDEF`) Checking that glyph is a mark using [is_mark_glyph()] method.
 - (`avar`) Variation coordinates normalization using [map_variation_coordinates()] method.
 - (`fvar`) Variation axis parsing using [variation_axis()] method.
+- (`VORG`) Retrieving glyph's vertical origin using [glyph_y_origin()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -86,6 +87,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [is_mark_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_mark_glyph
 [map_variation_coordinates()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.map_variation_coordinates
 [variation_axis()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.variation_axis
+[glyph_y_origin()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_y_origin
 
 ### Methods' computational complexity
 

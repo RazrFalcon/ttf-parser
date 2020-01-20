@@ -65,6 +65,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`GDEF`) Checking that glyph is a mark using [is_mark_glyph()] method.
 - (`avar`) Variation coordinates normalization using [map_variation_coordinates()] method.
 - (`fvar`) Variation axis parsing using [variation_axis()] method.
+- (`VORG`) Retrieving glyph's vertical origin using [glyph_y_origin()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -81,6 +82,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [is_mark_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_mark_glyph
 [map_variation_coordinates()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.map_variation_coordinates
 [variation_axis()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.variation_axis
+[glyph_y_origin()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_y_origin
 
 ## Methods' computational complexity
 
@@ -167,6 +169,7 @@ mod post;
 mod raw;
 mod vhea;
 mod vmtx;
+mod vorg;
 
 use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray, Offset};
 pub use cff::CFFError;
@@ -519,6 +522,7 @@ pub enum TableName {
     PostScript,
     VerticalHeader,
     VerticalMetrics,
+    VerticalOrigin,
     WindowsMetrics,
 }
 
@@ -543,6 +547,7 @@ pub struct Font<'a> {
     post: Option<&'a [u8]>,
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<&'a [u8]>,
+    vorg: Option<&'a [u8]>,
     number_of_glyphs: GlyphId,
 }
 
@@ -609,6 +614,7 @@ impl<'a> Font<'a> {
             post: None,
             vhea: None,
             vmtx: None,
+            vorg: None,
             number_of_glyphs: GlyphId(0),
         };
 
@@ -694,6 +700,7 @@ impl<'a> Font<'a> {
                 b"name" => font.name = data.get(range),
                 b"post" => font.post = data.get(range),
                 b"vmtx" => font.vmtx = data.get(range),
+                b"VORG" => font.vorg = data.get(range),
                 _ => {}
             }
         }
@@ -731,6 +738,7 @@ impl<'a> Font<'a> {
             TableName::PostScript                   => self.post.is_some(),
             TableName::VerticalHeader               => self.vhea.is_some(),
             TableName::VerticalMetrics              => self.vmtx.is_some(),
+            TableName::VerticalOrigin               => self.vorg.is_some(),
             TableName::WindowsMetrics               => self.os_2.is_some(),
         }
     }

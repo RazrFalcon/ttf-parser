@@ -472,6 +472,12 @@ VARIATION_AXIS_RECORD = [
     TableRow(True, TTF_UInt16(),    'axisNameID'),
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/vorg#vertical-origin-table-format
+VERT_ORIGIN_Y_METRICS = [
+    TableRow(True,  TTF_GlyphId(),  'glyphIndex'),
+    TableRow(True,  TTF_Int16(),    'vertOriginY'),
+]
+
 
 def print_struct(name: str, size: int, owned: bool, has_tail: bool) -> None:
     print('#[derive(Clone, Copy)]')
@@ -686,5 +692,12 @@ print()
 generate_table(FVAR_TABLE, 'Table', has_tail=True)
 print()
 generate_table(VARIATION_AXIS_RECORD, 'VariationAxisRecord', owned=True, impl_from_data=True)
+print('}')
+print()
+print('pub mod vorg {')
+print('use crate::GlyphId;')
+print('use crate::parser::FromData;')
+print()
+generate_table(VERT_ORIGIN_Y_METRICS, 'VertOriginYMetrics', owned=True, impl_from_data=True)
 print('}')
 print()

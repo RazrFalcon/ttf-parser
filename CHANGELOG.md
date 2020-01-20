@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::variation_axes_count`
 - `Font::variation_axis`
 - `Font::map_variation_coordinates`
+- `Font::glyph_y_origin`
 - `Tag` type.
 
 ### Changed

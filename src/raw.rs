@@ -258,45 +258,6 @@ pub mod vhea {
     }
 }
 
-pub mod vmtx {
-    use crate::parser::FromData;
-
-    #[derive(Clone, Copy)]
-    pub struct VerticalMetrics {
-        data: [u8; 4],
-    }
-
-    impl VerticalMetrics {
-        pub const SIZE: usize = 4;
-
-        #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            VerticalMetrics { data }
-        }
-
-        #[inline(always)]
-        pub fn advance_height(&self) -> u16 {
-            u16::from_be_bytes([self.data[0], self.data[1]])
-        }
-
-        #[inline(always)]
-        pub fn top_side_bearing(&self) -> i16 {
-            i16::from_be_bytes([self.data[2], self.data[3]])
-        }
-    }
-
-    impl FromData for VerticalMetrics {
-        const SIZE: usize = VerticalMetrics::SIZE;
-
-        #[inline]
-        fn parse(data: &[u8]) -> Self {
-            Self::new(data)
-        }
-    }
-}
-
 pub mod cmap {
     use crate::parser::{FromData, Offset32};
     use crate::GlyphId;

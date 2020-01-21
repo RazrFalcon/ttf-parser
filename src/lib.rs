@@ -226,12 +226,6 @@ pub enum Error {
     /// Glyph doesn't have an outline.
     NoOutline,
 
-    /// No horizontal metrics for this glyph.
-    NoHorizontalMetrics,
-
-    /// No vertical metrics for this glyph.
-    NoVerticalMetrics,
-
     /// No kerning for this glyph.
     NoKerning,
 
@@ -278,12 +272,6 @@ impl core::fmt::Display for Error {
             }
             Error::NoOutline => {
                 write!(f, "glyph has no outline")
-            }
-            Error::NoHorizontalMetrics => {
-                write!(f, "glyph has no horizontal metrics")
-            }
-            Error::NoVerticalMetrics => {
-                write!(f, "glyph has no vertical metrics")
             }
             Error::NoKerning => {
                 write!(f, "glyph has no kerning")
@@ -443,28 +431,6 @@ pub struct LineMetrics {
 
     /// Line thickness.
     pub thickness: i16,
-}
-
-
-/// A horizontal metrics of a glyph.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct HorizontalMetrics {
-    /// A horizontal advance.
-    pub advance: u16,
-
-    /// Left side bearing.
-    pub left_side_bearing: i16,
-}
-
-
-/// A vertical metrics of a glyph.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct VerticalMetrics {
-    /// A vertical advance.
-    pub advance: u16,
-
-    /// Top side bearing.
-    pub top_side_bearing: i16,
 }
 
 
@@ -785,6 +751,15 @@ impl<'a> Font<'a> {
             Ok(())
         } else {
             Err(Error::NoGlyph)
+        }
+    }
+
+    #[inline]
+    pub(crate) fn check_glyph_id_opt(&self, glyph_id: GlyphId) -> Option<()> {
+        if glyph_id < self.number_of_glyphs {
+            Some(())
+        } else {
+            None
         }
     }
 

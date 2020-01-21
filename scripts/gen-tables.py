@@ -320,12 +320,6 @@ VHEA_TABLE = [
     TableRow(True,  TtfUInt16(),  'numOfLongVerMetrics'),
 ]
 
-# https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx#vertical-metrics-table-format
-VMTX_METRICS = [
-    TableRow(True,  TtfUInt16(),   'advanceHeight'),
-    TableRow(True,  TtfInt16(),    'topSideBearing'),
-]
-
 # https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
 NAME_RECORD_TABLE = [
     TableRow(True,  TtfUInt16(),   'platformID'),
@@ -647,12 +641,6 @@ print('}')
 print()
 print('pub mod vhea {')
 generate_table(VHEA_TABLE, 'Table')
-print('}')
-print()
-print('pub mod vmtx {')
-print('use crate::parser::FromData;')
-print()
-generate_table(VMTX_METRICS, 'VerticalMetrics', owned=True, impl_from_data=True)
 print('}')
 print()
 print('pub mod cmap {')

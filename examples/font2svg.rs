@@ -138,12 +138,12 @@ fn glyph_to_path(
         }
     };
 
-    let metrics = match font.glyph_hor_metrics(glyph_id) {
-        Ok(v) => v,
-        Err(_) => return,
+    let advance = match font.glyph_hor_advance(glyph_id) {
+        Some(v) => v,
+        None => return,
     };
 
-    let dx = (cell_size - metrics.advance as f64 * scale) / 2.0;
+    let dx = (cell_size - advance as f64 * scale) / 2.0;
     let y = y + cell_size + font.descender() as f64 * scale;
 
     let mut ts = svgtypes::Transform::default();

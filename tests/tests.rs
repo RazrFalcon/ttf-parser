@@ -416,20 +416,16 @@ fn superscript_metrics() {
 fn glyph_ver_metrics_1() {
     let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(
-        font.glyph_ver_metrics(GlyphId(0)).unwrap(),
-        ttf::VerticalMetrics { advance: 1000, top_side_bearing: 666 },
-    );
+    assert_eq!(font.glyph_ver_advance(GlyphId(0)).unwrap(), 1000);
+    assert_eq!(font.glyph_ver_side_bearing(GlyphId(0)).unwrap(), 666);
 }
 
 #[test]
 fn glyph_ver_metrics_2() {
     let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(
-        font.glyph_ver_metrics(GlyphId(1)).unwrap(),
-        ttf::VerticalMetrics { advance: 1000, top_side_bearing: 83 },
-    );
+    assert_eq!(font.glyph_ver_advance(GlyphId(1)).unwrap(), 1000);
+    assert_eq!(font.glyph_ver_side_bearing(GlyphId(1)).unwrap(), 83);
 }
 
 #[test]

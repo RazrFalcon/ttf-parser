@@ -22,8 +22,8 @@ A high-level, safe, zero-allocation TrueType font parser.
   <br/>All subtable formats except Mixed Coverage (8) are supported.
 - (`cmap`) Character variation to glyph index mapping using [glyph_variation_index()] method.
 - (`glyf`) Glyph outlining using [outline_glyph()] method.
-- (`hmtx`) Retrieving glyph's horizontal metrics using [glyph_hor_metrics()] method.
-- (`vmtx`) Retrieving glyph's vertical metrics using [glyph_ver_metrics()] method.
+- (`hmtx`) Retrieving glyph's horizontal metrics using [glyph_hor_advance()] and [glyph_hor_side_bearing()] methods.
+- (`vmtx`) Retrieving glyph's vertical metrics using [glyph_ver_advance()] and [glyph_ver_side_bearing()] methods.
 - (`kern`) Retrieving glyphs pair kerning using [glyphs_kerning()] method.
 - (`maxp`) Retrieving total number of glyphs using [number_of_glyphs()] method.
 - (`name`) Listing all name records using [names()] method.
@@ -38,8 +38,10 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_index
 [glyph_variation_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_variation_index
 [outline_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.outline_glyph
-[glyph_hor_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_metrics
-[glyph_ver_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_metrics
+[glyph_hor_advance()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_advance
+[glyph_hor_side_bearing()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_side_bearing
+[glyph_ver_advance()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance
+[glyph_ver_side_bearing()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing
 [glyphs_kerning()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyphs_kerning
 [number_of_glyphs()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.number_of_glyphs
 [names()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.names
@@ -71,6 +73,11 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`avar`) Variation coordinates normalization using [map_variation_coordinates()] method.
 - (`fvar`) Variation axis parsing using [variation_axis()] method.
 - (`VORG`) Retrieving glyph's vertical origin using [glyph_y_origin()] method.
+- (`MVAR`) Retrieving font's metrics variation using [metrics_variation()] method.
+- (`HVAR`) Retrieving glyph's variation offset for horizontal advance using [glyph_hor_advance_variation()] method.
+- (`HVAR`) Retrieving glyph's variation offset for horizontal side bearing using [glyph_hor_side_bearing_variation()] method.
+- (`VVAR`) Retrieving glyph's variation offset for vertical advance using [glyph_ver_advance_variation()] method.
+- (`VVAR`) Retrieving glyph's variation offset for vertical side bearing using [glyph_ver_side_bearing_variation()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -88,6 +95,11 @@ A high-level, safe, zero-allocation TrueType font parser.
 [map_variation_coordinates()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.map_variation_coordinates
 [variation_axis()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.variation_axis
 [glyph_y_origin()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_y_origin
+[metrics_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.metrics_variation
+[glyph_hor_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_advance_variation
+[glyph_hor_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_side_bearing_variation
+[glyph_ver_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance_variation
+[glyph_ver_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing_variation
 
 ### Methods' computational complexity
 

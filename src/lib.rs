@@ -17,8 +17,8 @@ A high-level, safe, zero-allocation TrueType font parser.
   <br/>All subtable formats except Mixed Coverage (8) are supported.
 - (`cmap`) Character variation to glyph index mapping using [glyph_variation_index()] method.
 - (`glyf`) Glyph outlining using [outline_glyph()] method.
-- (`hmtx`) Retrieving glyph's horizontal metrics using [glyph_hor_metrics()] method.
-- (`vmtx`) Retrieving glyph's vertical metrics using [glyph_ver_metrics()] method.
+- (`hmtx`) Retrieving glyph's horizontal metrics using [glyph_hor_advance()] and [glyph_hor_side_bearing()] methods.
+- (`vmtx`) Retrieving glyph's vertical metrics using [glyph_ver_advance()] and [glyph_ver_side_bearing()] methods.
 - (`kern`) Retrieving glyphs pair kerning using [glyphs_kerning()] method.
 - (`maxp`) Retrieving total number of glyphs using [number_of_glyphs()] method.
 - (`name`) Listing all name records using [names()] method.
@@ -33,8 +33,10 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_index
 [glyph_variation_index()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_variation_index
 [outline_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.outline_glyph
-[glyph_hor_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_metrics
-[glyph_ver_metrics()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_metrics
+[glyph_hor_advance()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_advance
+[glyph_hor_side_bearing()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_side_bearing
+[glyph_ver_advance()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance
+[glyph_ver_side_bearing()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing
 [glyphs_kerning()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyphs_kerning
 [number_of_glyphs()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.number_of_glyphs
 [names()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.names

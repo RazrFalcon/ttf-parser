@@ -190,6 +190,7 @@ use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray, Offset};
 pub use cff::CFFError;
 pub use fvar::VariationAxis;
 pub use gdef::{Class, GlyphClass};
+pub use head::IndexToLocationFormat;
 pub use name::*;
 pub use os2::*;
 

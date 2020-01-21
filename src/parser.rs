@@ -257,13 +257,13 @@ impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index as usize == self.data.len() {
-            return None;
-        }
-
-        let index = self.index;
         self.index += 1;
-        self.data.get(index)
+        self.data.get(self.index - 1)
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.data.get(n as u32)
     }
 }
 

@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/avar
 
-use crate::{Font, TableName, Result, Error};
+use crate::{Font, Result, Error};
 use crate::parser::{Stream, SafeStream, LazyArray, FromData};
 
 
@@ -12,14 +12,28 @@ impl<'a> Font<'a> {
     /// by multiplying each coordinate by 16384.
     ///
     /// Number of `coordinates` should be the same as number of variation axes in the font.
-    ///
-    /// Returns `false` when `avar` table is not present or invalid.
-    pub fn map_variation_coordinates(&self, coordinates: &mut [i32]) -> bool {
-        if let Some(data) = self.avar {
-            map_variation_coordinates_impl(data, coordinates).is_ok()
-        } else {
-            false
+    pub fn map_variation_coordinates(&self, coordinates: &mut [i32]) -> Result<()> {
+        let mut s = Stream::new(self.avar?);
+        let major_version: u16 = s.read()?;
+        let minor_version: u16 = s.read()?;
+
+        if major_version != 1 && minor_version != 0 {
+            return Err(Error::UnsupportedTableVersion);
         }
+
+        s.skip::<u16>(); // reserved
+        // TODO: check that `axisCount` is the same as in `fvar`?
+        let axis_count = s.read::<u16>()? as usize;
+        if axis_count != coordinates.len() {
+            return Err(Error::InvalidNumberOfVarCoordinates);
+        }
+
+        for i in 0..axis_count {
+            let map: LazyArray<AxisValueMapRecord> = s.read_array16()?;
+            coordinates[i] = map_value(&map, coordinates[i]);
+        }
+
+        Ok(())
     }
 }
 
@@ -40,31 +54,6 @@ impl FromData for AxisValueMapRecord {
             to_coordinate: s.read::<i16>() as i32,
         }
     }
-}
-
-fn map_variation_coordinates_impl(data: &[u8], coordinates: &mut [i32]) -> Result<()> {
-    let mut s = Stream::new(data);
-    let major_version: u16 = s.read()?;
-    let minor_version: u16 = s.read()?;
-
-    if major_version != 1 && minor_version != 0 {
-        return Err(Error::UnsupportedTableVersion(TableName::AxisVariations, major_version));
-    }
-
-    s.skip::<u16>(); // reserved
-    // TODO: check that `axisCount` is the same as in `fvar`?
-    let axis_count = s.read::<u16>()? as usize;
-    if axis_count != coordinates.len() {
-        // Actual error doesn't matter for now.
-        return Err(Error::UnsupportedTableVersion(TableName::AxisVariations, major_version));
-    }
-
-    for i in 0..axis_count {
-        let map: LazyArray<AxisValueMapRecord> = s.read_array16()?;
-        coordinates[i] = map_value(&map, coordinates[i]);
-    }
-
-    Ok(())
 }
 
 fn map_value(map: &LazyArray<AxisValueMapRecord>, value: i32) -> i32 {

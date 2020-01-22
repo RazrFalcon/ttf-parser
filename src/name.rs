@@ -9,7 +9,7 @@ use std::string::String;
 use crate::parser::LazyArray;
 
 use crate::parser::Stream;
-use crate::{Font, TableName, Result, Error};
+use crate::{Font, Result, Error};
 use crate::raw::name as raw;
 
 
@@ -253,7 +253,7 @@ impl<'a> Font<'a> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
         const LANG_TAG_RECORD_SIZE: u16 = 4;
 
-        let data = self.name.ok_or_else(|| Error::TableMissing(TableName::Naming))?;
+        let data = self.name?;
         let mut s = Stream::new(data);
         let format: u16 = s.read()?;
         let count: u16 = s.read()?;

@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vvar
 
-use crate::{Font, GlyphId};
+use crate::{Font, GlyphId, Result};
 
 
 impl<'a> Font<'a> {
@@ -17,7 +17,7 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         coordinates: &[i32],
-    ) -> Option<f32> {
+    ) -> Result<Option<f32>> {
         crate::hvar::glyph_advance_variation(self.vvar?, glyph_id, coordinates)
     }
 
@@ -34,7 +34,7 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         coordinates: &[i32],
-    ) -> Option<f32> {
+    ) -> Result<Option<f32>> {
         crate::hvar::glyph_side_bearing_variation(self.vvar?, glyph_id, coordinates)
     }
 }

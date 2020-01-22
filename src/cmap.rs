@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
 use crate::parser::{Stream, LazyArray, TrySlice};
-use crate::{Font, GlyphId, TableName, Result, Error, PlatformId};
+use crate::{Font, GlyphId, Result, PlatformId};
 use crate::raw::cmap as raw;
 
 
@@ -11,8 +11,8 @@ impl<'a> Font<'a> {
     /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
     ///
     /// All subtable formats except Mixed Coverage (8) are supported.
-    pub fn glyph_index(&self, c: char) -> Result<GlyphId> {
-        let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
+    pub fn glyph_index(&self, c: char) -> Result<Option<GlyphId>> {
+        let data = self.cmap?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
         let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
@@ -63,12 +63,12 @@ impl<'a> Font<'a> {
                 }
             };
 
-            if let Ok(id) = glyph {
-                return Ok(GlyphId(id));
+            if let Ok(Some(id)) = glyph {
+                return Ok(Some(GlyphId(id)));
             }
         }
 
-        Err(Error::NoGlyph)
+        Ok(None)
     }
 
     /// Resolves a variation of a Glyph ID from two code points.
@@ -78,8 +78,8 @@ impl<'a> Font<'a> {
     /// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences).
     ///
     /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
-    pub fn glyph_variation_index(&self, c: char, variation: char) -> Result<GlyphId> {
-        let data = self.cmap.ok_or_else(|| Error::TableMissing(TableName::CharacterToGlyphIndexMapping))?;
+    pub fn glyph_variation_index(&self, c: char, variation: char) -> Result<Option<GlyphId>> {
+        let data = self.cmap?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
         let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
@@ -98,7 +98,7 @@ impl<'a> Font<'a> {
             return self.parse_unicode_variation_sequences(subtable_data, c, variation as u32);
         }
 
-        Err(Error::NoGlyph)
+        Ok(None)
     }
 
     fn parse_unicode_variation_sequences(
@@ -106,7 +106,7 @@ impl<'a> Font<'a> {
         data: &[u8],
         c: char,
         variation: u32,
-    ) -> Result<GlyphId> {
+    ) -> Result<Option<GlyphId>> {
         let cp = c as u32;
 
         let mut s = Stream::new(data);
@@ -114,7 +114,10 @@ impl<'a> Font<'a> {
         s.skip::<u32>(); // length
         let records: LazyArray<raw::VariationSelectorRecord> = s.read_array32()?;
 
-        let record = records.binary_search_by(|v| v.var_selector().cmp(&variation)).ok_or(Error::NoGlyph)?;
+        let record = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
+            Some(v) => v,
+            None => return Ok(None),
+        };
 
         if let Some(offset) = record.default_uvs_offset() {
             let data = data.try_slice_from(offset)?;
@@ -133,24 +136,24 @@ impl<'a> Font<'a> {
             let mut s = Stream::new(data);
             let uvs_mappings: LazyArray<raw::UVSMappingRecord> = s.read_array32()?;
             if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
-                return Ok(mapping.glyph_id());
+                return Ok(Some(mapping.glyph_id()));
             }
         }
 
-        Err(Error::NoGlyph)
+        Ok(None)
     }
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table
-fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Result<u16> {
+fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Result<Option<u16>> {
     let length: u16 = s.read()?;
     s.skip::<u16>(); // language
 
     if code_point < (length as u32) {
         s.advance(code_point);
-        Ok(s.read::<u8>()? as u16)
+        Ok(Some(s.read::<u8>()? as u16))
     } else {
-        Err(Error::NoGlyph)
+        Ok(None)
     }
 }
 
@@ -159,10 +162,10 @@ fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Result<u16> {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-2-high-byte-mapping-through-table
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html
 // https://github.com/fonttools/fonttools/blob/a360252709a3d65f899915db0a5bd753007fdbb7/Lib/fontTools/ttLib/tables/_c_m_a_p.py#L360
-fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result<u16> {
+fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result<Option<u16>> {
     // This subtable supports code points only in a u16 range.
     if code_point > 0xffff {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     let code_point = code_point as u16;
@@ -175,8 +178,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
     s.skip::<u16>(); // language
     let sub_header_keys: LazyArray<u16> = s.read_array(256_u32)?;
     // The maximum index in a sub_header_keys is a sub_headers count.
-    let sub_headers_count = sub_header_keys.into_iter().map(|n| n / 8).max()
-        .ok_or_else(|| Error::NoGlyph)? + 1;
+    let sub_headers_count = try_ok!(sub_header_keys.into_iter().map(|n| n / 8).max()) + 1;
 
     // Remember sub_headers offset before reading. Will be used later.
     let sub_headers_offset = s.offset();
@@ -187,15 +189,15 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
         0
     } else {
         // 'Array that maps high bytes to subHeaders: value is subHeader index × 8.'
-        sub_header_keys.get(high_byte).ok_or_else(|| Error::NoGlyph)? / 8
+        try_ok!(sub_header_keys.get(high_byte)) / 8
     };
 
-    let sub_header = sub_headers.get(i).ok_or_else(|| Error::NoGlyph)?;
+    let sub_header = try_ok!(sub_headers.get(i));
 
     let first_code = sub_header.first_code();
     let range_end = first_code + sub_header.entry_count();
     if low_byte < first_code || low_byte > range_end {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     // SubHeaderRecord::id_range_offset points to SubHeaderRecord::first_code
@@ -217,18 +219,18 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
 
     let glyph: u16 = Stream::read_at(data, offset)?;
     if glyph == 0 {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     let glyph = ((glyph as i32 + sub_header.id_delta() as i32) % 65536) as u16;
-    Ok(glyph)
+    Ok(Some(glyph))
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
-fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result<u16> {
+fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result<Option<u16>> {
     // This subtable supports code points only in a u16 range.
     if code_point > 0xffff {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     let code_point = code_point as u16;
@@ -237,7 +239,7 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
     s.advance(6 as u32); // format + length + language
     let seg_count_x2: u16 = s.read()?;
     if seg_count_x2 < 2 {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     let seg_count = seg_count_x2 / 2;
@@ -254,22 +256,22 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
     let mut end = seg_count;
     while end > start {
         let index = (start + end) / 2;
-        let end_value = end_codes.get(index).ok_or_else(|| Error::NoGlyph)?;
+        let end_value = try_ok!(end_codes.get(index));
         if end_value >= code_point {
-            let start_value = start_codes.get(index).ok_or_else(|| Error::NoGlyph)?;
+            let start_value = try_ok!(start_codes.get(index));
             if start_value > code_point {
                 end = index;
             } else {
-                let id_range_offset = id_range_offsets.get(index).ok_or_else(|| Error::NoGlyph)?;
-                let id_delta = id_deltas.get(index).ok_or_else(|| Error::NoGlyph)?;
+                let id_range_offset = try_ok!(id_range_offsets.get(index));
+                let id_delta = try_ok!(id_deltas.get(index));
                 if id_range_offset == 0 {
-                    return Ok(code_point.wrapping_add(id_delta as u16));
+                    return Ok(Some(code_point.wrapping_add(id_delta as u16)));
                 }
 
                 let delta = (code_point as u32 - start_value as u32) * 2;
                 // Check for overflow.
                 if delta > core::u16::MAX as u32 {
-                    return Err(Error::NoGlyph);
+                    return Ok(None);
                 }
                 // `delta` must be u16.
                 let delta = delta as u16;
@@ -279,25 +281,25 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
                 let pos = pos.wrapping_add(id_range_offset);
                 let glyph_array_value: u16 = Stream::read_at(data, pos as usize)?;
                 if glyph_array_value == 0 {
-                    return Err(Error::NoGlyph);
+                    return Ok(None);
                 }
 
                 let glyph_id = (glyph_array_value as i16).wrapping_add(id_delta);
-                return Ok(glyph_id as u16);
+                return Ok(Some(glyph_id as u16));
             }
         } else {
             start = index + 1;
         }
     }
 
-    return Err(Error::NoGlyph);
+    Ok(None)
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-6-trimmed-table-mapping
-fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Result<u16> {
+fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Result<Option<u16>> {
     // This subtable supports code points only in a u16 range.
     if code_point > 0xffff {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     s.skip::<u16>(); // length
@@ -309,15 +311,15 @@ fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Result<u16> {
 
     // Check for overflow.
     if code_point < first_code_point {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     let idx = code_point - first_code_point;
-    glyphs.get(idx).ok_or_else(|| Error::NoGlyph)
+    Ok(glyphs.get(idx))
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-10-trimmed-array
-fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Result<u16> {
+fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Result<Option<u16>> {
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
@@ -326,17 +328,17 @@ fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Result<u16> {
 
     // Check for overflow.
     if code_point < first_code_point {
-        return Err(Error::NoGlyph);
+        return Ok(None);
     }
 
     let idx = code_point - first_code_point;
-    glyphs.get(idx).ok_or_else(|| Error::NoGlyph)
+    Ok(glyphs.get(idx))
 }
 
 // + ManyToOneRangeMappings
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-13-many-to-one-range-mappings
-fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> Result<u16> {
+fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> Result<Option<u16>> {
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
@@ -346,15 +348,15 @@ fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> 
         if code_point >= start_char_code && code_point <= group.end_char_code() {
             if format == Format::SegmentedCoverage {
                 let id = group.start_glyph_id() + code_point - start_char_code;
-                return Ok(id as u16);
+                return Ok(Some(id as u16));
             } else {
                 // TODO: what if start_glyph_id is > u16::MAX
-                return Ok(group.start_glyph_id() as u16);
+                return Ok(Some(group.start_glyph_id() as u16));
             }
         }
     }
 
-    Err(Error::NoGlyph)
+    Ok(None)
 }
 
 

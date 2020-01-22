@@ -6,7 +6,7 @@
 use core::ops::Range;
 
 use crate::parser::{Stream, TryFromData, TrySlice, U24, FromData};
-use crate::{Font, GlyphId, TableName, OutlineBuilder, Rect, Result, Error};
+use crate::{Font, GlyphId, OutlineBuilder, Rect, Result, Error};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: usize = 48;
@@ -104,6 +104,9 @@ pub enum CFFError {
     /// Usually indicates an implementation error and should not occur on valid fonts.
     InvalidArgumentsStackLength,
 
+    /// CharString references a non-existing subroutine.
+    InvalidSubroutineIndex,
+
     /// The `ItemVariationData` record should have format #1.
     ///
     /// CFF2 only.
@@ -145,6 +148,9 @@ impl core::fmt::Display for CFFError {
             CFFError::InvalidArgumentsStackLength => {
                 write!(f, "an invalid amount of items are in an arguments stack")
             }
+            CFFError::InvalidSubroutineIndex => {
+                write!(f, "an invalid subroutine index")
+            }
             CFFError::InvalidItemVariationDataFormat => {
                 write!(f, "invalid ItemVariationData format")
             }
@@ -176,7 +182,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
     s.skip::<u8>(); // Absolute offset
 
     if major != 1 {
-        return Err(Error::UnsupportedTableVersion(TableName::CompactFontFormat, major as u16));
+        return Err(Error::UnsupportedTableVersion);
     }
 
     // Jump to Name INDEX. It's not necessarily right after the header.
@@ -235,7 +241,7 @@ impl<'a> Font<'a> {
         metadata: &Metadata,
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
-    ) -> Result<Rect> {
+    ) -> Result<Option<Rect>> {
         parse_char_string(metadata, glyph_id, builder)
     }
 }
@@ -316,8 +322,11 @@ fn parse_char_string(
     metadata: &Metadata,
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
-) -> Result<Rect> {
-    let data = metadata.char_strings.get(glyph_id.0).ok_or(Error::NoGlyph)?;
+) -> Result<Option<Rect>> {
+    let data = match metadata.char_strings.get(glyph_id.0) {
+        Some(v) => v,
+        None => return Ok(None),
+    };
 
     let mut ctx = CharStringParserContext {
         metadata,
@@ -344,12 +353,12 @@ fn parse_char_string(
     let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, &mut inner_builder)?;
 
     let bbox = inner_builder.bbox;
-    Ok(Rect {
+    Ok(Some(Rect {
         x_min: bbox.x_min as i16,
         y_min: bbox.y_min as i16,
         x_max: bbox.x_max as i16,
         y_max: bbox.y_max as i16,
-    })
+    }))
 }
 
 
@@ -563,7 +572,7 @@ fn _parse_char_string(
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len() as u16);
                 let index = stack.pop() as i32 + subroutine_bias as i32;
-                let char_string = ctx.metadata.local_subrs.get(index as u16).ok_or(Error::NoGlyph)?;
+                let char_string = ctx.metadata.local_subrs.get(index as u16).ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
                 y = pos.1;
@@ -887,7 +896,7 @@ fn _parse_char_string(
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.global_subrs.len() as u16);
                 let index = stack.pop() as i32 + subroutine_bias as i32;
-                let char_string = ctx.metadata.global_subrs.get(index as u16).ok_or(Error::NoGlyph)?;
+                let char_string = ctx.metadata.global_subrs.get(index as u16).ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
                 y = pos.1;

@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
-use crate::{Font, LineMetrics, GlyphId};
+use crate::{Font, LineMetrics, GlyphId, Result};
 use crate::parser::{Stream, Fixed, LazyArray};
 
 
@@ -269,14 +269,12 @@ const MACINTOSH_NAMES: &[&str] = &[
 
 impl<'a> Font<'a> {
     /// Parses font's underline metrics.
-    ///
-    /// Returns `None` when `post` table is not present.
     #[inline]
-    pub fn underline_metrics(&self) -> Option<LineMetrics> {
-        let mut s = Stream::new_at(self.post?, 8);
-        Some(LineMetrics {
-            position: s.read().ok()?,
-            thickness: s.read().ok()?,
+    pub fn underline_metrics(&self) -> Result<LineMetrics> {
+        let mut s = Stream::new_at(self.post?, 8); // TODO: to raw
+        Ok(LineMetrics {
+            position: s.read()?,
+            thickness: s.read()?,
         })
     }
 
@@ -284,34 +282,34 @@ impl<'a> Font<'a> {
     ///
     /// Uses the `post` table as a source.
     ///
-    /// Returns `None` when `post` table is not present or no name is associated with `glyph`.
+    /// Returns `Ok(None)` when no name is associated with a `glyph`.
     #[inline]
-    pub fn glyph_name(&self, glyph: GlyphId) -> Option<&str> {
+    pub fn glyph_name(&self, glyph: GlyphId) -> Result<Option<&str>> {
         let mut s = Stream::new(self.post?);
-        let version: Fixed = s.read().ok()?;
+        let version: Fixed = s.read()?;
 
         // In case of version 1.0 we are using predefined set of names.
         if version.0 == 1.0 {
-            if (glyph.0 as usize) < MACINTOSH_NAMES.len() {
-                return Some(MACINTOSH_NAMES[glyph.0 as usize]);
+            return if (glyph.0 as usize) < MACINTOSH_NAMES.len() {
+                Ok(Some(MACINTOSH_NAMES[glyph.0 as usize]))
             } else {
-                return None;
-            }
+                Ok(None)
+            };
         }
 
         // Only version 2.0 of the table has data at the end.
         if version.0 != 2.0 || s.at_end() {
-            return None;
+            return Ok(None);
         }
 
         s.advance(28_u32); // Jump to the end of the base table.
-        let name_indexes: LazyArray<u16> = s.read_array16().ok()?;
-        let mut index = name_indexes.get(glyph.0)?;
+        let name_indexes: LazyArray<u16> = s.read_array16()?;
+        let mut index = try_ok!(name_indexes.get(glyph.0));
 
         // 'If the name index is between 0 and 257, treat the name index
         // as a glyph index in the Macintosh standard order.'
         if (index as usize) < MACINTOSH_NAMES.len() {
-            Some(MACINTOSH_NAMES[index as usize])
+            Ok(Some(MACINTOSH_NAMES[index as usize]))
         } else {
             // 'If the name index is between 258 and 65535, then subtract 258 and use that
             // to index into the list of Pascal strings at the end of the table.'
@@ -319,15 +317,18 @@ impl<'a> Font<'a> {
 
             let mut i = 0;
             while !s.at_end() && i < core::u16::MAX {
-                let len: u8 = s.read().ok()?;
+                let len: u8 = s.read()?;
 
                 if i == index {
                     if len == 0 {
                         // Empty name is an error.
                         break;
                     } else {
-                        let name = s.read_bytes(len as u16).ok()?;
-                        return core::str::from_utf8(name).ok();
+                        let name = s.read_bytes(len as u16)?;
+                        return match core::str::from_utf8(name) {
+                            Ok(v) => Ok(Some(v)),
+                            Err(_) => Ok(None), // TODO: custom error
+                        };
                     }
                 } else {
                     s.advance(len as u16);
@@ -336,7 +337,7 @@ impl<'a> Font<'a> {
                 i += 1;
             }
 
-            None
+            Ok(None)
         }
     }
 }

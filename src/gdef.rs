@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 
-use crate::{Font, GlyphId, Error, TableName, Result};
+use crate::{Font, GlyphId, Result};
 use crate::parser::{Stream, SafeStream, FromData, TrySlice, Offset, Offset16, Offset32};
 use crate::raw::gdef as raw;
 
@@ -98,36 +98,36 @@ impl<'a> ClassDefinitionTable<'a> {
 
 
 impl<'a> Font<'a> {
-    fn glyph_class_data(&self) -> Result<&[u8]> {
-        let table = self.gdef.ok_or_else(|| Error::TableMissing(TableName::GlyphDefinition))?;
-        match table.glyph_class_def_offset() {
-            Some(offset) => table.data.try_slice_from(offset),
-            None => Err(Error::NoGlyph), // TODO: custom error
-        }
-    }
-
     /// Checks that font has
     /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
     pub fn has_glyph_classes(&self) -> bool {
-        self.glyph_class_data().is_ok()
+        if let Ok(table) = self.gdef {
+            if let Some(offset) = table.glyph_class_def_offset() {
+                return table.data.try_slice_from(offset).is_ok();
+            }
+        }
+
+        false
     }
 
     /// Returns glyph's class according to
     /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
     ///
-    /// Returns `None` when glyph class is not set
-    /// or *Glyph Class Definition Table* is not present.
-    pub fn glyph_class(&self, glyph_id: GlyphId) -> Result<GlyphClass> {
-        self.check_glyph_id(glyph_id)?;
+    /// Returns `Ok(None)` when *Glyph Class Definition Table* is not set
+    /// or glyph class is not set or invalid.
+    pub fn glyph_class(&self, glyph_id: GlyphId) -> Result<Option<GlyphClass>> {
+        let table = self.gdef?;
+        let data = match table.glyph_class_def_offset() {
+            Some(offset) => table.data.try_slice_from(offset)?,
+            None => return Ok(None),
+        };
 
-        let data = self.glyph_class_data()?;
-        let table = ClassDefinitionTable::new(data);
-        match table.get(glyph_id)?.0 {
-            1 => Ok(GlyphClass::Base),
-            2 => Ok(GlyphClass::Ligature),
-            3 => Ok(GlyphClass::Mark),
-            4 => Ok(GlyphClass::Component),
-            value => Err(Error::InvalidGlyphClass(value)),
+        match ClassDefinitionTable::new(data).get(glyph_id)?.0 {
+            1 => Ok(Some(GlyphClass::Base)),
+            2 => Ok(Some(GlyphClass::Ligature)),
+            3 => Ok(Some(GlyphClass::Mark)),
+            4 => Ok(Some(GlyphClass::Component)),
+            _ => Ok(None),
         }
     }
 
@@ -136,35 +136,33 @@ impl<'a> Font<'a> {
     ///
     /// All glyphs not assigned to a class fall into Class 0.
     pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Result<Class> {
-        self.check_glyph_id(glyph_id)?;
-        let table = self.gdef.ok_or_else(|| Error::TableMissing(TableName::GlyphDefinition))?;
-
+        let table = self.gdef?;
         match table.mark_attach_class_def_offset() {
             Some(offset) => {
                 let data = table.data.try_slice_from(offset)?;
                 let table = ClassDefinitionTable::new(data);
                 table.get(glyph_id)
             }
-            None => Err(Error::NoGlyph), // TODO: custom error
+            None => Ok(Class(0)),
         }
     }
 
-    /// Checks that `glyph_id` is a mark according to
+    /// Checks that glyph is a mark according to
     /// [Mark Glyph Sets Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-glyph-sets-table).
     ///
     /// `set_index` allows checking a specific glyph coverage set.
     /// Otherwise all sets will be checked.
     ///
-    /// Returns `false` when *Mark Glyph Sets Table* is not present.
+    /// Returns `Ok(false)` when *Mark Glyph Sets Table* is not set.
     pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u32>) -> Result<bool> {
-        self.check_glyph_id(glyph_id)?;
-        let table = self.gdef.ok_or_else(|| Error::TableMissing(TableName::GlyphDefinition))?;
+        let table = self.gdef?;
 
         // `markGlyphSetsDefOffset` is present only in table version >= 1.2
         if !(table.major_version() == 1 && table.minor_version() == 2) {
             return Ok(false);
         }
 
+        // Offset can be NULL.
         let offset: Option<Offset16>
             = Stream::read_at(table.data, raw::MARK_GLYPH_SETS_DEF_OFFSET_OFFSET)?;
         let offset = match offset {
@@ -176,6 +174,7 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(data);
         let format: u16 = s.read()?;
         if format != 1 {
+            // Unsupported version.
             return Ok(false);
         }
 

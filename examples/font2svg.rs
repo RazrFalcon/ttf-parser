@@ -129,9 +129,8 @@ fn glyph_to_path(
     path_buf.clear();
     let mut builder = Builder(path_buf);
     let bbox = match font.outline_glyph(glyph_id, &mut builder) {
-        Ok(v) => v,
-        Err(ttf::Error::NoOutline) => return,
-        Err(ttf::Error::NoGlyph) => return,
+        Ok(Some(v)) => v,
+        Ok(None) => return,
         Err(e) => {
             eprintln!("Warning (glyph {}): {}.", glyph_id.0, e);
             return;
@@ -139,8 +138,8 @@ fn glyph_to_path(
     };
 
     let advance = match font.glyph_hor_advance(glyph_id) {
-        Some(v) => v,
-        None => return,
+        Ok(Some(v)) => v,
+        _ => return,
     };
 
     let dx = (cell_size - advance as f64 * scale) / 2.0;

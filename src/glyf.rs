@@ -3,7 +3,7 @@
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
 use crate::parser::{Stream, LazyArray, TrySlice, F2DOT14};
-use crate::{Font, GlyphId, OutlineBuilder, TableName, Rect, Result, Error};
+use crate::{Font, GlyphId, OutlineBuilder, Rect, Result, Error};
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
 trait OutlineBuilderInner {
@@ -115,34 +115,34 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
-    ) -> Result<Rect> {
+    ) -> Result<Option<Rect>> {
         let mut b = Builder {
             builder,
             transform: Transform::default(),
             is_default_ts: true,
         };
 
-        let glyph_data = self.glyph_data(glyph_id)?;
+        let glyph_data = bail!(self.glyph_data(glyph_id));
         self.outline_impl(glyph_data, 0, &mut b)
     }
 
-    pub(crate) fn glyf_glyph_bbox(&self, glyph_id: GlyphId) -> Result<Rect> {
-        let glyph_data = self.glyph_data(glyph_id)?;
+    pub(crate) fn glyf_glyph_bbox(&self, glyph_id: GlyphId) -> Result<Option<Rect>> {
+        let glyph_data = bail!(self.glyph_data(glyph_id));
         let mut s = Stream::new(glyph_data);
         s.skip::<i16>(); // number_of_contours
         // It's faster to parse the rect directly, instead of using `FromData`.
-        Ok(Rect {
+        Ok(Some(Rect {
             x_min: s.read()?,
             y_min: s.read()?,
             x_max: s.read()?,
             y_max: s.read()?,
-        })
+        }))
     }
 
-    fn glyph_data(&self, glyph_id: GlyphId) -> Result<&[u8]> {
-        let range = self.glyph_range(glyph_id)?;
-        let data = self.glyf.ok_or_else(|| Error::TableMissing(TableName::GlyphData))?;
-        data.try_slice(range)
+    fn glyph_data(&self, glyph_id: GlyphId) -> Result<Option<&[u8]>> {
+        let range = try_ok!(self.glyph_range(glyph_id)?);
+        let data = self.glyf?;
+        Ok(Some(data.try_slice(range)?))
     }
 
     fn outline_impl(
@@ -150,9 +150,9 @@ impl<'a> Font<'a> {
         data: &[u8],
         depth: u8,
         builder: &mut Builder,
-    ) -> Result<Rect> {
+    ) -> Result<Option<Rect>> {
         if depth >= MAX_COMPONENTS {
-            return Ok(Rect::zero());
+            return Err(Error::GlyphDataRecursion);
         }
 
         let mut s = Stream::new(data);
@@ -171,10 +171,10 @@ impl<'a> Font<'a> {
             self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
         } else {
             // An empty glyph.
-            return Ok(Rect::zero());
+            return Ok(None);
         }
 
-        Ok(rect)
+        Ok(Some(rect))
     }
 
     #[inline(never)]
@@ -182,7 +182,7 @@ impl<'a> Font<'a> {
         glyph_data: &[u8],
         number_of_contours: u16,
         builder: &mut Builder,
-    ) -> Result<()> {
+    ) -> Result<Option<()>> {
         let mut s = Stream::new(glyph_data);
         let endpoints: LazyArray<u16> = s.read_array(number_of_contours)?;
 
@@ -191,7 +191,7 @@ impl<'a> Font<'a> {
             let last_point = endpoints.last().unwrap();
             // Prevent overflow.
             if last_point == core::u16::MAX {
-                return Ok(());
+                return Ok(None);
             }
 
             last_point + 1
@@ -201,8 +201,7 @@ impl<'a> Font<'a> {
         s.advance(instructions_len);
 
         let flags_offset = s.offset();
-        let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)
-            .ok_or_else(|| Error::NoOutline)?;
+        let x_coords_len = try_ok!(Self::resolve_x_coords_len(&mut s, points_total));
         let x_coords_offset = s.offset();
         let y_coords_offset = x_coords_offset + x_coords_len as usize;
 
@@ -241,7 +240,7 @@ impl<'a> Font<'a> {
             total += n;
         }
 
-        Ok(())
+        Ok(Some(()))
     }
 
     /// Resolves the X coordinates length.
@@ -409,7 +408,7 @@ impl<'a> Font<'a> {
             ts.d = ts.a;
         }
 
-        if let Ok(glyph_data) = self.glyph_data(glyph_id) {
+        if let Ok(Some(glyph_data)) = self.glyph_data(glyph_id) {
             let transform = Transform::combine(builder.transform, ts);
             let mut b = Builder {
                 builder: builder.builder,

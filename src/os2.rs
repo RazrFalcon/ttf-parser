@@ -5,11 +5,11 @@ use crate::{Font, LineMetrics};
 use crate::raw::os_2 as raw;
 
 
-macro_rules! try_opt_or {
+macro_rules! try_or {
     ($value:expr, $ret:expr) => {
         match $value {
-            Some(v) => v,
-            None => return $ret,
+            Ok(v) => v,
+            Err(_) => return $ret,
         }
     };
 }
@@ -143,7 +143,7 @@ impl<'a> Font<'a> {
     /// Returns `Weight::Normal` when OS/2 table is not present.
     #[inline]
     pub fn weight(&self) -> Weight {
-        let table = try_opt_or!(self.os_2, Weight::default());
+        let table = try_or!(self.os_2, Weight::default());
         Weight::from(table.us_weight_class())
     }
 
@@ -152,7 +152,7 @@ impl<'a> Font<'a> {
     /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
     #[inline]
     pub fn width(&self) -> Width {
-        let table = try_opt_or!(self.os_2, Width::default());
+        let table = try_or!(self.os_2, Width::default());
         match table.us_width_class() {
             1 => Width::UltraCondensed,
             2 => Width::ExtraCondensed,
@@ -196,10 +196,10 @@ impl<'a> Font<'a> {
 
     /// Checks that font is marked as *Oblique*.
     ///
-    /// Returns `None` when OS/2 table is not present or when its version is < 4.
+    /// Returns `false` when OS/2 table is not present or when its version is < 4.
     #[inline]
     pub fn is_oblique(&self) -> bool {
-        let table = try_opt_or!(self.os_2, false);
+        let table = try_or!(self.os_2, false);
         if table.version() < 4 {
             return false;
         }
@@ -210,7 +210,7 @@ impl<'a> Font<'a> {
 
     #[inline]
     pub(crate) fn is_use_typo_metrics(&self) -> bool {
-        let table = try_opt_or!(self.os_2, false);
+        let table = try_or!(self.os_2, false);
         if table.version() < 4 {
             return false;
         }
@@ -221,7 +221,7 @@ impl<'a> Font<'a> {
 
     #[inline]
     fn get_fs_selection(&self, bit: u16) -> bool {
-        let table = try_opt_or!(self.os_2, false);
+        let table = try_or!(self.os_2, false);
         (table.fs_selection() >> bit) & 1 == 1
     }
 
@@ -230,7 +230,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
-        let table = self.os_2?;
+        let table = self.os_2.ok()?;
         if table.version() < 2 {
             return None;
         }
@@ -244,7 +244,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
-        let table = self.os_2?;
+        let table = self.os_2.ok()?;
         Some(LineMetrics {
             thickness: table.y_strikeout_size(),
             position: table.y_strikeout_position(),
@@ -256,7 +256,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
-        let table = self.os_2?;
+        let table = self.os_2.ok()?;
         Some(ScriptMetrics {
             x_size: table.y_subscript_x_size(),
             y_size: table.y_subscript_y_size(),
@@ -270,7 +270,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
-        let table = self.os_2?;
+        let table = self.os_2.ok()?;
         Some(ScriptMetrics {
             x_size: table.y_superscript_x_size(),
             y_size: table.y_superscript_y_size(),

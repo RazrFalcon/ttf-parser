@@ -96,6 +96,13 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_ver_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance_variation
 [glyph_ver_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing_variation
 
+## Error handling
+
+The library uses `Result<Option<T>, Error>` pattern, where `Error` indicates a parsing error
+and `Ok(None)` a not set value.
+This is a bit verbose, but allows us to separate malformed files and not set values.
+For example, if a font doesn't have a glyph for a specified character - it's not an error.
+
 ## Methods' computational complexity
 
 TrueType fonts designed for fast querying, so most of the methods are very fast.
@@ -126,14 +133,15 @@ test glyph_name_276              ... bench:   216.0 ns/iter (+/- 0)
 test from_data_ttf               ... bench:   200.0 ns/iter (+/- 3)
 test family_name                 ... bench:   161.0 ns/iter (+/- 5)
 test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
-test glyph_2_hor_metrics         ... bench:     7.0 ns/iter (+/- 0)
+test hor_advance                 ... bench:     3.0 ns/iter (+/- 0)
+test hor_side_bearing            ... bench:     3.0 ns/iter (+/- 0)
 test glyph_name_8                ... bench:     2.0 ns/iter (+/- 0)
+test ascender                    ... bench:     0.6 ns/iter (+/- 0)
 test x_height                    ... bench:     0.5 ns/iter (+/- 0)
 test underline_metrics           ... bench:     0.5 ns/iter (+/- 0)
 test strikeout_metrics           ... bench:     0.5 ns/iter (+/- 0)
 test units_per_em                ... bench:     0.5 ns/iter (+/- 0)
 test subscript_metrics           ... bench:     0.2 ns/iter (+/- 0)
-test ascender                    ... bench:     0.2 ns/iter (+/- 0)
 test width                       ... bench:     0.2 ns/iter (+/- 0)
 ```
 
@@ -161,6 +169,25 @@ we are using predefined names, so no parsing is involved.
 extern crate std;
 
 use core::fmt;
+
+macro_rules! try_ok {
+    ($e:expr) => {
+        match $e {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+    };
+}
+
+macro_rules! bail {
+    ($e:expr) => {
+        match $e {
+            Ok(Some(v)) => v,
+            Ok(None) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+    };
+}
 
 mod avar;
 mod cff;
@@ -223,33 +250,20 @@ pub enum Error {
     /// Table has an invalid size.
     InvalidTableSize(TableName),
 
-    /// Font doesn't have such glyph ID.
-    NoGlyph,
-
-    /// Glyph doesn't have an outline.
-    NoOutline,
-
-    /// No kerning for this glyph.
-    NoKerning,
-
     /// An unsupported table version.
-    UnsupportedTableVersion(TableName, u16),
+    UnsupportedTableVersion,
 
-    /// An invalid glyph class.
-    ///
-    /// <https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table>
-    InvalidGlyphClass(u16),
+    /// The number of provided variation coordinates must be the same
+    /// as the axis number in the font.
+    InvalidNumberOfVarCoordinates,
+
+    /// Recursion detected in the `glyf` table.
+    GlyphDataRecursion,
 
     /// An attempt to slice a raw data out of bounds.
     ///
     /// This may be caused by a bug in the library or by a malformed font.
-    #[allow(missing_docs)]
-    SliceOutOfBounds {
-        // u32 is enough, since fonts are usually times smaller.
-        start: u32,
-        end: u32,
-        data_len: u32,
-    },
+    SliceOutOfBounds,
 
     /// A CFF/CFF2 table parsing error.
     CFFError(CFFError),
@@ -270,23 +284,17 @@ impl core::fmt::Display for Error {
             Error::InvalidTableSize(name) => {
                 write!(f, "table {:?} has an invalid size", name)
             }
-            Error::NoGlyph => {
-                write!(f, "font doesn't have such glyph ID")
+            Error::UnsupportedTableVersion => {
+                write!(f, "table has an unsupported version")
             }
-            Error::NoOutline => {
-                write!(f, "glyph has no outline")
+            Error::InvalidNumberOfVarCoordinates => {
+                write!(f, "invalid number of variation coordinates")
             }
-            Error::NoKerning => {
-                write!(f, "glyph has no kerning")
+            Error::GlyphDataRecursion => {
+                write!(f, "recursion detected in the 'glyf' table")
             }
-            Error::UnsupportedTableVersion(name, version) => {
-                write!(f, "table {:?} with version {} is not supported", name, version)
-            }
-            Error::InvalidGlyphClass(value) => {
-                write!(f, "{} is an invalid glyph class", value)
-            }
-            Error::SliceOutOfBounds { start, end, data_len } => {
-                write!(f, "an attempt to slice {}..{} on 0..{}", start, end, data_len)
+            Error::SliceOutOfBounds => {
+                write!(f, "an attempt to slice out of bounds")
             }
             Error::CFFError(e) => {
                 write!(f, "CFF table parsing failed cause {}", e)
@@ -447,18 +455,6 @@ pub struct Rect {
     pub y_max: i16,
 }
 
-impl Rect {
-    #[inline]
-    pub(crate) fn zero() -> Self {
-        Rect {
-            x_min: 0,
-            y_min: 0,
-            x_max: 0,
-            y_max: 0,
-        }
-    }
-}
-
 
 /// A trait for glyph outline construction.
 pub trait OutlineBuilder {
@@ -515,27 +511,27 @@ pub enum TableName {
 /// A font data handle.
 #[derive(Clone)]
 pub struct Font<'a> {
-    avar: Option<&'a [u8]>,
+    avar: Result<&'a [u8]>,
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
-    cff_: Option<cff::Metadata<'a>>,
-    cff2: Option<cff2::Metadata<'a>>,
-    cmap: Option<&'a [u8]>,
-    fvar: Option<raw::fvar::Table<'a>>,
-    gdef: Option<raw::gdef::Table<'a>>,
-    glyf: Option<&'a [u8]>,
-    hmtx: Option<&'a [u8]>,
-    hvar: Option<&'a [u8]>,
-    kern: Option<&'a [u8]>,
-    loca: Option<&'a [u8]>,
-    mvar: Option<&'a [u8]>,
-    name: Option<&'a [u8]>,
-    os_2: Option<raw::os_2::Table<'a>>,
-    post: Option<&'a [u8]>,
-    vhea: Option<raw::vhea::Table<'a>>,
-    vmtx: Option<&'a [u8]>,
-    vorg: Option<&'a [u8]>,
-    vvar: Option<&'a [u8]>,
+    cff_: Result<cff::Metadata<'a>>,
+    cff2: Result<cff2::Metadata<'a>>,
+    cmap: Result<&'a [u8]>,
+    fvar: Result<raw::fvar::Table<'a>>,
+    gdef: Result<raw::gdef::Table<'a>>,
+    glyf: Result<&'a [u8]>,
+    hmtx: Result<&'a [u8]>,
+    hvar: Result<&'a [u8]>,
+    kern: Result<&'a [u8]>,
+    loca: Result<&'a [u8]>,
+    mvar: Result<&'a [u8]>,
+    name: Result<&'a [u8]>,
+    os_2: Result<raw::os_2::Table<'a>>,
+    post: Result<&'a [u8]>,
+    vhea: Result<raw::vhea::Table<'a>>,
+    vmtx: Result<&'a [u8]>,
+    vorg: Result<&'a [u8]>,
+    vvar: Result<&'a [u8]>,
     number_of_glyphs: GlyphId,
 }
 
@@ -585,27 +581,27 @@ impl<'a> Font<'a> {
         let tables: LazyArray<raw::TableRecord> = s.read_array(num_tables)?;
 
         let mut font = Font {
-            avar: None,
+            avar: Err(Error::TableMissing(TableName::AxisVariations)),
+            cff2: Err(Error::TableMissing(TableName::CompactFontFormat2)),
+            cff_: Err(Error::TableMissing(TableName::CompactFontFormat)),
+            cmap: Err(Error::TableMissing(TableName::CharacterToGlyphIndexMapping)),
+            fvar: Err(Error::TableMissing(TableName::FontVariations)),
+            gdef: Err(Error::TableMissing(TableName::GlyphDefinition)),
+            glyf: Err(Error::TableMissing(TableName::GlyphData)),
             head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
             hhea: raw::hhea::Table::new(&[0; raw::hhea::Table::SIZE]),
-            cff_: None,
-            cff2: None,
-            cmap: None,
-            fvar: None,
-            gdef: None,
-            glyf: None,
-            hmtx: None,
-            hvar: None,
-            kern: None,
-            loca: None,
-            mvar: None,
-            name: None,
-            os_2: None,
-            post: None,
-            vhea: None,
-            vmtx: None,
-            vorg: None,
-            vvar: None,
+            hmtx: Err(Error::TableMissing(TableName::HorizontalMetrics)),
+            hvar: Err(Error::TableMissing(TableName::HorizontalMetricsVariations)),
+            kern: Err(Error::TableMissing(TableName::Kerning)),
+            loca: Err(Error::TableMissing(TableName::IndexToLocation)),
+            mvar: Err(Error::TableMissing(TableName::MetricsVariations)),
+            name: Err(Error::TableMissing(TableName::Naming)),
+            os_2: Err(Error::TableMissing(TableName::WindowsMetrics)),
+            post: Err(Error::TableMissing(TableName::PostScript)),
+            vhea: Err(Error::TableMissing(TableName::VerticalHeader)),
+            vmtx: Err(Error::TableMissing(TableName::VerticalMetrics)),
+            vorg: Err(Error::TableMissing(TableName::VerticalOrigin)),
+            vvar: Err(Error::TableMissing(TableName::VerticalMetricsVariations)),
             number_of_glyphs: GlyphId(0),
         };
 
@@ -649,52 +645,60 @@ impl<'a> Font<'a> {
                         return Err(Error::InvalidTableSize(TableName::WindowsMetrics));
                     }
 
-                    font.os_2 = data.get(range).map(raw::os_2::Table::new);
+                    if let Some(table) = data.get(range) {
+                        font.os_2 = Ok(raw::os_2::Table::new(table));
+                    }
                 }
                 b"vhea" => {
                     if length != raw::vhea::Table::SIZE {
                         return Err(Error::InvalidTableSize(TableName::VerticalHeader));
                     }
 
-                    font.vhea = data.get(range).map(raw::vhea::Table::new);
+                    if let Some(data) = data.get(range) {
+                        font.vhea = Ok(raw::vhea::Table::new(data));
+                    }
                 }
                 b"GDEF" => {
                     if length < raw::gdef::Table::MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::GlyphDefinition));
                     }
 
-                    font.gdef = data.get(range).map(raw::gdef::Table::new);
+                    if let Some(data) = data.get(range) {
+                        font.gdef = Ok(raw::gdef::Table::new(data));
+                    }
                 }
                 b"fvar" => {
                     if length < raw::fvar::Table::MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::FontVariations));
                     }
 
-                    font.fvar = data.get(range).map(raw::fvar::Table::new);
+                    if let Some(table) = data.get(range) {
+                        font.fvar = Ok(raw::fvar::Table::new(table));
+                    }
                 }
                 b"CFF " => {
                     if let Some(data) = data.get(range) {
-                        font.cff_ = Some(cff::parse_metadata(data)?);
+                        font.cff_ = cff::parse_metadata(data);
                     }
                 }
                 b"CFF2" => {
                     if let Some(data) = data.get(range) {
-                        font.cff2 = Some(cff2::parse_metadata(data)?);
+                        font.cff2 = cff2::parse_metadata(data);
                     }
                 }
-                b"avar" => font.avar = data.get(range),
-                b"cmap" => font.cmap = data.get(range),
-                b"glyf" => font.glyf = data.get(range),
-                b"hmtx" => font.hmtx = data.get(range),
-                b"kern" => font.kern = data.get(range),
-                b"loca" => font.loca = data.get(range),
-                b"name" => font.name = data.get(range),
-                b"post" => font.post = data.get(range),
-                b"vmtx" => font.vmtx = data.get(range),
-                b"VORG" => font.vorg = data.get(range),
-                b"MVAR" => font.mvar = data.get(range),
-                b"HVAR" => font.hvar = data.get(range),
-                b"VVAR" => font.vvar = data.get(range),
+                b"avar" => if let Some(data) = data.get(range) { font.avar = Ok(data); }
+                b"cmap" => if let Some(data) = data.get(range) { font.cmap = Ok(data); }
+                b"glyf" => if let Some(data) = data.get(range) { font.glyf = Ok(data); }
+                b"hmtx" => if let Some(data) = data.get(range) { font.hmtx = Ok(data); }
+                b"kern" => if let Some(data) = data.get(range) { font.kern = Ok(data); }
+                b"loca" => if let Some(data) = data.get(range) { font.loca = Ok(data); }
+                b"name" => if let Some(data) = data.get(range) { font.name = Ok(data); }
+                b"post" => if let Some(data) = data.get(range) { font.post = Ok(data); }
+                b"vmtx" => if let Some(data) = data.get(range) { font.vmtx = Ok(data); }
+                b"VORG" => if let Some(data) = data.get(range) { font.vorg = Ok(data); }
+                b"MVAR" => if let Some(data) = data.get(range) { font.mvar = Ok(data); }
+                b"HVAR" => if let Some(data) = data.get(range) { font.hvar = Ok(data); }
+                b"VVAR" => if let Some(data) = data.get(range) { font.vvar = Ok(data); }
                 _ => {}
             }
         }
@@ -718,25 +722,25 @@ impl<'a> Font<'a> {
             TableName::Header                       => true,
             TableName::HorizontalHeader             => true,
             TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => self.avar.is_some(),
-            TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
-            TableName::CompactFontFormat            => self.cff_.is_some(),
-            TableName::CompactFontFormat2           => self.cff2.is_some(),
-            TableName::FontVariations               => self.fvar.is_some(),
-            TableName::GlyphData                    => self.glyf.is_some(),
-            TableName::GlyphDefinition              => self.gdef.is_some(),
-            TableName::HorizontalMetrics            => self.hmtx.is_some(),
-            TableName::HorizontalMetricsVariations  => self.hvar.is_some(),
-            TableName::IndexToLocation              => self.loca.is_some(),
-            TableName::Kerning                      => self.kern.is_some(),
-            TableName::MetricsVariations            => self.mvar.is_some(),
-            TableName::Naming                       => self.name.is_some(),
-            TableName::PostScript                   => self.post.is_some(),
-            TableName::VerticalHeader               => self.vhea.is_some(),
-            TableName::VerticalMetrics              => self.vmtx.is_some(),
-            TableName::VerticalMetricsVariations    => self.vvar.is_some(),
-            TableName::VerticalOrigin               => self.vorg.is_some(),
-            TableName::WindowsMetrics               => self.os_2.is_some(),
+            TableName::AxisVariations               => self.avar.is_ok(),
+            TableName::CharacterToGlyphIndexMapping => self.cmap.is_ok(),
+            TableName::CompactFontFormat            => self.cff_.is_ok(),
+            TableName::CompactFontFormat2           => self.cff2.is_ok(),
+            TableName::FontVariations               => self.fvar.is_ok(),
+            TableName::GlyphData                    => self.glyf.is_ok(),
+            TableName::GlyphDefinition              => self.gdef.is_ok(),
+            TableName::HorizontalMetrics            => self.hmtx.is_ok(),
+            TableName::HorizontalMetricsVariations  => self.hvar.is_ok(),
+            TableName::IndexToLocation              => self.loca.is_ok(),
+            TableName::Kerning                      => self.kern.is_ok(),
+            TableName::MetricsVariations            => self.mvar.is_ok(),
+            TableName::Naming                       => self.name.is_ok(),
+            TableName::PostScript                   => self.post.is_ok(),
+            TableName::VerticalHeader               => self.vhea.is_ok(),
+            TableName::VerticalMetrics              => self.vmtx.is_ok(),
+            TableName::VerticalMetricsVariations    => self.vvar.is_ok(),
+            TableName::VerticalOrigin               => self.vorg.is_ok(),
+            TableName::WindowsMetrics               => self.os_2.is_ok(),
         }
     }
 
@@ -749,26 +753,24 @@ impl<'a> Font<'a> {
     }
 
     #[inline]
-    pub(crate) fn check_glyph_id(&self, glyph_id: GlyphId) -> Result<()> {
+    pub(crate) fn check_glyph_id(&self, glyph_id: GlyphId) -> Result<Option<()>> {
         if glyph_id < self.number_of_glyphs {
-            Ok(())
+            Ok(Some(()))
         } else {
-            Err(Error::NoGlyph)
+            Ok(None)
         }
     }
 
-    #[inline]
-    pub(crate) fn check_glyph_id_opt(&self, glyph_id: GlyphId) -> Option<()> {
-        if glyph_id < self.number_of_glyphs {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    /// Outlines a glyph and returns a tight glyph bounding box.
+    /// Outlines a glyph and returns its tight bounding box.
+    ///
+    /// **Warning**: since `ttf-parser` is a pull parser,
+    /// `OutlineBuilder` will emit segments even when outline is partially malformed.
+    /// You must check `outline_glyph()` result for error before using
+    /// `OutlineBuilder`'s output.
     ///
     /// This method supports `glyf`, `CFF` and `CFF2` tables.
+    ///
+    /// Returns `Ok(None)` when glyph has no outline.
     ///
     /// # Example
     ///
@@ -803,7 +805,7 @@ impl<'a> Font<'a> {
     /// let data = std::fs::read("tests/fonts/glyphs.ttf").unwrap();
     /// let font = ttf_parser::Font::from_data(&data, 0).unwrap();
     /// let mut builder = Builder(String::new());
-    /// let bbox = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap();
+    /// let bbox = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap().unwrap();
     /// assert_eq!(builder.0, "M 50 0 L 50 750 L 450 750 L 450 0 L 50 0 Z ");
     /// assert_eq!(bbox, ttf_parser::Rect { x_min: 50, y_min: 0, x_max: 450, y_max: 750 });
     /// ```
@@ -812,20 +814,20 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
-    ) -> Result<Rect> {
-        if self.glyf.is_some() {
+    ) -> Result<Option<Rect>> {
+        if self.glyf.is_ok() {
             return self.glyf_glyph_outline(glyph_id, builder);
         }
 
-        if let Some(ref metadata) = self.cff_ {
+        if let Ok(ref metadata) = self.cff_ {
             return self.cff_glyph_outline(metadata, glyph_id, builder);
         }
 
-        if let Some(ref metadata) = self.cff2 {
+        if let Ok(ref metadata) = self.cff2 {
             return self.cff2_glyph_outline(metadata, glyph_id, builder);
         }
 
-        Err(Error::NoGlyph)
+        Ok(None)
     }
 
     /// Returns a tight glyph bounding box.
@@ -837,7 +839,7 @@ impl<'a> Font<'a> {
     /// a bounding box and you have an OpenType font (which uses CFF/CFF2)
     /// then prefer `outline_glyph()` method.
     #[inline]
-    pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Result<Rect> {
+    pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Result<Option<Rect>> {
         struct DummyOutline;
         impl OutlineBuilder for DummyOutline {
             fn move_to(&mut self, _: f32, _: f32) {}
@@ -847,19 +849,19 @@ impl<'a> Font<'a> {
             fn close(&mut self) {}
         }
 
-        if self.glyf.is_some() {
+        if self.glyf.is_ok() {
             return self.glyf_glyph_bbox(glyph_id);
         }
 
-        if let Some(ref metadata) = self.cff_ {
+        if let Ok(ref metadata) = self.cff_ {
             return self.cff_glyph_outline(metadata, glyph_id, &mut DummyOutline);
         }
 
-        if let Some(ref metadata) = self.cff2 {
+        if let Ok(ref metadata) = self.cff2 {
             return self.cff2_glyph_outline(metadata, glyph_id, &mut DummyOutline);
         }
 
-        Err(Error::NoGlyph)
+        Ok(None)
     }
 }
 

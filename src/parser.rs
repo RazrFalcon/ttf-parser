@@ -276,22 +276,12 @@ pub trait TrySlice<'a> {
 impl<'a> TrySlice<'a> for &'a [u8] {
     #[inline]
     fn try_slice(&self, range: Range<usize>) -> Result<&'a [u8]> {
-        self.get(range.clone())
-            .ok_or_else(|| Error::SliceOutOfBounds {
-                start: range.start as u32,
-                end: range.end as u32,
-                data_len: self.len() as u32,
-            })
+        self.get(range.clone()).ok_or_else(|| Error::SliceOutOfBounds)
     }
 
     #[inline]
     fn try_slice_from<T: Offset>(&self, start: T) -> Result<&'a [u8]> {
-        self.get(start.to_usize()..)
-            .ok_or_else(|| Error::SliceOutOfBounds {
-                start: start.to_usize() as u32,
-                end: self.len() as u32,
-                data_len: self.len() as u32,
-            })
+        self.get(start.to_usize()..).ok_or_else(|| Error::SliceOutOfBounds)
     }
 }
 

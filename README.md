@@ -101,6 +101,13 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_ver_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance_variation
 [glyph_ver_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing_variation
 
+### Error handling
+
+The library uses `Result<Option<T>, Error>` pattern, where `Error` indicates a parsing error
+and `Ok(None)` a not set value.
+This is a bit verbose, but allows us to separate malformed files and not set values.
+For example, if font doesn't have a glyph for a specified character - it's not an error.
+
 ### Methods' computational complexity
 
 TrueType fonts designed for fast querying, so most of the methods are very fast.
@@ -131,14 +138,15 @@ test glyph_name_276              ... bench:   216.0 ns/iter (+/- 0)
 test from_data_ttf               ... bench:   200.0 ns/iter (+/- 3)
 test family_name                 ... bench:   161.0 ns/iter (+/- 5)
 test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
-test glyph_2_hor_metrics         ... bench:     7.0 ns/iter (+/- 0)
+test hor_advance                 ... bench:     3.0 ns/iter (+/- 0)
+test hor_side_bearing            ... bench:     3.0 ns/iter (+/- 0)
 test glyph_name_8                ... bench:     2.0 ns/iter (+/- 0)
+test ascender                    ... bench:     0.6 ns/iter (+/- 0)
 test x_height                    ... bench:     0.5 ns/iter (+/- 0)
 test underline_metrics           ... bench:     0.5 ns/iter (+/- 0)
 test strikeout_metrics           ... bench:     0.5 ns/iter (+/- 0)
 test units_per_em                ... bench:     0.5 ns/iter (+/- 0)
 test subscript_metrics           ... bench:     0.2 ns/iter (+/- 0)
-test ascender                    ... bench:     0.2 ns/iter (+/- 0)
 test width                       ... bench:     0.2 ns/iter (+/- 0)
 ```
 

@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+**A major rewrite.**
+
 ### Added
 - Basic CFF2 support.
 - `Font::glyph_bounding_box`
@@ -29,6 +32,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Tag` type.
 
 ### Changed
+- Most of the methods will return `Result<Option<T>, Error>` from now.
 - `Font::outline_glyph` not accepts `&mut dyn OutlineBuilder` and not `&mut impl OutlineBuilder`.
 - `Font::ascender`, `Font::descender` and `Font::line_gap` will check `USE_TYPO_METRICS`
   flag in OS/2 table now.
@@ -37,6 +41,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Removed
 - `Error::InvalidGlyphClass`, because unused.
+- `NoGlyph`, `NoOutline` and `NoKerning` errors. `Result<Option<T>, Error>` is used instead.
 
 ## [0.3.0] - 2019-09-26
 ### Added

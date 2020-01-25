@@ -1177,7 +1177,10 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
 
 pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
     let offset_size: OffsetSize = s.try_read()?;
-    let offsets_len = (count + 1) * offset_size as u32;
+    let offsets_len = match (count + 1).checked_mul(offset_size as u32) {
+        Some(v) => v,
+        None => return Err(Error::SliceOutOfBounds),
+    };
     let offsets = VarOffsets {
         data: &s.read_bytes(offsets_len)?,
         offset_size,
@@ -1406,7 +1409,7 @@ impl<'a> DictionaryParser<'a> {
         while !s.at_end() {
             let b: u8 = s.read().ok()?;
             // 0..=21 bytes are operators.
-            if b <= 21 {
+            if is_dict_one_byte_op(b) {
                 let mut operator = b as u16;
 
                 // Check that operator is two byte long.
@@ -1442,7 +1445,7 @@ impl<'a> DictionaryParser<'a> {
         while !s.at_end() {
             let b: u8 = s.read()?;
             // 0..=21 bytes are operators.
-            if b <= 21 {
+            if is_dict_one_byte_op(b) {
                 break;
             } else {
                 let op = parse_number(b, &mut s)?;
@@ -1461,6 +1464,18 @@ impl<'a> DictionaryParser<'a> {
     #[inline]
     fn operands(&self) -> &[Number] {
         &self.operands[..self.operands_len as usize]
+    }
+}
+
+// One-byte CFF DICT Operators according to the
+// Adobe Technical Note #5176, Appendix H CFF DICT Encoding.
+pub fn is_dict_one_byte_op(b: u8) -> bool {
+    match b {
+        0..=27 => true,
+        28..=30 => false, // numbers
+        31 => true, // Reserved
+        32..=254 => false, // numbers
+        255 => true, // Reserved
     }
 }
 

@@ -11,6 +11,7 @@ use crate::cff::{
     Builder, RectF, DataIndex, Number, IsEven, Operator,
     ArgumentsStack, OutlineBuilderInner, CFFError,
     calc_subroutine_bias, f32_abs, parse_number, skip_number, parse_index_impl, try_f32_to_i16,
+    is_dict_one_byte_op
 };
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cff2#7-top-dict-data
@@ -1101,31 +1102,23 @@ impl<'a> DictionaryParser<'a> {
     }
 }
 
-// https://docs.microsoft.com/en-us/typography/opentype/spec/cff2#table-17-one-byte-cff2-dict-operators
-fn is_dict_one_byte_op(b: u8) -> bool {
-    match b {
-        0..=5 => true, // Reserved
-        6 => true, // BlueValues
-        7 => true, // OtherBlues
-        8 => true, // FamilyBlues
-        9 => true, // FamilyOtherBlues
-        10 => true, // StdHW
-        11 => true, // StdVW
-        12 => true, // First byte of a 2-byte operator
-        13..=16 => true, // Reserved
-        17 => true, // CharStrings
-        18 => true, // Private
-        19 => true, // Subrs
-        20 | 21 => true, // Reserved
-        22 => true, // vsindex
-        23 => true, // blend
-        24 => true, // vstore
-        25..=27 => true, // Reserved
-        28 | 29 => false, // numbers
-        30 => true, // BCD
-        31 => true, // Reserved
-        32..=246 => false, // numbers
-        247..=254 => false, // numbers
-        255 => true, // Reserved
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::string::ToString;
+    use crate::writer;
+    use writer::TtfType::*;
+    use crate::cff::parse_index_impl;
+
+    #[test]
+    fn index_data_offsets_len_overflow() {
+        let data = writer::convert(&[
+            UInt8(4), // offset size
+            // other data doesn't matter
+        ]);
+
+        let res = parse_index_impl(std::u32::MAX / 2, &mut Stream::new(&data));
+        assert_eq!(res.unwrap_err().to_string(), "an attempt to slice out of bounds");
     }
 }

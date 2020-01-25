@@ -102,6 +102,7 @@ The library uses `Result<Option<T>, Error>` pattern, where `Error` indicates a p
 and `Ok(None)` a not set value.
 This is a bit verbose, but allows us to separate malformed files and not set values.
 For example, if a font doesn't have a glyph for a specified character - it's not an error.
+And error will be emitted only in two cases: on a malformed file or bug in implementation.
 
 ## Methods' computational complexity
 
@@ -212,6 +213,9 @@ mod vhea;
 mod vmtx;
 mod vorg;
 mod vvar;
+
+#[cfg(feature = "std")]
+mod writer;
 
 use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray, Offset};
 pub use cff::CFFError;
@@ -883,4 +887,147 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     }
 
     Some(table.num_fonts())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::string::ToString;
+    use crate::writer;
+    use writer::TtfType::*;
+
+    #[test]
+    fn empty_font() {
+        assert_eq!(Font::from_data(&[], 0).unwrap_err().to_string(),
+                   "not a TrueType font");
+    }
+
+    #[test]
+    fn incomplete_header() {
+        let data = writer::convert(&[
+            TrueTypeMagic,
+            UInt16(0), // numTables
+            UInt16(0), // searchRange
+            UInt16(0), // entrySelector
+            UInt16(0), // rangeShift
+        ]);
+
+        for i in 0..data.len() {
+            assert_eq!(Font::from_data(&data[0..i], 0).unwrap_err().to_string(),
+                       "not a TrueType font");
+        }
+    }
+
+    #[test]
+    fn zero_tables() {
+        let data = writer::convert(&[
+            TrueTypeMagic,
+            UInt16(0), // numTables
+            UInt16(0), // searchRange
+            UInt16(0), // entrySelector
+            UInt16(0), // rangeShift
+        ]);
+
+        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
+                   "font doesn't have a Header table");
+    }
+
+    #[test]
+    fn tables_count_overflow() {
+        let data = writer::convert(&[
+            TrueTypeMagic,
+            UInt16(std::u16::MAX), // numTables
+            UInt16(0), // searchRange
+            UInt16(0), // entrySelector
+            UInt16(0), // rangeShift
+        ]);
+
+        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
+                   "an attempt to slice out of bounds");
+    }
+
+    #[test]
+    fn open_type_magic() {
+        let data = writer::convert(&[
+            OpenTypeMagic,
+            UInt16(0), // numTables
+            UInt16(0), // searchRange
+            UInt16(0), // entrySelector
+            UInt16(0), // rangeShift
+        ]);
+
+        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
+                   "font doesn't have a Header table");
+    }
+
+    #[test]
+    fn unknown_magic() {
+        let data = writer::convert(&[
+            Raw(&[0xFF, 0xFF, 0xFF, 0xFF]),
+            UInt16(0), // numTables
+            UInt16(0), // searchRange
+            UInt16(0), // entrySelector
+            UInt16(0), // rangeShift
+        ]);
+
+        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
+                   "not a TrueType font");
+    }
+
+    #[test]
+    fn empty_font_collection() {
+        let data = writer::convert(&[
+            FontCollectionMagic,
+            UInt16(1), // majorVersion
+            UInt16(0), // minorVersion
+            UInt32(0), // numFonts
+        ]);
+
+        assert_eq!(fonts_in_collection(&data), Some(0));
+        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
+                   "font index is out of bounds");
+    }
+
+    #[test]
+    fn font_collection_num_fonts_overflow() {
+        let data = writer::convert(&[
+            FontCollectionMagic,
+            UInt16(1), // majorVersion
+            UInt16(0), // minorVersion
+            UInt32(std::u32::MAX), // numFonts
+        ]);
+
+        assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
+        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
+                   "an attempt to slice out of bounds");
+    }
+
+    #[test]
+    fn font_index_overflow_1() {
+        let data = writer::convert(&[
+            FontCollectionMagic,
+            UInt16(1), // majorVersion
+            UInt16(0), // minorVersion
+            UInt32(1), // numFonts
+        ]);
+
+        assert_eq!(fonts_in_collection(&data), Some(1));
+        assert_eq!(Font::from_data(&data, std::u32::MAX).unwrap_err().to_string(),
+                   "font index is out of bounds");
+    }
+
+    #[test]
+    fn font_index_overflow_2() {
+        let data = writer::convert(&[
+            FontCollectionMagic,
+            UInt16(1), // majorVersion
+            UInt16(0), // minorVersion
+            UInt32(std::u32::MAX), // numFonts
+        ]);
+
+        assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
+        assert_eq!(Font::from_data(&data, std::u32::MAX - 1).unwrap_err().to_string(),
+                   "an attempt to slice out of bounds");
+    }
 }

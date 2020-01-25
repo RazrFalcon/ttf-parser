@@ -40,127 +40,6 @@ impl ttf::OutlineBuilder for Builder {
     }
 }
 
-
-#[test]
-fn empty_font() {
-    assert_eq!(Font::from_data(&[], 0).unwrap_err().to_string(),
-               "not a TrueType font");
-}
-
-#[test]
-fn incomplete_header() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // magic
-        0x00, 0x00, // numTables
-        0x00, 0x00, // searchRange
-        0x00, 0x00, // entrySelector
-        0x00, 0x00, // rangeShift
-    ];
-
-    for i in 0..data.len() {
-        assert_eq!(Font::from_data(&data[0..i], 0).unwrap_err().to_string(),
-                   "not a TrueType font");
-    }
-}
-
-#[test]
-fn zero_tables() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // magic
-        0x00, 0x00, // numTables
-        0x00, 0x00, // searchRange
-        0x00, 0x00, // entrySelector
-        0x00, 0x00, // rangeShift
-    ];
-
-    assert_eq!(Font::from_data(data, 0).unwrap_err().to_string(),
-               "font doesn't have a Header table");
-}
-
-#[test]
-fn tables_count_overflow() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // magic
-        0xFF, 0xFF, // numTables
-        0x00, 0x00, // searchRange
-        0x00, 0x00, // entrySelector
-        0x00, 0x00, // rangeShift
-    ];
-
-    assert_eq!(Font::from_data(data, 0).unwrap_err().to_string(),
-               "an attempt to slice out of bounds");
-}
-
-#[test]
-fn open_type_magic() {
-    let data = &[
-        0x4F, 0x54, 0x54, 0x4F, // magic
-        0x00, 0x00, // numTables
-        0x00, 0x00, // searchRange
-        0x00, 0x00, // entrySelector
-        0x00, 0x00, // rangeShift
-    ];
-
-    assert_eq!(Font::from_data(data, 0).unwrap_err().to_string(),
-               "font doesn't have a Header table");
-}
-
-#[test]
-fn unknown_magic() {
-    let data = &[
-        0xFF, 0xFF, 0xFF, 0xFF, // magic
-        0x00, 0x00, // numTables
-        0x00, 0x00, // searchRange
-        0x00, 0x00, // entrySelector
-        0x00, 0x00, // rangeShift
-    ];
-
-    assert_eq!(Font::from_data(data, 0).unwrap_err().to_string(),
-               "not a TrueType font");
-}
-
-#[test]
-fn empty_font_collection() {
-    let data = &[
-        0x74, 0x74, 0x63, 0x66, // magic/ttcf
-        0x00, 0x01, // majorVersion
-        0x00, 0x00, // minorVersion
-        0x00, 0x00, 0x00, 0x00, // numFonts
-    ];
-
-    assert_eq!(ttf::fonts_in_collection(data), Some(0));
-    assert_eq!(Font::from_data(data, 0).unwrap_err().to_string(),
-               "font index is out of bounds");
-}
-
-#[test]
-fn font_collection_num_fonts_overflow() {
-    let data = &[
-        0x74, 0x74, 0x63, 0x66, // magic/ttcf
-        0x00, 0x01, // majorVersion
-        0x00, 0x00, // minorVersion
-        0xFF, 0xFF, 0xFF, 0xFF, // numFonts
-    ];
-
-    assert_eq!(ttf::fonts_in_collection(data), Some(4294967295));
-    assert_eq!(Font::from_data(data, 0).unwrap_err().to_string(),
-               "an attempt to slice out of bounds");
-}
-
-#[test]
-fn font_index_overflow() {
-    let data = &[
-        0xFF, 0xFF, 0xFF, 0xFF, // magic
-        0x00, 0x00, // numTables
-        0x00, 0x00, // searchRange
-        0x00, 0x00, // entrySelector
-        0x00, 0x00, // rangeShift
-    ];
-
-    assert_eq!(Font::from_data(data, std::u32::MAX).unwrap_err().to_string(),
-               "not a TrueType font");
-}
-
 #[test]
 fn number_of_glyphs() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
@@ -410,7 +289,13 @@ fn superscript_metrics() {
     );
 }
 
-// TODO: hmtx
+#[test]
+fn glyph_hor_metrics_1() {
+    let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let font = Font::from_data(&data, 0).unwrap();
+    assert_eq!(font.glyph_hor_advance(GlyphId(0)).unwrap(), Some(653));
+    assert_eq!(font.glyph_hor_side_bearing(GlyphId(0)).unwrap(), Some(89));
+}
 
 #[test]
 fn glyph_ver_metrics_1() {

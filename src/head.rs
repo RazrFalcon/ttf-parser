@@ -22,7 +22,7 @@ impl<'a> Font<'a> {
 
     /// Returns font's units per EM.
     ///
-    /// Returns `None` if value is not in a 16..16384 range.
+    /// Returns `None` when value is not in a 16..=16384 range.
     #[inline]
     pub fn units_per_em(&self) -> Option<u16> {
         let num = self.head.units_per_em();

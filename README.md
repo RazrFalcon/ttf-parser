@@ -106,7 +106,8 @@ A high-level, safe, zero-allocation TrueType font parser.
 The library uses `Result<Option<T>, Error>` pattern, where `Error` indicates a parsing error
 and `Ok(None)` a not set value.
 This is a bit verbose, but allows us to separate malformed files and not set values.
-For example, if font doesn't have a glyph for a specified character - it's not an error.
+For example, if a font doesn't have a glyph for a specified character - it's not an error.
+And error will be emitted only in two cases: on a malformed file or bug in implementation.
 
 ### Methods' computational complexity
 

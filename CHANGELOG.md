@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Error::InvalidGlyphClass`, because unused.
 - `NoGlyph`, `NoOutline` and `NoKerning` errors. `Result<Option<T>, Error>` is used instead.
 
+### Fixed
+- `glyph_hor_side_bearing` parsing when the number of metrics is less than the total number of glyphs.
+- Multiple CFF parsing fixes. The parser is more strict now.
+
 ## [0.3.0] - 2019-09-26
 ### Added
 - `no_std` compatibility.

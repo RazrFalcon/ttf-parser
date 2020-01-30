@@ -51,7 +51,7 @@ fn parse_format1(s: &mut Stream, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Resu
 
     let needle = (glyph_id1.0 as u32) << 16 | glyph_id2.0 as u32;
     match pairs.binary_search_by(|v| v.pair.cmp(&needle)) {
-        Some(v) => Ok(Some(v.value)),
+        Some((_, v)) => Ok(Some(v.value)),
         None => Ok(None),
     }
 }

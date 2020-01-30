@@ -225,14 +225,14 @@ impl<'a, T: FromData, Idx: FSize> LazyArray<'a, T, Idx> {
     }
 
     #[inline]
-    pub fn binary_search(&self, x: &T) -> Option<T>
+    pub fn binary_search(&self, x: &T) -> Option<(Idx, T)>
         where T: Ord
     {
         self.binary_search_by(|p| p.cmp(x))
     }
 
     #[inline]
-    pub fn binary_search_by<F>(&self, mut f: F) -> Option<T>
+    pub fn binary_search_by<F>(&self, mut f: F) -> Option<(Idx, T)>
         where F: FnMut(&T) -> core::cmp::Ordering
     {
         // Based on Rust std implementation.
@@ -258,8 +258,7 @@ impl<'a, T: FromData, Idx: FSize> LazyArray<'a, T, Idx> {
 
         // base is always in [0, size) because base <= mid.
         let value = self.at(base);
-        let cmp = f(&value);
-        if cmp == Ordering::Equal { Some(value) } else { None }
+        if f(&value) == Ordering::Equal { Some((base, value)) } else { None }
     }
 }
 

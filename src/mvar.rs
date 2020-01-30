@@ -35,7 +35,7 @@ impl<'a> Font<'a> {
         let variation_store_offset = bail!(s.read::<Option<Offset16>>());
 
         let value_records = s.read_array::<raw::ValueRecord, u16>(count)?;
-        let record = try_ok!(value_records.binary_search_by(|r| r.value_tag().cmp(&tag)));
+        let (_, record) = try_ok!(value_records.binary_search_by(|r| r.value_tag().cmp(&tag)));
 
         let mut s2 = Stream::new_at(self.mvar?, variation_store_offset.to_usize());
         parse_item_variation_store(

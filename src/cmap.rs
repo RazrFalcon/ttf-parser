@@ -114,7 +114,7 @@ impl<'a> Font<'a> {
         s.skip::<u32>(); // length
         let records = s.read_array32::<raw::VariationSelectorRecord>()?;
 
-        let record = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
+        let (_, record) = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
             Some(v) => v,
             None => return Ok(None),
         };
@@ -135,7 +135,7 @@ impl<'a> Font<'a> {
             let data = data.try_slice_from(offset)?;
             let mut s = Stream::new(data);
             let uvs_mappings = s.read_array32::<raw::UVSMappingRecord>()?;
-            if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
+            if let Some((_, mapping)) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
                 return Ok(Some(mapping.glyph_id()));
             }
         }

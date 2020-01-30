@@ -152,7 +152,7 @@ impl<'a> Name<'a> {
     #[inline(never)]
     fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
-        for c in LazyArray::new(self.name()) {
+        for c in LazyArray::<u16, u16>::new(self.name()) {
             name.push(c);
         }
 

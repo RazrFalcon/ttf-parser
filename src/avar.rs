@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/avar
 
 use crate::{Font, Result, Error};
-use crate::parser::{Stream, SafeStream, LazyArray, FromData};
+use crate::parser::{Stream, SafeStream, LazyArray16, FromData};
 
 
 impl<'a> Font<'a> {
@@ -29,7 +29,7 @@ impl<'a> Font<'a> {
         }
 
         for i in 0..axis_count {
-            let map: LazyArray<AxisValueMapRecord> = s.read_array16()?;
+            let map = s.read_array16::<AxisValueMapRecord>()?;
             coordinates[i] = map_value(&map, coordinates[i]);
         }
 
@@ -56,27 +56,27 @@ impl FromData for AxisValueMapRecord {
     }
 }
 
-fn map_value(map: &LazyArray<AxisValueMapRecord>, value: i32) -> i32 {
+fn map_value(map: &LazyArray16<AxisValueMapRecord>, value: i32) -> i32 {
     // This code is based on harfbuzz implementation.
 
     if map.len() == 0 {
         return value;
     } else if map.len() == 1 {
-        let record = map.at(0u32);
+        let record = map.at(0);
         return value - record.from_coordinate + record.to_coordinate;
     }
 
-    let record_0 = map.at(0u32);
+    let record_0 = map.at(0);
     if value <= record_0.from_coordinate {
         return value - record_0.from_coordinate + record_0.to_coordinate;
     }
 
-    let mut i = 1u32;
-    while i < map.len() as u32 && value > map.at(i).from_coordinate {
+    let mut i = 1;
+    while i < map.len() && value > map.at(i).from_coordinate {
         i += 1;
     }
 
-    if i == map.len() as u32 {
+    if i == map.len() {
         i -= 1;
     }
 

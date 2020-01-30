@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
 use crate::{Font, LineMetrics, GlyphId, Result};
-use crate::parser::{Stream, Fixed, LazyArray};
+use crate::parser::{Stream, Fixed};
 
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
@@ -303,7 +303,7 @@ impl<'a> Font<'a> {
         }
 
         s.advance(28_u32); // Jump to the end of the base table.
-        let name_indexes: LazyArray<u16> = s.read_array16()?;
+        let name_indexes = s.read_array16::<u16>()?;
         let mut index = try_ok!(name_indexes.get(glyph.0));
 
         // 'If the name index is between 0 and 257, treat the name index

@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
-use crate::parser::{Stream, LazyArray, TrySlice};
+use crate::parser::{Stream, TrySlice};
 use crate::{Font, GlyphId, Result, PlatformId};
 use crate::raw::cmap as raw;
 
@@ -15,7 +15,7 @@ impl<'a> Font<'a> {
         let data = self.cmap?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
-        let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
+        let records = s.read_array16::<raw::EncodingRecord>()?;
         for record in records {
             let subtable_data = data.try_slice_from(record.offset())?;
             let mut s = Stream::new(subtable_data);
@@ -82,7 +82,7 @@ impl<'a> Font<'a> {
         let data = self.cmap?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
-        let records: LazyArray<raw::EncodingRecord> = s.read_array16()?;
+        let records = s.read_array16::<raw::EncodingRecord>()?;
         for record in records {
             let subtable_data = data.try_slice_from(record.offset())?;
             let mut s = Stream::new(subtable_data);
@@ -112,7 +112,7 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(data);
         s.skip::<u16>(); // format
         s.skip::<u32>(); // length
-        let records: LazyArray<raw::VariationSelectorRecord> = s.read_array32()?;
+        let records = s.read_array32::<raw::VariationSelectorRecord>()?;
 
         let record = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
             Some(v) => v,
@@ -122,7 +122,7 @@ impl<'a> Font<'a> {
         if let Some(offset) = record.default_uvs_offset() {
             let data = data.try_slice_from(offset)?;
             let mut s = Stream::new(data);
-            let ranges: LazyArray<raw::UnicodeRangeRecord> = s.read_array32()?;
+            let ranges = s.read_array32::<raw::UnicodeRangeRecord>()?;
             for range in ranges {
                 if range.contains(c) {
                     // This is a default glyph.
@@ -134,7 +134,7 @@ impl<'a> Font<'a> {
         if let Some(offset) = record.non_default_uvs_offset() {
             let data = data.try_slice_from(offset)?;
             let mut s = Stream::new(data);
-            let uvs_mappings: LazyArray<raw::UVSMappingRecord> = s.read_array32()?;
+            let uvs_mappings = s.read_array32::<raw::UVSMappingRecord>()?;
             if let Some(mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
                 return Ok(Some(mapping.glyph_id()));
             }
@@ -176,13 +176,13 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Result
     s.skip::<u16>(); // format
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
-    let sub_header_keys: LazyArray<u16> = s.read_array(256_u32)?;
+    let sub_header_keys = s.read_array::<u16, u16>(256)?;
     // The maximum index in a sub_header_keys is a sub_headers count.
     let sub_headers_count = try_ok!(sub_header_keys.into_iter().map(|n| n / 8).max()) + 1;
 
     // Remember sub_headers offset before reading. Will be used later.
     let sub_headers_offset = s.offset();
-    let sub_headers: LazyArray<raw::SubHeaderRecord> = s.read_array(sub_headers_count)?;
+    let sub_headers = s.read_array::<raw::SubHeaderRecord, u16>(sub_headers_count)?;
 
     let i = if code_point < 0xff {
         // 'SubHeader 0 is special: it is used for single-byte character codes.'
@@ -244,12 +244,12 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
 
     let seg_count = seg_count_x2 / 2;
     s.advance(6 as u32); // searchRange + entrySelector + rangeShift
-    let end_codes: LazyArray<u16> = s.read_array(seg_count)?;
+    let end_codes = s.read_array::<u16, u16>(seg_count)?;
     s.skip::<u16>(); // reservedPad
-    let start_codes: LazyArray<u16> = s.read_array(seg_count)?;
-    let id_deltas: LazyArray<i16> = s.read_array(seg_count)?;
+    let start_codes = s.read_array::<u16, u16>(seg_count)?;
+    let id_deltas = s.read_array::<i16, u16>(seg_count)?;
     let id_range_offset_pos = s.offset();
-    let id_range_offsets: LazyArray<u16> = s.read_array(seg_count)?;
+    let id_range_offsets = s.read_array::<u16, u16>(seg_count)?;
 
     // A custom binary search.
     let mut start = 0;
@@ -305,7 +305,7 @@ fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Result<Option
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
     let first_code_point: u16 = s.read()?;
-    let glyphs: LazyArray<u16> = s.read_array16()?;
+    let glyphs = s.read_array16::<u16>()?;
 
     let code_point = code_point as u16;
 
@@ -324,7 +324,7 @@ fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Result<Option<u16>> {
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
     let first_code_point: u32 = s.read()?;
-    let glyphs: LazyArray<u16> = s.read_array32()?;
+    let glyphs = s.read_array32::<u16>()?;
 
     // Check for overflow.
     if code_point < first_code_point {
@@ -342,7 +342,7 @@ fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> 
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
-    let groups: LazyArray<raw::SequentialMapGroup> = s.read_array32()?;
+    let groups = s.read_array32::<raw::SequentialMapGroup>()?;
     for group in groups {
         let start_char_code = group.start_char_code();
         if code_point >= start_char_code && code_point <= group.end_char_code() {

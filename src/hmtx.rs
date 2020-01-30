@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx
 
 use crate::{Font, GlyphId, Result};
-use crate::parser::{Stream, LazyArray};
+use crate::parser::Stream;
 use crate::raw::hmtx as raw;
 
 impl<'a> Font<'a> {
@@ -39,7 +39,7 @@ pub fn parse_glyph_advance(
     number_of_hmetrics: u16,
 ) -> Result<Option<u16>> {
     let mut s = Stream::new(data);
-    let array: LazyArray<raw::HorizontalMetrics> = s.read_array(number_of_hmetrics)?;
+    let array = s.read_array::<raw::HorizontalMetrics, u16>(number_of_hmetrics)?;
     if let Some(metrics) = array.get(glyph_id.0) {
         Ok(Some(metrics.advance_width()))
     } else {
@@ -58,7 +58,7 @@ pub fn parse_glyph_side_bearing(
     number_of_glyphs: u16,
 ) -> Result<Option<i16>> {
     let mut s = Stream::new(data);
-    let array: LazyArray<raw::HorizontalMetrics> = s.read_array(number_of_hmetrics)?;
+    let array = s.read_array::<raw::HorizontalMetrics, u16>(number_of_hmetrics)?;
     if let Some(metrics) = array.get(glyph_id.0) {
         Ok(Some(metrics.lsb()))
     } else {
@@ -72,7 +72,7 @@ pub fn parse_glyph_side_bearing(
         }
 
         let count = number_of_glyphs - number_of_hmetrics;
-        let left_side_bearings: LazyArray<i16> = s.read_array(count)?;
+        let left_side_bearings = s.read_array::<i16, u16>(count)?;
         // Overflow is not possible, because when `glyph_id` is smaller than `number_of_hmetrics`
         // this branch will not be executed.
         Ok(left_side_bearings.get(glyph_id.0 - number_of_hmetrics))

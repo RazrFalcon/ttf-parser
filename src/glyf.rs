@@ -2,7 +2,7 @@
 
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
-use crate::parser::{Stream, LazyArray, TrySlice, F2DOT14};
+use crate::parser::{Stream, TrySlice, F2DOT14};
 use crate::{Font, GlyphId, OutlineBuilder, Rect, Result, Error};
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
@@ -184,7 +184,7 @@ impl<'a> Font<'a> {
         builder: &mut Builder,
     ) -> Result<Option<()>> {
         let mut s = Stream::new(glyph_data);
-        let endpoints: LazyArray<u16> = s.read_array(number_of_contours)?;
+        let endpoints = s.read_array::<u16, u16>(number_of_contours)?;
 
         let points_total = {
             // Unwrap is safe, because it's guarantee that array has at least one value.

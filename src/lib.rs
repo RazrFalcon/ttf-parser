@@ -217,7 +217,7 @@ mod vvar;
 #[cfg(feature = "std")]
 mod writer;
 
-use parser::{Stream, FromData, SafeStream, TrySlice, LazyArray, Offset};
+use parser::{Stream, FromData, SafeStream, TrySlice, Offset};
 pub use cff::CFFError;
 pub use fvar::VariationAxis;
 pub use gdef::{Class, GlyphClass};
@@ -582,7 +582,7 @@ impl<'a> Font<'a> {
 
         let num_tables: u16 = s.read()?;
         s.advance(6u32); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
-        let tables: LazyArray<raw::TableRecord> = s.read_array(num_tables)?;
+        let tables = s.read_array::<raw::TableRecord, u16>(num_tables)?;
 
         let mut font = Font {
             avar: Err(Error::TableMissing(TableName::AxisVariations)),

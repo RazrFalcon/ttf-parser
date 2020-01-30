@@ -2,7 +2,7 @@
 
 use core::ops::Range;
 
-use crate::parser::{Stream, LazyArray};
+use crate::parser::Stream;
 use crate::{Font, GlyphId, Result};
 
 impl<'a> Font<'a> {
@@ -30,12 +30,12 @@ impl<'a> Font<'a> {
         let mut s = Stream::new(self.loca?);
         let range = match format {
             Format::Short => {
-                let array: LazyArray<u16> = s.read_array(total)?;
+                let array = s.read_array::<u16, u16>(total)?;
                 // 'The actual local offset divided by 2 is stored.'
                 array.at(glyph_id) as usize * 2 .. array.at(glyph_id + 1) as usize * 2
             }
-            Format::Long  => {
-                let array: LazyArray<u32> = s.read_array(total)?;
+            Format::Long => {
+                let array = s.read_array::<u32, u16>(total)?;
                 array.at(glyph_id) as usize .. array.at(glyph_id + 1) as usize
             }
         };

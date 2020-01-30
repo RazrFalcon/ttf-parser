@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vorg
 
 use crate::{Font, GlyphId, Result, Error};
-use crate::parser::{Stream, LazyArray};
+use crate::parser::Stream;
 use crate::raw::vorg as raw;
 
 
@@ -18,7 +18,7 @@ impl<'a> Font<'a> {
         }
 
         let default_y: i16 = s.read()?;
-        let origins: LazyArray<raw::VertOriginYMetrics> = s.read_array16()?;
+        let origins = s.read_array16::<raw::VertOriginYMetrics>()?;
         Ok(origins.binary_search_by(|m| m.glyph_index().cmp(&glyph))
             .map(|m| m.vert_origin_y())
             .unwrap_or(default_y))

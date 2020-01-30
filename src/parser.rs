@@ -122,45 +122,81 @@ pub trait TryFromData: Sized {
 }
 
 
-// Like `usize`, but for font.
-pub trait FSize {
+// u16/u32 length type.
+pub trait FSize
+    : std::ops::Add<Output=Self>
+    + std::ops::AddAssign
+    + std::ops::Sub<Output=Self>
+    + std::ops::SubAssign
+    + std::ops::Div<Output=Self>
+    + PartialOrd
+    + Sized
+    + Copy
+{
+    const ZERO: Self;
+    const ONE: Self;
+    const TWO: Self;
+
+    fn from_usize(n: usize) -> Self;
     fn to_usize(&self) -> usize;
 }
 
 impl FSize for u16 {
+    const ZERO: Self = 0;
+    const ONE: Self = 1;
+    const TWO: Self = 2;
+
+    #[inline]
+    fn from_usize(n: usize) -> Self {
+        debug_assert!(n <= std::u16::MAX as usize);
+        n as u16
+    }
+
     #[inline]
     fn to_usize(&self) -> usize { *self as usize }
 }
 
 impl FSize for u32 {
+    const ZERO: Self = 0;
+    const ONE: Self = 1;
+    const TWO: Self = 2;
+
+    #[inline]
+    fn from_usize(n: usize) -> Self {
+        debug_assert!(n <= std::u32::MAX as usize);
+        n as u32
+    }
+
     #[inline]
     fn to_usize(&self) -> usize { *self as usize }
 }
 
 
 #[derive(Clone, Copy)]
-pub struct LazyArray<'a, T> {
+pub struct LazyArray<'a, T, Idx: FSize> {
     data: &'a [u8],
-    phantom: core::marker::PhantomData<T>,
+    data_type: core::marker::PhantomData<T>,
+    len_type: core::marker::PhantomData<Idx>,
 }
 
-impl<'a, T: FromData> LazyArray<'a, T> {
+impl<'a, T: FromData, Idx: FSize> LazyArray<'a, T, Idx> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
         LazyArray {
             data,
-            phantom: core::marker::PhantomData,
+            data_type: core::marker::PhantomData,
+            len_type: core::marker::PhantomData,
         }
     }
 
-    pub fn at<L: FSize>(&self, index: L) -> T {
+    pub fn at(&self, index: Idx) -> T {
         let start = index.to_usize() * T::SIZE;
         let end = start + T::SIZE;
         T::parse(&self.data[start..end])
     }
 
-    pub fn get<L: FSize>(&self, index: L) -> Option<T> {
-        if index.to_usize() < self.len() {
+    pub fn get(&self, index: Idx) -> Option<T> {
+        if index < self.len() {
             let start = index.to_usize() * T::SIZE;
             let end = start + T::SIZE;
             Some(T::parse(&self.data[start..end]))
@@ -172,20 +208,20 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     #[inline]
     pub fn last(&self) -> Option<T> {
         if !self.is_empty() {
-            self.get(self.len() as u32 - 1)
+            self.get(self.len() - Idx::ONE)
         } else {
             None
         }
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        self.data.len() / T::SIZE
+    pub fn len(&self) -> Idx {
+        Idx::from_usize(self.data.len() / T::SIZE)
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.len() == Idx::ZERO
     }
 
     #[inline]
@@ -203,14 +239,14 @@ impl<'a, T: FromData> LazyArray<'a, T> {
 
         use core::cmp::Ordering;
 
-        let mut size = self.len() as u32;
-        if size == 0 {
+        let mut size = self.len();
+        if size == Idx::ZERO {
             return None;
         }
 
-        let mut base = 0;
-        while size > 1 {
-            let half = size / 2;
+        let mut base = Idx::ZERO;
+        while size > Idx::ONE {
+            let half = size / Idx::TWO;
             let mid = base + half;
             // mid is always in [0, size), that means mid is >= 0 and < size.
             // mid >= 0: by definition
@@ -227,43 +263,45 @@ impl<'a, T: FromData> LazyArray<'a, T> {
     }
 }
 
-impl<'a, T: FromData + core::fmt::Debug + Copy> core::fmt::Debug for LazyArray<'a, T> {
+impl<'a, T: FromData + core::fmt::Debug + Copy, Idx: FSize> core::fmt::Debug for LazyArray<'a, T, Idx> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.debug_list().entries(self.into_iter()).finish()
     }
 }
 
-impl<'a, T: FromData> IntoIterator for LazyArray<'a, T> {
+impl<'a, T: FromData, Idx: FSize> IntoIterator for LazyArray<'a, T, Idx> {
     type Item = T;
-    type IntoIter = LazyArrayIter<'a, T>;
+    type IntoIter = LazyArrayIter<'a, T, Idx>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         LazyArrayIter {
             data: self,
-            index: 0,
+            index: Idx::ZERO,
         }
     }
 }
 
+pub type LazyArray16<'a, T> = LazyArray<'a, T, u16>;
 
-pub struct LazyArrayIter<'a, T> {
-    data: LazyArray<'a, T>,
-    index: u32,
+
+pub struct LazyArrayIter<'a, T, Idx: FSize> {
+    data: LazyArray<'a, T, Idx>,
+    index: Idx,
 }
 
-impl<'a, T: FromData> Iterator for LazyArrayIter<'a, T> {
+impl<'a, T: FromData, Idx: FSize> Iterator for LazyArrayIter<'a, T, Idx> {
     type Item = T;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.index += 1;
-        self.data.get(self.index - 1)
+        self.index += Idx::ONE;
+        self.data.get(self.index - Idx::ONE)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.data.get(n as u32)
+        self.data.get(FSize::from_usize(n))
     }
 }
 
@@ -372,20 +410,20 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn read_array<T: FromData, L: FSize>(&mut self, len: L) -> Result<LazyArray<'a, T>> {
+    pub fn read_array<T: FromData, Idx: FSize>(&mut self, len: Idx) -> Result<LazyArray<'a, T, Idx>> {
         let len = len.to_usize() * T::SIZE;
         let data = self.read_bytes(len as u32)?;
         Ok(LazyArray::new(data))
     }
 
     #[inline]
-    pub fn read_array16<T: FromData>(&mut self) -> Result<LazyArray<'a, T>> {
+    pub fn read_array16<T: FromData>(&mut self) -> Result<LazyArray<'a, T, u16>> {
         let count: u16 = self.read()?;
         self.read_array(count)
     }
 
     #[inline]
-    pub fn read_array32<T: FromData>(&mut self) -> Result<LazyArray<'a, T>> {
+    pub fn read_array32<T: FromData>(&mut self) -> Result<LazyArray<'a, T, u32>> {
         let count: u32 = self.read()?;
         self.read_array(count)
     }
@@ -493,8 +531,8 @@ impl FromData for Option<Offset32> {
 
 
 /// Array of offsets from beginning of `data`.
-#[derive(Clone, Copy)]
-pub struct Offsets<'a, T: Offset> {
+#[derive(Clone)]
+pub struct Offsets<'a, T: Offset, Idx: FSize> {
     data: &'a [u8],
-    offsets: LazyArray<'a, T>, // [Offset16/Offset32]
+    offsets: LazyArray<'a, T, Idx>, // [Offset16/Offset32]
 }

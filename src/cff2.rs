@@ -4,7 +4,7 @@
 
 use core::ops::Range;
 
-use crate::parser::{Stream, TrySlice, LazyArray};
+use crate::parser::{Stream, TrySlice};
 use crate::{Font, GlyphId, OutlineBuilder, Rect, Result, Error};
 
 use crate::cff::{
@@ -250,7 +250,7 @@ fn parse_variation_store<'a>(s: &mut Stream<'a>) -> Result<ItemVariationStore<'a
     Ok(ItemVariationStore(data))
 }
 
-fn parse_variation_regions(store: ItemVariationStore, vsindex: u32) -> Result<u16> {
+fn parse_variation_regions(store: ItemVariationStore, vsindex: u16) -> Result<u16> {
     let mut s = Stream::new(store.0);
 
     let format: u16 = s.read()?;
@@ -259,7 +259,7 @@ fn parse_variation_regions(store: ItemVariationStore, vsindex: u32) -> Result<u1
     }
 
     s.skip::<u32>(); // variation_region_list_offset
-    let offsets: LazyArray<u32> = s.read_array16()?;
+    let offsets = s.read_array16::<u32>()?;
 
     // Offsets in bytes from the start of the item variation store
     // to each item variation data subtable.
@@ -653,7 +653,7 @@ fn _parse_char_string(
                 }
 
                 ctx.variation_regions = parse_variation_regions(
-                    ctx.metadata.item_variation_store, stack.pop() as u32,
+                    ctx.metadata.item_variation_store, stack.pop() as u16, // TODO: check
                 )?;
 
                 ctx.had_vsindex = true;

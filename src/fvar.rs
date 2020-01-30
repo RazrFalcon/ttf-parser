@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/fvar
 
 use crate::{Font, Tag, Result};
-use crate::parser::{Stream, Offset, LazyArray};
+use crate::parser::{Stream, Offset};
 use crate::raw::fvar as raw;
 
 
@@ -37,7 +37,7 @@ impl<'a> Font<'a> {
         let table = self.fvar?;
         let offset = table.axes_array_offset();
         let mut s = Stream::new_at(table.data, offset.to_usize());
-        let axes: LazyArray<raw::VariationAxisRecord> = s.read_array(table.axis_count())?;
+        let axes = s.read_array::<raw::VariationAxisRecord, u16>(table.axis_count())?;
         if let Some(index) = axes.into_iter().position(|r| r.axis_tag() == tag).map(|i| i as u16) {
             let record = axes.at(index);
 

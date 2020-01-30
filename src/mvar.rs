@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
 
 use crate::{Font, Tag, Result, Error};
-use crate::parser::{Stream, LazyArray, Offset, Offset16, Offset32};
+use crate::parser::{Stream, Offset, Offset16, Offset32};
 use crate::raw::mvar as raw;
 
 
@@ -34,7 +34,7 @@ impl<'a> Font<'a> {
 
         let variation_store_offset = bail!(s.read::<Option<Offset16>>());
 
-        let value_records: LazyArray<raw::ValueRecord> = s.read_array(count)?;
+        let value_records = s.read_array::<raw::ValueRecord, u16>(count)?;
         let record = try_ok!(value_records.binary_search_by(|r| r.value_tag().cmp(&tag)));
 
         let mut s2 = Stream::new_at(self.mvar?, variation_store_offset.to_usize());
@@ -58,7 +58,7 @@ pub fn parse_item_variation_store(
     }
 
     let variation_region_list_offset: Offset32 = s.read()?;
-    let item_variation_data_offsets: LazyArray<Offset32> = s.read_array16()?;
+    let item_variation_data_offsets = s.read_array16::<Offset32>()?;
 
     let var_data_offset = try_ok!(item_variation_data_offsets.get(outer_index));
     let mut s = orig.clone();
@@ -81,10 +81,10 @@ fn parse_item_variation_data(
         return Ok(None);
     }
 
-    let short_delta_count = s.read::<u16>()? as u32;
-    let region_index_count = s.read::<u16>()? as u32;
-    let region_indexes: LazyArray<u16> = s.read_array(region_index_count as u16)?;
-    s.advance(inner_index as u32 * (short_delta_count + region_index_count));
+    let short_delta_count: u16 = s.read()?;
+    let region_index_count: u16 = s.read()?;
+    let region_indexes = s.read_array::<u16, u16>(region_index_count as u16)?;
+    s.advance(inner_index as u32 * (short_delta_count as u32 + region_index_count as u32));
 
     let mut delta = 0.0;
     let mut i = 0;

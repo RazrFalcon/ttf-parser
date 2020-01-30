@@ -154,7 +154,7 @@ impl<'a> Font<'a> {
     /// Otherwise all sets will be checked.
     ///
     /// Returns `Ok(false)` when *Mark Glyph Sets Table* is not set.
-    pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u32>) -> Result<bool> {
+    pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u16>) -> Result<bool> {
         let table = self.gdef?;
 
         // `markGlyphSetsDefOffset` is present only in table version >= 1.2

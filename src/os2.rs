@@ -5,16 +5,6 @@ use crate::{Font, LineMetrics};
 use crate::raw::os_2 as raw;
 
 
-macro_rules! try_or {
-    ($value:expr, $ret:expr) => {
-        match $value {
-            Ok(v) => v,
-            Err(_) => return $ret,
-        }
-    };
-}
-
-
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]

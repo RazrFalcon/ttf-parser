@@ -1,7 +1,8 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 
 use crate::{Font, GlyphId, Result};
-use crate::parser::{Stream, SafeStream, FromData, TrySlice, Offset, Offset16, Offset32};
+use crate::parser::{Stream, TrySlice, Offset, Offset16, Offset32};
+use crate::ggg::{Class, ClassDefinitionTable, CoverageTable};
 use crate::raw::gdef as raw;
 
 
@@ -13,87 +14,6 @@ pub enum GlyphClass {
     Ligature  = 2,
     Mark      = 3,
     Component = 4,
-}
-
-
-/// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-table
-struct CoverageTable<'a> {
-    data: &'a [u8],
-}
-
-impl<'a> CoverageTable<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        CoverageTable { data }
-    }
-
-    fn contains(&self, glyph_id: GlyphId) -> bool {
-        let mut s = Stream::new(self.data);
-        let format: u16 = match s.read() {
-            Ok(v) => v,
-            Err(_) => return false,
-        };
-
-        match format {
-            1 => {
-                s.read_array16::<GlyphId>().unwrap().binary_search(&glyph_id).is_some()
-            }
-            2 => {
-                let records = s.read_array16::<raw::RangeRecord>().unwrap();
-                records.into_iter().any(|r| r.range().contains(&glyph_id))
-            }
-            _ => false,
-        }
-    }
-}
-
-
-/// A value of [Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table).
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct Class(pub u16);
-
-impl FromData for Class {
-    fn parse(data: &[u8]) -> Self {
-        Class(SafeStream::new(data).read())
-    }
-}
-
-
-/// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
-struct ClassDefinitionTable<'a> {
-    data: &'a [u8],
-}
-
-impl<'a> ClassDefinitionTable<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        ClassDefinitionTable { data }
-    }
-
-    /// Any glyph not included in the range of covered glyph IDs automatically belongs to Class 0.
-    fn get(&self, glyph_id: GlyphId) -> Result<Class> {
-        let mut s = Stream::new(self.data);
-        let format: u16 = s.read()?;
-        match format {
-            1 => {
-                let start_glyph_id: GlyphId = s.read()?;
-
-                // Prevent overflow.
-                if glyph_id < start_glyph_id {
-                    return Ok(Class(0));
-                }
-
-                let classes = s.read_array16::<Class>()?;
-                Ok(classes.get(glyph_id.0 - start_glyph_id.0).unwrap_or(Class(0)))
-            }
-            2 => {
-                let records = s.read_array16::<raw::ClassRangeRecord>()?;
-                Ok(match records.into_iter().find(|r| r.range().contains(&glyph_id)) {
-                    Some(record) => Class(record.class()),
-                    None => Class(0),
-                })
-            }
-            _ => Ok(Class(0)),
-        }
-    }
 }
 
 

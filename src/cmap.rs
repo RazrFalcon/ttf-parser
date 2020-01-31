@@ -244,6 +244,7 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Result
 
     let seg_count = seg_count_x2 / 2;
     s.advance(6 as u32); // searchRange + entrySelector + rangeShift
+
     let end_codes = s.read_array::<u16, u16>(seg_count)?;
     s.skip::<u16>(); // reservedPad
     let start_codes = s.read_array::<u16, u16>(seg_count)?;

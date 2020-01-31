@@ -486,6 +486,36 @@ MVAR_REGION_AXIS_COORDINATES_RECORD = [
     TableRow(True,  TtfInt16(), 'endCoord'),    #
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/gsub
+# https://docs.microsoft.com/en-us/typography/opentype/spec/gpos
+GSUB_GPOS_TABLE = [
+    TableRow(True,  TtfUInt16(),            'majorVersion'),
+    TableRow(True,  TtfUInt16(),            'minorVersion'),
+    TableRow(True,  TtfOffset16(),          'scriptListOffset'),
+    TableRow(True,  TtfOffset16(),          'featureListOffset'),
+    TableRow(True,  TtfOffset16(),          'lookupListOffset'),
+    TableRow(True,  TtfOptionalOffset32(),  'featureVariationsOffset', optional=True),
+]
+
+GSUB_GPOS_RECORD = [
+    TableRow(True,  TtfTag(),       'tag'),
+    TableRow(True,  TtfOffset16(),  'offset'),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#condition-table-format-1-font-variation-axis-range
+GSUB_GPOS_CONDITION_TABLE = [
+    TableRow(True,  TtfUInt16(),    'format'),
+    TableRow(True,  TtfUInt16(),    'axisIndex'),
+    TableRow(True,  TtfInt16(),     'filterRangeMinValue'),  # Use i16 instead of F2DOT14 to simplify calculations.
+    TableRow(True,  TtfInt16(),     'filterRangeMaxValue'),  #
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#featurevariations-table
+GSUB_GPOS_FEATURE_VARIATION_RECORD = [
+    TableRow(True,  TtfOffset32(),  'conditionSetOffset'),
+    TableRow(True,  TtfOffset32(),  'featureTableSubstitutionOffset'),
+]
+
 
 def print_struct(name: str, size: int, owned: bool, has_tail: bool) -> None:
     print('#[derive(Clone, Copy)]')
@@ -682,6 +712,21 @@ print()
 generate_table(GDEF_CLASS_RANGE_RECORD, 'ClassRangeRecord', owned=True, impl_from_data=True)
 print()
 generate_table(GDEF_RANGE_RECORD, 'RangeRecord', owned=True, impl_from_data=True)
+print('}')
+print()
+print('pub mod gsubgpos {')
+print('use crate::Tag;')
+print('use crate::parser::{Offset16, Offset32, FromData};')
+print()
+table_field_offset(GSUB_GPOS_TABLE, 'featureVariationsOffset')
+print()
+generate_table(GSUB_GPOS_TABLE, 'Table', has_tail=True)
+print()
+generate_table(GSUB_GPOS_RECORD, 'Record', owned=True, impl_from_data=True)
+print()
+generate_table(GSUB_GPOS_CONDITION_TABLE, 'Condition', owned=True, impl_from_data=True)
+print()
+generate_table(GSUB_GPOS_FEATURE_VARIATION_RECORD, 'FeatureVariationRecord', owned=True, impl_from_data=True)
 print('}')
 print()
 print('pub mod fvar {')

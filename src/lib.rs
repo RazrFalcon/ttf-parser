@@ -190,13 +190,25 @@ macro_rules! bail {
     };
 }
 
+macro_rules! try_or {
+    ($value:expr, $ret:expr) => {
+        match $value {
+            Ok(v) => v,
+            Err(_) => return $ret,
+        }
+    };
+}
+
 mod avar;
-mod cff;
 mod cff2;
+mod cff;
 mod cmap;
 mod fvar;
 mod gdef;
+mod ggg;
 mod glyf;
+mod gpos;
+mod gsub;
 mod head;
 mod hhea;
 mod hmtx;
@@ -217,13 +229,17 @@ mod vvar;
 #[cfg(feature = "std")]
 mod writer;
 
-use parser::{Stream, FromData, SafeStream, TrySlice, Offset};
+use parser::{Stream, SafeStream, TrySlice, Offset};
 pub use cff::CFFError;
 pub use fvar::VariationAxis;
-pub use gdef::{Class, GlyphClass};
+pub use gdef::GlyphClass;
+pub use ggg::*;
+pub use gpos::PositioningTable;
+pub use gsub::SubstitutionTable;
 pub use head::IndexToLocationFormat;
 pub use name::*;
 pub use os2::*;
+pub use parser::{FromData, ArraySize, LazyArray, LazyArray16, LazyArray32, LazyArrayIter};
 
 
 /// A type-safe wrapper for glyph ID.
@@ -235,6 +251,12 @@ impl FromData for GlyphId {
     fn parse(data: &[u8]) -> Self {
         let mut s = SafeStream::new(data);
         GlyphId(s.read())
+    }
+}
+
+impl Default for GlyphId {
+    fn default() -> Self {
+        GlyphId(0)
     }
 }
 
@@ -435,6 +457,14 @@ impl core::fmt::Display for Tag {
     }
 }
 
+impl FromData for Tag {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        Tag(u32::parse(data))
+    }
+}
+
+
 
 /// A line metrics.
 ///
@@ -449,7 +479,7 @@ pub struct LineMetrics {
 }
 
 
-/// Rectangle.
+/// A rectangle.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
 pub struct Rect {
@@ -494,6 +524,8 @@ pub enum TableName {
     FontVariations,
     GlyphData,
     GlyphDefinition,
+    GlyphPositioning,
+    GlyphSubstitution,
     Header,
     HorizontalHeader,
     HorizontalMetrics,
@@ -516,14 +548,16 @@ pub enum TableName {
 #[derive(Clone)]
 pub struct Font<'a> {
     avar: Result<&'a [u8]>,
-    head: raw::head::Table<'a>,
-    hhea: raw::hhea::Table<'a>,
-    cff_: Result<cff::Metadata<'a>>,
     cff2: Result<cff2::Metadata<'a>>,
+    cff_: Result<cff::Metadata<'a>>,
     cmap: Result<&'a [u8]>,
     fvar: Result<raw::fvar::Table<'a>>,
     gdef: Result<raw::gdef::Table<'a>>,
     glyf: Result<&'a [u8]>,
+    gpos: Result<raw::gsubgpos::Table<'a>>,
+    gsub: Result<raw::gsubgpos::Table<'a>>,
+    head: raw::head::Table<'a>,
+    hhea: raw::hhea::Table<'a>,
     hmtx: Result<&'a [u8]>,
     hvar: Result<&'a [u8]>,
     kern: Result<&'a [u8]>,
@@ -585,6 +619,8 @@ impl<'a> Font<'a> {
         let tables = s.read_array::<raw::TableRecord, u16>(num_tables)?;
 
         let mut font = Font {
+            head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
+            hhea: raw::hhea::Table::new(&[0; raw::hhea::Table::SIZE]),
             avar: Err(Error::TableMissing(TableName::AxisVariations)),
             cff2: Err(Error::TableMissing(TableName::CompactFontFormat2)),
             cff_: Err(Error::TableMissing(TableName::CompactFontFormat)),
@@ -592,8 +628,8 @@ impl<'a> Font<'a> {
             fvar: Err(Error::TableMissing(TableName::FontVariations)),
             gdef: Err(Error::TableMissing(TableName::GlyphDefinition)),
             glyf: Err(Error::TableMissing(TableName::GlyphData)),
-            head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
-            hhea: raw::hhea::Table::new(&[0; raw::hhea::Table::SIZE]),
+            gpos: Err(Error::TableMissing(TableName::GlyphPositioning)),
+            gsub: Err(Error::TableMissing(TableName::GlyphSubstitution)),
             hmtx: Err(Error::TableMissing(TableName::HorizontalMetrics)),
             hvar: Err(Error::TableMissing(TableName::HorizontalMetricsVariations)),
             kern: Err(Error::TableMissing(TableName::Kerning)),
@@ -671,6 +707,24 @@ impl<'a> Font<'a> {
                         font.gdef = Ok(raw::gdef::Table::new(data));
                     }
                 }
+                b"GSUB" => {
+                    if length < raw::gsubgpos::Table::MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::GlyphSubstitution));
+                    }
+
+                    if let Some(data) = data.get(range) {
+                        font.gsub = Ok(raw::gsubgpos::Table::new(data));
+                    }
+                }
+                b"GPOS" => {
+                    if length < raw::gsubgpos::Table::MIN_SIZE {
+                        return Err(Error::InvalidTableSize(TableName::GlyphPositioning));
+                    }
+
+                    if let Some(data) = data.get(range) {
+                        font.gpos = Ok(raw::gsubgpos::Table::new(data));
+                    }
+                }
                 b"fvar" => {
                     if length < raw::fvar::Table::MIN_SIZE {
                         return Err(Error::InvalidTableSize(TableName::FontVariations));
@@ -733,6 +787,8 @@ impl<'a> Font<'a> {
             TableName::FontVariations               => self.fvar.is_ok(),
             TableName::GlyphData                    => self.glyf.is_ok(),
             TableName::GlyphDefinition              => self.gdef.is_ok(),
+            TableName::GlyphPositioning             => self.gpos.is_ok(),
+            TableName::GlyphSubstitution            => self.gsub.is_ok(),
             TableName::HorizontalMetrics            => self.hmtx.is_ok(),
             TableName::HorizontalMetricsVariations  => self.hvar.is_ok(),
             TableName::IndexToLocation              => self.loca.is_ok(),

@@ -13,8 +13,8 @@ impl<'a> Font<'a> {
         let data = self.kern?;
 
         let mut s = Stream::new(data);
-        let version: u16 = s.read()?;
 
+        let version: u16 = s.read()?;
         if version != 0 {
             return Err(Error::UnsupportedTableVersion);
         }

@@ -783,6 +783,179 @@ pub mod gdef {
     }
 }
 
+pub mod gsubgpos {
+    use crate::parser::{FromData, Offset16, Offset32};
+    use crate::Tag;
+
+    pub const FEATURE_VARIATIONS_OFFSET_OFFSET: usize = 10;
+
+    #[derive(Clone, Copy)]
+    pub struct Table<'a> {
+        pub data: &'a [u8],
+    }
+
+    impl<'a> Table<'a> {
+        pub const MIN_SIZE: usize = 10;
+
+        #[inline(always)]
+        pub fn new(input: &'a [u8]) -> Self {
+            Table { data: input }
+        }
+
+        #[inline(always)]
+        pub fn major_version(&self) -> u16 {
+            u16::from_be_bytes([self.data[0], self.data[1]])
+        }
+
+        #[inline(always)]
+        pub fn minor_version(&self) -> u16 {
+            u16::from_be_bytes([self.data[2], self.data[3]])
+        }
+
+        #[inline(always)]
+        pub fn script_list_offset(&self) -> Offset16 {
+            Offset16(u16::from_be_bytes([self.data[4], self.data[5]]))
+        }
+
+        #[inline(always)]
+        pub fn feature_list_offset(&self) -> Offset16 {
+            Offset16(u16::from_be_bytes([self.data[6], self.data[7]]))
+        }
+
+        #[inline(always)]
+        pub fn lookup_list_offset(&self) -> Offset16 {
+            Offset16(u16::from_be_bytes([self.data[8], self.data[9]]))
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct Record {
+        data: [u8; 6],
+    }
+
+    impl Record {
+        pub const SIZE: usize = 6;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            Record { data }
+        }
+
+        #[inline(always)]
+        pub fn tag(&self) -> Tag {
+            use core::convert::TryInto;
+            // Unwrap is safe, because an array and a slice have the same size.
+            Tag::from_bytes(&self.data[0..4].try_into().unwrap())
+        }
+
+        #[inline(always)]
+        pub fn offset(&self) -> Offset16 {
+            Offset16(u16::from_be_bytes([self.data[4], self.data[5]]))
+        }
+    }
+
+    impl FromData for Record {
+        const SIZE: usize = Record::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct Condition {
+        data: [u8; 8],
+    }
+
+    impl Condition {
+        pub const SIZE: usize = 8;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            Condition { data }
+        }
+
+        #[inline(always)]
+        pub fn format(&self) -> u16 {
+            u16::from_be_bytes([self.data[0], self.data[1]])
+        }
+
+        #[inline(always)]
+        pub fn axis_index(&self) -> u16 {
+            u16::from_be_bytes([self.data[2], self.data[3]])
+        }
+
+        #[inline(always)]
+        pub fn filter_range_min_value(&self) -> i16 {
+            i16::from_be_bytes([self.data[4], self.data[5]])
+        }
+
+        #[inline(always)]
+        pub fn filter_range_max_value(&self) -> i16 {
+            i16::from_be_bytes([self.data[6], self.data[7]])
+        }
+    }
+
+    impl FromData for Condition {
+        const SIZE: usize = Condition::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct FeatureVariationRecord {
+        data: [u8; 8],
+    }
+
+    impl FeatureVariationRecord {
+        pub const SIZE: usize = 8;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            FeatureVariationRecord { data }
+        }
+
+        #[inline(always)]
+        pub fn condition_set_offset(&self) -> Offset32 {
+            Offset32(u32::from_be_bytes([
+                self.data[0],
+                self.data[1],
+                self.data[2],
+                self.data[3],
+            ]))
+        }
+
+        #[inline(always)]
+        pub fn feature_table_substitution_offset(&self) -> Offset32 {
+            Offset32(u32::from_be_bytes([
+                self.data[4],
+                self.data[5],
+                self.data[6],
+                self.data[7],
+            ]))
+        }
+    }
+
+    impl FromData for FeatureVariationRecord {
+        const SIZE: usize = FeatureVariationRecord::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+}
+
 pub mod fvar {
     use crate::parser::{FromData, Offset16};
     use crate::Tag;

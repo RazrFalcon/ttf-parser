@@ -4,6 +4,7 @@ use crate::{Font, GlyphId, Result};
 use crate::parser::Stream;
 use crate::raw::hmtx as raw;
 
+
 impl<'a> Font<'a> {
     /// Parses glyph's horizontal advance using
     /// [Horizontal Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx).

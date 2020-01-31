@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::vertical_height`
 - `Font::vertical_line_gap`
 - `Tag` type.
+- Initial GSUB/GPOS support.
 
 ### Changed
 - Most of the methods will return `Result<Option<T>, Error>` from now.

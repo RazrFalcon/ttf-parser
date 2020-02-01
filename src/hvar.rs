@@ -90,7 +90,7 @@ pub fn glyph_advance_variation(
 
     let major_version: u16 = s.read()?;
     let minor_version: u16 = s.read()?;
-    if major_version != 1 && minor_version != 0 {
+    if !(major_version == 1 && minor_version == 0) {
         return Err(Error::UnsupportedTableVersion);
     }
 
@@ -118,7 +118,7 @@ pub fn glyph_side_bearing_variation(
 
     let major_version: u16 = s.read()?;
     let minor_version: u16 = s.read()?;
-    if major_version != 1 && minor_version != 0 {
+    if !(major_version == 1 && minor_version == 0) {
         return Err(Error::UnsupportedTableVersion);
     }
 

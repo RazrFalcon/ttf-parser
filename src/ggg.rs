@@ -103,7 +103,7 @@ pub(crate) fn parse_lookups(table: raw::gsubgpos::Table) -> Result<Lookups> {
 }
 
 pub(crate) fn parse_feature_variations(table: raw::gsubgpos::Table) -> Result<FeatureVariations> {
-    if table.major_version() != 1 && table.minor_version() != 1 {
+    if !(table.major_version() == 1 && table.minor_version() == 1) {
         return Ok(FeatureVariations { data: &[], records: LazyArray::new(&[]), index: 0 });
     }
 
@@ -253,10 +253,10 @@ impl<'a> Script<'a> {
     /// Returns a `Language` by `tag`.
     ///
     /// Uses binary search and not an iterator internally.
-    pub fn language_by_tag(&self, tag: Tag) -> Option<(u16, Language)> {
+    pub fn language_by_tag(&self, tag: Tag) -> Option<(LanguageIndex, Language)> {
         let (idx, _) = self.records.binary_search_by(|r| r.tag().cmp(&tag))?;
         let lang = self.language_at(LanguageIndex(idx))?;
-        Some((idx, lang))
+        Some((LanguageIndex(idx), lang))
     }
 }
 

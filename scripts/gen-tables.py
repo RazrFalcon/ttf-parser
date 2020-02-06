@@ -498,6 +498,19 @@ GSUB_GPOS_FEATURE_VARIATION_RECORD = [
     TableRow(True,  TtfOffset32(),  'featureTableSubstitutionOffset'),
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/post
+POST_TABLE = [
+    TableRow(False, TtfFixed(),     'version'),
+    TableRow(False, TtfFixed(),     'italicAngle'),
+    TableRow(True,  TtfFWORD(),     'underlinePosition'),
+    TableRow(True,  TtfFWORD(),     'underlineThickness'),
+    TableRow(False, TtfUInt32(),    'isFixedPitch'),
+    TableRow(False, TtfUInt32(),    'minMemType42'),
+    TableRow(False, TtfUInt32(),    'maxMemType42'),
+    TableRow(False, TtfUInt32(),    'minMemType1'),
+    TableRow(False, TtfUInt32(),    'maxMemType1'),
+]
+
 
 def print_struct(name: str, size: int, owned: bool) -> None:
     print('#[derive(Clone, Copy)]')
@@ -512,7 +525,7 @@ def print_struct_size(size: int) -> None:
     print(f'pub const SIZE: usize = {size};')
 
 
-def print_constructor(name: str, owned: bool) -> None:
+def print_constructor(name: str, size: int, owned: bool) -> None:
     print('#[inline(always)]')
     if owned:
         print('pub fn new(input: &[u8]) -> Self {')
@@ -523,6 +536,7 @@ def print_constructor(name: str, owned: bool) -> None:
         print('}')
     else:
         print('pub fn new(input: &\'a [u8]) -> Self {')
+        print(f'    debug_assert_eq!(input.len(), {size});')
         print(f'    {name} {{ data: input }}')
         print('}')
 
@@ -581,7 +595,7 @@ def generate_table(table: List[TableRow], struct_name: str, owned: bool = False,
     if not parse:
         print_struct_size(struct_size)
         print()
-        print_constructor(struct_name, owned)
+        print_constructor(struct_name, struct_size, owned)
         print()
     else:
         print_parse(struct_size)
@@ -650,6 +664,10 @@ print('pub mod vhea {')
 print('use core::num::NonZeroU16;')
 print()
 generate_table(VHEA_TABLE, 'Table', parse=True)
+print('}')
+print()
+print('pub mod post {')
+generate_table(POST_TABLE, 'Table')
 print('}')
 print()
 print('pub mod cmap {')

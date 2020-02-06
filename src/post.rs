@@ -1,7 +1,8 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
 use crate::{Font, LineMetrics, GlyphId};
-use crate::parser::{Stream, Fixed};
+use crate::parser::{Stream, LazyArray16};
+use crate::raw;
 
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
@@ -267,14 +268,50 @@ const MACINTOSH_NAMES: &[&str] = &[
 ];
 
 
+#[derive(Clone, Copy)]
+pub struct Table<'a> {
+    table: raw::post::Table<'a>,
+    name_indexes: LazyArray16<'a, u16>,
+    names: &'a [u8],
+}
+
+impl<'a> Table<'a> {
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let version: u32 = Stream::new(data).read()?;
+        if !(version == 0x00010000 || version == 0x00020000 ||
+             version == 0x00025000 || version == 0x00030000 ||
+             version == 0x00040000)
+        {
+            return None;
+        }
+
+        let mut name_indexes = LazyArray16::default();
+        let mut names: &[u8] = &[];
+
+        // Only version 2.0 of the table has data at the end.
+        if version == 0x00020000 {
+            let mut s = Stream::new_at(data, raw::post::Table::SIZE);
+            name_indexes = s.read_array16()?;
+            names = s.tail()?;
+        }
+
+        Some(Table {
+            table: raw::post::Table::new(data.get(0..raw::post::Table::SIZE)?),
+            name_indexes,
+            names,
+        })
+    }
+}
+
+
 impl<'a> Font<'a> {
     /// Parses font's underline metrics.
     #[inline]
     pub fn underline_metrics(&self) -> Option<LineMetrics> {
-        let mut s = Stream::new_at(self.post?, 8); // TODO: to raw
+        let table = self.post?.table;
         Some(LineMetrics {
-            position: s.read()?,
-            thickness: s.read()?,
+            position: table.underline_position(),
+            thickness: table.underline_thickness(),
         })
     }
 
@@ -282,29 +319,11 @@ impl<'a> Font<'a> {
     ///
     /// Uses the `post` table as a source.
     ///
-    /// Returns `Ok(None)` when no name is associated with a `glyph`.
+    /// Returns `None` when no name is associated with a `glyph`.
     #[inline]
     pub fn glyph_name(&self, glyph: GlyphId) -> Option<&str> {
-        let mut s = Stream::new(self.post?);
-        let version: Fixed = s.read()?;
-
-        // In case of version 1.0 we are using predefined set of names.
-        if version.0 == 1.0 {
-            return if (glyph.0 as usize) < MACINTOSH_NAMES.len() {
-                Some(MACINTOSH_NAMES[glyph.0 as usize])
-            } else {
-                None
-            };
-        }
-
-        // Only version 2.0 of the table has data at the end.
-        if version.0 != 2.0 || s.at_end() {
-            return None;
-        }
-
-        s.advance(28_u32); // Jump to the end of the base table.
-        let name_indexes = s.read_array16::<u16>()?;
-        let mut index = name_indexes.get(glyph.0)?;
+        let table = self.post?;
+        let mut index = table.name_indexes.get(glyph.0)?;
 
         // 'If the name index is between 0 and 257, treat the name index
         // as a glyph index in the Macintosh standard order.'
@@ -315,6 +334,7 @@ impl<'a> Font<'a> {
             // to index into the list of Pascal strings at the end of the table.'
             index -= MACINTOSH_NAMES.len() as u16;
 
+            let mut s = Stream::new(table.names);
             let mut i = 0;
             while !s.at_end() && i < core::u16::MAX {
                 let len: u8 = s.read()?;

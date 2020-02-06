@@ -85,7 +85,7 @@ impl<'a> Font<'a> {
     /// Parses glyph's class according to
     /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
     ///
-    /// Returns `Ok(None)` when *Glyph Class Definition Table* is not set
+    /// Returns `None` when *Glyph Class Definition Table* is not set
     /// or glyph class is not set or invalid.
     pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
         match self.gdef?.glyph_classes?.get(glyph_id).0 {

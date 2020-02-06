@@ -136,7 +136,7 @@ test outline_glyph_8_from_glyf   ... bench:         285 ns/iter (+/- 10)
 test glyph_name_276              ... bench:         214 ns/iter (+/- 3)
 test family_name                 ... bench:         170 ns/iter (+/- 12)
 test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
-test glyph_name_8                ... bench:           2 ns/iter (+/- 0)
+test glyph_name_8                ... bench:           1 ns/iter (+/- 0)
 test underline_metrics           ... bench:         0.5 ns/iter (+/- 0)
 test units_per_em                ... bench:         0.5 ns/iter (+/- 0)
 test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 0)
@@ -450,7 +450,7 @@ pub struct Font<'a> {
     mvar: Option<&'a [u8]>,
     name: name::Names<'a>,
     os_2: Option<os2::Table<'a>>,
-    post: Option<&'a [u8]>,
+    post: Option<post::Table<'a>>,
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<hmtx::Table<'a>>,
     vorg: Option<&'a [u8]>,
@@ -558,7 +558,7 @@ impl<'a> Font<'a> {
                 b"loca" => loca = data.get(range),
                 b"maxp" => maxp = data.get(range).and_then(|data| maxp::parse(data)),
                 b"name" => name = data.get(range).map(|data| name::parse(data)).unwrap_or_default(),
-                b"post" => post = data.get(range),
+                b"post" => post = data.get(range).and_then(|data| post::Table::parse(data)),
                 b"vhea" => vhea = data.get(range).and_then(|data| raw::vhea::Table::parse(data)),
                 b"vmtx" => vmtx = data.get(range),
                 _ => {}
@@ -638,7 +638,7 @@ impl<'a> Font<'a> {
     ///
     /// This method supports `glyf`, `CFF` and `CFF2` tables.
     ///
-    /// Returns `Ok(None)` when glyph has no outline.
+    /// Returns `None` when glyph has no outline.
     ///
     /// # Example
     ///

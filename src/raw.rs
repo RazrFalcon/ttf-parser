@@ -15,6 +15,7 @@ impl<'a> TTCHeader<'a> {
 
     #[inline(always)]
     pub fn new(input: &'a [u8]) -> Self {
+        debug_assert_eq!(input.len(), 12);
         TTCHeader { data: input }
     }
 
@@ -223,6 +224,34 @@ pub mod vhea {
         #[inline(always)]
         pub fn num_of_long_ver_metrics(&self) -> Option<NonZeroU16> {
             NonZeroU16::new(u16::from_be_bytes([self.data[34], self.data[35]]))
+        }
+    }
+}
+
+pub mod post {
+    #[derive(Clone, Copy)]
+    pub struct Table<'a> {
+        data: &'a [u8],
+    }
+
+    impl<'a> Table<'a> {
+        #[allow(dead_code)]
+        pub const SIZE: usize = 32;
+
+        #[inline(always)]
+        pub fn new(input: &'a [u8]) -> Self {
+            debug_assert_eq!(input.len(), 32);
+            Table { data: input }
+        }
+
+        #[inline(always)]
+        pub fn underline_position(&self) -> i16 {
+            i16::from_be_bytes([self.data[8], self.data[9]])
+        }
+
+        #[inline(always)]
+        pub fn underline_thickness(&self) -> i16 {
+            i16::from_be_bytes([self.data[10], self.data[11]])
         }
     }
 }
@@ -502,6 +531,7 @@ pub mod os_2 {
 
         #[inline(always)]
         pub fn new(input: &'a [u8]) -> Self {
+            debug_assert_eq!(input.len(), 78);
             Table { data: input }
         }
 

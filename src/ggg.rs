@@ -19,7 +19,7 @@ impl<'a> GsubGposTable<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let version: u32 = s.read()?;
-        if version != 0x00010000 {
+        if !(version == 0x00010000 || version == 0x00010001) {
             return None;
         }
 
@@ -28,7 +28,7 @@ impl<'a> GsubGposTable<'a> {
         let lookup_list_offset: Offset16 = s.read()?;
 
         let mut feature_variations_offset: Option<Offset32> = None;
-        if version != 0x00010001 {
+        if version == 0x00010001 {
             feature_variations_offset = s.read()?;
         }
 

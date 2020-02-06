@@ -13,8 +13,12 @@ edition = "2018"
 exclude = ["fonts/**"]
 
 [features]
-default = ["std"]
+default = ["std", "logging"]
 std = []
+logging = ["log"]
+
+[dependencies]
+log = { version = "0.4.8", optional = true }
 
 [dev-dependencies]
 bencher = "0.1"

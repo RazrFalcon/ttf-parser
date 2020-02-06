@@ -1,7 +1,3 @@
-use core::ops::Range;
-
-use crate::{Error, Result};
-
 /// A trait for parsing raw binary data.
 ///
 /// This is a low-level, internal trait that should not be used directly.
@@ -110,21 +106,6 @@ impl FromData for Fixed {
 }
 
 
-pub trait TryFromData: Sized {
-    /// Stores an object size in raw data.
-    ///
-    /// `mem::size_of` by default.
-    ///
-    /// Override when size of `Self` != size of a raw data.
-    /// For example, when you are parsing `u16`, but storing it as `u8`.
-    /// In this case `size_of::<Self>()` == 1, but `FromData::SIZE` == 2.
-    const SIZE: usize = core::mem::size_of::<Self>();
-
-    /// Parses an object from a raw data.
-    fn try_parse(data: &[u8]) -> Result<Self>;
-}
-
-
 /// A u16/u32 length type used by `LazyArray`.
 pub trait ArraySize
     : core::ops::Add<Output=Self>
@@ -185,10 +166,20 @@ impl ArraySize for u32 {
 ///
 /// This is a low-level, internal structure that should not be used directly.
 #[derive(Clone, Copy)]
-pub struct LazyArray<'a, T, Idx: ArraySize> {
+pub struct LazyArray<'a, T, Idx> {
     data: &'a [u8],
     data_type: core::marker::PhantomData<T>,
     len_type: core::marker::PhantomData<Idx>,
+}
+
+impl<T, Idx> Default for LazyArray<'_, T, Idx> {
+    fn default() -> Self {
+        LazyArray {
+            data: &[],
+            data_type: core::marker::PhantomData,
+            len_type: core::marker::PhantomData,
+        }
+    }
 }
 
 impl<'a, T: FromData, Idx: ArraySize> LazyArray<'a, T, Idx> {
@@ -335,24 +326,6 @@ impl<T: FromData, Idx: ArraySize> core::fmt::Debug for LazyArrayIter<'_, T, Idx>
 }
 
 
-pub trait TrySlice<'a> {
-    fn try_slice(&self, range: Range<usize>) -> Result<&'a [u8]>;
-    fn try_slice_from<T: Offset>(&self, start: T) -> Result<&'a [u8]>;
-}
-
-impl<'a> TrySlice<'a> for &'a [u8] {
-    #[inline]
-    fn try_slice(&self, range: Range<usize>) -> Result<&'a [u8]> {
-        self.get(range.clone()).ok_or_else(|| Error::SliceOutOfBounds)
-    }
-
-    #[inline]
-    fn try_slice_from<T: Offset>(&self, start: T) -> Result<&'a [u8]> {
-        self.get(start.to_usize()..).ok_or_else(|| Error::SliceOutOfBounds)
-    }
-}
-
-
 #[derive(Clone, Copy)]
 pub struct Stream<'a> {
     data: &'a [u8],
@@ -387,8 +360,8 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn tail(&self) -> Result<&'a [u8]> {
-        self.data.try_slice(self.offset..self.data.len())
+    pub fn tail(&self) -> Option<&'a [u8]> {
+        self.data.get(self.offset..self.data.len())
     }
 
     #[inline]
@@ -402,65 +375,55 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn read<T: FromData>(&mut self) -> Result<T> {
+    pub fn read<T: FromData>(&mut self) -> Option<T> {
         let start = self.offset;
         self.offset += T::SIZE;
         let end = self.offset;
 
-        let data = self.data.try_slice(start..end)?;
-        Ok(T::parse(data))
+        let data = self.data.get(start..end)?;
+        Some(T::parse(data))
     }
 
     #[inline]
-    pub fn try_read<T: TryFromData>(&mut self) -> Result<T> {
-        let start = self.offset;
-        self.offset += T::SIZE;
-        let end = self.offset;
-
-        let data = self.data.try_slice(start..end)?;
-        T::try_parse(data)
-    }
-
-    #[inline]
-    pub fn read_at<T: FromData>(data: &[u8], mut offset: usize) -> Result<T> {
+    pub fn read_at<T: FromData>(data: &[u8], mut offset: usize) -> Option<T> {
         let start = offset;
         offset += T::SIZE;
         let end = offset;
 
-        let data = data.try_slice(start..end)?;
-        Ok(T::parse(data))
+        let data = data.get(start..end)?;
+        Some(T::parse(data))
     }
 
     #[inline]
-    pub fn read_bytes<L: ArraySize>(&mut self, len: L) -> Result<&'a [u8]> {
+    pub fn read_bytes<L: ArraySize>(&mut self, len: L) -> Option<&'a [u8]> {
         let offset = self.offset;
         self.offset += len.to_usize();
-        self.data.try_slice(offset..(offset + len.to_usize()))
+        self.data.get(offset..(offset + len.to_usize()))
     }
 
     #[inline]
-    pub fn read_array<T: FromData, Idx: ArraySize>(&mut self, len: Idx) -> Result<LazyArray<'a, T, Idx>> {
+    pub fn read_array<T: FromData, Idx: ArraySize>(&mut self, len: Idx) -> Option<LazyArray<'a, T, Idx>> {
         let len = len.to_usize() * T::SIZE;
         let data = self.read_bytes(len as u32)?;
-        Ok(LazyArray::new(data))
+        Some(LazyArray::new(data))
     }
 
     #[inline]
-    pub fn read_array16<T: FromData>(&mut self) -> Result<LazyArray<'a, T, u16>> {
+    pub fn read_array16<T: FromData>(&mut self) -> Option<LazyArray<'a, T, u16>> {
         let count: u16 = self.read()?;
         self.read_array(count)
     }
 
-    pub fn read_array32<T: FromData>(&mut self) -> Result<LazyArray<'a, T, u32>> {
+    pub fn read_array32<T: FromData>(&mut self) -> Option<LazyArray<'a, T, u32>> {
         let count: u32 = self.read()?;
         self.read_array(count)
     }
 
     #[inline]
-    pub fn read_offsets16(&mut self, data: &'a [u8]) -> Result<Offsets16<'a>> {
+    pub fn read_offsets16(&mut self, data: &'a [u8]) -> Option<Offsets16<'a>> {
         let count: u16 = self.read()?;
         let offsets = self.read_array(count)?;
-        Ok(Offsets16 { data, offsets })
+        Some(Offsets16 { data, offsets })
     }
 }
 
@@ -542,6 +505,7 @@ impl FromData for Option<Offset16> {
 pub struct Offset32(pub u32);
 
 impl Offset for Offset32 {
+    #[inline]
     fn to_usize(&self) -> usize {
         self.0 as usize
     }
@@ -585,9 +549,9 @@ impl<'a, T: Offset + FromData> Offsets<'a, T, u16> {
         self.offsets.at(index)
     }
 
-    pub fn slice(&self, index: u16) -> Result<&'a [u8]> {
+    pub fn slice(&self, index: u16) -> Option<&'a [u8]> {
         let offset = self.offsets.at(index).to_usize();
-        self.data.try_slice(offset..self.data.len())
+        self.data.get(offset..self.data.len())
     }
 }
 
@@ -629,7 +593,7 @@ impl<'a, T: Offset + FromData> Iterator for OffsetsIter<'a, T> {
                 return self.next();
             }
 
-            self.offsets.slice(idx).ok()
+            self.offsets.slice(idx)
         } else {
             None
         }

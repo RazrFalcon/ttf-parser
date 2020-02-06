@@ -4,6 +4,7 @@ rust:
   - stable
   - nightly
 script:
+  - set -e
   - cargo build --no-default-features --verbose --all
   - cargo build --verbose --all
   - cargo test --verbose --all

@@ -124,8 +124,49 @@ pub struct ScriptMetrics {
 }
 
 
-// We already checked that OS/2 table has a valid length,
-// so it's safe to use `SafeStream`.
+#[derive(Clone, Copy)]
+pub(crate) struct Table<'a> {
+    version: u8,
+    data: &'a [u8],
+    pub table: raw::Table<'a>,
+}
+
+impl<'a> core::ops::Deref for Table<'a> {
+    type Target = raw::Table<'a>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.table
+    }
+}
+
+impl<'a> Table<'a> {
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let version: u16 = s.read()?;
+
+        let table_len = match version {
+            0 => 78,
+            1 => 86,
+            2 => 96,
+            3 => 96,
+            4 => 96,
+            5 => 100,
+            _ => return None,
+        };
+
+        if data.len() != table_len {
+            return None;
+        }
+
+        Some(Table {
+            version: version as u8,
+            data,
+            table: raw::Table::new(&data[0..78]),
+        })
+    }
+}
+
 
 impl<'a> Font<'a> {
     /// Parses font's weight.
@@ -133,7 +174,7 @@ impl<'a> Font<'a> {
     /// Returns `Weight::Normal` when OS/2 table is not present.
     #[inline]
     pub fn weight(&self) -> Weight {
-        let table = try_or!(self.os_2, Weight::default());
+        let table = try_opt_or!(self.os_2, Weight::default());
         Weight::from(table.us_weight_class())
     }
 
@@ -142,7 +183,7 @@ impl<'a> Font<'a> {
     /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
     #[inline]
     pub fn width(&self) -> Width {
-        let table = try_or!(self.os_2, Width::default());
+        let table = try_opt_or!(self.os_2, Width::default());
         match table.us_width_class() {
             1 => Width::UltraCondensed,
             2 => Width::ExtraCondensed,
@@ -189,8 +230,8 @@ impl<'a> Font<'a> {
     /// Returns `false` when OS/2 table is not present or when its version is < 4.
     #[inline]
     pub fn is_oblique(&self) -> bool {
-        let table = try_or!(self.os_2, false);
-        if table.version() < 4 {
+        let table = try_opt_or!(self.os_2, false);
+        if table.version < 4 {
             return false;
         }
 
@@ -200,8 +241,8 @@ impl<'a> Font<'a> {
 
     #[inline]
     pub(crate) fn is_use_typo_metrics(&self) -> bool {
-        let table = try_or!(self.os_2, false);
-        if table.version() < 4 {
+        let table = try_opt_or!(self.os_2, false);
+        if table.version < 4 {
             return false;
         }
 
@@ -211,7 +252,7 @@ impl<'a> Font<'a> {
 
     #[inline]
     fn get_fs_selection(&self, bit: u16) -> bool {
-        let table = try_or!(self.os_2, false);
+        let table = try_opt_or!(self.os_2, false);
         (table.fs_selection() >> bit) & 1 == 1
     }
 
@@ -220,13 +261,13 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
-        let table = self.os_2.ok()?;
-        if table.version() < 2 {
+        let table = self.os_2?;
+        if table.version < 2 {
             return None;
         }
 
         // We cannot use SafeStream here, because X height is an optional data.
-        Stream::read_at(table.data, raw::SX_HEIGHT_OFFSET).ok()
+        Stream::read_at(table.data, raw::SX_HEIGHT_OFFSET)
     }
 
     /// Parses font's strikeout metrics.
@@ -234,7 +275,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
-        let table = self.os_2.ok()?;
+        let table = self.os_2?;
         Some(LineMetrics {
             thickness: table.y_strikeout_size(),
             position: table.y_strikeout_position(),
@@ -246,7 +287,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
-        let table = self.os_2.ok()?;
+        let table = self.os_2?;
         Some(ScriptMetrics {
             x_size: table.y_subscript_x_size(),
             y_size: table.y_subscript_y_size(),
@@ -260,7 +301,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
-        let table = self.os_2.ok()?;
+        let table = self.os_2?;
         Some(ScriptMetrics {
             x_size: table.y_superscript_x_size(),
             y_size: table.y_superscript_y_size(),

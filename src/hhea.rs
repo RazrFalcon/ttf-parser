@@ -7,7 +7,6 @@ impl<'a> Font<'a> {
     #[inline]
     pub fn ascender(&self) -> i16 {
         if self.is_use_typo_metrics() {
-            // Unwrap is safe because we already checked that OS/2 table exists.
             self.os_2.map(|table| table.s_typo_ascender()).unwrap()
         } else {
             self.hhea.ascender()
@@ -18,7 +17,6 @@ impl<'a> Font<'a> {
     #[inline]
     pub fn descender(&self) -> i16 {
         if self.is_use_typo_metrics() {
-            // Unwrap is safe because we already checked that OS/2 table exists.
             self.os_2.map(|table| table.s_typo_descender()).unwrap()
         } else {
             self.hhea.descender()
@@ -35,15 +33,9 @@ impl<'a> Font<'a> {
     #[inline]
     pub fn line_gap(&self) -> i16 {
         if self.is_use_typo_metrics() {
-            // Unwrap is safe because we already checked that OS/2 table exists.
             self.os_2.map(|table| table.s_typo_line_gap()).unwrap()
         } else {
             self.hhea.line_gap()
         }
-    }
-
-    #[inline]
-    pub(crate) fn number_of_hmetrics(&self) -> u16 {
-        self.hhea.number_of_h_metrics()
     }
 }

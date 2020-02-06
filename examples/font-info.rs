@@ -1,22 +1,21 @@
 fn main() {
-    if let Err(e) = process() {
-        eprintln!("Error: {}.", e);
-        std::process::exit(1);
-    }
-}
-
-fn process() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 2 {
         println!("Usage:\n\tfont-info font.ttf");
         std::process::exit(1);
     }
 
-    let font_data = std::fs::read(&args[1])?;
+    let font_data = std::fs::read(&args[1]).unwrap();
 
     let now = std::time::Instant::now();
 
-    let font = ttf_parser::Font::from_data(&font_data, 0)?;
+    let font = match ttf_parser::Font::from_data(&font_data, 0) {
+        Some(f) => f,
+        None => {
+            eprint!("Error: failed to open a font.");
+            std::process::exit(1);
+        },
+    };
 
     println!("Family name: {:?}", font.family_name());
     println!("PostScript name: {:?}", font.post_script_name());
@@ -38,6 +37,4 @@ fn process() -> Result<(), Box<dyn std::error::Error>> {
     println!("Superscript: {:?}", font.superscript_metrics());
 
     println!("Elapsed: {}us", now.elapsed().as_micros());
-
-    Ok(())
 }

@@ -2,8 +2,8 @@
 
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
-use crate::parser::{Stream, TrySlice, F2DOT14};
-use crate::{Font, GlyphId, OutlineBuilder, Rect, Result, Error};
+use crate::parser::{Stream, F2DOT14};
+use crate::{Font, GlyphId, OutlineBuilder, Rect};
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
 trait OutlineBuilderInner {
@@ -115,34 +115,34 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
-    ) -> Result<Option<Rect>> {
+    ) -> Option<Rect> {
         let mut b = Builder {
             builder,
             transform: Transform::default(),
             is_default_ts: true,
         };
 
-        let glyph_data = bail!(self.glyph_data(glyph_id));
+        let glyph_data = self.glyph_data(glyph_id)?;
         self.outline_impl(glyph_data, 0, &mut b)
     }
 
-    pub(crate) fn glyf_glyph_bbox(&self, glyph_id: GlyphId) -> Result<Option<Rect>> {
-        let glyph_data = bail!(self.glyph_data(glyph_id));
+    pub(crate) fn glyf_glyph_bbox(&self, glyph_id: GlyphId) -> Option<Rect> {
+        let glyph_data = self.glyph_data(glyph_id)?;
         let mut s = Stream::new(glyph_data);
         s.skip::<i16>(); // number_of_contours
         // It's faster to parse the rect directly, instead of using `FromData`.
-        Ok(Some(Rect {
+        Some(Rect {
             x_min: s.read()?,
             y_min: s.read()?,
             x_max: s.read()?,
             y_max: s.read()?,
-        }))
+        })
     }
 
-    fn glyph_data(&self, glyph_id: GlyphId) -> Result<Option<&[u8]>> {
-        let range = try_ok!(self.glyph_range(glyph_id)?);
+    fn glyph_data(&self, glyph_id: GlyphId) -> Option<&[u8]> {
+        let range = self.glyph_range(glyph_id)?;
         let data = self.glyf?;
-        Ok(Some(data.try_slice(range)?))
+        data.get(range)
     }
 
     fn outline_impl(
@@ -150,9 +150,10 @@ impl<'a> Font<'a> {
         data: &[u8],
         depth: u8,
         builder: &mut Builder,
-    ) -> Result<Option<Rect>> {
+    ) -> Option<Rect> {
         if depth >= MAX_COMPONENTS {
-            return Err(Error::GlyphDataRecursion);
+            warn!("Recursion detected in the 'glyf' table.");
+            return None;
         }
 
         let mut s = Stream::new(data);
@@ -171,10 +172,10 @@ impl<'a> Font<'a> {
             self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
         } else {
             // An empty glyph.
-            return Ok(None);
+            return None;
         }
 
-        Ok(Some(rect))
+        Some(rect)
     }
 
     #[inline(never)]
@@ -182,7 +183,7 @@ impl<'a> Font<'a> {
         glyph_data: &[u8],
         number_of_contours: u16,
         builder: &mut Builder,
-    ) -> Result<Option<()>> {
+    ) -> Option<()> {
         let mut s = Stream::new(glyph_data);
         let endpoints = s.read_array::<u16, u16>(number_of_contours)?;
 
@@ -191,7 +192,7 @@ impl<'a> Font<'a> {
             let last_point = endpoints.last().unwrap();
             // Prevent overflow.
             if last_point == core::u16::MAX {
-                return Ok(None);
+                return None;
             }
 
             last_point + 1
@@ -201,14 +202,14 @@ impl<'a> Font<'a> {
         s.advance(instructions_len);
 
         let flags_offset = s.offset();
-        let x_coords_len = try_ok!(Self::resolve_x_coords_len(&mut s, points_total));
+        let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)?;
         let x_coords_offset = s.offset();
         let y_coords_offset = x_coords_offset + x_coords_len as usize;
 
         let mut points = GlyphPoints {
-            flags: Stream::new(glyph_data.try_slice(flags_offset..x_coords_offset)?),
-            x_coords: Stream::new(glyph_data.try_slice(x_coords_offset..y_coords_offset)?),
-            y_coords: Stream::new(glyph_data.try_slice(y_coords_offset..glyph_data.len())?),
+            flags: Stream::new(glyph_data.get(flags_offset..x_coords_offset)?),
+            x_coords: Stream::new(glyph_data.get(x_coords_offset..y_coords_offset)?),
+            y_coords: Stream::new(glyph_data.get(y_coords_offset..glyph_data.len())?),
             points_left: points_total,
             flag_repeats: 0,
             last_flags: SimpleGlyphFlags::empty(),
@@ -240,7 +241,7 @@ impl<'a> Font<'a> {
             total += n;
         }
 
-        Ok(Some(()))
+        Some(())
     }
 
     /// Resolves the X coordinates length.
@@ -255,12 +256,12 @@ impl<'a> Font<'a> {
         let mut flags_left = points_total;
         let mut x_coords_len = 0u16;
         while flags_left > 0 {
-            let flags: u8 = s.read().ok()?;
+            let flags: u8 = s.read()?;
             let flags = Flags::from_bits_truncate(flags);
 
             // The number of times a glyph point repeats.
             let repeats = if flags.contains(Flags::REPEAT_FLAG) {
-                let repeats: u8 = s.read().ok()?;
+                let repeats: u8 = s.read()?;
                 repeats as u16 + 1
             } else {
                 1
@@ -372,11 +373,12 @@ impl<'a> Font<'a> {
         glyph_data: &[u8],
         depth: u8,
         builder: &mut Builder,
-    ) -> Result<()> {
+    ) -> Option<()> {
         type Flags = CompositeGlyphFlags;
 
         if depth >= MAX_COMPONENTS {
-            return Ok(());
+            warn!("Recursion detected in the 'glyf' table.");
+            return None;
         }
 
         let mut s = Stream::new(glyph_data);
@@ -408,7 +410,7 @@ impl<'a> Font<'a> {
             ts.d = ts.a;
         }
 
-        if let Ok(Some(glyph_data)) = self.glyph_data(glyph_id) {
+        if let Some(glyph_data) = self.glyph_data(glyph_id) {
             let transform = Transform::combine(builder.transform, ts);
             let mut b = Builder {
                 builder: builder.builder,
@@ -425,7 +427,7 @@ impl<'a> Font<'a> {
             }
         }
 
-        Ok(())
+        Some(())
     }
 }
 
@@ -513,9 +515,9 @@ impl<'a> Iterator for GlyphPoints<'a> {
         }
 
         if self.flag_repeats == 0 {
-            self.last_flags = Flags::from_bits_truncate(self.flags.read().ok()?);
+            self.last_flags = Flags::from_bits_truncate(self.flags.read()?);
             if self.last_flags.contains(Flags::REPEAT_FLAG) {
-                self.flag_repeats = self.flags.read().ok()?;
+                self.flag_repeats = self.flags.read()?;
             }
         } else {
             self.flag_repeats -= 1;
@@ -526,7 +528,7 @@ impl<'a> Iterator for GlyphPoints<'a> {
             Flags::X_SHORT_VECTOR,
             Flags::X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR,
             &mut self.x_coords,
-        ).ok()?;
+        )?;
         self.x = self.x.wrapping_add(x);
 
         let y = get_glyph_coord(
@@ -534,7 +536,7 @@ impl<'a> Iterator for GlyphPoints<'a> {
             Flags::Y_SHORT_VECTOR,
             Flags::Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR,
             &mut self.y_coords,
-        ).ok()?;
+        )?;
         self.y = self.y.wrapping_add(y);
 
         self.points_left -= 1;
@@ -552,13 +554,13 @@ fn get_glyph_coord(
     short_vector: SimpleGlyphFlags,
     is_same_or_positive_short_vector: SimpleGlyphFlags,
     coords: &mut Stream,
-) -> Result<i16> {
+) -> Option<i16> {
     let flags = (
         flags.contains(short_vector),
         flags.contains(is_same_or_positive_short_vector),
     );
 
-    Ok(match flags {
+    Some(match flags {
         (true, true) => {
             coords.read::<u8>()? as i16
         }

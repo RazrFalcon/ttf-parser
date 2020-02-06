@@ -3,9 +3,10 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 ## Features
 
-- A high-level API.
+- A high-level API, for people who doesn't know how TrueType works internally.
+  Basically, no direct access to font tables.
 - Zero allocations.
-- Zero dependencies.
+- Zero required dependencies. Logging is enabled by default.
 - `no_std` compatible.
 - Fast.
 - Stateless.
@@ -24,7 +25,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`name`) Listing all name records using [names()] method.
 - (`name`) Retrieving font's family name using [family_name()] method.
 - (`name`) Retrieving font's PostScript name using [post_script_name()] method.
-- (`post`) Retrieving font's underline metrics name using [underline_metrics()] method.
+- (`post`) Retrieving font's underline metrics using [underline_metrics()] method.
 - (`post`) Retrieving glyph's name using [glyph_name()] method.
 - (`head`) Retrieving font's units per EM value using [units_per_em()] method.
 - (`hhea`) Retrieving generic font info using: [ascender()], [descender()], [height()]
@@ -98,11 +99,11 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 ## Error handling
 
-The library uses `Result<Option<T>, Error>` pattern, where `Error` indicates a parsing error
-and `Ok(None)` a not set value.
-This is a bit verbose, but allows us to separate malformed files and not set values.
-For example, if a font doesn't have a glyph for a specified character - it's not an error.
-And error will be emitted only in two cases: on a malformed file or bug in implementation.
+`ttf-parser` is designed to parse well-formed fonts, so it does not have an `Error` enum.
+It doesn't mean that it will crash or panic on malformed fonts, only that the
+error handling will boil down to `Option::None`. So you will not get a detailed cause of an error.
+By doing so we can simplify an API quite a lot since otherwise, we will have to use
+`Result<Option<T>, Error>`.
 
 ## Methods' computational complexity
 
@@ -114,36 +115,36 @@ The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
 ```text
-test outline_cff  ... bench:   1,010,120 ns/iter (+/- 11,517)
-test outline_cff2 ... bench:   1,385,488 ns/iter (+/- 21,411)
-test outline_glyf ... bench:     717,052 ns/iter (+/- 5,907)
+test outline_cff  ... bench:   1,293,929 ns/iter (+/- 7,798)
+test outline_cff2 ... bench:   1,847,932 ns/iter (+/- 13,006)
+test outline_glyf ... bench:     764,206 ns/iter (+/- 5,716)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:   745.0 ns/iter (+/- 31)
-test from_data_otf_cff2          ... bench:   673.0 ns/iter (+/- 9)
-test outline_glyph_276_from_cff2 ... bench:   595.0 ns/iter (+/- 24)
-test outline_glyph_276_from_glyf ... bench:   564.0 ns/iter (+/- 6)
-test from_data_otf_cff           ... bench:   485.0 ns/iter (+/- 11)
-test outline_glyph_8_from_cff2   ... bench:   371.0 ns/iter (+/- 54)
-test outline_glyph_8_from_glyf   ... bench:   249.0 ns/iter (+/- 2)
-test outline_glyph_8_from_cff    ... bench:   243.0 ns/iter (+/- 7)
-test glyph_name_276              ... bench:   216.0 ns/iter (+/- 0)
-test from_data_ttf               ... bench:   200.0 ns/iter (+/- 3)
-test family_name                 ... bench:   161.0 ns/iter (+/- 5)
-test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
-test hor_advance                 ... bench:     3.0 ns/iter (+/- 0)
-test hor_side_bearing            ... bench:     3.0 ns/iter (+/- 0)
-test glyph_name_8                ... bench:     2.0 ns/iter (+/- 0)
-test ascender                    ... bench:     0.6 ns/iter (+/- 0)
-test x_height                    ... bench:     0.5 ns/iter (+/- 0)
-test underline_metrics           ... bench:     0.5 ns/iter (+/- 0)
-test strikeout_metrics           ... bench:     0.5 ns/iter (+/- 0)
-test units_per_em                ... bench:     0.5 ns/iter (+/- 0)
-test subscript_metrics           ... bench:     0.2 ns/iter (+/- 0)
-test width                       ... bench:     0.2 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:         877 ns/iter (+/- 265)
+test outline_glyph_276_from_cff2 ... bench:         779 ns/iter (+/- 122)
+test from_data_otf_cff2          ... bench:         675 ns/iter (+/- 8)
+test outline_glyph_276_from_glyf ... bench:         623 ns/iter (+/- 77)
+test from_data_otf_cff           ... bench:         562 ns/iter (+/- 7)
+test outline_glyph_8_from_cff2   ... bench:         531 ns/iter (+/- 118)
+test outline_glyph_8_from_cff    ... bench:         322 ns/iter (+/- 7)
+test from_data_ttf               ... bench:         313 ns/iter (+/- 4)
+test outline_glyph_8_from_glyf   ... bench:         285 ns/iter (+/- 10)
+test glyph_name_276              ... bench:         214 ns/iter (+/- 3)
+test family_name                 ... bench:         170 ns/iter (+/- 12)
+test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
+test glyph_name_8                ... bench:           2 ns/iter (+/- 0)
+test underline_metrics           ... bench:         0.5 ns/iter (+/- 3)
+test units_per_em                ... bench:         0.5 ns/iter (+/- 3)
+test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 5)
+test ascender                    ... bench:         0.2 ns/iter (+/- 0)
+test hor_advance                 ... bench:         0.2 ns/iter (+/- 3)
+test hor_side_bearing            ... bench:         0.2 ns/iter (+/- 1)
+test subscript_metrics           ... bench:         0.2 ns/iter (+/- 2)
+test width                       ... bench:         0.2 ns/iter (+/- 1)
+test x_height                    ... bench:         0.2 ns/iter (+/- 2)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data
@@ -170,33 +171,27 @@ we are using predefined names, so no parsing is involved.
 extern crate std;
 
 use core::fmt;
+use core::num::NonZeroU16;
 
-macro_rules! try_ok {
-    ($e:expr) => {
-        match $e {
-            Some(v) => v,
-            None => return Ok(None),
-        };
-    };
-}
-
-macro_rules! bail {
-    ($e:expr) => {
-        match $e {
-            Ok(Some(v)) => v,
-            Ok(None) => return Ok(None),
-            Err(e) => return Err(e),
-        };
-    };
-}
-
-macro_rules! try_or {
+macro_rules! try_opt_or {
     ($value:expr, $ret:expr) => {
         match $value {
-            Ok(v) => v,
-            Err(_) => return $ret,
+            Some(v) => v,
+            None => return $ret,
         }
     };
+}
+
+#[cfg(feature = "logging")]
+macro_rules! warn {
+    ($($arg:tt)+) => (
+        log::log!(log::Level::Warn, $($arg)+);
+    )
+}
+
+#[cfg(not(feature = "logging"))]
+macro_rules! warn {
+    ($($arg:tt)+) => () // do nothing
 }
 
 mod avar;
@@ -215,6 +210,7 @@ mod hmtx;
 mod hvar;
 mod kern;
 mod loca;
+mod maxp;
 mod mvar;
 mod name;
 mod os2;
@@ -229,8 +225,7 @@ mod vvar;
 #[cfg(feature = "std")]
 mod writer;
 
-use parser::{Stream, SafeStream, TrySlice, Offset};
-pub use cff::CFFError;
+use parser::{Stream, SafeStream, Offset};
 pub use fvar::VariationAxis;
 pub use gdef::GlyphClass;
 pub use ggg::*;
@@ -259,87 +254,6 @@ impl Default for GlyphId {
         GlyphId(0)
     }
 }
-
-
-/// A font parsing error.
-#[derive(Clone, Copy, Debug)]
-pub enum Error {
-    /// Not a TrueType data.
-    NotATrueType,
-
-    /// The font index is out of bounds.
-    FontIndexOutOfBounds,
-
-    /// One of the required tables is missing.
-    TableMissing(TableName),
-
-    /// Table has an invalid size.
-    InvalidTableSize(TableName),
-
-    /// An unsupported table version.
-    UnsupportedTableVersion,
-
-    /// The number of provided variation coordinates must be the same
-    /// as the axis number in the font.
-    InvalidNumberOfVarCoordinates,
-
-    /// Recursion detected in the `glyf` table.
-    GlyphDataRecursion,
-
-    /// An attempt to slice a raw data out of bounds.
-    ///
-    /// This may be caused by a bug in the library or by a malformed font.
-    SliceOutOfBounds,
-
-    /// A CFF/CFF2 table parsing error.
-    CFFError(CFFError),
-}
-
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match *self {
-            Error::NotATrueType => {
-                write!(f, "not a TrueType font")
-            }
-            Error::FontIndexOutOfBounds => {
-                write!(f, "font index is out of bounds")
-            }
-            Error::TableMissing(name) => {
-                write!(f, "font doesn't have a {:?} table", name)
-            }
-            Error::InvalidTableSize(name) => {
-                write!(f, "table {:?} has an invalid size", name)
-            }
-            Error::UnsupportedTableVersion => {
-                write!(f, "table has an unsupported version")
-            }
-            Error::InvalidNumberOfVarCoordinates => {
-                write!(f, "invalid number of variation coordinates")
-            }
-            Error::GlyphDataRecursion => {
-                write!(f, "recursion detected in the 'glyf' table")
-            }
-            Error::SliceOutOfBounds => {
-                write!(f, "an attempt to slice out of bounds")
-            }
-            Error::CFFError(e) => {
-                write!(f, "CFF table parsing failed cause {}", e)
-            }
-        }
-    }
-}
-
-impl From<CFFError> for Error {
-    #[inline]
-    fn from(e: CFFError) -> Self {
-        Error::CFFError(e)
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for Error {}
-
-pub(crate) type Result<T> = core::result::Result<T, Error>;
 
 
 /// A 4-byte tag.
@@ -513,85 +427,56 @@ pub trait OutlineBuilder {
 }
 
 
-/// A table name.
-#[derive(Clone, Copy, PartialEq, Debug)]
-#[allow(missing_docs)]
-pub enum TableName {
-    AxisVariations,
-    CharacterToGlyphIndexMapping,
-    CompactFontFormat,
-    CompactFontFormat2,
-    FontVariations,
-    GlyphData,
-    GlyphDefinition,
-    GlyphPositioning,
-    GlyphSubstitution,
-    Header,
-    HorizontalHeader,
-    HorizontalMetrics,
-    HorizontalMetricsVariations,
-    IndexToLocation,
-    Kerning,
-    MaximumProfile,
-    MetricsVariations,
-    Naming,
-    PostScript,
-    VerticalHeader,
-    VerticalMetrics,
-    VerticalMetricsVariations,
-    VerticalOrigin,
-    WindowsMetrics,
-}
-
-
 /// A font data handle.
 #[derive(Clone)]
 pub struct Font<'a> {
-    avar: Result<&'a [u8]>,
-    cff2: Result<cff2::Metadata<'a>>,
-    cff_: Result<cff::Metadata<'a>>,
-    cmap: Result<&'a [u8]>,
-    fvar: Result<raw::fvar::Table<'a>>,
-    gdef: Result<raw::gdef::Table<'a>>,
-    glyf: Result<&'a [u8]>,
-    gpos: Result<raw::gsubgpos::Table<'a>>,
-    gsub: Result<raw::gsubgpos::Table<'a>>,
+    avar: Option<&'a [u8]>,
+    cff_: Option<cff::Metadata<'a>>,
+    cff2: Option<cff2::Metadata<'a>>,
+    cmap: Option<&'a [u8]>,
+    fvar: Option<fvar::Table<'a>>,
+    gdef: Option<gdef::Table<'a>>,
+    glyf: Option<&'a [u8]>,
+    gpos: Option<ggg::GsubGposTable<'a>>,
+    gsub: Option<ggg::GsubGposTable<'a>>,
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
-    hmtx: Result<&'a [u8]>,
-    hvar: Result<&'a [u8]>,
-    kern: Result<&'a [u8]>,
-    loca: Result<&'a [u8]>,
-    mvar: Result<&'a [u8]>,
-    name: Result<&'a [u8]>,
-    os_2: Result<raw::os_2::Table<'a>>,
-    post: Result<&'a [u8]>,
-    vhea: Result<raw::vhea::Table<'a>>,
-    vmtx: Result<&'a [u8]>,
-    vorg: Result<&'a [u8]>,
-    vvar: Result<&'a [u8]>,
-    number_of_glyphs: GlyphId,
+    hmtx: Option<hmtx::Table<'a>>,
+    hvar: Option<&'a [u8]>,
+    kern: Option<&'a [u8]>,
+    loca: Option<loca::Table<'a>>,
+    mvar: Option<&'a [u8]>,
+    name: name::Names<'a>,
+    os_2: Option<os2::Table<'a>>,
+    post: Option<&'a [u8]>,
+    vhea: Option<raw::vhea::Table<'a>>,
+    vmtx: Option<hmtx::Table<'a>>,
+    vorg: Option<&'a [u8]>,
+    vvar: Option<&'a [u8]>,
+    number_of_glyphs: NonZeroU16,
 }
 
 impl<'a> Font<'a> {
     /// Creates a `Font` object from a raw data.
     ///
-    /// You can set `index` in case of font collections.
+    /// You can set `index` for font collections.
     /// For simple `ttf` fonts set `index` to 0.
     ///
-    /// This function only parses font tables, so it's relatively light.
+    /// This method will do some parsing and sanitization, so it's a bit expensive.
     ///
-    /// Required tables: `head` and `hhea`.
-    pub fn from_data(data: &'a [u8], index: u32) -> Result<Self> {
+    /// Required tables: `head`, `hhea` and `maxp`.
+    ///
+    /// If an optional table has an invalid data it will be skipped.
+    pub fn from_data(data: &'a [u8], index: u32) -> Option<Self> {
         let table_data = if let Some(n) = fonts_in_collection(data) {
             if index < n {
                 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
                 const OFFSET_32_SIZE: usize = 4;
                 let offset = raw::TTCHeader::SIZE + OFFSET_32_SIZE * index as usize;
                 let font_offset: u32 = Stream::read_at(data, offset)?;
-                data.try_slice(font_offset as usize .. data.len())?
+                data.get(font_offset as usize .. data.len())?
             } else {
-                return Err(Error::FontIndexOutOfBounds);
+                return None;
             }
         } else {
             data
@@ -600,7 +485,7 @@ impl<'a> Font<'a> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
         const OFFSET_TABLE_SIZE: usize = 12;
         if data.len() < OFFSET_TABLE_SIZE {
-            return Err(Error::NotATrueType);
+            return None;
         }
 
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
@@ -611,42 +496,37 @@ impl<'a> Font<'a> {
 
         let sfnt_version: u32 = s.read()?;
         if sfnt_version != SFNT_VERSION_TRUE_TYPE && sfnt_version != SFNT_VERSION_OPEN_TYPE {
-            return Err(Error::NotATrueType);
+            return None;
         }
 
         let num_tables: u16 = s.read()?;
         s.advance(6u32); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
         let tables = s.read_array::<raw::TableRecord, u16>(num_tables)?;
 
-        let mut font = Font {
-            head: raw::head::Table::new(&[0; raw::head::Table::SIZE]),
-            hhea: raw::hhea::Table::new(&[0; raw::hhea::Table::SIZE]),
-            avar: Err(Error::TableMissing(TableName::AxisVariations)),
-            cff2: Err(Error::TableMissing(TableName::CompactFontFormat2)),
-            cff_: Err(Error::TableMissing(TableName::CompactFontFormat)),
-            cmap: Err(Error::TableMissing(TableName::CharacterToGlyphIndexMapping)),
-            fvar: Err(Error::TableMissing(TableName::FontVariations)),
-            gdef: Err(Error::TableMissing(TableName::GlyphDefinition)),
-            glyf: Err(Error::TableMissing(TableName::GlyphData)),
-            gpos: Err(Error::TableMissing(TableName::GlyphPositioning)),
-            gsub: Err(Error::TableMissing(TableName::GlyphSubstitution)),
-            hmtx: Err(Error::TableMissing(TableName::HorizontalMetrics)),
-            hvar: Err(Error::TableMissing(TableName::HorizontalMetricsVariations)),
-            kern: Err(Error::TableMissing(TableName::Kerning)),
-            loca: Err(Error::TableMissing(TableName::IndexToLocation)),
-            mvar: Err(Error::TableMissing(TableName::MetricsVariations)),
-            name: Err(Error::TableMissing(TableName::Naming)),
-            os_2: Err(Error::TableMissing(TableName::WindowsMetrics)),
-            post: Err(Error::TableMissing(TableName::PostScript)),
-            vhea: Err(Error::TableMissing(TableName::VerticalHeader)),
-            vmtx: Err(Error::TableMissing(TableName::VerticalMetrics)),
-            vorg: Err(Error::TableMissing(TableName::VerticalOrigin)),
-            vvar: Err(Error::TableMissing(TableName::VerticalMetricsVariations)),
-            number_of_glyphs: GlyphId(0),
-        };
-
-        let mut has_head = false;
-        let mut has_hhea = false;
+        let mut cff_ = None;
+        let mut cff2 = None;
+        let mut gdef = None;
+        let mut gpos = None;
+        let mut gsub = None;
+        let mut hvar = None;
+        let mut mvar = None;
+        let mut os_2 = None;
+        let mut vorg = None;
+        let mut vvar = None;
+        let mut avar = None;
+        let mut cmap = None;
+        let mut fvar = None;
+        let mut glyf = None;
+        let mut head = None;
+        let mut hhea = None;
+        let mut hmtx = None;
+        let mut kern = None;
+        let mut loca = None;
+        let mut maxp = None;
+        let mut name = Names::default();
+        let mut post = None;
+        let mut vhea = None;
+        let mut vmtx = None;
         for table in tables {
             let offset = table.offset().to_usize();
             let length = table.length() as usize;
@@ -655,153 +535,86 @@ impl<'a> Font<'a> {
             // It's way faster to compare `[u8; 4]` with `&[u8]`
             // rather than `&[u8]` with `&[u8]`.
             match &table.table_tag().to_bytes() {
-                b"head" => {
-                    if length != raw::head::Table::SIZE {
-                        return Err(Error::InvalidTableSize(TableName::Header));
-                    }
-
-                    font.head = raw::head::Table::new(data.try_slice(range)?);
-                    has_head = true;
-                }
-                b"hhea" => {
-                    if length != raw::hhea::Table::SIZE {
-                        return Err(Error::InvalidTableSize(TableName::HorizontalHeader));
-                    }
-
-                    font.hhea = raw::hhea::Table::new(data.try_slice(range)?);
-                    has_hhea = true;
-                }
-                b"maxp" => {
-                    if length < raw::maxp::Table::SIZE {
-                        return Err(Error::InvalidTableSize(TableName::MaximumProfile));
-                    }
-
-                    let data = data.try_slice(offset..(offset + raw::maxp::Table::SIZE))?;
-                    let table = raw::maxp::Table::new(data);
-                    font.number_of_glyphs = GlyphId(table.num_glyphs());
-                }
-                b"OS/2" => {
-                    if length < raw::os_2::Table::MIN_SIZE {
-                        return Err(Error::InvalidTableSize(TableName::WindowsMetrics));
-                    }
-
-                    if let Some(table) = data.get(range) {
-                        font.os_2 = Ok(raw::os_2::Table::new(table));
-                    }
-                }
-                b"vhea" => {
-                    if length != raw::vhea::Table::SIZE {
-                        return Err(Error::InvalidTableSize(TableName::VerticalHeader));
-                    }
-
-                    if let Some(data) = data.get(range) {
-                        font.vhea = Ok(raw::vhea::Table::new(data));
-                    }
-                }
-                b"GDEF" => {
-                    if length < raw::gdef::Table::MIN_SIZE {
-                        return Err(Error::InvalidTableSize(TableName::GlyphDefinition));
-                    }
-
-                    if let Some(data) = data.get(range) {
-                        font.gdef = Ok(raw::gdef::Table::new(data));
-                    }
-                }
-                b"GSUB" => {
-                    if length < raw::gsubgpos::Table::MIN_SIZE {
-                        return Err(Error::InvalidTableSize(TableName::GlyphSubstitution));
-                    }
-
-                    if let Some(data) = data.get(range) {
-                        font.gsub = Ok(raw::gsubgpos::Table::new(data));
-                    }
-                }
-                b"GPOS" => {
-                    if length < raw::gsubgpos::Table::MIN_SIZE {
-                        return Err(Error::InvalidTableSize(TableName::GlyphPositioning));
-                    }
-
-                    if let Some(data) = data.get(range) {
-                        font.gpos = Ok(raw::gsubgpos::Table::new(data));
-                    }
-                }
-                b"fvar" => {
-                    if length < raw::fvar::Table::MIN_SIZE {
-                        return Err(Error::InvalidTableSize(TableName::FontVariations));
-                    }
-
-                    if let Some(table) = data.get(range) {
-                        font.fvar = Ok(raw::fvar::Table::new(table));
-                    }
-                }
-                b"CFF " => {
-                    if let Some(data) = data.get(range) {
-                        font.cff_ = cff::parse_metadata(data);
-                    }
-                }
-                b"CFF2" => {
-                    if let Some(data) = data.get(range) {
-                        font.cff2 = cff2::parse_metadata(data);
-                    }
-                }
-                b"avar" => if let Some(data) = data.get(range) { font.avar = Ok(data); }
-                b"cmap" => if let Some(data) = data.get(range) { font.cmap = Ok(data); }
-                b"glyf" => if let Some(data) = data.get(range) { font.glyf = Ok(data); }
-                b"hmtx" => if let Some(data) = data.get(range) { font.hmtx = Ok(data); }
-                b"kern" => if let Some(data) = data.get(range) { font.kern = Ok(data); }
-                b"loca" => if let Some(data) = data.get(range) { font.loca = Ok(data); }
-                b"name" => if let Some(data) = data.get(range) { font.name = Ok(data); }
-                b"post" => if let Some(data) = data.get(range) { font.post = Ok(data); }
-                b"vmtx" => if let Some(data) = data.get(range) { font.vmtx = Ok(data); }
-                b"VORG" => if let Some(data) = data.get(range) { font.vorg = Ok(data); }
-                b"MVAR" => if let Some(data) = data.get(range) { font.mvar = Ok(data); }
-                b"HVAR" => if let Some(data) = data.get(range) { font.hvar = Ok(data); }
-                b"VVAR" => if let Some(data) = data.get(range) { font.vvar = Ok(data); }
+                b"CFF " => cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
+                b"CFF2" => cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
+                b"GDEF" => gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
+                b"GPOS" => gpos = data.get(range).and_then(|data| ggg::GsubGposTable::parse(data)),
+                b"GSUB" => gsub = data.get(range).and_then(|data| ggg::GsubGposTable::parse(data)),
+                b"HVAR" => hvar = data.get(range),
+                b"MVAR" => mvar = data.get(range),
+                b"OS/2" => os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
+                b"VORG" => vorg = data.get(range),
+                b"VVAR" => vvar = data.get(range),
+                b"avar" => avar = data.get(range),
+                b"cmap" => cmap = data.get(range),
+                b"fvar" => fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
+                b"glyf" => glyf = data.get(range),
+                b"head" => head = data.get(range).and_then(|data| raw::head::Table::parse(data)),
+                b"hhea" => hhea = data.get(range).and_then(|data| raw::hhea::Table::parse(data)),
+                b"hmtx" => hmtx = data.get(range),
+                b"kern" => kern = data.get(range),
+                b"loca" => loca = data.get(range),
+                b"maxp" => maxp = data.get(range).and_then(|data| maxp::parse(data)),
+                b"name" => name = data.get(range).map(|data| name::parse(data)).unwrap_or_default(),
+                b"post" => post = data.get(range),
+                b"vhea" => vhea = data.get(range).and_then(|data| raw::vhea::Table::parse(data)),
+                b"vmtx" => vmtx = data.get(range),
                 _ => {}
             }
         }
 
         // Check for mandatory tables.
-        if !has_head {
-            return Err(Error::TableMissing(TableName::Header));
+        let head = head?;
+        let hhea = hhea?;
+        let maxp = maxp?;
+        let number_of_glyphs = maxp.number_of_glyphs;
+
+        let mut font = Font {
+            avar,
+            cff_,
+            cff2,
+            cmap,
+            fvar,
+            gdef,
+            glyf,
+            gpos,
+            gsub,
+            head,
+            hhea,
+            hmtx: None,
+            hvar,
+            kern,
+            loca: None,
+            mvar,
+            name,
+            os_2,
+            post,
+            vhea,
+            vmtx: None,
+            vorg,
+            vvar,
+            number_of_glyphs,
+        };
+
+        if let Some(data) = hmtx {
+            if let Some(number_of_h_metrics) = font.hhea.number_of_h_metrics() {
+                font.hmtx = hmtx::Table::parse(data, number_of_h_metrics, font.number_of_glyphs);
+            }
         }
 
-        if !has_hhea {
-            return Err(Error::TableMissing(TableName::HorizontalHeader));
+        if let (Some(vhea), Some(data)) = (font.vhea, vmtx) {
+            if let Some(number_of_v_metrics) = vhea.num_of_long_ver_metrics() {
+                font.vmtx = hmtx::Table::parse(data, number_of_v_metrics, font.number_of_glyphs);
+            }
         }
 
-        Ok(font)
-    }
-
-    /// Checks that font has a specified table.
-    #[inline]
-    pub fn has_table(&self, name: TableName) -> bool {
-        match name {
-            TableName::Header                       => true,
-            TableName::HorizontalHeader             => true,
-            TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => self.avar.is_ok(),
-            TableName::CharacterToGlyphIndexMapping => self.cmap.is_ok(),
-            TableName::CompactFontFormat            => self.cff_.is_ok(),
-            TableName::CompactFontFormat2           => self.cff2.is_ok(),
-            TableName::FontVariations               => self.fvar.is_ok(),
-            TableName::GlyphData                    => self.glyf.is_ok(),
-            TableName::GlyphDefinition              => self.gdef.is_ok(),
-            TableName::GlyphPositioning             => self.gpos.is_ok(),
-            TableName::GlyphSubstitution            => self.gsub.is_ok(),
-            TableName::HorizontalMetrics            => self.hmtx.is_ok(),
-            TableName::HorizontalMetricsVariations  => self.hvar.is_ok(),
-            TableName::IndexToLocation              => self.loca.is_ok(),
-            TableName::Kerning                      => self.kern.is_ok(),
-            TableName::MetricsVariations            => self.mvar.is_ok(),
-            TableName::Naming                       => self.name.is_ok(),
-            TableName::PostScript                   => self.post.is_ok(),
-            TableName::VerticalHeader               => self.vhea.is_ok(),
-            TableName::VerticalMetrics              => self.vmtx.is_ok(),
-            TableName::VerticalMetricsVariations    => self.vvar.is_ok(),
-            TableName::VerticalOrigin               => self.vorg.is_ok(),
-            TableName::WindowsMetrics               => self.os_2.is_ok(),
+        if let Some(data) = loca {
+            if let Some(format) = font.index_to_location_format() {
+                font.loca = loca::Table::parse(data, font.number_of_glyphs, format);
+            }
         }
+
+        Some(font)
     }
 
     /// Returns a total number of glyphs in the font.
@@ -809,16 +622,7 @@ impl<'a> Font<'a> {
     /// The value was already parsed, so this function doesn't involve any parsing.
     #[inline]
     pub fn number_of_glyphs(&self) -> u16 {
-        self.number_of_glyphs.0
-    }
-
-    #[inline]
-    pub(crate) fn check_glyph_id(&self, glyph_id: GlyphId) -> Result<Option<()>> {
-        if glyph_id < self.number_of_glyphs {
-            Ok(Some(()))
-        } else {
-            Ok(None)
-        }
+        self.number_of_glyphs.get()
     }
 
     /// Outlines a glyph and returns its tight bounding box.
@@ -865,7 +669,7 @@ impl<'a> Font<'a> {
     /// let data = std::fs::read("tests/fonts/glyphs.ttf").unwrap();
     /// let font = ttf_parser::Font::from_data(&data, 0).unwrap();
     /// let mut builder = Builder(String::new());
-    /// let bbox = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap().unwrap();
+    /// let bbox = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap();
     /// assert_eq!(builder.0, "M 50 0 L 50 750 L 450 750 L 450 0 L 50 0 Z ");
     /// assert_eq!(bbox, ttf_parser::Rect { x_min: 50, y_min: 0, x_max: 450, y_max: 750 });
     /// ```
@@ -874,20 +678,20 @@ impl<'a> Font<'a> {
         &self,
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
-    ) -> Result<Option<Rect>> {
-        if self.glyf.is_ok() {
+    ) -> Option<Rect> {
+        if self.glyf.is_some() {
             return self.glyf_glyph_outline(glyph_id, builder);
         }
 
-        if let Ok(ref metadata) = self.cff_ {
+        if let Some(ref metadata) = self.cff_ {
             return self.cff_glyph_outline(metadata, glyph_id, builder);
         }
 
-        if let Ok(ref metadata) = self.cff2 {
+        if let Some(ref metadata) = self.cff2 {
             return self.cff2_glyph_outline(metadata, glyph_id, builder);
         }
 
-        Ok(None)
+        None
     }
 
     /// Returns a tight glyph bounding box.
@@ -899,7 +703,7 @@ impl<'a> Font<'a> {
     /// a bounding box and you have an OpenType font (which uses CFF/CFF2)
     /// then prefer `outline_glyph()` method.
     #[inline]
-    pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Result<Option<Rect>> {
+    pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Option<Rect> {
         struct DummyOutline;
         impl OutlineBuilder for DummyOutline {
             fn move_to(&mut self, _: f32, _: f32) {}
@@ -909,19 +713,19 @@ impl<'a> Font<'a> {
             fn close(&mut self) {}
         }
 
-        if self.glyf.is_ok() {
+        if self.glyf.is_some() {
             return self.glyf_glyph_bbox(glyph_id);
         }
 
-        if let Ok(ref metadata) = self.cff_ {
+        if let Some(ref metadata) = self.cff_ {
             return self.cff_glyph_outline(metadata, glyph_id, &mut DummyOutline);
         }
 
-        if let Ok(ref metadata) = self.cff2 {
+        if let Some(ref metadata) = self.cff2 {
             return self.cff2_glyph_outline(metadata, glyph_id, &mut DummyOutline);
         }
 
-        Ok(None)
+        None
     }
 }
 
@@ -949,14 +753,12 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::string::ToString;
     use crate::writer;
     use writer::TtfType::*;
 
     #[test]
     fn empty_font() {
-        assert_eq!(Font::from_data(&[], 0).unwrap_err().to_string(),
-                   "not a TrueType font");
+        assert!(Font::from_data(&[], 0).is_none());
     }
 
     #[test]
@@ -970,8 +772,7 @@ mod tests {
         ]);
 
         for i in 0..data.len() {
-            assert_eq!(Font::from_data(&data[0..i], 0).unwrap_err().to_string(),
-                       "not a TrueType font");
+            assert!(Font::from_data(&data[0..i], 0).is_none());
         }
     }
 
@@ -985,8 +786,7 @@ mod tests {
             UInt16(0), // rangeShift
         ]);
 
-        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
-                   "font doesn't have a Header table");
+        assert!(Font::from_data(&data, 0).is_none());
     }
 
     #[test]
@@ -999,8 +799,7 @@ mod tests {
             UInt16(0), // rangeShift
         ]);
 
-        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
-                   "an attempt to slice out of bounds");
+        assert!(Font::from_data(&data, 0).is_none());
     }
 
     #[test]
@@ -1013,8 +812,7 @@ mod tests {
             UInt16(0), // rangeShift
         ]);
 
-        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
-                   "font doesn't have a Header table");
+        assert!(Font::from_data(&data, 0).is_none());
     }
 
     #[test]
@@ -1027,8 +825,7 @@ mod tests {
             UInt16(0), // rangeShift
         ]);
 
-        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
-                   "not a TrueType font");
+        assert!(Font::from_data(&data, 0).is_none());
     }
 
     #[test]
@@ -1041,8 +838,7 @@ mod tests {
         ]);
 
         assert_eq!(fonts_in_collection(&data), Some(0));
-        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
-                   "font index is out of bounds");
+        assert!(Font::from_data(&data, 0).is_none());
     }
 
     #[test]
@@ -1055,8 +851,7 @@ mod tests {
         ]);
 
         assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
-        assert_eq!(Font::from_data(&data, 0).unwrap_err().to_string(),
-                   "an attempt to slice out of bounds");
+        assert!(Font::from_data(&data, 0).is_none());
     }
 
     #[test]
@@ -1069,8 +864,7 @@ mod tests {
         ]);
 
         assert_eq!(fonts_in_collection(&data), Some(1));
-        assert_eq!(Font::from_data(&data, std::u32::MAX).unwrap_err().to_string(),
-                   "font index is out of bounds");
+        assert!(Font::from_data(&data, std::u32::MAX).is_none());
     }
 
     #[test]
@@ -1083,7 +877,6 @@ mod tests {
         ]);
 
         assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
-        assert_eq!(Font::from_data(&data, std::u32::MAX - 1).unwrap_err().to_string(),
-                   "an attempt to slice out of bounds");
+        assert!(Font::from_data(&data, std::u32::MAX - 1).is_none());
     }
 }

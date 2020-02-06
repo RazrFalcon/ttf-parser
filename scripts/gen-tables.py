@@ -55,6 +55,17 @@ class TtfUInt16(TtfType):
         print(f'u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]])')
 
 
+class TtfNonZeroUInt16(TtfType):
+    def to_rust(self) -> str:
+        return 'Option<NonZeroU16>'
+
+    def size(self) -> int:
+        return 2
+
+    def print(self, offset: int) -> None:
+        print(f'NonZeroU16::new(u16::from_be_bytes([self.data[{offset}], self.data[{offset + 1}]]))')
+
+
 class TtfInt16(TtfType):
     def to_rust(self) -> str:
         return 'i16'
@@ -273,24 +284,24 @@ HEAD_TABLE = [
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/hhea
 HHEA_TABLE = [
-    TableRow(False, TtfUInt16(),  'majorVersion'),
-    TableRow(False, TtfUInt16(),  'minorVersion'),
-    TableRow(True,  TtfFWORD(),   'ascender'),
-    TableRow(True,  TtfFWORD(),   'descender'),
-    TableRow(True,  TtfFWORD(),   'lineGap'),
-    TableRow(False, TtfUFWORD(),  'advanceWidthMax'),
-    TableRow(False, TtfFWORD(),   'minLeftSideBearing'),
-    TableRow(False, TtfFWORD(),   'minRightSideBearing'),
-    TableRow(False, TtfFWORD(),   'xMaxExtent'),
-    TableRow(False, TtfInt16(),   'caretSlopeRise'),
-    TableRow(False, TtfInt16(),   'caretSlopeRun'),
-    TableRow(False, TtfInt16(),   'caretOffset'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'metricDataFormat'),
-    TableRow(True,  TtfUInt16(),  'numberOfHMetrics'),
+    TableRow(False, TtfUInt16(),        'majorVersion'),
+    TableRow(False, TtfUInt16(),        'minorVersion'),
+    TableRow(True,  TtfFWORD(),         'ascender'),
+    TableRow(True,  TtfFWORD(),         'descender'),
+    TableRow(True,  TtfFWORD(),         'lineGap'),
+    TableRow(False, TtfUFWORD(),        'advanceWidthMax'),
+    TableRow(False, TtfFWORD(),         'minLeftSideBearing'),
+    TableRow(False, TtfFWORD(),         'minRightSideBearing'),
+    TableRow(False, TtfFWORD(),         'xMaxExtent'),
+    TableRow(False, TtfInt16(),         'caretSlopeRise'),
+    TableRow(False, TtfInt16(),         'caretSlopeRun'),
+    TableRow(False, TtfInt16(),         'caretOffset'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'metricDataFormat'),
+    TableRow(True,  TtfNonZeroUInt16(), 'numberOfHMetrics'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx
@@ -301,23 +312,23 @@ HMTX_METRICS = [
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/vhea#table-format
 VHEA_TABLE = [
-    TableRow(False, TtfFixed(),   'version'),
-    TableRow(True,  TtfInt16(),   'ascender'),
-    TableRow(True,  TtfInt16(),   'descender'),
-    TableRow(True,  TtfInt16(),   'lineGap'),
-    TableRow(False, TtfInt16(),   'advanceHeightMax'),
-    TableRow(False, TtfInt16(),   'minTopSideBearing'),
-    TableRow(False, TtfInt16(),   'minBottomSideBearing'),
-    TableRow(False, TtfInt16(),   'yMaxExtent'),
-    TableRow(False, TtfInt16(),   'caretSlopeRise'),
-    TableRow(False, TtfInt16(),   'caretSlopeRun'),
-    TableRow(False, TtfInt16(),   'caretOffset'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'reserved'),
-    TableRow(False, TtfInt16(),   'metricDataFormat'),
-    TableRow(True,  TtfUInt16(),  'numOfLongVerMetrics'),
+    TableRow(False, TtfFixed(),         'version'),
+    TableRow(True,  TtfInt16(),         'ascender'),
+    TableRow(True,  TtfInt16(),         'descender'),
+    TableRow(True,  TtfInt16(),         'lineGap'),
+    TableRow(False, TtfInt16(),         'advanceHeightMax'),
+    TableRow(False, TtfInt16(),         'minTopSideBearing'),
+    TableRow(False, TtfInt16(),         'minBottomSideBearing'),
+    TableRow(False, TtfInt16(),         'yMaxExtent'),
+    TableRow(False, TtfInt16(),         'caretSlopeRise'),
+    TableRow(False, TtfInt16(),         'caretSlopeRun'),
+    TableRow(False, TtfInt16(),         'caretOffset'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'reserved'),
+    TableRow(False, TtfInt16(),         'metricDataFormat'),
+    TableRow(True,  TtfNonZeroUInt16(), 'numOfLongVerMetrics'),
 ]
 
 # https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
@@ -371,15 +382,9 @@ CMAP_VARIATION_SELECTOR_RECORD = [
     TableRow(True,  TtfOptionalOffset32(),  'nonDefaultUVSOffset'),
 ]
 
-# https://docs.microsoft.com/en-us/typography/opentype/spec/maxp
-MAXP_TABLE = [
-    TableRow(False, TtfFixed(),    'version'),
-    TableRow(True,  TtfUInt16(),   'numGlyphs'),
-]
-
 # https://docs.microsoft.com/en-us/typography/opentype/spec/os2#os2-table-formats
 OS_2_TABLE = [
-    TableRow(True,  TtfUInt16(),   'version'),
+    TableRow(False, TtfUInt16(),   'version'),
     TableRow(False, TtfInt16(),    'xAvgCharWidth'),
     TableRow(True,  TtfUInt16(),   'usWeightClass'),
     TableRow(True,  TtfUInt16(),   'usWidthClass'),
@@ -444,18 +449,6 @@ GDEF_RANGE_RECORD = [
     TableRow(False, TtfUInt16(),                'startCoverageIndex'),
 ]
 
-# https://docs.microsoft.com/en-us/typography/opentype/spec/fvar
-FVAR_TABLE = [
-    TableRow(False, TtfUInt16(),   'majorVersion'),
-    TableRow(False, TtfUInt16(),   'minorVersion'),
-    TableRow(True,  TtfOffset16(), 'axesArrayOffset'),
-    TableRow(False, TtfUInt16(),   'reserved'),
-    TableRow(True,  TtfUInt16(),   'axisCount'),
-    TableRow(False, TtfUInt16(),   'axisSize'),
-    TableRow(False, TtfUInt16(),   'instanceCount'),
-    TableRow(False, TtfUInt16(),   'instanceSize'),
-]
-
 # https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord
 FVAR_VARIATION_AXIS_RECORD = [
     TableRow(True,  TtfTag(),       'axisTag'),
@@ -486,17 +479,6 @@ MVAR_REGION_AXIS_COORDINATES_RECORD = [
     TableRow(True,  TtfInt16(), 'endCoord'),    #
 ]
 
-# https://docs.microsoft.com/en-us/typography/opentype/spec/gsub
-# https://docs.microsoft.com/en-us/typography/opentype/spec/gpos
-GSUB_GPOS_TABLE = [
-    TableRow(True,  TtfUInt16(),            'majorVersion'),
-    TableRow(True,  TtfUInt16(),            'minorVersion'),
-    TableRow(True,  TtfOffset16(),          'scriptListOffset'),
-    TableRow(True,  TtfOffset16(),          'featureListOffset'),
-    TableRow(True,  TtfOffset16(),          'lookupListOffset'),
-    TableRow(True,  TtfOptionalOffset32(),  'featureVariationsOffset', optional=True),
-]
-
 GSUB_GPOS_RECORD = [
     TableRow(True,  TtfTag(),       'tag'),
     TableRow(True,  TtfOffset16(),  'offset'),
@@ -517,30 +499,22 @@ GSUB_GPOS_FEATURE_VARIATION_RECORD = [
 ]
 
 
-def print_struct(name: str, size: int, owned: bool, has_tail: bool) -> None:
+def print_struct(name: str, size: int, owned: bool) -> None:
     print('#[derive(Clone, Copy)]')
-    if has_tail:
-        print(f'pub struct {name}<\'a> {{ pub data: &\'a [u8] }}')
-    elif owned:
+    if owned:
         print(f'pub struct {name} {{ data: [u8; {size}] }}')
     else:
         print(f'pub struct {name}<\'a> {{ data: &\'a [u8; {size}] }}')
 
 
-def print_struct_size(size: int, has_tail: bool) -> None:
-    if has_tail:
-        print(f'pub const MIN_SIZE: usize = {size};')
-    else:
-        print(f'pub const SIZE: usize = {size};')
+def print_struct_size(size: int) -> None:
+    print('#[allow(dead_code)]')
+    print(f'pub const SIZE: usize = {size};')
 
 
-def print_constructor(name: str, size: int, owned: bool, has_tail: bool) -> None:
+def print_constructor(name: str, size: int, owned: bool) -> None:
     print('#[inline(always)]')
-    if has_tail:
-        print('pub fn new(input: &\'a [u8]) -> Self {')
-        print(f'    {name} {{ data: input }}')
-        print('}')
-    elif owned:
+    if owned:
         print('pub fn new(input: &[u8]) -> Self {')
         print('    let mut data = [0u8; Self::SIZE];')
         # Do not use `copy_from_slice`, because it's slower.
@@ -551,6 +525,19 @@ def print_constructor(name: str, size: int, owned: bool, has_tail: bool) -> None
         print('pub fn new(input: &\'a [u8]) -> Self {')
         print(f'    {name} {{ data: array_ref![input, {size}] }}')
         print('}')
+
+
+def print_parse(size: int) -> None:
+    print('#[inline(always)]')
+    print('pub fn parse(input: &\'a [u8]) -> Option<Self> {')
+    print(f'    if input.len() == {size} {{')
+    print('        Some(Table {')
+    print(f'            data: array_ref![input, {size}],')
+    print('        })')
+    print('    } else {')
+    print('        None')
+    print('    }')
+    print('}')
 
 
 def print_method(spec_name: str, ttf_type: TtfType, offset: int) -> None:
@@ -576,7 +563,7 @@ def print_impl_from_data(name: str) -> None:
 
 # Structs smaller than 16 bytes is more efficient to store as owned.
 def generate_table(table: List[TableRow], struct_name: str, owned: bool = False,
-                   impl_from_data: bool = False, has_tail: bool = False) -> None:
+                   impl_from_data: bool = False, parse: bool = False) -> None:
     struct_size = 0
     for row in table:
         if row.optional:
@@ -584,16 +571,21 @@ def generate_table(table: List[TableRow], struct_name: str, owned: bool = False,
         else:
             struct_size += row.ttf_type.size()
 
-    print_struct(struct_name, struct_size, owned, has_tail)
+    print_struct(struct_name, struct_size, owned)
     print()
     if owned:
         print(f'impl {struct_name} {{')
     else:
         print(f'impl<\'a> {struct_name}<\'a> {{')
-    print_struct_size(struct_size, has_tail)
-    print()
-    print_constructor(struct_name, struct_size, owned, has_tail)
-    print()
+
+    if not parse:
+        print_struct_size(struct_size)
+        print()
+        print_constructor(struct_name, struct_size, owned)
+        print()
+    else:
+        print_parse(struct_size)
+        print()
 
     offset = 0
     for row in table:
@@ -652,15 +644,13 @@ print()
 generate_table(TABLE_RECORD, 'TableRecord', owned=True, impl_from_data=True)
 print()
 print('pub mod head {')
-generate_table(HEAD_TABLE, 'Table')
-print('}')
-print()
-print('pub mod maxp {')
-generate_table(MAXP_TABLE, 'Table')
+generate_table(HEAD_TABLE, 'Table', parse=True)
 print('}')
 print()
 print('pub mod hhea {')
-generate_table(HHEA_TABLE, 'Table')
+print('use core::num::NonZeroU16;')
+print()
+generate_table(HHEA_TABLE, 'Table', parse=True)
 print('}')
 print()
 print('pub mod hmtx {')
@@ -670,7 +660,9 @@ generate_table(HMTX_METRICS, 'HorizontalMetrics', owned=True, impl_from_data=Tru
 print('}')
 print()
 print('pub mod vhea {')
-generate_table(VHEA_TABLE, 'Table')
+print('use core::num::NonZeroU16;')
+print()
+generate_table(VHEA_TABLE, 'Table', parse=True)
 print('}')
 print()
 print('pub mod cmap {')
@@ -693,7 +685,7 @@ print()
 print('pub mod os_2 {')
 table_field_offset(OS_2_TABLE, 'sxHeight')
 print()
-generate_table(OS_2_TABLE, 'Table', has_tail=True)
+generate_table(OS_2_TABLE, 'Table')
 print('}')
 print()
 print('pub mod name {')
@@ -703,11 +695,7 @@ print()
 print('pub mod gdef {')
 print('use core::ops::RangeInclusive;')
 print('use crate::GlyphId;')
-print('use crate::parser::{Offset16, FromData};')
-print()
-table_field_offset(GDEF_TABLE, 'markGlyphSetsDefOffset')
-print()
-generate_table(GDEF_TABLE, 'Table', has_tail=True)
+print('use crate::parser::FromData;')
 print()
 generate_table(GDEF_CLASS_RANGE_RECORD, 'ClassRangeRecord', owned=True, impl_from_data=True)
 print()
@@ -718,10 +706,6 @@ print('pub mod gsubgpos {')
 print('use crate::Tag;')
 print('use crate::parser::{Offset16, Offset32, FromData};')
 print()
-table_field_offset(GSUB_GPOS_TABLE, 'featureVariationsOffset')
-print()
-generate_table(GSUB_GPOS_TABLE, 'Table', has_tail=True)
-print()
 generate_table(GSUB_GPOS_RECORD, 'Record', owned=True, impl_from_data=True)
 print()
 generate_table(GSUB_GPOS_CONDITION_TABLE, 'Condition', owned=True, impl_from_data=True)
@@ -731,9 +715,7 @@ print('}')
 print()
 print('pub mod fvar {')
 print('use crate::Tag;')
-print('use crate::parser::{Offset16, FromData};')
-print()
-generate_table(FVAR_TABLE, 'Table', has_tail=True)
+print('use crate::parser::FromData;')
 print()
 generate_table(FVAR_VARIATION_AXIS_RECORD, 'VariationAxisRecord', owned=True, impl_from_data=True)
 print('}')

@@ -4,11 +4,11 @@
 
 use core::ops::Range;
 
-use crate::parser::{Stream, TrySlice};
-use crate::{Font, GlyphId, OutlineBuilder, Rect, Result, Error};
+use crate::{Font, GlyphId, OutlineBuilder, Rect};
+use crate::parser::{Stream, LazyArray16};
 
 use crate::cff::{
-    Builder, RectF, DataIndex, Number, IsEven, Operator,
+    Builder, RectF, DataIndex, IsEven, Operator,
     ArgumentsStack, OutlineBuilderInner, CFFError,
     calc_subroutine_bias, f32_abs, parse_number, skip_number, parse_index_impl, try_f32_to_i16,
     is_dict_one_byte_op
@@ -81,12 +81,26 @@ pub struct Metadata<'a> {
     local_subrs: DataIndex<'a>,
     char_strings: DataIndex<'a>,
     item_variation_store: ItemVariationStore<'a>,
+    variation_region: u16,
 }
 
-#[derive(Clone, Copy, Default)]
-struct ItemVariationStore<'a>(&'a [u8]);
+#[derive(Clone, Copy)]
+struct ItemVariationStore<'a> {
+    data: &'a [u8],
+    offsets: LazyArray16<'a, u32>,
+}
 
-pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
+impl<'a> Default for ItemVariationStore<'a> {
+    #[inline]
+    fn default() -> Self {
+        ItemVariationStore {
+            data: &[],
+            offsets: LazyArray16::new(&[]),
+        }
+    }
+}
+
+pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     let mut s = Stream::new(data);
 
     // Parse Header.
@@ -96,7 +110,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
     let top_dict_length: u16 = s.read()?;
 
     if major != 2 {
-        return Err(Error::UnsupportedTableVersion);
+        return None;
     }
 
     // Jump to Top DICT. It's not necessarily right after the header.
@@ -108,6 +122,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
     let top_dict = parse_top_dict(top_dict_data)?;
 
     let mut metadata = Metadata::default();
+
     // Parse Global Subroutines INDEX.
     metadata.global_subrs = parse_index(&mut s)?;
 
@@ -119,20 +134,21 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
     if let Some(offset) = top_dict.variation_store_offset {
         let mut s = Stream::new_at(data, offset);
         metadata.item_variation_store = parse_variation_store(&mut s)?;
+        metadata.variation_region = parse_variation_regions(metadata.item_variation_store, 0).ok()?;
     }
 
     // TODO: simplify
     if let Some(offset) = top_dict.font_dict_index_offset {
         let mut s = Stream::new_at(data, offset);
         'outer: for font_dict_data in parse_index(&mut s)? {
-            if let Some(private_dict_range) = parse_font_dict(font_dict_data)? {
+            if let Some(private_dict_range) = parse_font_dict(font_dict_data) {
                 // 'Private DICT size and offset, from start of the CFF2 table.'
-                let private_dict_data = data.try_slice(private_dict_range.clone())?;
-                if let Some(subroutines_offset) = parse_private_dict(private_dict_data)? {
+                let private_dict_data = data.get(private_dict_range.clone())?;
+                if let Some(subroutines_offset) = parse_private_dict(private_dict_data) {
                     // 'The local subroutines offset is relative to the beginning
                     // of the Private DICT data.'
                     if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
-                        let data = data.try_slice(start..data.len())?;
+                        let data = data.get(start..data.len())?;
                         let mut s = Stream::new(data);
                         metadata.local_subrs = parse_index(&mut s)?;
                         break 'outer;
@@ -142,7 +158,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
         }
     }
 
-    Ok(metadata)
+    Some(metadata)
 }
 
 
@@ -152,8 +168,16 @@ impl<'a> Font<'a> {
         metadata: &Metadata,
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
-    ) -> Result<Option<Rect>> {
-        parse_char_string(metadata, glyph_id, builder)
+    ) -> Option<Rect> {
+        let data = metadata.char_strings.get(glyph_id.0)?;
+        match parse_char_string(data, metadata, builder) {
+            Ok(bbox) => Some(bbox),
+            #[allow(unused_variables)]
+            Err(e) => {
+                warn!("Glyph {} parsing failed cause {}.", glyph_id.0, e);
+                None
+            }
+        }
     }
 }
 
@@ -164,56 +188,56 @@ struct TopDictData {
     variation_store_offset: Option<usize>,
 }
 
-fn parse_top_dict(data: &[u8]) -> Result<TopDictData> {
+fn parse_top_dict(data: &[u8]) -> Option<TopDictData> {
     let mut dict_data = TopDictData::default();
 
     // TODO: simplify
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
-        if operator.value() == top_dict_operator::CHAR_STRINGS_OFFSET {
+        if operator.get() == top_dict_operator::CHAR_STRINGS_OFFSET {
             dict_parser.parse_operands()?;
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                dict_data.char_strings_offset = operands[0].as_i32() as usize;
+                dict_data.char_strings_offset = operands[0] as usize;
             }
-        } else if operator.value() == top_dict_operator::FONT_DICT_INDEX_OFFSET {
+        } else if operator.get() == top_dict_operator::FONT_DICT_INDEX_OFFSET {
             dict_parser.parse_operands()?;
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                dict_data.font_dict_index_offset = Some(operands[0].as_i32() as usize);
+                dict_data.font_dict_index_offset = Some(operands[0] as usize);
             }
-        } else if operator.value() == top_dict_operator::VARIATION_STORE_OFFSET {
+        } else if operator.get() == top_dict_operator::VARIATION_STORE_OFFSET {
             dict_parser.parse_operands()?;
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                dict_data.variation_store_offset = Some(operands[0].as_i32() as usize);
+                dict_data.variation_store_offset = Some(operands[0] as usize);
             }
         }
     }
 
     // Must be set, otherwise there are nothing to parse.
     if dict_data.char_strings_offset == 0 {
-        return Err(CFFError::NoCharStrings.into());
+        return None;
     }
 
-    Ok(dict_data)
+    Some(dict_data)
 }
 
-fn parse_font_dict(data: &[u8]) -> Result<Option<Range<usize>>> {
+fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
     let mut private_dict_range = None;
 
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
-        if operator.value() == font_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
+        if operator.get() == font_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
             dict_parser.parse_operands()?;
             let operands = dict_parser.operands();
 
             if operands.len() == 2 {
-                let len = operands[0].as_i32() as usize;
-                let start = operands[1].as_i32() as usize;
+                let len = operands[0] as usize;
+                let start = operands[1] as usize;
                 private_dict_range = Some(start..start+len);
             }
 
@@ -221,81 +245,81 @@ fn parse_font_dict(data: &[u8]) -> Result<Option<Range<usize>>> {
         }
     }
 
-    Ok(private_dict_range)
+    private_dict_range
 }
 
-fn parse_private_dict(data: &[u8]) -> Result<Option<usize>> {
+fn parse_private_dict(data: &[u8]) -> Option<usize> {
     let mut subroutines_offset = None;
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
-        if operator.value() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
+        if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
             dict_parser.parse_operands()?;
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                subroutines_offset = Some(operands[0].as_i32() as usize);
+                subroutines_offset = Some(operands[0] as usize);
             }
 
             break;
         }
     }
 
-    Ok(subroutines_offset)
+    subroutines_offset
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store-header-and-item-variation-data-subtables
-fn parse_variation_store<'a>(s: &mut Stream<'a>) -> Result<ItemVariationStore<'a>> {
+fn parse_variation_store<'a>(s: &mut Stream<'a>) -> Option<ItemVariationStore<'a>> {
     let length: u16 = s.read()?;
     let data = s.read_bytes(length)?;
-    Ok(ItemVariationStore(data))
-}
 
-fn parse_variation_regions(store: ItemVariationStore, vsindex: u16) -> Result<u16> {
-    let mut s = Stream::new(store.0);
-
+    let mut s = Stream::new(data);
     let format: u16 = s.read()?;
     if format != 1 {
-        return Err(CFFError::InvalidItemVariationDataIndex.into());
+        return None;
     }
 
     s.skip::<u32>(); // variation_region_list_offset
     let offsets = s.read_array16::<u32>()?;
 
-    // Offsets in bytes from the start of the item variation store
-    // to each item variation data subtable.
-    if let Some(offset) = offsets.get(vsindex) {
-        let mut s2 = Stream::new_at(store.0, offset as usize);
+    Some(ItemVariationStore { data, offsets })
+}
+
+fn parse_variation_regions(store: ItemVariationStore, vsindex: u16) -> Result<u16, CFFError> {
+    #[inline]
+    fn parse(store: ItemVariationStore, vsindex: u16) -> Option<u16> {
+        // Offsets in bytes from the start of the item variation store
+        // to each item variation data subtable.
+        let offset = store.offsets.get(vsindex)?;
+        let mut s2 = Stream::new_at(store.data, offset as usize);
         s2.skip::<u16>(); // item_count
         s2.skip::<u16>(); // short_delta_count
         let region_index_count: u16 = s2.read()?;
-        return Ok(region_index_count);
+        Some(region_index_count)
     }
 
-    Err(CFFError::InvalidItemVariationDataIndex.into())
+    parse(store, vsindex).ok_or(CFFError::InvalidItemVariationDataIndex)
 }
 
 struct CharStringParserContext<'a> {
     metadata: &'a Metadata<'a>,
     is_first_move_to: bool,
     has_move_to: bool,
-    variation_regions: u16,
+    variation_region: u16,
     had_vsindex: bool,
     had_blend: bool,
     stems_len: u32,
 }
 
 fn parse_char_string(
+    data: &[u8],
     metadata: &Metadata,
-    glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
-) -> Result<Option<Rect>> {
-    let data = try_ok!(metadata.char_strings.get(glyph_id.0));
-
+) -> Result<Rect, CFFError> {
     let mut ctx = CharStringParserContext {
         metadata,
         is_first_move_to: true,
         has_move_to: false,
-        variation_regions: parse_variation_regions(metadata.item_variation_store, 0)?,
+        variation_region: metadata.variation_region,
         had_vsindex: false,
         had_blend: false,
         stems_len: 0,
@@ -326,15 +350,15 @@ fn parse_char_string(
         bbox.x_max == core::f32::MIN &&
         bbox.y_max == core::f32::MIN
     {
-        return Ok(None);
+        return Err(CFFError::ZeroBBox);
     }
 
-    Ok(Some(Rect {
+    Ok(Rect {
         x_min: try_f32_to_i16(bbox.x_min)?,
         y_min: try_f32_to_i16(bbox.y_min)?,
         x_max: try_f32_to_i16(bbox.x_max)?,
         y_max: try_f32_to_i16(bbox.y_max)?,
-    }))
+    })
 }
 
 // TODO: It would be great to merge this with CFF, but we need const generics first.
@@ -350,14 +374,14 @@ fn _parse_char_string(
     stack: &mut ArgumentsStack,
     depth: u8,
     builder: &mut Builder,
-) -> Result<(f32, f32)> {
+) -> Result<(f32, f32), CFFError> {
     let mut s = Stream::new(char_string);
     while !s.at_end() {
-        let op: u8 = s.read()?;
+        let op: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
         match op {
             0 | 2 | 9 | 11 | 13 | 14 | 17 => {
                 // Reserved.
-                return Err(CFFError::InvalidOperator.into());
+                return Err(CFFError::InvalidOperator);
             }
             operator::HORIZONTAL_STEM |
             operator::VERTICAL_STEM |
@@ -377,7 +401,7 @@ fn _parse_char_string(
                 // dy1
 
                 if stack.len() != 1 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if ctx.is_first_move_to {
@@ -397,11 +421,11 @@ fn _parse_char_string(
                 // {dxa dya}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len().is_odd() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -419,11 +443,11 @@ fn _parse_char_string(
                 //     {dxa dyb}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -448,11 +472,11 @@ fn _parse_char_string(
                 //     {dya dxb}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -476,11 +500,11 @@ fn _parse_char_string(
                 // {dxa dya dxb dyb dxc dyc}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() % 6 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -500,11 +524,11 @@ fn _parse_char_string(
             }
             operator::CALL_LOCAL_SUBROUTINE => {
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if depth == STACK_LIMIT {
-                    return Err(CFFError::NestingLimitReached.into());
+                    return Err(CFFError::NestingLimitReached);
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len() as u16);
@@ -517,17 +541,17 @@ fn _parse_char_string(
             }
             TWO_BYTE_OPERATOR_MARK => {
                 // flex
-                let op2: u8 = s.read()?;
+                let op2: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
                 match op2 {
                     operator::HFLEX => {
                         // dx1 dx2 dy2 dx3 dx4 dx5 dx6
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 7 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -550,11 +574,11 @@ fn _parse_char_string(
                         // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 13 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -578,11 +602,11 @@ fn _parse_char_string(
                         // dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 9 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -605,11 +629,11 @@ fn _parse_char_string(
                         // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 11 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -635,7 +659,7 @@ fn _parse_char_string(
                         stack.clear();
                     }
                     _ => {
-                        return Err(CFFError::UnsupportedOperator.into());
+                        return Err(CFFError::UnsupportedOperator);
                     }
                 }
             }
@@ -645,14 +669,14 @@ fn _parse_char_string(
                 // `vsindex` must precede the first `blend` operator, and may occur only once.
                 if ctx.had_blend || ctx.had_vsindex {
                     // TODO: maybe add a custom error
-                    return Err(CFFError::InvalidOperator.into());
+                    return Err(CFFError::InvalidOperator);
                 }
 
                 if stack.len() != 1 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
-                ctx.variation_regions = parse_variation_regions(
+                ctx.variation_region = parse_variation_regions(
                     ctx.metadata.item_variation_store, stack.pop() as u16, // TODO: check
                 )?;
 
@@ -668,14 +692,14 @@ fn _parse_char_string(
                 ctx.had_blend = true;
 
                 let n = stack.pop() as usize;
-                let k = ctx.variation_regions as usize;
+                let k = ctx.variation_region as usize;
 
                 // `blend` operators can be successive.
                 // In this case we should process only the last `n * (k + 1)` values.
                 // And keep previous unchanged.
                 let len = n * (k + 1);
                 if stack.len() < len {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 // Remove deltas, but keep nums.
@@ -693,7 +717,7 @@ fn _parse_char_string(
                 // dx1 dy1
 
                 if stack.len() != 2 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if ctx.is_first_move_to {
@@ -714,7 +738,7 @@ fn _parse_char_string(
                 // dx1
 
                 if stack.len() != 1 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if ctx.is_first_move_to {
@@ -734,15 +758,15 @@ fn _parse_char_string(
                 // {dxa dya dxb dyb dxc dyc}+ dxd dyd
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 8 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if (stack.len() - 2) % 6 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -768,15 +792,15 @@ fn _parse_char_string(
                 // {dxa dya}+ dxb dyb dxc dyc dxd dyd
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 8 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if (stack.len() - 6).is_odd() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -804,7 +828,7 @@ fn _parse_char_string(
                 let mut i = 0;
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 // The odd argument count indicates an X position.
@@ -814,7 +838,7 @@ fn _parse_char_string(
                 }
 
                 if (stack.len() - i) % 4 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 while i < stack.len() {
@@ -835,7 +859,7 @@ fn _parse_char_string(
                 // dy1? {dxa dxb dyb dxc}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 let mut i = 0;
@@ -847,7 +871,7 @@ fn _parse_char_string(
                 }
 
                 if (stack.len() - i) % 4 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 while i < stack.len() {
@@ -865,19 +889,19 @@ fn _parse_char_string(
                 stack.clear();
             }
             operator::SHORT_INT => {
-                let b1 = s.read::<u8>()? as i32;
-                let b2 = s.read::<u8>()? as i32;
+                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
+                let b2 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
                 let n = ((b1 << 24) | (b2 << 16)) >> 16;
                 debug_assert!((-32768..=32767).contains(&n));
                 stack.push(n as f32)?;
             }
             operator::CALL_GLOBAL_SUBROUTINE => {
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if depth == STACK_LIMIT {
-                    return Err(CFFError::NestingLimitReached.into());
+                    return Err(CFFError::NestingLimitReached);
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.global_subrs.len() as u16);
@@ -893,17 +917,17 @@ fn _parse_char_string(
                 //                 {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 4 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 stack.reverse();
                 while !stack.is_empty() {
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x;
@@ -918,7 +942,7 @@ fn _parse_char_string(
                     }
 
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x + stack.pop();
@@ -937,17 +961,17 @@ fn _parse_char_string(
                 //                 {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf?
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 4 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 stack.reverse();
                 while !stack.is_empty() {
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x + stack.pop();
@@ -962,7 +986,7 @@ fn _parse_char_string(
                     }
 
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x;
@@ -981,19 +1005,19 @@ fn _parse_char_string(
                 stack.push(n as f32)?;
             }
             247..=250 => {
-                let b1 = s.read::<u8>()? as i32;
+                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
                 let n = (op as i32 - 247) * 256 + b1 + 108;
                 debug_assert!((108..=1131).contains(&n));
                 stack.push(n as f32)?;
             }
             251..=254 => {
-                let b1 = s.read::<u8>()? as i32;
+                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
                 let n = -(op as i32 - 251) * 256 - b1 - 108;
                 debug_assert!((-1131..=-108).contains(&n));
                 stack.push(n as f32)?;
             }
             operator::FIXED_16_16 => {
-                let n = s.read::<u32>()? as i32 as f32 / 65536.0;
+                let n = s.read::<u32>().ok_or(CFFError::ReadOutOfBounds)? as i32 as f32 / 65536.0;
                 stack.push(n)?;
             }
         }
@@ -1004,13 +1028,13 @@ fn _parse_char_string(
     Ok((x, y))
 }
 
-fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
+fn parse_index<'a>(s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
     // Unlike in CFF, in CFF2 `count` us u32 and not u16.
     let count: u32 = s.read()?;
     if count != 0 && count != core::u32::MAX {
         parse_index_impl(count as u32, s)
     } else {
-        Ok(DataIndex::default())
+        Some(DataIndex::default())
     }
 }
 
@@ -1022,7 +1046,7 @@ struct DictionaryParser<'a> {
     // Offset to the last operands start.
     operands_offset: usize,
     // Actual operands.
-    operands: [Number; MAX_OPERANDS_LEN], // 2052B
+    operands: [i32; MAX_OPERANDS_LEN], // 2052B
     // An amount of operands in the `operands` array.
     operands_len: u16,
 }
@@ -1034,7 +1058,7 @@ impl<'a> DictionaryParser<'a> {
             data,
             offset: 0,
             operands_offset: 0,
-            operands: [Number::Integer(0); MAX_OPERANDS_LEN],
+            operands: [0; MAX_OPERANDS_LEN],
             operands_len: 0,
         }
     }
@@ -1044,7 +1068,7 @@ impl<'a> DictionaryParser<'a> {
         let mut s = Stream::new_at(self.data, self.offset);
         self.operands_offset = self.offset;
         while !s.at_end() {
-            let b: u8 = s.read().ok()?;
+            let b: u8 = s.read()?;
             if is_dict_one_byte_op(b) {
                 let mut operator = b as u16;
 
@@ -1052,7 +1076,7 @@ impl<'a> DictionaryParser<'a> {
                 if b == TWO_BYTE_OPERATOR_MARK {
                     // Use a 1200 'prefix' to make two byte operators more readable.
                     // 12 3 => 1203
-                    operator = 1200 + s.read::<u8>().ok()? as u16;
+                    operator = 1200 + s.read::<u8>()? as u16;
                 }
 
                 self.offset = s.offset();
@@ -1075,7 +1099,7 @@ impl<'a> DictionaryParser<'a> {
     ///
     /// We still have to "skip" operands during operators search (see `skip_number()`),
     /// but it's still faster that a naive method.
-    fn parse_operands(&mut self) -> Result<()> {
+    fn parse_operands(&mut self) -> Option<()> {
         let mut s = Stream::new_at(self.data, self.operands_offset);
         self.operands_len = 0;
         while !s.at_end() {
@@ -1093,11 +1117,11 @@ impl<'a> DictionaryParser<'a> {
             }
         }
 
-        Ok(())
+        Some(())
     }
 
     #[inline]
-    fn operands(&self) -> &[Number] {
+    fn operands(&self) -> &[i32] {
         &self.operands[..self.operands_len as usize]
     }
 }
@@ -1106,7 +1130,6 @@ impl<'a> DictionaryParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::string::ToString;
     use crate::writer;
     use writer::TtfType::*;
     use crate::cff::parse_index_impl;
@@ -1118,7 +1141,6 @@ mod tests {
             // other data doesn't matter
         ]);
 
-        let res = parse_index_impl(std::u32::MAX / 2, &mut Stream::new(&data));
-        assert_eq!(res.unwrap_err().to_string(), "an attempt to slice out of bounds");
+        assert!(parse_index_impl(std::u32::MAX / 2, &mut Stream::new(&data)).is_none());
     }
 }

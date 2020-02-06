@@ -1,32 +1,19 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx
+// https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx
 
-use crate::{Font, GlyphId, Result};
+use crate::{Font, GlyphId};
 
 impl<'a> Font<'a> {
     /// Parses glyph's vertical advance using
     /// [Vertical Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx).
-    pub fn glyph_ver_advance(&self, glyph_id: GlyphId) -> Result<Option<u16>> {
-        bail!(self.check_glyph_id(glyph_id));
-
-        let number_of_vmetrics = self.number_of_vmetrics()?;
-        if number_of_vmetrics == 0 {
-            return Ok(None);
-        }
-
-        crate::hmtx::parse_glyph_advance(self.vmtx?, glyph_id, number_of_vmetrics)
+    #[inline]
+    pub fn glyph_ver_advance(&self, glyph_id: GlyphId) -> Option<u16> {
+        self.vmtx.and_then(|vmtx| vmtx.advance(glyph_id))
     }
 
     /// Parses glyph's vertical side bearing using
     /// [Vertical Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx).
-    pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Result<Option<i16>> {
-        bail!(self.check_glyph_id(glyph_id));
-
-        let number_of_vmetrics = self.number_of_vmetrics()?;
-        if number_of_vmetrics == 0 {
-            return Ok(None);
-        }
-
-        crate::hmtx::parse_glyph_side_bearing(self.vmtx?, glyph_id, number_of_vmetrics,
-                                              self.number_of_glyphs())
+    #[inline]
+    pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+        self.vmtx.and_then(|vmtx| vmtx.side_bearing(glyph_id))
     }
 }

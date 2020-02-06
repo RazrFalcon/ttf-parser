@@ -31,18 +31,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::vertical_line_gap`
 - `Tag` type.
 - Initial GSUB/GPOS support.
+- Optional `log` dependency.
 
 ### Changed
-- Most of the methods will return `Result<Option<T>, Error>` from now.
-- `Font::outline_glyph` not accepts `&mut dyn OutlineBuilder` and not `&mut impl OutlineBuilder`.
+- `Font::outline_glyph` now accepts `&mut dyn OutlineBuilder` and not `&mut impl OutlineBuilder`.
 - `Font::ascender`, `Font::descender` and `Font::line_gap` will check `USE_TYPO_METRICS`
   flag in OS/2 table now.
 - `glyph_hor_metrics` was split into `glyph_hor_advance` and `glyph_hor_side_bearing`.
 - `glyph_ver_metrics` was split into `glyph_ver_advance` and `glyph_ver_side_bearing`.
+- `CFFError` is no longer public.
 
 ### Removed
-- `Error::InvalidGlyphClass`, because unused.
-- `NoGlyph`, `NoOutline` and `NoKerning` errors. `Result<Option<T>, Error>` is used instead.
+- `Error` enum. All methods will return `Option<T>` now.
+- `Font::has_table`, because the way it worked was confusing.
 
 ### Fixed
 - `glyph_hor_side_bearing` parsing when the number of metrics is less than the total number of glyphs.

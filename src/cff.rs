@@ -5,8 +5,8 @@
 
 use core::ops::Range;
 
-use crate::parser::{Stream, TryFromData, TrySlice, U24, FromData};
-use crate::{Font, GlyphId, OutlineBuilder, Rect, Result, Error};
+use crate::parser::{Stream, U24, FromData};
+use crate::{Font, GlyphId, OutlineBuilder, Rect};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: usize = 48;
@@ -15,7 +15,6 @@ const MAX_OPERANDS_LEN: usize = 48;
 const STACK_LIMIT: u8 = 10;
 const MAX_ARGUMENTS_STACK_LEN: usize = 48;
 
-const FLOAT_STACK_LEN: usize = 64;
 const END_OF_FLOAT_FLAG: u8 = 0xf;
 
 const TWO_BYTE_OPERATOR_MARK: u8 = 12;
@@ -70,75 +69,30 @@ mod private_dict_operator {
 /// A list of errors that can occur during a CFF table parsing.
 #[derive(Clone, Copy, Debug)]
 pub enum CFFError {
-    /// The CFF table doesn't have any char strings.
-    NoCharStrings,
-
-    /// An invalid operand occurred.
-    InvalidOperand,
-
-    /// An invalid operator occurred.
+    ReadOutOfBounds,
+    ZeroBBox,
     InvalidOperator,
-
-    /// An unsupported operator occurred.
     UnsupportedOperator,
-
-    /// The CharString must end with an `endchar` operator.
     MissingEndChar,
-
-    /// Unused data left after `endchar` operator.
     DataAfterEndChar,
-
-    /// Failed to parse a float number.
-    InvalidFloat,
-
-    /// The `OffSize` value must be in 1..4 range.
-    ///
-    /// Adobe Technical Note #5176, Table 2 CFF Data Types
-    InvalidOffsetSize,
-
-    /// Subroutines nesting is limited by 10.
-    ///
-    /// Adobe Technical Note #5177 Appendix B.
     NestingLimitReached,
-
-    /// An arguments stack size is limited by 48 values.
-    ///
-    /// Adobe Technical Note #5177 Appendix B.
     ArgumentsStackLimitReached,
-
-    /// Each operand expects a specific amount of arguments on the stack.
-    ///
-    /// Usually indicates an implementation error and should not occur on valid fonts.
     InvalidArgumentsStackLength,
-
-    /// `ttf-parser` only allows outlines in `i16` range.
     BboxOverflow,
-
-    /// A subpath must start with a moveto operator.
     MissingMoveTo,
-
-    /// CharString references a non-existing subroutine.
     InvalidSubroutineIndex,
-
-    /// The `ItemVariationData` record should have format #1.
-    ///
-    /// CFF2 only.
-    InvalidItemVariationDataFormat,
-
-    /// No `ItemVariationData` with required index.
-    ///
-    /// CFF2 only.
     InvalidItemVariationDataIndex,
 }
 
+#[cfg(feature = "logging")]
 impl core::fmt::Display for CFFError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match *self {
-            CFFError::NoCharStrings => {
-                write!(f, "table doesn't have any char strings")
+            CFFError::ReadOutOfBounds => {
+                write!(f, "read out of bounds")
             }
-            CFFError::InvalidOperand => {
-                write!(f, "an invalid operand occurred")
+            CFFError::ZeroBBox => {
+                write!(f, "zero bbox")
             }
             CFFError::InvalidOperator => {
                 write!(f, "an invalid operator occurred")
@@ -151,12 +105,6 @@ impl core::fmt::Display for CFFError {
             }
             CFFError::DataAfterEndChar => {
                 write!(f, "unused data left after 'endchar' operator")
-            }
-            CFFError::InvalidFloat => {
-                write!(f, "failed to parse a float number")
-            }
-            CFFError::InvalidOffsetSize => {
-                write!(f, "OffSize with an invalid value occurred")
             }
             CFFError::NestingLimitReached => {
                 write!(f, "subroutines nesting limit reached")
@@ -176,9 +124,6 @@ impl core::fmt::Display for CFFError {
             CFFError::InvalidSubroutineIndex => {
                 write!(f, "an invalid subroutine index")
             }
-            CFFError::InvalidItemVariationDataFormat => {
-                write!(f, "invalid ItemVariationData format")
-            }
             CFFError::InvalidItemVariationDataIndex => {
                 write!(f, "no ItemVariationData with required index")
             }
@@ -197,7 +142,7 @@ pub struct Metadata<'a> {
     char_strings: DataIndex<'a>,
 }
 
-pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
+pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     let mut s = Stream::new(data);
 
     // Parse Header.
@@ -207,7 +152,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
     s.skip::<u8>(); // Absolute offset
 
     if major != 1 {
-        return Err(Error::UnsupportedTableVersion);
+        return None;
     }
 
     // Jump to Name INDEX. It's not necessarily right after the header.
@@ -222,11 +167,11 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
 
     // Must be set, otherwise there are nothing to parse.
     if char_strings_offset == 0 {
-        return Err(CFFError::NoCharStrings.into());
+        return None;
     }
 
     let subroutines_offset = if let Some(range) = private_dict_range.clone() {
-        parse_private_dict(data.try_slice(range)?)?
+        parse_private_dict(data.get(range)?)
     } else {
         None
     };
@@ -243,7 +188,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
             // 'The local subroutines offset is relative to the beginning
             // of the Private DICT data.'
             if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
-                let data = data.try_slice(start..data.len())?;
+                let data = data.get(start..data.len())?;
                 let mut s = Stream::new(data);
                 metadata.local_subrs = parse_index(&mut s)?;
             }
@@ -257,7 +202,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Result<Metadata> {
         parse_index(&mut s)?
     };
 
-    Ok(metadata)
+    Some(metadata)
 }
 
 
@@ -267,32 +212,37 @@ impl<'a> Font<'a> {
         metadata: &Metadata,
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
-    ) -> Result<Option<Rect>> {
-        parse_char_string(metadata, glyph_id, builder)
+    ) -> Option<Rect> {
+        let data = metadata.char_strings.get(glyph_id.0)?;
+        match parse_char_string(data, metadata, builder) {
+            Ok(bbox) => Some(bbox),
+            #[allow(unused_variables)]
+            Err(e) => {
+                warn!("Glyph {} parsing failed cause {}.", glyph_id.0, e);
+                None
+            }
+        }
     }
 }
 
-fn parse_top_dict(s: &mut Stream) -> Result<(usize, Option<Range<usize>>)> {
+fn parse_top_dict(s: &mut Stream) -> Option<(usize, Option<Range<usize>>)> {
     let mut char_strings_offset = 0;
     let mut private_dict_range = None;
 
     let index = parse_index(s)?;
 
     // The Top DICT INDEX should have only one dictionary.
-    let data = match index.get(0) {
-        Some(v) => v,
-        None => return Err(CFFError::NoCharStrings.into()),
-    };
+    let data = index.get(0)?;
 
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
-        match operator.value() {
+        match operator.get() {
             top_dict_operator::CHAR_STRINGS_OFFSET => {
                 dict_parser.parse_operands()?;
                 let operands = dict_parser.operands();
 
                 if operands.len() == 1 {
-                    char_strings_offset = operands[0].as_i32() as usize;
+                    char_strings_offset = operands[0] as usize;
                 }
             }
             top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET => {
@@ -300,8 +250,8 @@ fn parse_top_dict(s: &mut Stream) -> Result<(usize, Option<Range<usize>>)> {
                 let operands = dict_parser.operands();
 
                 if operands.len() == 2 {
-                    let len = operands[0].as_i32() as usize;
-                    let start = operands[1].as_i32() as usize;
+                    let len = operands[0] as usize;
+                    let start = operands[1] as usize;
                     private_dict_range = Some(start..start+len);
                 }
             }
@@ -313,26 +263,26 @@ fn parse_top_dict(s: &mut Stream) -> Result<(usize, Option<Range<usize>>)> {
         }
     }
 
-    Ok((char_strings_offset, private_dict_range))
+    Some((char_strings_offset, private_dict_range))
 }
 
-fn parse_private_dict(data: &[u8]) -> Result<Option<usize>> {
+fn parse_private_dict(data: &[u8]) -> Option<usize> {
     let mut subroutines_offset = None;
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
-        if operator.value() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
+        if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
             dict_parser.parse_operands()?;
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                subroutines_offset = Some(operands[0].as_i32() as usize);
+                subroutines_offset = Some(operands[0] as usize);
             }
 
             break;
         }
     }
 
-    Ok(subroutines_offset)
+    subroutines_offset
 }
 
 struct CharStringParserContext<'a> {
@@ -345,15 +295,10 @@ struct CharStringParserContext<'a> {
 }
 
 fn parse_char_string(
+    data: &[u8],
     metadata: &Metadata,
-    glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
-) -> Result<Option<Rect>> {
-    let data = match metadata.char_strings.get(glyph_id.0) {
-        Some(v) => v,
-        None => return Ok(None),
-    };
-
+) -> Result<Rect, CFFError> {
     let mut ctx = CharStringParserContext {
         metadata,
         is_first_move_to: true,
@@ -381,7 +326,7 @@ fn parse_char_string(
     let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, &mut inner_builder)?;
 
     if !ctx.has_endchar {
-        return Err(CFFError::MissingEndChar.into());
+        return Err(CFFError::MissingEndChar);
     }
 
     let bbox = inner_builder.bbox;
@@ -392,22 +337,22 @@ fn parse_char_string(
        bbox.x_max == core::f32::MIN &&
        bbox.y_max == core::f32::MIN
     {
-        return Ok(None);
+        return Err(CFFError::ZeroBBox);
     }
 
-    Ok(Some(Rect {
+    Ok(Rect {
         x_min: try_f32_to_i16(bbox.x_min)?,
         y_min: try_f32_to_i16(bbox.y_min)?,
         x_max: try_f32_to_i16(bbox.x_max)?,
         y_max: try_f32_to_i16(bbox.y_max)?,
-    }))
+    })
 }
 
-pub fn try_f32_to_i16(n: f32) -> Result<i16> {
+pub fn try_f32_to_i16(n: f32) -> Result<i16, CFFError> {
     if n >= core::i16::MIN as f32 && n <= core::i16::MAX as f32 {
         Ok(n as i16)
     } else {
-        Err(CFFError::BboxOverflow.into())
+        Err(CFFError::BboxOverflow)
     }
 }
 
@@ -476,14 +421,14 @@ fn _parse_char_string(
     stack: &mut ArgumentsStack,
     depth: u8,
     builder: &mut Builder,
-) -> Result<(f32, f32)> {
+) -> Result<(f32, f32), CFFError> {
     let mut s = Stream::new(char_string);
     while !s.at_end() {
-        let op: u8 = s.read()?;
+        let op: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
         match op {
             0 | 2 | 9 | 13 | 15 | 16 | 17 => {
                 // Reserved.
-                return Err(CFFError::InvalidOperator.into());
+                return Err(CFFError::InvalidOperator);
             }
             operator::HORIZONTAL_STEM |
             operator::VERTICAL_STEM |
@@ -515,7 +460,7 @@ fn _parse_char_string(
                     i += 1;
                     ctx.width_parsed = true;
                 } else if stack.len() != 1 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if ctx.is_first_move_to {
@@ -535,11 +480,11 @@ fn _parse_char_string(
                 // {dxa dya}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len().is_odd() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -557,11 +502,11 @@ fn _parse_char_string(
                 //     {dxa dyb}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -586,11 +531,11 @@ fn _parse_char_string(
                 //     {dya dxb}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -614,11 +559,11 @@ fn _parse_char_string(
                 // {dxa dya dxb dyb dxc dyc}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() % 6 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -638,11 +583,11 @@ fn _parse_char_string(
             }
             operator::CALL_LOCAL_SUBROUTINE => {
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if depth == STACK_LIMIT {
-                    return Err(CFFError::NestingLimitReached.into());
+                    return Err(CFFError::NestingLimitReached);
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len() as u16);
@@ -655,7 +600,7 @@ fn _parse_char_string(
 
                 if ctx.has_endchar {
                     if !s.at_end() {
-                        return Err(CFFError::DataAfterEndChar.into());
+                        return Err(CFFError::DataAfterEndChar);
                     }
 
                     break;
@@ -666,17 +611,17 @@ fn _parse_char_string(
             }
             TWO_BYTE_OPERATOR_MARK => {
                 // flex
-                let op2: u8 = s.read()?;
+                let op2: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
                 match op2 {
                     operator::HFLEX => {
                         // dx1 dx2 dy2 dx3 dx4 dx5 dx6
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 7 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -699,11 +644,11 @@ fn _parse_char_string(
                         // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 13 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -727,11 +672,11 @@ fn _parse_char_string(
                         // dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 9 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -754,11 +699,11 @@ fn _parse_char_string(
                         // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6
 
                         if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo.into());
+                            return Err(CFFError::MissingMoveTo);
                         }
 
                         if stack.len() != 11 {
-                            return Err(CFFError::InvalidArgumentsStackLength.into());
+                            return Err(CFFError::InvalidArgumentsStackLength);
                         }
 
                         let dx1 = x + stack.at(0);
@@ -784,7 +729,7 @@ fn _parse_char_string(
                         stack.clear();
                     }
                     _ => {
-                        return Err(CFFError::UnsupportedOperator.into());
+                        return Err(CFFError::UnsupportedOperator);
                     }
                 }
             }
@@ -800,7 +745,7 @@ fn _parse_char_string(
                 }
 
                 if !s.at_end() {
-                    return Err(CFFError::DataAfterEndChar.into());
+                    return Err(CFFError::DataAfterEndChar);
                 }
 
                 ctx.has_endchar = true;
@@ -831,7 +776,7 @@ fn _parse_char_string(
                     i += 1;
                     ctx.width_parsed = true;
                 } else if stack.len() != 2 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if ctx.is_first_move_to {
@@ -856,7 +801,7 @@ fn _parse_char_string(
                     i += 1;
                     ctx.width_parsed = true;
                 } else if stack.len() != 1 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if ctx.is_first_move_to {
@@ -876,15 +821,15 @@ fn _parse_char_string(
                 // {dxa dya dxb dyb dxc dyc}+ dxd dyd
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 8 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if (stack.len() - 2) % 6 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -910,15 +855,15 @@ fn _parse_char_string(
                 // {dxa dya}+ dxb dyb dxc dyc dxd dyd
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 8 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if (stack.len() - 6).is_odd() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 let mut i = 0;
@@ -944,7 +889,7 @@ fn _parse_char_string(
                 // dx1? {dya dxb dyb dyc}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 let mut i = 0;
@@ -956,7 +901,7 @@ fn _parse_char_string(
                 }
 
                 if (stack.len() - i) % 4 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 while i < stack.len() {
@@ -977,7 +922,7 @@ fn _parse_char_string(
                 // dy1? {dxa dxb dyb dxc}+
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 let mut i = 0;
@@ -989,7 +934,7 @@ fn _parse_char_string(
                 }
 
                 if (stack.len() - i) % 4 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 while i < stack.len() {
@@ -1007,19 +952,19 @@ fn _parse_char_string(
                 stack.clear();
             }
             operator::SHORT_INT => {
-                let b1 = s.read::<u8>()? as i32;
-                let b2 = s.read::<u8>()? as i32;
+                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
+                let b2 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
                 let n = ((b1 << 24) | (b2 << 16)) >> 16;
                 debug_assert!((-32768..=32767).contains(&n));
                 stack.push(n as f32)?;
             }
             operator::CALL_GLOBAL_SUBROUTINE => {
                 if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 if depth == STACK_LIMIT {
-                    return Err(CFFError::NestingLimitReached.into());
+                    return Err(CFFError::NestingLimitReached);
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.global_subrs.len() as u16);
@@ -1032,7 +977,7 @@ fn _parse_char_string(
 
                 if ctx.has_endchar {
                     if !s.at_end() {
-                        return Err(CFFError::DataAfterEndChar.into());
+                        return Err(CFFError::DataAfterEndChar);
                     }
 
                     break;
@@ -1043,17 +988,17 @@ fn _parse_char_string(
                 //                 {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 4 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 stack.reverse();
                 while !stack.is_empty() {
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x;
@@ -1068,7 +1013,7 @@ fn _parse_char_string(
                     }
 
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x + stack.pop();
@@ -1087,17 +1032,17 @@ fn _parse_char_string(
                 //                 {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf?
 
                 if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo.into());
+                    return Err(CFFError::MissingMoveTo);
                 }
 
                 if stack.len() < 4 {
-                    return Err(CFFError::InvalidArgumentsStackLength.into());
+                    return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
                 stack.reverse();
                 while !stack.is_empty() {
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x + stack.pop();
@@ -1112,7 +1057,7 @@ fn _parse_char_string(
                     }
 
                     if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength.into());
+                        return Err(CFFError::InvalidArgumentsStackLength);
                     }
 
                     let x1 = x;
@@ -1131,19 +1076,19 @@ fn _parse_char_string(
                 stack.push(n as f32)?;
             }
             247..=250 => {
-                let b1 = s.read::<u8>()? as i32;
+                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
                 let n = (op as i32 - 247) * 256 + b1 + 108;
                 debug_assert!((108..=1131).contains(&n));
                 stack.push(n as f32)?;
             }
             251..=254 => {
-                let b1 = s.read::<u8>()? as i32;
+                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
                 let n = -(op as i32 - 251) * 256 - b1 - 108;
                 debug_assert!((-1131..=-108).contains(&n));
                 stack.push(n as f32)?;
             }
             operator::FIXED_16_16 => {
-                let n = s.read::<u32>()? as i32 as f32 / 65536.0;
+                let n = s.read::<u32>().ok_or(CFFError::ReadOutOfBounds)? as i32 as f32 / 65536.0;
                 stack.push(n)?;
             }
         }
@@ -1166,21 +1111,19 @@ pub fn calc_subroutine_bias(len: u16) -> u16 {
     }
 }
 
-fn parse_index<'a>(s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
+fn parse_index<'a>(s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
     let count: u16 = s.read()?;
     if count != 0 && count != core::u16::MAX {
         parse_index_impl(count as u32, s)
     } else {
-        Ok(DataIndex::default())
+        Some(DataIndex::default())
     }
 }
 
-pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Result<DataIndex<'a>> {
-    let offset_size: OffsetSize = s.try_read()?;
-    let offsets_len = match (count + 1).checked_mul(offset_size as u32) {
-        Some(v) => v,
-        None => return Err(Error::SliceOutOfBounds),
-    };
+#[inline]
+pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
+    let offset_size: OffsetSize = try_parse_offset_size(s)?;
+    let offsets_len = (count + 1).checked_mul(offset_size as u32)?;
     let offsets = VarOffsets {
         data: &s.read_bytes(offsets_len)?,
         offset_size,
@@ -1190,18 +1133,18 @@ pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Result<DataIndex<
     match offsets.last() {
         Some(last_offset) => {
             let data = s.read_bytes(last_offset)?;
-            Ok(DataIndex { data, offsets })
+            Some(DataIndex { data, offsets })
         }
         None => {
-            Ok(DataIndex::default())
+            Some(DataIndex::default())
         }
     }
 }
 
-fn skip_index(s: &mut Stream) -> Result<()> {
+fn skip_index(s: &mut Stream) -> Option<()> {
     let count: u16 = s.read()?;
     if count != 0 && count != core::u16::MAX {
-        let offset_size: OffsetSize = s.try_read()?;
+        let offset_size: OffsetSize = try_parse_offset_size(s)?;
         let offsets_len = (count + 1) as u32 * offset_size as u32;
         let offsets = VarOffsets {
             data: &s.read_bytes(offsets_len)?,
@@ -1213,7 +1156,7 @@ fn skip_index(s: &mut Stream) -> Result<()> {
         }
     }
 
-    Ok(())
+    Some(())
 }
 
 
@@ -1231,7 +1174,7 @@ impl<'a> VarOffsets<'a> {
 
         let start = index as usize * self.offset_size as usize;
         let end = start + self.offset_size as usize;
-        let data = self.data.try_slice(start..end).ok()?;
+        let data = self.data.get(start..end)?;
         let n: u32 = match self.offset_size {
             OffsetSize::Size1 => u8::parse(data) as u32,
             OffsetSize::Size2 => u16::parse(data) as u32,
@@ -1318,7 +1261,7 @@ impl<'a> DataIndex<'a> {
         } else if index + 1 < self.offsets.len() {
             let start = self.offsets.get(index)? as usize;
             let end = self.offsets.get(index + 1)? as usize;
-            let data = self.data.try_slice(start..end).ok()?;
+            let data = self.data.get(start..end)?;
             Some(data)
         } else {
             None
@@ -1355,16 +1298,14 @@ pub enum OffsetSize {
     Size4 = 4,
 }
 
-impl TryFromData for OffsetSize {
-    #[inline]
-    fn try_parse(data: &[u8]) -> Result<Self> {
-        match u8::parse(data) {
-            1 => Ok(OffsetSize::Size1),
-            2 => Ok(OffsetSize::Size2),
-            3 => Ok(OffsetSize::Size3),
-            4 => Ok(OffsetSize::Size4),
-            _ => Err(CFFError::InvalidOffsetSize.into()),
-        }
+#[inline]
+fn try_parse_offset_size(s: &mut Stream) -> Option<OffsetSize> {
+    match s.read::<u8>()? {
+        1 => Some(OffsetSize::Size1),
+        2 => Some(OffsetSize::Size2),
+        3 => Some(OffsetSize::Size3),
+        4 => Some(OffsetSize::Size4),
+        _ => None,
     }
 }
 
@@ -1374,7 +1315,7 @@ pub struct Operator(pub u16);
 
 impl Operator {
     #[inline]
-    pub fn value(&self) -> u16 { self.0 }
+    pub fn get(&self) -> u16 { self.0 }
 }
 
 
@@ -1385,7 +1326,7 @@ struct DictionaryParser<'a> {
     // Offset to the last operands start.
     operands_offset: usize,
     // Actual operands.
-    operands: [Number; MAX_OPERANDS_LEN], // 192B
+    operands: [i32; MAX_OPERANDS_LEN], // 192B
     // An amount of operands in the `operands` array.
     operands_len: u8,
 }
@@ -1397,7 +1338,7 @@ impl<'a> DictionaryParser<'a> {
             data,
             offset: 0,
             operands_offset: 0,
-            operands: [Number::Integer(0); MAX_OPERANDS_LEN],
+            operands: [0; MAX_OPERANDS_LEN],
             operands_len: 0,
         }
     }
@@ -1407,7 +1348,7 @@ impl<'a> DictionaryParser<'a> {
         let mut s = Stream::new_at(self.data, self.offset);
         self.operands_offset = self.offset;
         while !s.at_end() {
-            let b: u8 = s.read().ok()?;
+            let b: u8 = s.read()?;
             // 0..=21 bytes are operators.
             if is_dict_one_byte_op(b) {
                 let mut operator = b as u16;
@@ -1416,7 +1357,7 @@ impl<'a> DictionaryParser<'a> {
                 if b == TWO_BYTE_OPERATOR_MARK {
                     // Use a 1200 'prefix' to make two byte operators more readable.
                     // 12 3 => 1203
-                    operator = 1200 + s.read::<u8>().ok()? as u16;
+                    operator = 1200 + s.read::<u8>()? as u16;
                 }
 
                 self.offset = s.offset();
@@ -1439,7 +1380,7 @@ impl<'a> DictionaryParser<'a> {
     ///
     /// We still have to "skip" operands during operators search (see `skip_number()`),
     /// but it's still faster that a naive method.
-    fn parse_operands(&mut self) -> Result<()> {
+    fn parse_operands(&mut self) -> Option<()> {
         let mut s = Stream::new_at(self.data, self.operands_offset);
         self.operands_len = 0;
         while !s.at_end() {
@@ -1458,11 +1399,11 @@ impl<'a> DictionaryParser<'a> {
             }
         }
 
-        Ok(())
+        Some(())
     }
 
     #[inline]
-    fn operands(&self) -> &[Number] {
+    fn operands(&self) -> &[i32] {
         &self.operands[..self.operands_len as usize]
     }
 }
@@ -1480,102 +1421,45 @@ pub fn is_dict_one_byte_op(b: u8) -> bool {
 }
 
 // Adobe Technical Note #5177, Table 3 Operand Encoding
-pub fn parse_number(b0: u8, s: &mut Stream) -> Result<Number> {
+pub fn parse_number(b0: u8, s: &mut Stream) -> Option<i32> {
     match b0 {
         28 => {
             let n = s.read::<u16>()? as i32;
-            Ok(Number::Integer(n))
+            Some(n)
         }
         29 => {
             let n = s.read::<u32>()? as i32;
-            Ok(Number::Integer(n))
+            Some(n)
         }
         30 => {
-            parse_float(s)
+            // We do not parse float, because we don't use it.
+            // And by skipping it we can remove the core::num::dec2flt dependency.
+            while !s.at_end() {
+                let b1: u8 = s.read()?;
+                let nibble1 = b1 >> 4;
+                let nibble2 = b1 & 15;
+                if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {
+                    break;
+                }
+            }
+            Some(0)
         }
         32..=246 => {
             let n = b0 as i32 - 139;
-            Ok(Number::Integer(n))
+            Some(n)
         }
         247..=250 => {
             let b1 = s.read::<u8>()? as i32;
             let n = (b0 as i32 - 247) * 256 + b1 + 108;
-            Ok(Number::Integer(n))
+            Some(n)
         }
         251..=254 => {
             let b1 = s.read::<u8>()? as i32;
             let n = -(b0 as i32 - 251) * 256 - b1 - 108;
-            Ok(Number::Integer(n))
+            Some(n)
         }
-        _ => Err(CFFError::InvalidOperand.into()),
+        _ => None,
     }
-}
-
-fn parse_float(s: &mut Stream) -> Result<Number> {
-    let mut data = [0u8; FLOAT_STACK_LEN];
-    let mut idx = 0;
-
-    loop {
-        let b1: u8 = s.read()?;
-        let nibble1 = b1 >> 4;
-        let nibble2 = b1 & 15;
-
-        if nibble1 == END_OF_FLOAT_FLAG {
-            break;
-        }
-
-        idx = parse_float_nibble(nibble1, idx, &mut data)?;
-
-        if nibble2 == END_OF_FLOAT_FLAG {
-            break;
-        }
-
-        idx = parse_float_nibble(nibble2, idx, &mut data)?;
-    }
-
-    let s = core::str::from_utf8(&data[..idx]).map_err(|_| CFFError::InvalidFloat)?;
-    let n = s.parse().map_err(|_| CFFError::InvalidFloat)?;
-    Ok(Number::Float(n))
-}
-
-// Adobe Technical Note #5176, Table 5 Nibble Definitions
-fn parse_float_nibble(nibble: u8, mut idx: usize, data: &mut [u8]) -> Result<usize> {
-    if idx == FLOAT_STACK_LEN {
-        return Err(CFFError::InvalidFloat.into());
-    }
-
-    match nibble {
-        0..=9 => {
-            data[idx] = b'0' + nibble;
-        }
-        10 => {
-            data[idx] = b'.';
-        }
-        11 => {
-            data[idx] = b'E';
-        }
-        12 => {
-            if idx + 1 == FLOAT_STACK_LEN {
-                return Err(CFFError::InvalidFloat.into());
-            }
-
-            data[idx] = b'E';
-            idx += 1;
-            data[idx] = b'-';
-        }
-        13 => {
-            return Err(CFFError::InvalidFloat.into());
-        }
-        14 => {
-            data[idx] = b'-';
-        }
-        _ => {
-            return Err(CFFError::InvalidFloat.into());
-        }
-    }
-
-    idx += 1;
-    Ok(idx)
 }
 
 // Just like `parse_number`, but doesn't actually parses the data.
@@ -1585,7 +1469,7 @@ pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
         29 => s.skip::<u32>(),
         30 => {
             while !s.at_end() {
-                let b1: u8 = s.read().ok()?;
+                let b1: u8 = s.read()?;
                 let nibble1 = b1 >> 4;
                 let nibble2 = b1 & 15;
                 if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {
@@ -1600,23 +1484,6 @@ pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
     }
 
     Some(())
-}
-
-
-#[derive(Clone, Copy, Debug)]
-pub enum Number {
-    Integer(i32),
-    Float(f32),
-}
-
-impl Number {
-    #[inline]
-    pub fn as_i32(&self) -> i32 {
-        match *self {
-            Number::Integer(n) => n,
-            Number::Float(n) => n as i32,
-        }
-    }
 }
 
 
@@ -1638,9 +1505,9 @@ impl<'a> ArgumentsStack<'a> {
     }
 
     #[inline]
-    pub fn push(&mut self, n: f32) -> Result<()> {
+    pub fn push(&mut self, n: f32) -> Result<(), CFFError> {
         if self.len == self.max_len {
-            Err(CFFError::ArgumentsStackLimitReached.into())
+            Err(CFFError::ArgumentsStackLimitReached)
         } else {
             self.data[self.len] = n;
             self.len += 1;
@@ -1879,8 +1746,7 @@ mod tests {
             UInt8(0), // absolute offset
         ]);
 
-        assert_eq!(parse_metadata(&data).unwrap_err().to_string(),
-                   "table has an unsupported version");
+        assert!(parse_metadata(&data).is_none());
     }
 
     #[test]
@@ -1930,10 +1796,11 @@ mod tests {
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let rect = parse_char_string(&metadata, GlyphId(0), &mut builder).unwrap();
+        let char_str = metadata.char_strings.get(0).unwrap();
+        let rect = parse_char_string(char_str, &metadata, &mut builder).unwrap();
 
         assert_eq!(builder.0, "M 10 0 Z ");
-        assert_eq!(rect, Some(Rect { x_min: 10, y_min: 0, x_max: 10, y_max: 0 }));
+        assert_eq!(rect, Rect { x_min: 10, y_min: 0, x_max: 10, y_max: 0 });
     }
 
     fn rect(x_min: i16, y_min: i16, x_max: i16, y_max: i16) -> Rect {
@@ -1947,10 +1814,11 @@ mod tests {
                 let data = gen_cff($glob, $loc, $values);
                 let metadata = parse_metadata(&data).unwrap();
                 let mut builder = Builder(String::new());
-                let rect = parse_char_string(&metadata, GlyphId(0), &mut builder).unwrap();
+                let char_str = metadata.char_strings.get(0).unwrap();
+                let rect = parse_char_string(char_str, &metadata, &mut builder).unwrap();
 
                 assert_eq!(builder.0, $path);
-                assert_eq!(rect, Some($rect_res));
+                assert_eq!(rect, $rect_res);
             }
         };
     }
@@ -1968,7 +1836,8 @@ mod tests {
                 let data = gen_cff(&[], &[], $values);
                 let metadata = parse_metadata(&data).unwrap();
                 let mut builder = Builder(String::new());
-                let res = parse_char_string(&metadata, GlyphId(0), &mut builder);
+                let char_str = metadata.char_strings.get(0).unwrap();
+                let res = parse_char_string(char_str, &metadata, &mut builder);
 
                 assert_eq!(res.unwrap_err().to_string(), $err);
             }
@@ -2137,10 +2006,8 @@ mod tests {
         let data = gen_cff(&[], &[], &[UInt8(operator::ENDCHAR)]);
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let rect = parse_char_string(&metadata, GlyphId(0), &mut builder).unwrap();
-
-        assert_eq!(builder.0, "");
-        assert_eq!(rect, None);
+        let char_str = metadata.char_strings.get(0).unwrap();
+        assert!(parse_char_string(char_str, &metadata, &mut builder).is_err());
     }
 
     test_cs_with_subrs!(local_subr,
@@ -2202,117 +2069,117 @@ mod tests {
     test_cs_err!(reserved_operator, &[
         CFFInt(10), UInt8(2),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid operator occurred");
+    ], "an invalid operator occurred");
 
     test_cs_err!(line_to_without_move_to, &[
         CFFInt(10), CFFInt(20), UInt8(operator::LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause missing moveto operator");
+    ], "missing moveto operator");
 
     // Width must be set only once.
     test_cs_err!(two_vmove_to_with_width, &[
         CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
         CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(move_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(10), CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(move_to_with_not_enought_coords, &[
         CFFInt(10), UInt8(operator::MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(hmove_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::HORIZONTAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(hmove_to_with_not_enought_coords, &[
         UInt8(operator::HORIZONTAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(vmove_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::VERTICAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(vmove_to_with_not_enought_coords, &[
         UInt8(operator::VERTICAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(line_to_with_single_coord, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), UInt8(operator::LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(line_to_with_odd_number_of_coord, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(hline_to_without_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         UInt8(operator::HORIZONTAL_LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(vline_to_without_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         UInt8(operator::VERTICAL_LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(curve_to_with_invalid_num_of_coords_1, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(curve_to_with_invalid_num_of_coords_2, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80), CFFInt(90),
         UInt8(operator::CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(hh_curve_to_with_not_enought_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::HH_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(hh_curve_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
         UInt8(operator::HH_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(vv_curve_to_with_not_enought_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::VV_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(vv_curve_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
         UInt8(operator::VV_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause an invalid amount of items are in an arguments stack");
+    ], "an invalid amount of items are in an arguments stack");
 
     test_cs_err!(multiple_endchar, &[
         UInt8(operator::ENDCHAR),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause unused data left after 'endchar' operator");
+    ], "unused data left after 'endchar' operator");
 
     test_cs_err!(operands_overflow, &[
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
@@ -2320,7 +2187,7 @@ mod tests {
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-    ], "CFF table parsing failed cause arguments stack limit reached");
+    ], "arguments stack limit reached");
 
     test_cs_err!(operands_overflow_with_4_byte_ints, &[
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
@@ -2333,13 +2200,13 @@ mod tests {
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-    ], "CFF table parsing failed cause arguments stack limit reached");
+    ], "arguments stack limit reached");
 
     test_cs_err!(bbox_overflow, &[
         CFFInt(32767), UInt8(operator::HORIZONTAL_MOVE_TO),
         CFFInt(32767), UInt8(operator::HORIZONTAL_LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "CFF table parsing failed cause outline's bounding box is too large");
+    ], "outline's bounding box is too large");
 
     #[test]
     fn endchar_in_subr_with_extra_data_1() {
@@ -2364,9 +2231,10 @@ mod tests {
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let res = parse_char_string(&metadata, GlyphId(0), &mut builder);
+        let char_str = metadata.char_strings.get(0).unwrap();
+        let res = parse_char_string(char_str, &metadata, &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
-                   "CFF table parsing failed cause unused data left after 'endchar' operator");
+                   "unused data left after 'endchar' operator");
     }
 
     #[test]
@@ -2392,9 +2260,10 @@ mod tests {
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let res = parse_char_string(&metadata, GlyphId(0), &mut builder);
+        let char_str = metadata.char_strings.get(0).unwrap();
+        let res = parse_char_string(char_str, &metadata, &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
-                   "CFF table parsing failed cause unused data left after 'endchar' operator");
+                   "unused data left after 'endchar' operator");
     }
 
     #[test]
@@ -2420,9 +2289,10 @@ mod tests {
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let res = parse_char_string(&metadata, GlyphId(0), &mut builder);
+        let char_str = metadata.char_strings.get(0).unwrap();
+        let res = parse_char_string(char_str, &metadata, &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
-                   "CFF table parsing failed cause unused data left after 'endchar' operator");
+                   "unused data left after 'endchar' operator");
     }
 
     #[test]
@@ -2443,9 +2313,10 @@ mod tests {
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let res = parse_char_string(&metadata, GlyphId(0), &mut builder);
+        let char_str = metadata.char_strings.get(0).unwrap();
+        let res = parse_char_string(char_str, &metadata, &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
-                   "CFF table parsing failed cause subroutines nesting limit reached");
+                   "subroutines nesting limit reached");
     }
 
     #[test]
@@ -2466,9 +2337,10 @@ mod tests {
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let res = parse_char_string(&metadata, GlyphId(0), &mut builder);
+        let char_str = metadata.char_strings.get(0).unwrap();
+        let res = parse_char_string(char_str, &metadata, &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
-                   "CFF table parsing failed cause subroutines nesting limit reached");
+                   "subroutines nesting limit reached");
     }
 
     #[test]
@@ -2492,9 +2364,10 @@ mod tests {
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
-        let res = parse_char_string(&metadata, GlyphId(0), &mut builder);
+        let char_str = metadata.char_strings.get(0).unwrap();
+        let res = parse_char_string(char_str, &metadata, &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
-                   "CFF table parsing failed cause subroutines nesting limit reached");
+                   "subroutines nesting limit reached");
     }
 
     #[test]
@@ -2520,8 +2393,7 @@ mod tests {
             UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
         ]);
 
-        assert_eq!(parse_metadata(&data).unwrap_err().to_string(),
-                   "CFF table parsing failed cause table doesn't have any char strings");
+        assert!(parse_metadata(&data).is_none());
     }
 
     #[test]
@@ -2547,8 +2419,7 @@ mod tests {
             UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
         ]);
 
-        assert_eq!(parse_metadata(&data).unwrap_err().to_string(),
-                   "an attempt to slice out of bounds");
+        assert!(parse_metadata(&data).is_none());
     }
 
     #[test]
@@ -2559,7 +2430,7 @@ mod tests {
             // other data doesn't matter
         ]);
 
-        assert!(parse_index(&mut Stream::new(&data)).is_ok());
+        assert!(parse_index(&mut Stream::new(&data)).is_some());
     }
 
     #[test]
@@ -2570,8 +2441,7 @@ mod tests {
             // other data doesn't matter
         ]);
 
-        assert_eq!(parse_index(&mut Stream::new(&data)).unwrap_err().to_string(),
-                   "CFF table parsing failed cause OffSize with an invalid value occurred");
+        assert!(parse_index(&mut Stream::new(&data)).is_none());
     }
 
     #[test]
@@ -2582,8 +2452,7 @@ mod tests {
             // other data doesn't matter
         ]);
 
-        assert_eq!(parse_index(&mut Stream::new(&data)).unwrap_err().to_string(),
-                   "CFF table parsing failed cause OffSize with an invalid value occurred");
+        assert!(parse_index(&mut Stream::new(&data)).is_none());
     }
 
     #[test]

@@ -293,90 +293,90 @@ fn superscript_metrics() {
 fn glyph_hor_metrics_1() {
     let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_hor_advance(GlyphId(0)).unwrap(), Some(653));
-    assert_eq!(font.glyph_hor_side_bearing(GlyphId(0)).unwrap(), Some(89));
+    assert_eq!(font.glyph_hor_advance(GlyphId(0)), Some(653));
+    assert_eq!(font.glyph_hor_side_bearing(GlyphId(0)), Some(89));
 }
 
 #[test]
 fn glyph_ver_metrics_1() {
     let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_ver_advance(GlyphId(0)).unwrap(), Some(1000));
-    assert_eq!(font.glyph_ver_side_bearing(GlyphId(0)).unwrap(), Some(666));
+    assert_eq!(font.glyph_ver_advance(GlyphId(0)), Some(1000));
+    assert_eq!(font.glyph_ver_side_bearing(GlyphId(0)), Some(666));
 }
 
 #[test]
 fn glyph_ver_metrics_2() {
     let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_ver_advance(GlyphId(1)).unwrap(), Some(1000));
-    assert_eq!(font.glyph_ver_side_bearing(GlyphId(1)).unwrap(), Some(83));
+    assert_eq!(font.glyph_ver_advance(GlyphId(1)), Some(1000));
+    assert_eq!(font.glyph_ver_side_bearing(GlyphId(1)), Some(83));
 }
 
 #[test]
 fn glyph_class_1() {
     let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_class(GlyphId(0)).unwrap(), None);
+    assert_eq!(font.glyph_class(GlyphId(0)), None);
 }
 
 #[test]
 fn glyph_class_2() {
     let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_class(GlyphId(2)).unwrap(), Some(ttf::GlyphClass::Base));
+    assert_eq!(font.glyph_class(GlyphId(2)), Some(ttf::GlyphClass::Base));
 }
 
 #[test]
 fn glyph_class_3() {
     let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_class(GlyphId(4)).unwrap(), Some(ttf::GlyphClass::Mark));
+    assert_eq!(font.glyph_class(GlyphId(4)), Some(ttf::GlyphClass::Mark));
 }
 
 #[test]
 fn glyph_mark_attachment_class_1() {
     let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_mark_attachment_class(GlyphId(0)).unwrap(), ttf::Class(0));
+    assert_eq!(font.glyph_mark_attachment_class(GlyphId(0)), ttf::Class(0));
 }
 
 #[test]
 fn glyph_mark_attachment_class_2() {
     let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_mark_attachment_class(GlyphId(4)).unwrap(), ttf::Class(1));
+    assert_eq!(font.glyph_mark_attachment_class(GlyphId(4)), ttf::Class(1));
 }
 
 #[test]
 fn glyph_index_f00_01() {
     let data = fs::read("tests/fonts/cmap0_font1.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_index('4').unwrap(), Some(GlyphId(17)));
-    assert_eq!(font.glyph_index('5').unwrap(), Some(GlyphId(56)));
-    assert_eq!(font.glyph_index('6').unwrap(), Some(GlyphId(12)));
+    assert_eq!(font.glyph_index('4'), Some(GlyphId(17)));
+    assert_eq!(font.glyph_index('5'), Some(GlyphId(56)));
+    assert_eq!(font.glyph_index('6'), Some(GlyphId(12)));
 }
 
 #[test]
 fn glyph_index_f02_01() {
     let data = fs::read("tests/fonts/cmap2_font1.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_index('4').unwrap(), Some(GlyphId(17)));
-    assert_eq!(font.glyph_index('5').unwrap(), Some(GlyphId(56)));
-    assert_eq!(font.glyph_index('6').unwrap(), Some(GlyphId(12)));
-    assert_eq!(font.glyph_index('\u{8432}').unwrap(), Some(GlyphId(20)));
-    assert_eq!(font.glyph_index('\u{8433}').unwrap(), Some(GlyphId(21)));
-    assert_eq!(font.glyph_index('\u{8434}').unwrap(), Some(GlyphId(22)));
-    assert_eq!(font.glyph_index('\u{9232}').unwrap(), Some(GlyphId(23)));
-    assert_eq!(font.glyph_index('\u{9233}').unwrap(), Some(GlyphId(24)));
-    assert_eq!(font.glyph_index('\u{9234}').unwrap(), Some(GlyphId(25)));
+    assert_eq!(font.glyph_index('4'), Some(GlyphId(17)));
+    assert_eq!(font.glyph_index('5'), Some(GlyphId(56)));
+    assert_eq!(font.glyph_index('6'), Some(GlyphId(12)));
+    assert_eq!(font.glyph_index('\u{8432}'), Some(GlyphId(20)));
+    assert_eq!(font.glyph_index('\u{8433}'), Some(GlyphId(21)));
+    assert_eq!(font.glyph_index('\u{8434}'), Some(GlyphId(22)));
+    assert_eq!(font.glyph_index('\u{9232}'), Some(GlyphId(23)));
+    assert_eq!(font.glyph_index('\u{9233}'), Some(GlyphId(24)));
+    assert_eq!(font.glyph_index('\u{9234}'), Some(GlyphId(25)));
 }
 
 #[test]
 fn glyph_index_f04_01() {
     let data = fs::read("tests/fonts/TestCMAP14.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_index('芦').unwrap().unwrap(), GlyphId(1));
+    assert_eq!(font.glyph_index('芦'), Some(GlyphId(1)));
 }
 
 #[test]
@@ -384,17 +384,17 @@ fn glyph_index_f06_01() {
     let data = fs::read("tests/fonts/cmap-6.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
 
-    assert_eq!(font.glyph_index('"').unwrap(), Some(GlyphId(6)));
-    assert_eq!(font.glyph_index('#').unwrap(), Some(GlyphId(7)));
-    assert_eq!(font.glyph_index('$').unwrap(), Some(GlyphId(5)));
+    assert_eq!(font.glyph_index('"'), Some(GlyphId(6)));
+    assert_eq!(font.glyph_index('#'), Some(GlyphId(7)));
+    assert_eq!(font.glyph_index('$'), Some(GlyphId(5)));
 
     // Char before character map.
     // Should not overflow.
-    assert_eq!(font.glyph_index('!').unwrap(), None);
+    assert_eq!(font.glyph_index('!'), None);
 
     // Char after character map.
     // Should not read out of bounds.
-    assert_eq!(font.glyph_index('A').unwrap(), None);
+    assert_eq!(font.glyph_index('A'), None);
 }
 
 #[test]
@@ -402,31 +402,31 @@ fn glyph_index_f10_01() {
     let data = fs::read("tests/fonts/cmap-10.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
 
-    assert_eq!(font.glyph_index('\u{109423}').unwrap(), Some(GlyphId(26)));
-    assert_eq!(font.glyph_index('\u{109424}').unwrap(), Some(GlyphId(27)));
-    assert_eq!(font.glyph_index('\u{109425}').unwrap(), Some(GlyphId(32)));
+    assert_eq!(font.glyph_index('\u{109423}'), Some(GlyphId(26)));
+    assert_eq!(font.glyph_index('\u{109424}'), Some(GlyphId(27)));
+    assert_eq!(font.glyph_index('\u{109425}'), Some(GlyphId(32)));
 
     // Char before character map.
     // Should not overflow.
-    assert_eq!(font.glyph_index('!').unwrap(), None);
+    assert_eq!(font.glyph_index('!'), None);
 
     // Char after character map.
     // Should not read out of bounds.
-    assert_eq!(font.glyph_index('\u{109426}').unwrap(), None);
+    assert_eq!(font.glyph_index('\u{109426}'), None);
 }
 
 #[test]
 fn glyph_index_f12_01() {
     let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_index('明').unwrap(), Some(GlyphId(1)));
+    assert_eq!(font.glyph_index('明'), Some(GlyphId(1)));
 }
 
 #[test]
 fn glyph_variation_index_01() {
     let data = fs::read("tests/fonts/TestCMAP14.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_variation_index('芦', '\u{E0101}').unwrap(), Some(GlyphId(2)));
+    assert_eq!(font.glyph_variation_index('芦', '\u{E0101}'), Some(GlyphId(2)));
 }
 
 #[test]
@@ -434,15 +434,15 @@ fn glyphs_kerning_01() {
     let data = fs::read("tests/fonts/TestKERNOne.otf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
 
-    let t_id = font.glyph_index('T').unwrap().unwrap();
-    let u_id = font.glyph_index('u').unwrap().unwrap();
-    let dotless_i_id = font.glyph_index('\u{131}').unwrap().unwrap();
+    let t_id = font.glyph_index('T').unwrap();
+    let u_id = font.glyph_index('u').unwrap();
+    let dotless_i_id = font.glyph_index('\u{131}').unwrap();
 
-    assert_eq!(font.glyphs_kerning(t_id, dotless_i_id).unwrap(), Some(-200));
-    assert_eq!(font.glyphs_kerning(t_id, u_id).unwrap(), Some(-200));
-    assert_eq!(font.glyphs_kerning(dotless_i_id, t_id).unwrap(), Some(-200));
-    assert_eq!(font.glyphs_kerning(dotless_i_id, dotless_i_id).unwrap(), Some(500));
-    assert_eq!(font.glyphs_kerning(u_id, t_id).unwrap(), Some(-200));
+    assert_eq!(font.glyphs_kerning(t_id, dotless_i_id), Some(-200));
+    assert_eq!(font.glyphs_kerning(t_id, u_id), Some(-200));
+    assert_eq!(font.glyphs_kerning(dotless_i_id, t_id), Some(-200));
+    assert_eq!(font.glyphs_kerning(dotless_i_id, dotless_i_id), Some(500));
+    assert_eq!(font.glyphs_kerning(u_id, t_id), Some(-200));
 }
 
 #[test]
@@ -451,8 +451,8 @@ fn glyphs_kerning_02() {
     let font = Font::from_data(&data, 0).unwrap();
 
     // Random GID's.
-    assert_eq!(font.glyphs_kerning(GlyphId(0), GlyphId(0)).unwrap(), None);
-    assert_eq!(font.glyphs_kerning(GlyphId(0), GlyphId(100)).unwrap(), None);
+    assert_eq!(font.glyphs_kerning(GlyphId(0), GlyphId(0)), None);
+    assert_eq!(font.glyphs_kerning(GlyphId(0), GlyphId(100)), None);
 }
 
 // An attempt to check that table slices are still valid after moving.
@@ -481,8 +481,8 @@ fn glyph_name_01() {
     let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
 
-    assert_eq!(font.glyph_name(GlyphId(0)).unwrap(), Some(".notdef"));
-    assert_eq!(font.glyph_name(GlyphId(59)).unwrap(), Some("Amacron"));
-    assert_eq!(font.glyph_name(GlyphId(285)).unwrap(), Some("uni01050301"));
-    assert_eq!(font.glyph_name(GlyphId(10000)).unwrap(), None);
+    assert_eq!(font.glyph_name(GlyphId(0)), Some(".notdef"));
+    assert_eq!(font.glyph_name(GlyphId(59)), Some("Amacron"));
+    assert_eq!(font.glyph_name(GlyphId(285)), Some("uni01050301"));
+    assert_eq!(font.glyph_name(GlyphId(10000)), None);
 }

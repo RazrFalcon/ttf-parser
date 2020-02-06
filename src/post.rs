@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
-use crate::{Font, LineMetrics, GlyphId, Result};
+use crate::{Font, LineMetrics, GlyphId};
 use crate::parser::{Stream, Fixed};
 
 
@@ -270,9 +270,9 @@ const MACINTOSH_NAMES: &[&str] = &[
 impl<'a> Font<'a> {
     /// Parses font's underline metrics.
     #[inline]
-    pub fn underline_metrics(&self) -> Result<LineMetrics> {
+    pub fn underline_metrics(&self) -> Option<LineMetrics> {
         let mut s = Stream::new_at(self.post?, 8); // TODO: to raw
-        Ok(LineMetrics {
+        Some(LineMetrics {
             position: s.read()?,
             thickness: s.read()?,
         })
@@ -284,32 +284,32 @@ impl<'a> Font<'a> {
     ///
     /// Returns `Ok(None)` when no name is associated with a `glyph`.
     #[inline]
-    pub fn glyph_name(&self, glyph: GlyphId) -> Result<Option<&str>> {
+    pub fn glyph_name(&self, glyph: GlyphId) -> Option<&str> {
         let mut s = Stream::new(self.post?);
         let version: Fixed = s.read()?;
 
         // In case of version 1.0 we are using predefined set of names.
         if version.0 == 1.0 {
             return if (glyph.0 as usize) < MACINTOSH_NAMES.len() {
-                Ok(Some(MACINTOSH_NAMES[glyph.0 as usize]))
+                Some(MACINTOSH_NAMES[glyph.0 as usize])
             } else {
-                Ok(None)
+                None
             };
         }
 
         // Only version 2.0 of the table has data at the end.
         if version.0 != 2.0 || s.at_end() {
-            return Ok(None);
+            return None;
         }
 
         s.advance(28_u32); // Jump to the end of the base table.
         let name_indexes = s.read_array16::<u16>()?;
-        let mut index = try_ok!(name_indexes.get(glyph.0));
+        let mut index = name_indexes.get(glyph.0)?;
 
         // 'If the name index is between 0 and 257, treat the name index
         // as a glyph index in the Macintosh standard order.'
         if (index as usize) < MACINTOSH_NAMES.len() {
-            Ok(Some(MACINTOSH_NAMES[index as usize]))
+            Some(MACINTOSH_NAMES[index as usize])
         } else {
             // 'If the name index is between 258 and 65535, then subtract 258 and use that
             // to index into the list of Pascal strings at the end of the table.'
@@ -325,10 +325,7 @@ impl<'a> Font<'a> {
                         break;
                     } else {
                         let name = s.read_bytes(len as u16)?;
-                        return match core::str::from_utf8(name) {
-                            Ok(v) => Ok(Some(v)),
-                            Err(_) => Ok(None), // TODO: custom error
-                        };
+                        return core::str::from_utf8(name).ok();
                     }
                 } else {
                     s.advance(len as u16);
@@ -337,7 +334,7 @@ impl<'a> Font<'a> {
                 i += 1;
             }
 
-            Ok(None)
+            None
         }
     }
 }

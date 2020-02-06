@@ -23,6 +23,7 @@ pub struct TTCHeader<'a> {
 }
 
 impl<'a> TTCHeader<'a> {
+    #[allow(dead_code)]
     pub const SIZE: usize = 12;
 
     #[inline(always)]
@@ -51,6 +52,7 @@ pub struct TableRecord {
 }
 
 impl TableRecord {
+    #[allow(dead_code)]
     pub const SIZE: usize = 16;
 
     #[inline(always)]
@@ -99,12 +101,14 @@ pub mod head {
     }
 
     impl<'a> Table<'a> {
-        pub const SIZE: usize = 54;
-
         #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table {
-                data: array_ref![input, 54],
+        pub fn parse(input: &'a [u8]) -> Option<Self> {
+            if input.len() == 54 {
+                Some(Table {
+                    data: array_ref![input, 54],
+                })
+            } else {
+                None
             }
         }
 
@@ -120,42 +124,23 @@ pub mod head {
     }
 }
 
-pub mod maxp {
-    #[derive(Clone, Copy)]
-    pub struct Table<'a> {
-        data: &'a [u8; 6],
-    }
-
-    impl<'a> Table<'a> {
-        pub const SIZE: usize = 6;
-
-        #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table {
-                data: array_ref![input, 6],
-            }
-        }
-
-        #[inline(always)]
-        pub fn num_glyphs(&self) -> u16 {
-            u16::from_be_bytes([self.data[4], self.data[5]])
-        }
-    }
-}
-
 pub mod hhea {
+    use core::num::NonZeroU16;
+
     #[derive(Clone, Copy)]
     pub struct Table<'a> {
         data: &'a [u8; 36],
     }
 
     impl<'a> Table<'a> {
-        pub const SIZE: usize = 36;
-
         #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table {
-                data: array_ref![input, 36],
+        pub fn parse(input: &'a [u8]) -> Option<Self> {
+            if input.len() == 36 {
+                Some(Table {
+                    data: array_ref![input, 36],
+                })
+            } else {
+                None
             }
         }
 
@@ -175,8 +160,8 @@ pub mod hhea {
         }
 
         #[inline(always)]
-        pub fn number_of_h_metrics(&self) -> u16 {
-            u16::from_be_bytes([self.data[34], self.data[35]])
+        pub fn number_of_h_metrics(&self) -> Option<NonZeroU16> {
+            NonZeroU16::new(u16::from_be_bytes([self.data[34], self.data[35]]))
         }
     }
 }
@@ -190,6 +175,7 @@ pub mod hmtx {
     }
 
     impl HorizontalMetrics {
+        #[allow(dead_code)]
         pub const SIZE: usize = 4;
 
         #[inline(always)]
@@ -221,18 +207,22 @@ pub mod hmtx {
 }
 
 pub mod vhea {
+    use core::num::NonZeroU16;
+
     #[derive(Clone, Copy)]
     pub struct Table<'a> {
         data: &'a [u8; 36],
     }
 
     impl<'a> Table<'a> {
-        pub const SIZE: usize = 36;
-
         #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table {
-                data: array_ref![input, 36],
+        pub fn parse(input: &'a [u8]) -> Option<Self> {
+            if input.len() == 36 {
+                Some(Table {
+                    data: array_ref![input, 36],
+                })
+            } else {
+                None
             }
         }
 
@@ -252,8 +242,8 @@ pub mod vhea {
         }
 
         #[inline(always)]
-        pub fn num_of_long_ver_metrics(&self) -> u16 {
-            u16::from_be_bytes([self.data[34], self.data[35]])
+        pub fn num_of_long_ver_metrics(&self) -> Option<NonZeroU16> {
+            NonZeroU16::new(u16::from_be_bytes([self.data[34], self.data[35]]))
         }
     }
 }
@@ -268,6 +258,7 @@ pub mod cmap {
     }
 
     impl EncodingRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 8;
 
         #[inline(always)]
@@ -313,6 +304,7 @@ pub mod cmap {
     }
 
     impl SubHeaderRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 8;
 
         #[inline(always)]
@@ -358,6 +350,7 @@ pub mod cmap {
     }
 
     impl SequentialMapGroup {
+        #[allow(dead_code)]
         pub const SIZE: usize = 12;
 
         #[inline(always)]
@@ -398,6 +391,7 @@ pub mod cmap {
     }
 
     impl UnicodeRangeRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 4;
 
         #[inline(always)]
@@ -433,6 +427,7 @@ pub mod cmap {
     }
 
     impl UVSMappingRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 5;
 
         #[inline(always)]
@@ -468,6 +463,7 @@ pub mod cmap {
     }
 
     impl VariationSelectorRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 11;
 
         #[inline(always)]
@@ -518,20 +514,18 @@ pub mod os_2 {
 
     #[derive(Clone, Copy)]
     pub struct Table<'a> {
-        pub data: &'a [u8],
+        data: &'a [u8; 78],
     }
 
     impl<'a> Table<'a> {
-        pub const MIN_SIZE: usize = 78;
+        #[allow(dead_code)]
+        pub const SIZE: usize = 78;
 
         #[inline(always)]
         pub fn new(input: &'a [u8]) -> Self {
-            Table { data: input }
-        }
-
-        #[inline(always)]
-        pub fn version(&self) -> u16 {
-            u16::from_be_bytes([self.data[0], self.data[1]])
+            Table {
+                data: array_ref![input, 78],
+            }
         }
 
         #[inline(always)]
@@ -623,6 +617,7 @@ pub mod name {
     }
 
     impl NameRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 12;
 
         #[inline(always)]
@@ -665,55 +660,9 @@ pub mod name {
 }
 
 pub mod gdef {
-    use crate::parser::{FromData, Offset16};
+    use crate::parser::FromData;
     use crate::GlyphId;
     use core::ops::RangeInclusive;
-
-    pub const MARK_GLYPH_SETS_DEF_OFFSET_OFFSET: usize = 12;
-
-    #[derive(Clone, Copy)]
-    pub struct Table<'a> {
-        pub data: &'a [u8],
-    }
-
-    impl<'a> Table<'a> {
-        pub const MIN_SIZE: usize = 12;
-
-        #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table { data: input }
-        }
-
-        #[inline(always)]
-        pub fn major_version(&self) -> u16 {
-            u16::from_be_bytes([self.data[0], self.data[1]])
-        }
-
-        #[inline(always)]
-        pub fn minor_version(&self) -> u16 {
-            u16::from_be_bytes([self.data[2], self.data[3]])
-        }
-
-        #[inline(always)]
-        pub fn glyph_class_def_offset(&self) -> Option<Offset16> {
-            let n = u16::from_be_bytes([self.data[4], self.data[5]]);
-            if n != 0 {
-                Some(Offset16(n))
-            } else {
-                None
-            }
-        }
-
-        #[inline(always)]
-        pub fn mark_attach_class_def_offset(&self) -> Option<Offset16> {
-            let n = u16::from_be_bytes([self.data[10], self.data[11]]);
-            if n != 0 {
-                Some(Offset16(n))
-            } else {
-                None
-            }
-        }
-    }
 
     #[derive(Clone, Copy)]
     pub struct ClassRangeRecord {
@@ -721,6 +670,7 @@ pub mod gdef {
     }
 
     impl ClassRangeRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 6;
 
         #[inline(always)]
@@ -757,6 +707,7 @@ pub mod gdef {
     }
 
     impl RangeRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 6;
 
         #[inline(always)]
@@ -787,53 +738,13 @@ pub mod gsubgpos {
     use crate::parser::{FromData, Offset16, Offset32};
     use crate::Tag;
 
-    pub const FEATURE_VARIATIONS_OFFSET_OFFSET: usize = 10;
-
-    #[derive(Clone, Copy)]
-    pub struct Table<'a> {
-        pub data: &'a [u8],
-    }
-
-    impl<'a> Table<'a> {
-        pub const MIN_SIZE: usize = 10;
-
-        #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table { data: input }
-        }
-
-        #[inline(always)]
-        pub fn major_version(&self) -> u16 {
-            u16::from_be_bytes([self.data[0], self.data[1]])
-        }
-
-        #[inline(always)]
-        pub fn minor_version(&self) -> u16 {
-            u16::from_be_bytes([self.data[2], self.data[3]])
-        }
-
-        #[inline(always)]
-        pub fn script_list_offset(&self) -> Offset16 {
-            Offset16(u16::from_be_bytes([self.data[4], self.data[5]]))
-        }
-
-        #[inline(always)]
-        pub fn feature_list_offset(&self) -> Offset16 {
-            Offset16(u16::from_be_bytes([self.data[6], self.data[7]]))
-        }
-
-        #[inline(always)]
-        pub fn lookup_list_offset(&self) -> Offset16 {
-            Offset16(u16::from_be_bytes([self.data[8], self.data[9]]))
-        }
-    }
-
     #[derive(Clone, Copy)]
     pub struct Record {
         data: [u8; 6],
     }
 
     impl Record {
+        #[allow(dead_code)]
         pub const SIZE: usize = 6;
 
         #[inline(always)]
@@ -871,6 +782,7 @@ pub mod gsubgpos {
     }
 
     impl Condition {
+        #[allow(dead_code)]
         pub const SIZE: usize = 8;
 
         #[inline(always)]
@@ -916,6 +828,7 @@ pub mod gsubgpos {
     }
 
     impl FeatureVariationRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 8;
 
         #[inline(always)]
@@ -957,32 +870,8 @@ pub mod gsubgpos {
 }
 
 pub mod fvar {
-    use crate::parser::{FromData, Offset16};
+    use crate::parser::FromData;
     use crate::Tag;
-
-    #[derive(Clone, Copy)]
-    pub struct Table<'a> {
-        pub data: &'a [u8],
-    }
-
-    impl<'a> Table<'a> {
-        pub const MIN_SIZE: usize = 16;
-
-        #[inline(always)]
-        pub fn new(input: &'a [u8]) -> Self {
-            Table { data: input }
-        }
-
-        #[inline(always)]
-        pub fn axes_array_offset(&self) -> Offset16 {
-            Offset16(u16::from_be_bytes([self.data[4], self.data[5]]))
-        }
-
-        #[inline(always)]
-        pub fn axis_count(&self) -> u16 {
-            u16::from_be_bytes([self.data[8], self.data[9]])
-        }
-    }
 
     #[derive(Clone, Copy)]
     pub struct VariationAxisRecord {
@@ -990,6 +879,7 @@ pub mod fvar {
     }
 
     impl VariationAxisRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 20;
 
         #[inline(always)]
@@ -1052,6 +942,7 @@ pub mod vorg {
     }
 
     impl VertOriginYMetrics {
+        #[allow(dead_code)]
         pub const SIZE: usize = 4;
 
         #[inline(always)]
@@ -1092,6 +983,7 @@ pub mod mvar {
     }
 
     impl ValueRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 8;
 
         #[inline(always)]
@@ -1134,6 +1026,7 @@ pub mod mvar {
     }
 
     impl RegionAxisCoordinatesRecord {
+        #[allow(dead_code)]
         pub const SIZE: usize = 6;
 
         #[inline(always)]

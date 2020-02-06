@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
 
-use crate::{Font, Tag, Result, Error};
+use crate::{Font, Tag};
 use crate::parser::{Stream, Offset, Offset16, Offset32};
 use crate::raw::mvar as raw;
 
@@ -15,13 +15,13 @@ impl<'a> Font<'a> {
     /// Number of `coordinates` should be the same as number of variation axes in the font.
     ///
     /// Returns `None` when `MVAR` table is not present or invalid.
-    pub fn metrics_variation(&self, tag: Tag, coordinates: &[i32]) -> Result<Option<f32>> {
+    pub fn metrics_variation(&self, tag: Tag, coordinates: &[i32]) -> Option<f32> {
         let mut s = Stream::new(self.mvar?);
 
         let major_version: u16 = s.read()?;
         let minor_version: u16 = s.read()?;
         if !(major_version == 1 && minor_version == 0) {
-            return Ok(None);
+            return None;
         }
 
         s.skip::<u16>(); // reserved
@@ -29,15 +29,15 @@ impl<'a> Font<'a> {
 
         let count: u16 = s.read()?;
         if count == 0 {
-            return Ok(None);
+            return None;
         }
 
-        let variation_store_offset = bail!(s.read::<Option<Offset16>>());
+        let variation_store_offset = s.read::<Option<Offset16>>()?;
 
         let value_records = s.read_array::<raw::ValueRecord, u16>(count)?;
-        let (_, record) = try_ok!(value_records.binary_search_by(|r| r.value_tag().cmp(&tag)));
+        let (_, record) = value_records.binary_search_by(|r| r.value_tag().cmp(&tag))?;
 
-        let mut s2 = Stream::new_at(self.mvar?, variation_store_offset.to_usize());
+        let mut s2 = Stream::new_at(self.mvar?, variation_store_offset?.to_usize());
         parse_item_variation_store(
             record.delta_set_outer_index(), record.delta_set_inner_index(), coordinates, &mut s2,
         )
@@ -49,18 +49,18 @@ pub fn parse_item_variation_store(
     inner_index: u16,
     coordinates: &[i32],
     s: &mut Stream,
-) -> Result<Option<f32>> {
+) -> Option<f32> {
     let orig = s.clone();
 
     let format: u16 = s.read()?;
     if format != 1 {
-        return Err(Error::UnsupportedTableVersion);
+        return None;
     }
 
     let variation_region_list_offset: Offset32 = s.read()?;
     let item_variation_data_offsets = s.read_array16::<Offset32>()?;
 
-    let var_data_offset = try_ok!(item_variation_data_offsets.get(outer_index));
+    let var_data_offset = item_variation_data_offsets.get(outer_index)?;
     let mut s = orig.clone();
     s.advance(var_data_offset.0);
 
@@ -75,10 +75,10 @@ fn parse_item_variation_data(
     coordinates: &[i32],
     s: &mut Stream,
     region_s: Stream,
-) -> Result<Option<f32>> {
+) -> Option<f32> {
     let item_count: u16 = s.read()?;
     if inner_index >= item_count {
-        return Ok(None);
+        return None;
     }
 
     let short_delta_count: u16 = s.read()?;
@@ -89,25 +89,25 @@ fn parse_item_variation_data(
     let mut delta = 0.0;
     let mut i = 0;
     while i < short_delta_count {
-        let idx = try_ok!(region_indexes.get(i));
+        let idx = region_indexes.get(i)?;
         delta += s.read::<i16>()? as f32 * evaluate_region(idx, coordinates, region_s)?;
         i += 1;
     }
 
     while i < region_index_count {
-        let idx = try_ok!(region_indexes.get(i));
+        let idx = region_indexes.get(i)?;
         delta += s.read::<i8>()? as f32 * evaluate_region(idx, coordinates, region_s)?;
         i += 1;
     }
 
-    Ok(Some(delta))
+    Some(delta)
 }
 
 fn evaluate_region(
     index: u16,
     coordinates: &[i32],
     mut s: Stream,
-) -> Result<f32> {
+) -> Option<f32> {
 
     let axis_count: u16 = s.read()?;
     s.skip::<u16>(); // region_count
@@ -119,13 +119,13 @@ fn evaluate_region(
         let coord = coordinates.get(i as usize).cloned().unwrap_or(0);
         let factor = evaluate_axis(&record, coord);
         if factor == 0.0 {
-            return Ok(0.0);
+            return Some(0.0);
         }
 
         v *= factor;
     }
 
-    Ok(v)
+    Some(v)
 }
 
 fn evaluate_axis(axis: &raw::RegionAxisCoordinatesRecord, coord: i32) -> f32 {

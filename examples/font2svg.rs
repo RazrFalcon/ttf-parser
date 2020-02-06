@@ -23,7 +23,7 @@ fn process() -> Result<(), Box<dyn std::error::Error>> {
     // Exclude IO operations.
     let now = std::time::Instant::now();
 
-    let font = ttf::Font::from_data(&font_data, 0)?;
+    let font = ttf::Font::from_data(&font_data, 0).ok_or("failed to open a font")?;
     let units_per_em = font.units_per_em().ok_or("invalid units per em")?;
     let scale = FONT_SIZE / units_per_em as f64;
 
@@ -129,16 +129,12 @@ fn glyph_to_path(
     path_buf.clear();
     let mut builder = Builder(path_buf);
     let bbox = match font.outline_glyph(glyph_id, &mut builder) {
-        Ok(Some(v)) => v,
-        Ok(None) => return,
-        Err(e) => {
-            eprintln!("Warning (glyph {}): {}.", glyph_id.0, e);
-            return;
-        }
+        Some(v) => v,
+        None => return,
     };
 
     let advance = match font.glyph_hor_advance(glyph_id) {
-        Ok(Some(v)) => v,
+        Some(v) => v,
         _ => return,
     };
 

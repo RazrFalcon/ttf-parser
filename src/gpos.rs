@@ -1,14 +1,13 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos
 
-use crate::{Font, Result};
+use crate::Font;
 use crate::ggg::*;
-use crate::raw;
 
 
 impl<'a> Font<'a> {
     /// Returns a reference to a [Glyph Positioning Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos).
-    pub fn positioning_table(&self) -> Result<PositioningTable<'a>> {
-        Ok(PositioningTable { data: self.gpos? })
+    pub fn positioning_table(&self) -> Option<PositioningTable<'a>> {
+        self.gpos.map(|table| PositioningTable { table })
     }
 }
 
@@ -16,24 +15,24 @@ impl<'a> Font<'a> {
 /// A reference to a [Glyph Positioning Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos).
 #[derive(Clone, Copy)]
 pub struct PositioningTable<'a> {
-    data: raw::gsubgpos::Table<'a>,
+    table: GsubGposTable<'a>,
 }
 
 impl<'a> GlyphPosSubTable for PositioningTable<'a> {
-    fn scripts(&self) -> Result<Scripts> {
-        parse_scripts(self.data)
+    fn scripts(&self) -> Scripts {
+        self.table.script
     }
 
-    fn features(&self) -> Result<Features> {
-        parse_features(self.data)
+    fn features(&self) -> Features {
+        self.table.features
     }
 
-    fn lookups(&self) -> Result<Lookups> {
-        parse_lookups(self.data)
+    fn lookups(&self) -> Lookups {
+        self.table.lookups
     }
 
-    fn feature_variations(&self) -> Result<FeatureVariations> {
-        parse_feature_variations(self.data)
+    fn feature_variations(&self) -> FeatureVariations {
+        self.table.feature_variations
     }
 }
 

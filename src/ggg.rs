@@ -2,128 +2,141 @@
 
 use core::convert::TryFrom;
 
-use crate::{GlyphId, Result, Error, Tag};
+use crate::{GlyphId, Tag};
 use crate::parser::*;
-use crate::raw;
 use crate::raw::gsubgpos::{Record, Condition, FeatureVariationRecord};
+
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct GsubGposTable<'a> {
+    pub script: Scripts<'a>,
+    pub features: Features<'a>,
+    pub lookups: Lookups<'a>,
+    pub feature_variations: FeatureVariations<'a>,
+}
+
+impl<'a> GsubGposTable<'a> {
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let version: u32 = s.read()?;
+        if version != 0x00010000 {
+            return None;
+        }
+
+        let script_list_offset: Offset16 = s.read()?;
+        let feature_list_offset: Offset16 = s.read()?;
+        let lookup_list_offset: Offset16 = s.read()?;
+
+        let mut feature_variations_offset: Option<Offset32> = None;
+        if version != 0x00010001 {
+            feature_variations_offset = s.read()?;
+        }
+
+        let mut table = GsubGposTable::default();
+
+        {
+            let data = data.get(script_list_offset.to_usize()..)?;
+            table.script = Scripts {
+                data,
+                records: Stream::new(data).read_array16()?,
+                index: 0,
+            };
+        }
+
+        {
+            let data = data.get(feature_list_offset.to_usize()..)?;
+            table.features = Features {
+                data,
+                records: Stream::new(data).read_array16()?,
+                index: 0,
+            };
+        }
+
+        {
+            let data = data.get(lookup_list_offset.to_usize()..)?;
+            table.lookups = Lookups {
+                data,
+                records: Stream::new(data).read_array16()?,
+                index: 0,
+            };
+        }
+
+        if let Some(offset) = feature_variations_offset {
+            let data = data.get(offset.to_usize()..)?;
+            let mut s = Stream::new(data);
+            s.skip::<u16>(); // majorVersion
+            s.skip::<u16>(); // minorVersion
+            table.feature_variations = FeatureVariations {
+                data,
+                records: s.read_array32()?,
+                index: 0,
+            };
+        }
+
+        Some(table)
+    }
+}
 
 
 /// A generic interface over GSUB/GPOS tables.
 pub trait GlyphPosSubTable {
     /// Returns an iterator over GSUB/GPOS table scripts.
-    fn scripts(&self) -> Result<Scripts>;
+    fn scripts(&self) -> Scripts;
 
     /// Returns a `Script` at `index`.
     ///
     /// Just a shorthand for:
     ///
     /// ```ignore
-    /// table.scripts()?.nth(index.0 as usize).transpose()
+    /// table.scripts().nth(index.0 as usize)
     /// ```
-    fn script_at(&self, index: ScriptIndex) -> Result<Option<Script>> {
-        self.scripts()?.nth(index.0 as usize).transpose()
+    fn script_at(&self, index: ScriptIndex) -> Option<Script> {
+        self.scripts().nth(index.0 as usize)
     }
 
     /// Returns an iterator over GSUB/GPOS table features.
-    fn features(&self) -> Result<Features>;
+    fn features(&self) -> Features;
 
     /// Returns a `Feature` at `index`.
     ///
     /// Just a shorthand for:
     ///
     /// ```ignore
-    /// table.features()?.nth(index.0 as usize).transpose()
+    /// table.features().nth(index.0 as usize)
     /// ```
-    fn feature_at(&self, index: FeatureIndex) -> Result<Option<Feature>> {
-        self.features()?.nth(index.0 as usize).transpose()
+    fn feature_at(&self, index: FeatureIndex) -> Option<Feature> {
+        self.features().nth(index.0 as usize)
     }
 
     /// Returns an iterator over GSUB/GPOS table lookups.
-    fn lookups(&self) -> Result<Lookups>;
+    fn lookups(&self) -> Lookups;
 
     /// Returns a `Lookup` at `index`.
     ///
     /// Just a shorthand for:
     ///
     /// ```ignore
-    /// table.lookups()?.nth(index.0 as usize).transpose()
+    /// table.lookups().nth(index.0 as usize)
     /// ```
-    fn lookup_at(&self, index: LookupIndex) -> Result<Option<Lookup>> {
-        self.lookups()?.nth(index.0 as usize).transpose()
+    fn lookup_at(&self, index: LookupIndex) -> Option<Lookup> {
+        self.lookups().nth(index.0 as usize)
     }
 
     /// Returns an iterator over GSUB/GPOS table feature variations.
     ///
     /// Iterator will be empty when font doesn't have Feature Variations data.
-    fn feature_variations(&self) -> Result<FeatureVariations>;
+    fn feature_variations(&self) -> FeatureVariations;
 
     /// Returns a `feature_variations` at `index`.
     ///
     /// Just a shorthand for:
     ///
     /// ```ignore
-    /// table.feature_variations()?.nth(index.0 as usize).transpose()
+    /// table.feature_variations().nth(index.0 as usize)
     /// ```
-    fn feature_variation_at(&self, index: FeatureVariationIndex) -> Result<Option<FeatureVariation>> {
-        self.feature_variations()?.nth(index.0 as usize).transpose()
+    fn feature_variation_at(&self, index: FeatureVariationIndex) -> Option<FeatureVariation> {
+        self.feature_variations().nth(index.0 as usize)
     }
-}
-
-pub(crate) fn parse_scripts(table: raw::gsubgpos::Table) -> Result<Scripts> {
-    let data = table.data.try_slice_from(table.script_list_offset())?;
-    let mut s = Stream::new(data);
-    let count: u16 = s.read()?;
-    Ok(Scripts {
-        data,
-        records: s.read_array(count)?,
-        index: 0,
-    })
-}
-
-pub(crate) fn parse_features(table: raw::gsubgpos::Table) -> Result<Features> {
-    let data = table.data.try_slice_from(table.feature_list_offset())?;
-    let mut s = Stream::new(data);
-    let count: u16 = s.read()?;
-    Ok(Features {
-        data,
-        records: s.read_array(count)?,
-        index: 0,
-    })
-}
-
-pub(crate) fn parse_lookups(table: raw::gsubgpos::Table) -> Result<Lookups> {
-    let data = table.data.try_slice_from(table.lookup_list_offset())?;
-    let mut s = Stream::new(data);
-    let count: u16 = s.read()?;
-    Ok(Lookups {
-        data,
-        records: s.read_array(count)?,
-        index: 0,
-    })
-}
-
-pub(crate) fn parse_feature_variations(table: raw::gsubgpos::Table) -> Result<FeatureVariations> {
-    if !(table.major_version() == 1 && table.minor_version() == 1) {
-        return Ok(FeatureVariations { data: &[], records: LazyArray::new(&[]), index: 0 });
-    }
-
-    let offset: Option<Offset32>
-        = Stream::read_at(table.data, raw::gsubgpos::FEATURE_VARIATIONS_OFFSET_OFFSET)?;
-
-    let offset = match offset {
-        Some(v) => v,
-        None => return Ok(FeatureVariations { data: &[], records: LazyArray::new(&[]), index: 0 }),
-    };
-
-    let data = table.data.try_slice_from(offset)?;
-    let mut s = Stream::new(data);
-    s.skip::<u16>(); // majorVersion
-    s.skip::<u16>(); // minorVersion
-    Ok(FeatureVariations {
-        data,
-        records: s.read_array32()?,
-        index: 0,
-    })
 }
 
 
@@ -168,7 +181,7 @@ impl FromData for LookupIndex {
 
 /// An iterator over GSUB/GPOS table scripts.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Scripts<'a> {
     data: &'a [u8], // GSUB/GPOS data from beginning of ScriptList.
     records: LazyArray16<'a, Record>,
@@ -176,7 +189,7 @@ pub struct Scripts<'a> {
 }
 
 impl<'a> Iterator for Scripts<'a> {
-    type Item = Result<Script<'a>>;
+    type Item = Script<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.index = self.index.checked_add(1)?;
@@ -188,21 +201,17 @@ impl<'a> Iterator for Scripts<'a> {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        fn parse(data: &[u8], record: Record) -> Result<Script> {
-            let data = data.try_slice_from(record.offset())?;
-            let mut s = Stream::new(data);
-            let default_lang: Option<Offset16> = s.read()?;
-            let records = s.read_array16()?;
-            Ok(Script {
-                data,
-                script: record.tag(),
-                default_lang_offset: default_lang,
-                records,
-            })
-        }
-
         let record = self.records.get(u16::try_from(n).ok()?)?;
-        Some(parse(self.data, record))
+        let data = self.data.get(record.offset().to_usize()..)?;
+        let mut s = Stream::new(data);
+        let default_lang: Option<Offset16> = s.read()?;
+        let records = s.read_array16()?;
+        Some(Script {
+            data,
+            script: record.tag(),
+            default_lang_offset: default_lang,
+            records,
+        })
     }
 }
 
@@ -226,8 +235,8 @@ impl<'a> Script<'a> {
 
     /// Returns scrips's default language.
     pub fn default_language(&self) -> Option<Language> {
-        let data = self.data.try_slice_from(self.default_lang_offset?).ok()?;
-        parse_lang_sys_table(data, None).ok()
+        let data = self.data.get(self.default_lang_offset?.to_usize()..)?;
+        parse_lang_sys_table(data, None)
     }
 
     /// Returns an iterator over scrips's languages.
@@ -284,12 +293,12 @@ impl<'a> Iterator for Languages<'a> {
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let record = self.records.get(u16::try_from(n).ok()?)?;
-        let data = self.data.try_slice_from(record.offset()).ok()?;
-        parse_lang_sys_table(data, Some(record.tag())).ok()
+        let data = self.data.get(record.offset().to_usize()..)?;
+        parse_lang_sys_table(data, Some(record.tag()))
     }
 }
 
-fn parse_lang_sys_table(data: &[u8], tag: Option<Tag>) -> Result<Language> {
+fn parse_lang_sys_table(data: &[u8], tag: Option<Tag>) -> Option<Language> {
     let mut s = Stream::new(data);
     s.skip::<u16>(); // lookupOrder (reserved)
 
@@ -299,7 +308,7 @@ fn parse_lang_sys_table(data: &[u8], tag: Option<Tag>) -> Result<Language> {
     };
 
     let count: u16 = s.read()?;
-    Ok(Language {
+    Some(Language {
         tag: tag.unwrap_or_else(|| Tag::from_bytes(b"DFLT")),
         required_feature_index,
         feature_indices: s.read_array(count)?,
@@ -320,7 +329,7 @@ pub struct Language<'a> {
 
 /// An iterator over GSUB/GPOS table features.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Features<'a> {
     data: &'a [u8], // Data from beginning of FeatureList.
     records: LazyArray16<'a, Record>,
@@ -328,7 +337,7 @@ pub struct Features<'a> {
 }
 
 impl<'a> Iterator for Features<'a> {
-    type Item = Result<Feature<'a>>;
+    type Item = Feature<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.index = self.index.checked_add(1)?;
@@ -340,18 +349,14 @@ impl<'a> Iterator for Features<'a> {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        fn parse(data: &[u8], record: Record) -> Result<Feature> {
-            let data = data.try_slice_from(record.offset())?;
-            let mut s = Stream::new(data);
-            s.skip::<Offset16>(); // featureParams
-            Ok(Feature {
-                tag: record.tag(),
-                lookup_indices: s.read_array16()?,
-            })
-        }
-
         let record = self.records.get(u16::try_from(n).ok()?)?;
-        Some(parse(self.data, record))
+        let data = self.data.get(record.offset().to_usize()..)?;
+        let mut s = Stream::new(data);
+        s.skip::<Offset16>(); // featureParams
+        Some(Feature {
+            tag: record.tag(),
+            lookup_indices: s.read_array16()?,
+        })
     }
 }
 
@@ -368,7 +373,7 @@ pub struct Feature<'a> {
 
 /// An iterator over GSUB/GPOS table lookups.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Lookups<'a> {
     data: &'a [u8], // Data from beginning of LookupList.
     records: LazyArray16<'a, Record>,
@@ -376,7 +381,7 @@ pub struct Lookups<'a> {
 }
 
 impl<'a> Iterator for Lookups<'a> {
-    type Item = Result<Lookup<'a>>;
+    type Item = Lookup<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.index = self.index.checked_add(1)?;
@@ -388,23 +393,19 @@ impl<'a> Iterator for Lookups<'a> {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        fn parse(data: &[u8], record: Record) -> Result<Lookup> {
-            let data = data.try_slice_from(record.offset())?;
-            let mut s = Stream::new(data);
-            let lookup_type: u16 = s.read()?;
-            let lookup_flag: u16 = s.read()?;
-            let offsets = s.read_offsets16(data)?;
-            let mark_filtering_set: u16 = s.read()?;
-            Ok(Lookup {
-                lookup_type,
-                lookup_flag,
-                offsets,
-                mark_filtering_set,
-            })
-        }
-
         let record = self.records.get(u16::try_from(n).ok()?)?;
-        Some(parse(self.data, record))
+        let data = self.data.get(record.offset().to_usize()..)?;
+        let mut s = Stream::new(data);
+        let lookup_type: u16 = s.read()?;
+        let lookup_flag: u16 = s.read()?;
+        let offsets = s.read_offsets16(data)?;
+        let mark_filtering_set: u16 = s.read()?;
+        Some(Lookup {
+            lookup_type,
+            lookup_flag,
+            offsets,
+            mark_filtering_set,
+        })
     }
 }
 
@@ -422,7 +423,7 @@ pub struct Lookup<'a> {
 
 /// An iterator over GSUB/GPOS table features.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct FeatureVariations<'a> {
     data: &'a [u8], // Data from beginning of FeatureVariationsList.
     records: LazyArray32<'a, FeatureVariationRecord>,
@@ -430,7 +431,7 @@ pub struct FeatureVariations<'a> {
 }
 
 impl<'a> Iterator for FeatureVariations<'a> {
-    type Item = Result<FeatureVariation<'a>>;
+    type Item = FeatureVariation<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.index = self.index.checked_add(1)?;
@@ -443,11 +444,11 @@ impl<'a> Iterator for FeatureVariations<'a> {
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let record = self.records.get(u32::try_from(n).ok()?)?;
-        Some(Ok(FeatureVariation {
+        Some(FeatureVariation {
             data: self.data,
             condition_set_offset: record.condition_set_offset(),
             feature_table_substitution_offset: record.feature_table_substitution_offset(),
-        }))
+        })
     }
 }
 
@@ -468,7 +469,7 @@ impl<'a> FeatureVariation<'a> {
     ///
     /// Number of `coordinates` should be the same as number of variation axes in the font.
     pub fn evaluate(&self, coordinates: &[i32]) -> bool {
-        for condition in try_or!(self.condition_set(), false).filter_map(Result::ok) {
+        for condition in try_opt_or!(self.condition_set(), false) {
             if !condition.evaluate(coordinates) {
                 return false;
             }
@@ -477,9 +478,9 @@ impl<'a> FeatureVariation<'a> {
         true
     }
 
-    fn condition_set(&self) -> Result<ConditionSet<'a>> {
-        let data = self.data.try_slice_from(self.condition_set_offset)?;
-        Ok(ConditionSet {
+    fn condition_set(&self) -> Option<ConditionSet<'a>> {
+        let data = self.data.get(self.condition_set_offset.to_usize()..)?;
+        Some(ConditionSet {
             data,
             offsets: Stream::new(data).read_array16()?,
             index: 0,
@@ -487,12 +488,12 @@ impl<'a> FeatureVariation<'a> {
     }
 
     /// Returns an iterator over feature variation substitutions.
-    pub fn substitutions(&self) -> Result<FeatureSubstitutions<'a>> {
-        let data = self.data.try_slice_from(self.feature_table_substitution_offset)?;
+    pub fn substitutions(&self) -> Option<FeatureSubstitutions<'a>> {
+        let data = self.data.get(self.feature_table_substitution_offset.to_usize()..)?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // majorVersion
         s.skip::<u16>(); // minorVersion
-        Ok(FeatureSubstitutions {
+        Some(FeatureSubstitutions {
             data,
             records: s.read_array16()?,
             index: 0,
@@ -509,7 +510,7 @@ struct ConditionSet<'a> {
 }
 
 impl<'a> Iterator for ConditionSet<'a> {
-    type Item = Result<Condition>;
+    type Item = Condition;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.index = self.index.checked_add(1)?;
@@ -521,18 +522,13 @@ impl<'a> Iterator for ConditionSet<'a> {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        fn parse(data: &[u8], offset: Offset32) -> Result<Condition> {
-            let condition: Condition = Stream::read_at(data, offset.to_usize())?;
-            if condition.format() != 1 {
-                return Err(Error::UnsupportedTableVersion);
-            }
-
-            Ok(condition)
+        let offset = self.offsets.get(u16::try_from(n).ok()?)?;
+        let condition: Condition = Stream::read_at(self.data, offset.to_usize())?;
+        if condition.format() != 1 {
+            return None;
         }
 
-
-        let offset = self.offsets.get(u16::try_from(n).ok()?)?;
-        Some(parse(self.data, offset))
+        Some(condition)
     }
 }
 
@@ -609,12 +605,12 @@ impl<'a> FeatureSubstitution<'a> {
     }
 
     /// Returns substitution's feature.
-    pub fn feature(&self) -> Result<Feature<'a>> {
-        let data = self.data.try_slice_from(self.table_offset)?;
+    pub fn feature(&self) -> Option<Feature<'a>> {
+        let data = self.data.get(self.table_offset.to_usize()..)?;
         let mut s = Stream::new(data);
         s.skip::<u16>(); // featureParams (reserved)
         let count: u16 = s.read()?;
-        Ok(Feature {
+        Some(Feature {
             tag: Tag(0),
             lookup_indices: s.read_array(count)?,
         })
@@ -635,17 +631,14 @@ impl<'a> CoverageTable<'a> {
 
     pub fn contains(&self, glyph_id: GlyphId) -> bool {
         let mut s = Stream::new(self.data);
-        let format: u16 = match s.read() {
-            Ok(v) => v,
-            Err(_) => return false,
-        };
+        let format: u16 = try_opt_or!(s.read(), false);
 
         match format {
             1 => {
                 s.read_array16::<GlyphId>().unwrap().binary_search(&glyph_id).is_some()
             }
             2 => {
-                let records = s.read_array16::<crate::raw::gdef::RangeRecord>().unwrap();
+                let records = try_opt_or!(s.read_array16::<crate::raw::gdef::RangeRecord>(), false);
                 records.into_iter().any(|r| r.range().contains(&glyph_id))
             }
             _ => false,
@@ -666,6 +659,7 @@ impl FromData for Class {
 
 
 /// A [Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table).
+#[derive(Clone, Copy)]
 pub(crate) struct ClassDefinitionTable<'a> {
     data: &'a [u8],
 }
@@ -676,7 +670,11 @@ impl<'a> ClassDefinitionTable<'a> {
     }
 
     /// Any glyph not included in the range of covered glyph IDs automatically belongs to Class 0.
-    pub fn get(&self, glyph_id: GlyphId) -> Result<Class> {
+    pub fn get(&self, glyph_id: GlyphId) -> Class {
+        self.get_impl(glyph_id).unwrap_or(Class(0))
+    }
+
+    fn get_impl(&self, glyph_id: GlyphId) -> Option<Class> {
         let mut s = Stream::new(self.data);
         let format: u16 = s.read()?;
         match format {
@@ -685,20 +683,18 @@ impl<'a> ClassDefinitionTable<'a> {
 
                 // Prevent overflow.
                 if glyph_id < start_glyph_id {
-                    return Ok(Class(0));
+                    return None;
                 }
 
                 let classes = s.read_array16::<Class>()?;
-                Ok(classes.get(glyph_id.0 - start_glyph_id.0).unwrap_or(Class(0)))
+                classes.get(glyph_id.0 - start_glyph_id.0)
             }
             2 => {
                 let records = s.read_array16::<crate::raw::gdef::ClassRangeRecord>()?;
-                Ok(match records.into_iter().find(|r| r.range().contains(&glyph_id)) {
-                    Some(record) => Class(record.class()),
-                    None => Class(0),
-                })
+                records.into_iter().find(|r| r.range().contains(&glyph_id))
+                    .map(|record| Class(record.class()))
             }
-            _ => Ok(Class(0)),
+            _ => None,
         }
     }
 }

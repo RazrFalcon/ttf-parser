@@ -1,7 +1,9 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/fvar
 
-use crate::{Font, Tag, Result};
-use crate::parser::{Stream, Offset};
+use core::num::NonZeroU16;
+
+use crate::{Font, Tag};
+use crate::parser::{Stream, Offset16, Offset, LazyArray16};
 use crate::raw::fvar as raw;
 
 
@@ -20,41 +22,65 @@ pub struct VariationAxis {
 }
 
 
+#[derive(Clone, Copy)]
+pub(crate) struct Table<'a> {
+    axis_count: NonZeroU16,
+    axes: LazyArray16<'a, raw::VariationAxisRecord>,
+}
+
+impl<'a> Table<'a> {
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let version: u32 = s.read()?;
+        if version != 0x00010000 {
+            return None;
+        }
+
+        let axes_array_offset: Offset16 = s.read()?;
+        s.skip::<u16>(); // reserved
+        let axis_count: u16 = s.read()?;
+
+        // 'If axisCount is zero, then the font is not functional as a variable font,
+        // and must be treated as a non-variable font;
+        // any variation-specific tables or data is ignored.'
+        let axis_count = NonZeroU16::new(axis_count)?;
+
+        let mut s = Stream::new_at(data, axes_array_offset.to_usize());
+        let axes = s.read_array(axis_count.get())?;
+
+        Some(Table {
+            axis_count,
+            axes,
+        })
+    }
+}
+
+
 impl<'a> Font<'a> {
     /// Parses a number of variation axes.
     ///
     /// Returns `None` when font is not a variable font.
     /// Number of axis is never 0.
-    pub fn variation_axes_count(&self) -> Option<u16> {
-        match self.fvar.ok()?.axis_count() {
-            0 => None,
-            n => Some(n),
-        }
+    pub fn variation_axes_count(&self) -> Option<NonZeroU16> {
+        self.fvar.map(|fvar| fvar.axis_count)
     }
 
     /// Parses a variation axis by tag.
-    pub fn variation_axis(&self, tag: Tag) -> Result<Option<VariationAxis>> {
-        let table = self.fvar?;
-        let offset = table.axes_array_offset();
-        let mut s = Stream::new_at(table.data, offset.to_usize());
-        let axes = s.read_array::<raw::VariationAxisRecord, u16>(table.axis_count())?;
-        if let Some(index) = axes.into_iter().position(|r| r.axis_tag() == tag).map(|i| i as u16) {
-            let record = axes.at(index);
+    pub fn variation_axis(&self, tag: Tag) -> Option<VariationAxis> {
+        let (index, record) = self.fvar?.axes.into_iter()
+            .enumerate().find(|(_, r)| r.axis_tag() == tag)?;
 
-            let default_value = record.default_value();
-            let min_value = core::cmp::min(default_value, record.min_value());
-            let max_value = core::cmp::max(default_value, record.max_value());
+        let default_value = record.default_value();
+        let min_value = core::cmp::min(default_value, record.min_value());
+        let max_value = core::cmp::max(default_value, record.max_value());
 
-            return Ok(Some(VariationAxis {
-                index,
-                min_value: min_value as f32 / 65536.0,
-                default_value: default_value as f32 / 65536.0,
-                max_value: max_value as f32 / 65536.0,
-                name_id: record.axis_name_id(),
-                hidden: (record.flags() >> 3) & 1 == 1,
-            }))
-        }
-
-        Ok(None)
+        Some(VariationAxis {
+            index: index as u16,
+            min_value: min_value as f32 / 65536.0,
+            default_value: default_value as f32 / 65536.0,
+            max_value: max_value as f32 / 65536.0,
+            name_id: record.axis_name_id(),
+            hidden: (record.flags() >> 3) & 1 == 1,
+        })
     }
 }

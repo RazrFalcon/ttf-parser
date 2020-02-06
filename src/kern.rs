@@ -1,22 +1,20 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/kern
 
 use crate::parser::{Stream, FromData, SafeStream};
-use crate::{Font, GlyphId, Result, Error};
+use crate::{Font, GlyphId};
 
 impl<'a> Font<'a> {
     /// Returns a glyphs pair kerning.
     ///
     /// Only horizontal kerning is supported.
-    pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Result<Option<i16>> {
-        self.check_glyph_id(glyph_id1)?;
-        self.check_glyph_id(glyph_id2)?;
+    pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {
         let data = self.kern?;
 
         let mut s = Stream::new(data);
 
         let version: u16 = s.read()?;
         if version != 0 {
-            return Err(Error::UnsupportedTableVersion);
+            return None;
         }
 
         let number_of_subtables: u16 = s.read()?;
@@ -25,7 +23,7 @@ impl<'a> Font<'a> {
         //       but I'm not sure how exactly this should be implemented.
         //       Also, I have to find a font, that actually has more that one table.
         if number_of_subtables == 0 {
-            return Ok(None);
+            return None;
         }
 
         s.skip::<u16>(); // subtable_version
@@ -33,27 +31,24 @@ impl<'a> Font<'a> {
         let coverage: Coverage = s.read()?;
 
         if !coverage.is_horizontal() {
-            return Ok(None);
+            return None;
         }
 
         if coverage.format != 0 {
-            return Ok(None);
+            return None;
         }
 
         parse_format1(&mut s, glyph_id1, glyph_id2)
     }
 }
 
-fn parse_format1(s: &mut Stream, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Result<Option<i16>> {
+fn parse_format1(s: &mut Stream, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {
     let number_of_pairs: u16 = s.read()?;
     s.advance(6u32); // search_range (u16) + entry_selector (u16) + range_shift (u16)
     let pairs = s.read_array::<KerningRecord, u16>(number_of_pairs)?;
 
     let needle = (glyph_id1.0 as u32) << 16 | glyph_id2.0 as u32;
-    match pairs.binary_search_by(|v| v.pair.cmp(&needle)) {
-        Some((_, v)) => Ok(Some(v.value)),
-        None => Ok(None),
-    }
+    pairs.binary_search_by(|v| v.pair.cmp(&needle)).map(|(_, v)| v.value)
 }
 
 struct KerningRecord {

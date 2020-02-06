@@ -8,9 +8,10 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 ### Features
 
-- A high-level API.
+- A high-level API, for people who doesn't know how TrueType works internally.
+  Basically, no direct access to font tables.
 - Zero allocations.
-- Zero dependencies.
+- Zero required dependencies. Logging is enabled by default.
 - `no_std` compatible.
 - Fast.
 - Stateless.
@@ -29,7 +30,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`name`) Listing all name records using [names()] method.
 - (`name`) Retrieving font's family name using [family_name()] method.
 - (`name`) Retrieving font's PostScript name using [post_script_name()] method.
-- (`post`) Retrieving font's underline metrics name using [underline_metrics()] method.
+- (`post`) Retrieving font's underline metrics using [underline_metrics()] method.
 - (`post`) Retrieving glyph's name using [glyph_name()] method.
 - (`head`) Retrieving font's units per EM value using [units_per_em()] method.
 - (`hhea`) Retrieving generic font info using: [ascender()], [descender()], [height()]
@@ -103,11 +104,11 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 ### Error handling
 
-The library uses `Result<Option<T>, Error>` pattern, where `Error` indicates a parsing error
-and `Ok(None)` a not set value.
-This is a bit verbose, but allows us to separate malformed files and not set values.
-For example, if a font doesn't have a glyph for a specified character - it's not an error.
-And error will be emitted only in two cases: on a malformed file or bug in implementation.
+`ttf-parser` is designed to parse well-formed fonts, so it does not have an `Error` enum.
+It doesn't mean that it will crash or panic on malformed fonts, only that the
+error handling will boil down to `Option::None`. So you will not get a detailed cause of an error.
+By doing so we can simplify an API quite a lot since otherwise, we will have to use
+`Result<Option<T>, Error>`.
 
 ### Methods' computational complexity
 
@@ -119,36 +120,36 @@ The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
 ```
-test outline_cff  ... bench:   1,010,120 ns/iter (+/- 11,517)
-test outline_cff2 ... bench:   1,385,488 ns/iter (+/- 21,411)
-test outline_glyf ... bench:     717,052 ns/iter (+/- 5,907)
+test outline_cff  ... bench:   1,293,929 ns/iter (+/- 7,798)
+test outline_cff2 ... bench:   1,847,932 ns/iter (+/- 13,006)
+test outline_glyf ... bench:     764,206 ns/iter (+/- 5,716)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:   745.0 ns/iter (+/- 31)
-test from_data_otf_cff2          ... bench:   673.0 ns/iter (+/- 9)
-test outline_glyph_276_from_cff2 ... bench:   595.0 ns/iter (+/- 24)
-test outline_glyph_276_from_glyf ... bench:   564.0 ns/iter (+/- 6)
-test from_data_otf_cff           ... bench:   485.0 ns/iter (+/- 11)
-test outline_glyph_8_from_cff2   ... bench:   371.0 ns/iter (+/- 54)
-test outline_glyph_8_from_glyf   ... bench:   249.0 ns/iter (+/- 2)
-test outline_glyph_8_from_cff    ... bench:   243.0 ns/iter (+/- 7)
-test glyph_name_276              ... bench:   216.0 ns/iter (+/- 0)
-test from_data_ttf               ... bench:   200.0 ns/iter (+/- 3)
-test family_name                 ... bench:   161.0 ns/iter (+/- 5)
-test glyph_index_u41             ... bench:    14.0 ns/iter (+/- 1)
-test hor_advance                 ... bench:     3.0 ns/iter (+/- 0)
-test hor_side_bearing            ... bench:     3.0 ns/iter (+/- 0)
-test glyph_name_8                ... bench:     2.0 ns/iter (+/- 0)
-test ascender                    ... bench:     0.6 ns/iter (+/- 0)
-test x_height                    ... bench:     0.5 ns/iter (+/- 0)
-test underline_metrics           ... bench:     0.5 ns/iter (+/- 0)
-test strikeout_metrics           ... bench:     0.5 ns/iter (+/- 0)
-test units_per_em                ... bench:     0.5 ns/iter (+/- 0)
-test subscript_metrics           ... bench:     0.2 ns/iter (+/- 0)
-test width                       ... bench:     0.2 ns/iter (+/- 0)
+test outline_glyph_276_from_cff  ... bench:         877 ns/iter (+/- 265)
+test outline_glyph_276_from_cff2 ... bench:         779 ns/iter (+/- 122)
+test from_data_otf_cff2          ... bench:         675 ns/iter (+/- 8)
+test outline_glyph_276_from_glyf ... bench:         623 ns/iter (+/- 77)
+test from_data_otf_cff           ... bench:         562 ns/iter (+/- 7)
+test outline_glyph_8_from_cff2   ... bench:         531 ns/iter (+/- 118)
+test outline_glyph_8_from_cff    ... bench:         322 ns/iter (+/- 7)
+test from_data_ttf               ... bench:         313 ns/iter (+/- 4)
+test outline_glyph_8_from_glyf   ... bench:         285 ns/iter (+/- 10)
+test glyph_name_276              ... bench:         214 ns/iter (+/- 3)
+test family_name                 ... bench:         170 ns/iter (+/- 12)
+test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
+test glyph_name_8                ... bench:           2 ns/iter (+/- 0)
+test underline_metrics           ... bench:         0.5 ns/iter (+/- 3)
+test units_per_em                ... bench:         0.5 ns/iter (+/- 3)
+test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 5)
+test ascender                    ... bench:         0.2 ns/iter (+/- 0)
+test hor_advance                 ... bench:         0.2 ns/iter (+/- 3)
+test hor_side_bearing            ... bench:         0.2 ns/iter (+/- 1)
+test subscript_metrics           ... bench:         0.2 ns/iter (+/- 2)
+test width                       ... bench:         0.2 ns/iter (+/- 1)
+test x_height                    ... bench:         0.2 ns/iter (+/- 2)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data

@@ -8,8 +8,8 @@ use std::string::String;
 #[cfg(feature = "std")]
 use crate::parser::LazyArray;
 
+use crate::Font;
 use crate::parser::Stream;
-use crate::{Font, Result, Error};
 use crate::raw::name as raw;
 
 
@@ -201,6 +201,17 @@ pub struct Names<'a> {
     total: u16,
 }
 
+impl Default for Names<'_> {
+    fn default() -> Self {
+        Names {
+            names: &[],
+            storage: &[],
+            index: 0,
+            total: 0,
+        }
+    }
+}
+
 impl<'a> Names<'a> {
     fn new(names: &'a [u8], storage: &'a [u8]) -> Self {
         Names {
@@ -237,43 +248,43 @@ impl<'a> Iterator for Names<'a> {
 }
 
 
+pub(crate) fn parse(data: &[u8]) -> Names {
+    parse_impl(data).unwrap_or_default()
+}
+
+#[inline(never)]
+fn parse_impl(data: &[u8]) -> Option<Names> {
+    // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
+    const LANG_TAG_RECORD_SIZE: u16 = 4;
+
+    let mut s = Stream::new(data);
+    let format: u16 = s.read()?;
+    let count: u16 = s.read()?;
+    s.skip::<u16>(); // offset
+
+    if format == 0 {
+        Some(Names::new(s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?, s.tail()?))
+    } else if format == 1 {
+        let lang_tag_count: u16 = s.read()?;
+        let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
+
+        s.advance(lang_tag_len); // langTagRecords
+        Some(Names::new(s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?, s.tail()?))
+    } else {
+        warn!("{} is an unsupported name table format.", format);
+        None
+    }
+}
+
 impl<'a> Font<'a> {
     /// Returns an iterator over [Name Records].
     ///
+    /// An iterator can be empty.
+    ///
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
+    #[inline]
     pub fn names(&self) -> Names {
-        match self._names() {
-            Ok(v) => v,
-            Err(_) => Names { names: &[], storage: &[], index: 0, total: 0 },
-        }
-    }
-
-    #[inline(never)]
-    fn _names(&self) -> Result<Names> {
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
-        const LANG_TAG_RECORD_SIZE: u16 = 4;
-
-        let data = self.name?;
-        let mut s = Stream::new(data);
-        let format: u16 = s.read()?;
-        let count: u16 = s.read()?;
-        s.skip::<u16>(); // offset
-
-        if format == 0 {
-            Ok(Names::new(s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?, s.tail()?))
-        } else if format == 1 {
-            let lang_tag_count: u16 = s.read()?;
-            let lang_tag_len = lang_tag_count
-                .checked_mul(LANG_TAG_RECORD_SIZE)
-                .ok_or_else(|| Error::NotATrueType)?;
-
-            s.advance(lang_tag_len); // langTagRecords
-            Ok(Names::new(s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?, s.tail()?))
-        } else {
-            // Invalid format.
-            // The error type doesn't matter, since we will ignore it anyway.
-            Err(Error::NotATrueType)
-        }
+        self.name
     }
 
     /// Returns font's family name.

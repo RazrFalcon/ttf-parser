@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/avar
 
-use crate::{Font, Result, Error};
+use crate::Font;
 use crate::parser::{Stream, SafeStream, LazyArray16, FromData};
 
 
@@ -12,20 +12,20 @@ impl<'a> Font<'a> {
     /// by multiplying each coordinate by 16384.
     ///
     /// Number of `coordinates` should be the same as number of variation axes in the font.
-    pub fn map_variation_coordinates(&self, coordinates: &mut [i32]) -> Result<()> {
+    pub fn map_variation_coordinates(&self, coordinates: &mut [i32]) -> Option<()> {
         let mut s = Stream::new(self.avar?);
         let major_version: u16 = s.read()?;
         let minor_version: u16 = s.read()?;
 
         if !(major_version == 1 && minor_version == 0) {
-            return Err(Error::UnsupportedTableVersion);
+            return None;
         }
 
         s.skip::<u16>(); // reserved
         // TODO: check that `axisCount` is the same as in `fvar`?
         let axis_count = s.read::<u16>()? as usize;
         if axis_count != coordinates.len() {
-            return Err(Error::InvalidNumberOfVarCoordinates);
+            return None;
         }
 
         for i in 0..axis_count {
@@ -33,7 +33,7 @@ impl<'a> Font<'a> {
             coordinates[i] = map_value(&map, coordinates[i]);
         }
 
-        Ok(())
+        Some(())
     }
 }
 

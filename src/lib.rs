@@ -6,6 +6,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - A high-level API, for people who doesn't know how TrueType works internally.
   Basically, no direct access to font tables.
 - Zero allocations.
+- Zero unsafe.
 - Zero required dependencies. Logging is enabled by default.
 - `no_std` compatible.
 - Fast.
@@ -136,15 +137,15 @@ test glyph_name_276              ... bench:         214 ns/iter (+/- 3)
 test family_name                 ... bench:         170 ns/iter (+/- 12)
 test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
 test glyph_name_8                ... bench:           2 ns/iter (+/- 0)
-test underline_metrics           ... bench:         0.5 ns/iter (+/- 3)
-test units_per_em                ... bench:         0.5 ns/iter (+/- 3)
-test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 5)
+test underline_metrics           ... bench:         0.5 ns/iter (+/- 0)
+test units_per_em                ... bench:         0.5 ns/iter (+/- 0)
+test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 0)
 test ascender                    ... bench:         0.2 ns/iter (+/- 0)
-test hor_advance                 ... bench:         0.2 ns/iter (+/- 3)
-test hor_side_bearing            ... bench:         0.2 ns/iter (+/- 1)
-test subscript_metrics           ... bench:         0.2 ns/iter (+/- 2)
-test width                       ... bench:         0.2 ns/iter (+/- 1)
-test x_height                    ... bench:         0.2 ns/iter (+/- 2)
+test hor_advance                 ... bench:         0.2 ns/iter (+/- 0)
+test hor_side_bearing            ... bench:         0.2 ns/iter (+/- 0)
+test subscript_metrics           ... bench:         0.2 ns/iter (+/- 0)
+test width                       ... bench:         0.2 ns/iter (+/- 0)
+test x_height                    ... bench:         0.2 ns/iter (+/- 0)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data
@@ -156,12 +157,13 @@ we are using predefined names, so no parsing is involved.
 ## Safety
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library has a single `unsafe` block for array casting.
+- The library forbids the unsafe code.
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.3.0")]
 
 #![no_std]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]

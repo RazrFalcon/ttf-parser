@@ -3,7 +3,7 @@
 use crate::Font;
 
 impl<'a> Font<'a> {
-    /// Returns font's ascender value.
+    /// Parses font's ascender value.
     #[inline]
     pub fn ascender(&self) -> i16 {
         if self.is_use_typo_metrics() {
@@ -13,7 +13,7 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Returns font's descender value.
+    /// Parses font's descender value.
     #[inline]
     pub fn descender(&self) -> i16 {
         if self.is_use_typo_metrics() {
@@ -23,13 +23,13 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Returns font's height.
+    /// Parses font's height.
     #[inline]
     pub fn height(&self) -> i16 {
         self.ascender() - self.descender()
     }
 
-    /// Returns font's line gap.
+    /// Parses font's line gap.
     #[inline]
     pub fn line_gap(&self) -> i16 {
         if self.is_use_typo_metrics() {

@@ -8,7 +8,7 @@ use crate::raw::cmap as raw;
 impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
     ///
-    /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
+    /// Returns `None` instead of `0` when glyph is not found.
     ///
     /// All subtable formats except Mixed Coverage (8) are supported.
     pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
@@ -77,7 +77,7 @@ impl<'a> Font<'a> {
     /// [Unicode Variation Sequences](
     /// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences).
     ///
-    /// Returns `Error::NoGlyph` instead of `0` when glyph is not found.
+    /// Returns `None` instead of `0` when glyph is not found.
     pub fn glyph_variation_index(&self, c: char, variation: char) -> Option<GlyphId> {
         let data = self.cmap?;
         let mut s = Stream::new(data);

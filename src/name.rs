@@ -287,7 +287,7 @@ impl<'a> Font<'a> {
         self.name
     }
 
-    /// Returns font's family name.
+    /// Parses font's family name.
     ///
     /// *Typographic Family* is preferred over *Family*.
     ///
@@ -313,7 +313,7 @@ impl<'a> Font<'a> {
         iter.nth(idx?).and_then(|name| name.name_from_utf16_be())
     }
 
-    /// Returns font's PostScript name.
+    /// Parses font's PostScript name.
     ///
     /// Note that font can have multiple names. You can use [`names()`] to list them all.
     ///

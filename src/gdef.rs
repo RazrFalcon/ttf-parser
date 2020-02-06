@@ -82,7 +82,7 @@ impl<'a> Font<'a> {
         self.gdef.map(|gdef| gdef.glyph_classes.is_some()).unwrap_or(false)
     }
 
-    /// Returns glyph's class according to
+    /// Parses glyph's class according to
     /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
     ///
     /// Returns `Ok(None)` when *Glyph Class Definition Table* is not set
@@ -97,7 +97,7 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Returns glyph's mark attachment class according to
+    /// Parses glyph's mark attachment class according to
     /// [Mark Attachment Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-attachment-class-definition-table).
     ///
     /// All glyphs not assigned to a class fall into Class 0.

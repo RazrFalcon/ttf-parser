@@ -621,6 +621,8 @@ impl<'a> Font<'a> {
 
     /// Returns a total number of glyphs in the font.
     ///
+    /// Never zero.
+    ///
     /// The value was already parsed, so this function doesn't involve any parsing.
     #[inline]
     pub fn number_of_glyphs(&self) -> u16 {
@@ -737,7 +739,7 @@ impl fmt::Debug for Font<'_> {
     }
 }
 
-/// Returns a number of fonts stored in a TrueType font collection.
+/// Parses the number of fonts stored in a TrueType font collection.
 ///
 /// Returns `None` if a provided data is not a TrueType font collection.
 #[inline]

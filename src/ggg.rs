@@ -233,7 +233,7 @@ impl<'a> Script<'a> {
         self.script
     }
 
-    /// Returns scrips's default language.
+    /// Parses scrips's default language.
     pub fn default_language(&self) -> Option<Language> {
         let data = self.data.get(self.default_lang_offset?.to_usize()..)?;
         parse_lang_sys_table(data, None)
@@ -487,7 +487,7 @@ impl<'a> FeatureVariation<'a> {
         })
     }
 
-    /// Returns an iterator over feature variation substitutions.
+    /// Parses an iterator over feature variation substitutions.
     pub fn substitutions(&self) -> Option<FeatureSubstitutions<'a>> {
         let data = self.data.get(self.feature_table_substitution_offset.to_usize()..)?;
         let mut s = Stream::new(data);
@@ -604,7 +604,7 @@ impl<'a> FeatureSubstitution<'a> {
         self.index
     }
 
-    /// Returns substitution's feature.
+    /// Parses substitution's feature.
     pub fn feature(&self) -> Option<Feature<'a>> {
         let data = self.data.get(self.table_offset.to_usize()..)?;
         let mut s = Stream::new(data);

@@ -10,7 +10,7 @@ pub enum IndexToLocationFormat {
 }
 
 impl<'a> Font<'a> {
-    /// Returns glyphs index to location format.
+    /// Parses glyphs index to location format.
     #[inline]
     pub fn index_to_location_format(&self) -> Option<IndexToLocationFormat> {
         match self.head.index_to_loc_format() {
@@ -20,7 +20,7 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Returns font's units per EM.
+    /// Parses font's units per EM.
     ///
     /// Returns `None` when value is not in a 16..=16384 range.
     #[inline]

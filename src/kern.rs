@@ -4,7 +4,7 @@ use crate::parser::{Stream, FromData, SafeStream};
 use crate::{Font, GlyphId};
 
 impl<'a> Font<'a> {
-    /// Returns a glyphs pair kerning.
+    /// Parses a glyphs pair kerning.
     ///
     /// Only horizontal kerning is supported.
     pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {

@@ -3,7 +3,7 @@
 use crate::Font;
 
 impl<'a> Font<'a> {
-    /// Returns font's vertical ascender value.
+    /// Parses font's vertical ascender value.
     ///
     /// Returns `None` when `vhea` table is not present.
     #[inline]
@@ -11,7 +11,7 @@ impl<'a> Font<'a> {
         self.vhea.map(|table| table.ascender())
     }
 
-    /// Returns font's vertical descender value.
+    /// Parses font's vertical descender value.
     ///
     /// Returns `None` when `vhea` table is not present.
     #[inline]
@@ -19,7 +19,7 @@ impl<'a> Font<'a> {
         self.vhea.map(|table| table.descender())
     }
 
-    /// Returns font's vertical height.
+    /// Parses font's vertical height.
     ///
     /// Returns `None` when `vhea` table is not present.
     #[inline]
@@ -27,7 +27,7 @@ impl<'a> Font<'a> {
         Some(self.vertical_ascender()? - self.vertical_descender()?)
     }
 
-    /// Returns font's vertical line gap.
+    /// Parses font's vertical line gap.
     ///
     /// Returns `None` when `vhea` table is not present.
     #[inline]

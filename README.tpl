@@ -3,6 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/{{crate}}.svg)](https://crates.io/crates/{{crate}})
 [![Documentation](https://docs.rs/{{crate}}/badge.svg)](https://docs.rs/{{crate}})
 [![Rust 1.35+](https://img.shields.io/badge/rust-1.35+-orange.svg)](https://www.rust-lang.org)
+![](https://img.shields.io/badge/unsafe-forbidden-brightgreen.svg)
 
 {{readme}}
 

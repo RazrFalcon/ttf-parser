@@ -429,6 +429,37 @@ pub trait OutlineBuilder {
 }
 
 
+/// A table name.
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[allow(missing_docs)]
+pub enum TableName {
+    AxisVariations,
+    CharacterToGlyphIndexMapping,
+    CompactFontFormat,
+    CompactFontFormat2,
+    FontVariations,
+    GlyphData,
+    GlyphDefinition,
+    GlyphPositioning,
+    GlyphSubstitution,
+    Header,
+    HorizontalHeader,
+    HorizontalMetrics,
+    HorizontalMetricsVariations,
+    IndexToLocation,
+    Kerning,
+    MaximumProfile,
+    MetricsVariations,
+    Naming,
+    PostScript,
+    VerticalHeader,
+    VerticalMetrics,
+    VerticalMetricsVariations,
+    VerticalOrigin,
+    WindowsMetrics,
+}
+
+
 /// A font data handle.
 #[derive(Clone)]
 pub struct Font<'a> {
@@ -448,7 +479,7 @@ pub struct Font<'a> {
     kern: Option<&'a [u8]>,
     loca: Option<loca::Table<'a>>,
     mvar: Option<&'a [u8]>,
-    name: name::Names<'a>,
+    name: Option<name::Names<'a>>,
     os_2: Option<os2::Table<'a>>,
     post: Option<post::Table<'a>>,
     vhea: Option<raw::vhea::Table<'a>>,
@@ -525,7 +556,7 @@ impl<'a> Font<'a> {
         let mut kern = None;
         let mut loca = None;
         let mut maxp = None;
-        let mut name = Names::default();
+        let mut name = None;
         let mut post = None;
         let mut vhea = None;
         let mut vmtx = None;
@@ -557,7 +588,7 @@ impl<'a> Font<'a> {
                 b"kern" => kern = data.get(range),
                 b"loca" => loca = data.get(range),
                 b"maxp" => maxp = data.get(range).and_then(|data| maxp::parse(data)),
-                b"name" => name = data.get(range).map(|data| name::parse(data)).unwrap_or_default(),
+                b"name" => name = data.get(range).and_then(|data| name::parse(data)),
                 b"post" => post = data.get(range).and_then(|data| post::Table::parse(data)),
                 b"vhea" => vhea = data.get(range).and_then(|data| raw::vhea::Table::parse(data)),
                 b"vmtx" => vmtx = data.get(range),
@@ -617,6 +648,39 @@ impl<'a> Font<'a> {
         }
 
         Some(font)
+    }
+
+    /// Checks that font has a specified table.
+    ///
+    /// Will return `true` only for tables that were successfully parsed.
+    #[inline]
+    pub fn has_table(&self, name: TableName) -> bool {
+        match name {
+            TableName::Header                       => true,
+            TableName::HorizontalHeader             => true,
+            TableName::MaximumProfile               => true,
+            TableName::AxisVariations               => self.avar.is_some(),
+            TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
+            TableName::CompactFontFormat            => self.cff_.is_some(),
+            TableName::CompactFontFormat2           => self.cff2.is_some(),
+            TableName::FontVariations               => self.fvar.is_some(),
+            TableName::GlyphData                    => self.glyf.is_some(),
+            TableName::GlyphDefinition              => self.gdef.is_some(),
+            TableName::GlyphPositioning             => self.gpos.is_some(),
+            TableName::GlyphSubstitution            => self.gsub.is_some(),
+            TableName::HorizontalMetrics            => self.hmtx.is_some(),
+            TableName::HorizontalMetricsVariations  => self.hvar.is_some(),
+            TableName::IndexToLocation              => self.loca.is_some(),
+            TableName::Kerning                      => self.kern.is_some(),
+            TableName::MetricsVariations            => self.mvar.is_some(),
+            TableName::Naming                       => self.name.is_some(),
+            TableName::PostScript                   => self.post.is_some(),
+            TableName::VerticalHeader               => self.vhea.is_some(),
+            TableName::VerticalMetrics              => self.vmtx.is_some(),
+            TableName::VerticalMetricsVariations    => self.vvar.is_some(),
+            TableName::VerticalOrigin               => self.vorg.is_some(),
+            TableName::WindowsMetrics               => self.os_2.is_some(),
+        }
     }
 
     /// Returns a total number of glyphs in the font.

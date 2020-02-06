@@ -248,12 +248,8 @@ impl<'a> Iterator for Names<'a> {
 }
 
 
-pub(crate) fn parse(data: &[u8]) -> Names {
-    parse_impl(data).unwrap_or_default()
-}
-
 #[inline(never)]
-fn parse_impl(data: &[u8]) -> Option<Names> {
+pub(crate) fn parse(data: &[u8]) -> Option<Names> {
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
     const LANG_TAG_RECORD_SIZE: u16 = 4;
 
@@ -284,7 +280,7 @@ impl<'a> Font<'a> {
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
     #[inline]
     pub fn names(&self) -> Names {
-        self.name
+        self.name.unwrap_or_default()
     }
 
     /// Parses font's family name.

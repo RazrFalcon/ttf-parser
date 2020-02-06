@@ -43,7 +43,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Removed
 - `Error` enum. All methods will return `Option<T>` now.
-- `Font::has_table`, because the way it worked was confusing.
 
 ### Fixed
 - `glyph_hor_side_bearing` parsing when the number of metrics is less than the total number of glyphs.

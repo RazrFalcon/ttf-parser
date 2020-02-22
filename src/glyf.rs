@@ -2,7 +2,9 @@
 
 // This module is a heavily modified version of https://github.com/raphlinus/font-rs
 
-use crate::parser::{Stream, F2DOT14};
+use core::num::NonZeroU16;
+
+use crate::parser::{Stream, F2DOT14, FromData};
 use crate::{Font, GlyphId, OutlineBuilder, Rect};
 
 /// A wrapper that transforms segments before passing them to `OutlineBuilder`.
@@ -60,17 +62,19 @@ impl<'a> OutlineBuilderInner for Builder<'a> {
 struct SimpleGlyphFlags(u8);
 
 impl SimpleGlyphFlags {
-    const ON_CURVE_POINT: Self                          = Self(1 << 0);
-    const X_SHORT_VECTOR: Self                          = Self(1 << 1);
-    const Y_SHORT_VECTOR: Self                          = Self(1 << 2);
-    const REPEAT_FLAG: Self                             = Self(1 << 3);
-    const X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR: Self    = Self(1 << 4);
-    const Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR: Self    = Self(1 << 5);
+    #[inline] fn on_curve_point(&self) -> bool { self.0 & 0x01 != 0 }
+    #[inline] fn x_short(&self) -> bool { self.0 & 0x02 != 0 }
+    #[inline] fn y_short(&self) -> bool { self.0 & 0x04 != 0 }
+    #[inline] fn repeat_flag(&self) -> bool { self.0 & 0x08 != 0 }
+    #[inline] fn x_is_same_or_positive_short(&self) -> bool { self.0 & 0x10 != 0 }
+    #[inline] fn y_is_same_or_positive_short(&self) -> bool { self.0 & 0x20 != 0 }
+}
 
-    #[inline] fn empty() -> Self { Self(0) }
-    #[inline] fn all() -> Self { Self(63) }
-    #[inline] fn from_bits_truncate(bits: u8) -> Self { Self(bits & Self::all().0) }
-    #[inline] fn contains(&self, other: Self) -> bool { (self.0 & other.0) == other.0 }
+impl FromData for SimpleGlyphFlags {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        SimpleGlyphFlags(data[0])
+    }
 }
 
 
@@ -79,16 +83,19 @@ impl SimpleGlyphFlags {
 struct CompositeGlyphFlags(u16);
 
 impl CompositeGlyphFlags {
-    const ARG_1_AND_2_ARE_WORDS: Self     = Self(1 << 0);
-    const ARGS_ARE_XY_VALUES: Self        = Self(1 << 1);
-    const WE_HAVE_A_SCALE: Self           = Self(1 << 3);
-    const MORE_COMPONENTS: Self           = Self(1 << 5);
-    const WE_HAVE_AN_X_AND_Y_SCALE: Self  = Self(1 << 6);
-    const WE_HAVE_A_TWO_BY_TWO: Self      = Self(1 << 7);
+    #[inline] fn arg_1_and_2_are_words(&self) -> bool { self.0 & 0x0001 != 0 }
+    #[inline] fn args_are_xy_values(&self) -> bool { self.0 & 0x0002 != 0 }
+    #[inline] fn we_have_a_scale(&self) -> bool { self.0 & 0x0008 != 0 }
+    #[inline] fn more_components(&self) -> bool { self.0 & 0x0020 != 0 }
+    #[inline] fn we_have_an_x_and_y_scale(&self) -> bool { self.0 & 0x0040 != 0 }
+    #[inline] fn we_have_a_two_by_two(&self) -> bool { self.0 & 0x0080 != 0 }
+}
 
-    #[inline] fn all() -> Self { Self(235) }
-    #[inline] fn from_bits_truncate(bits: u16) -> Self { Self(bits & Self::all().0) }
-    #[inline] fn contains(&self, other: Self) -> bool { (self.0 & other.0) == other.0 }
+impl FromData for CompositeGlyphFlags {
+    #[inline]
+    fn parse(data: &[u8]) -> Self {
+        CompositeGlyphFlags(u16::parse(data))
+    }
 }
 
 
@@ -167,7 +174,8 @@ impl<'a> Font<'a> {
         };
 
         if number_of_contours > 0 {
-            Self::parse_simple_outline(s.tail()?, number_of_contours as u16, builder)?;
+            let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
+            Self::parse_simple_outline(s.tail()?, number_of_contours, builder)?;
         } else if number_of_contours < 0 {
             self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
         } else {
@@ -181,15 +189,14 @@ impl<'a> Font<'a> {
     #[inline(never)]
     fn parse_simple_outline(
         glyph_data: &[u8],
-        number_of_contours: u16,
+        number_of_contours: NonZeroU16,
         builder: &mut Builder,
     ) -> Option<()> {
         let mut s = Stream::new(glyph_data);
-        let endpoints = s.read_array::<u16, u16>(number_of_contours)?;
+        let endpoints = s.read_array::<u16, u16>(number_of_contours.get())?;
 
         let points_total = {
-            // Unwrap is safe, because it's guarantee that array has at least one value.
-            let last_point = endpoints.last().unwrap();
+            let last_point = endpoints.last()?;
             // Prevent overflow.
             if last_point == core::u16::MAX {
                 return None;
@@ -212,7 +219,7 @@ impl<'a> Font<'a> {
             y_coords: Stream::new(glyph_data.get(y_coords_offset..glyph_data.len())?),
             points_left: points_total,
             flag_repeats: 0,
-            last_flags: SimpleGlyphFlags::empty(),
+            last_flags: SimpleGlyphFlags(0),
             x: 0,
             y: 0,
         };
@@ -251,27 +258,24 @@ impl<'a> Font<'a> {
         s: &mut Stream,
         points_total: u16,
     ) -> Option<u16> {
-        type Flags = SimpleGlyphFlags;
-
         let mut flags_left = points_total;
         let mut x_coords_len = 0u16;
         while flags_left > 0 {
-            let flags: u8 = s.read()?;
-            let flags = Flags::from_bits_truncate(flags);
+            let flags: SimpleGlyphFlags = s.read()?;
 
             // The number of times a glyph point repeats.
-            let repeats = if flags.contains(Flags::REPEAT_FLAG) {
+            let repeats = if flags.repeat_flag() {
                 let repeats: u8 = s.read()?;
                 repeats as u16 + 1
             } else {
                 1
             };
 
-            if flags.contains(Flags::X_SHORT_VECTOR) {
+            if flags.x_short() {
                 // Coordinate is 1 byte long.
                 x_coords_len = x_coords_len.checked_add(repeats)?;
             } else {
-                if !flags.contains(Flags::X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR) {
+                if !flags.x_is_same_or_positive_short() {
                     // Coordinate is 2 bytes long.
                     x_coords_len = x_coords_len.checked_add(repeats * 2)?;
                 }
@@ -374,21 +378,19 @@ impl<'a> Font<'a> {
         depth: u8,
         builder: &mut Builder,
     ) -> Option<()> {
-        type Flags = CompositeGlyphFlags;
-
         if depth >= MAX_COMPONENTS {
             warn!("Recursion detected in the 'glyf' table.");
             return None;
         }
 
         let mut s = Stream::new(glyph_data);
-        let flags = Flags::from_bits_truncate(s.read()?);
+        let flags: CompositeGlyphFlags = s.read()?;
         let glyph_id: GlyphId = s.read()?;
 
         let mut ts = Transform::default();
 
-        if flags.contains(Flags::ARGS_ARE_XY_VALUES) {
-            if flags.contains(Flags::ARG_1_AND_2_ARE_WORDS) {
+        if flags.args_are_xy_values() {
+            if flags.arg_1_and_2_are_words() {
                 ts.e = s.read::<i16>()? as f32;
                 ts.f = s.read::<i16>()? as f32;
             } else {
@@ -397,15 +399,15 @@ impl<'a> Font<'a> {
             }
         }
 
-        if flags.contains(Flags::WE_HAVE_A_TWO_BY_TWO) {
+        if flags.we_have_a_two_by_two() {
             ts.a = s.read::<F2DOT14>()?.0;
             ts.b = s.read::<F2DOT14>()?.0;
             ts.c = s.read::<F2DOT14>()?.0;
             ts.d = s.read::<F2DOT14>()?.0;
-        } else if flags.contains(Flags::WE_HAVE_AN_X_AND_Y_SCALE) {
+        } else if flags.we_have_an_x_and_y_scale() {
             ts.a = s.read::<F2DOT14>()?.0;
             ts.d = s.read::<F2DOT14>()?.0;
-        } else if flags.contains(Flags::WE_HAVE_A_SCALE) {
+        } else if flags.we_have_a_scale() {
             ts.a = f32_bound(-2.0, s.read::<F2DOT14>()?.0, 2.0);
             ts.d = ts.a;
         }
@@ -421,7 +423,7 @@ impl<'a> Font<'a> {
             self.outline_impl(glyph_data, depth + 1, &mut b)?;
         }
 
-        if flags.contains(Flags::MORE_COMPONENTS) {
+        if flags.more_components() {
             if depth < MAX_COMPONENTS {
                 self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
             }
@@ -508,35 +510,51 @@ impl<'a> Iterator for GlyphPoints<'a> {
     type Item = GlyphPoint;
 
     fn next(&mut self) -> Option<Self::Item> {
-        type Flags = SimpleGlyphFlags;
-
         if self.points_left == 0 {
             return None;
         }
 
         if self.flag_repeats == 0 {
-            self.last_flags = Flags::from_bits_truncate(self.flags.read()?);
-            if self.last_flags.contains(Flags::REPEAT_FLAG) {
+            self.last_flags = self.flags.read()?;
+            if self.last_flags.repeat_flag() {
                 self.flag_repeats = self.flags.read()?;
             }
         } else {
             self.flag_repeats -= 1;
         }
 
-        let x = get_glyph_coord(
-            self.last_flags,
-            Flags::X_SHORT_VECTOR,
-            Flags::X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR,
-            &mut self.x_coords,
-        )?;
+        let x = match (self.last_flags.x_short(), self.last_flags.x_is_same_or_positive_short()) {
+            (true, true) => {
+                self.x_coords.read::<u8>()? as i16
+            }
+            (true, false) => {
+                -(self.x_coords.read::<u8>()? as i16)
+            }
+            (false, true) => {
+                // Keep previous coordinate.
+                0
+            }
+            (false, false) => {
+                self.x_coords.read()?
+            }
+        };
         self.x = self.x.wrapping_add(x);
 
-        let y = get_glyph_coord(
-            self.last_flags,
-            Flags::Y_SHORT_VECTOR,
-            Flags::Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR,
-            &mut self.y_coords,
-        )?;
+        let y = match (self.last_flags.y_short(), self.last_flags.y_is_same_or_positive_short()) {
+            (true, true) => {
+                self.y_coords.read::<u8>()? as i16
+            }
+            (true, false) => {
+                -(self.y_coords.read::<u8>()? as i16)
+            }
+            (false, true) => {
+                // Keep previous coordinate.
+                0
+            }
+            (false, false) => {
+                self.y_coords.read()?
+            }
+        };
         self.y = self.y.wrapping_add(y);
 
         self.points_left -= 1;
@@ -544,37 +562,9 @@ impl<'a> Iterator for GlyphPoints<'a> {
         Some(GlyphPoint {
             x: self.x,
             y: self.y,
-            on_curve_point: self.last_flags.contains(Flags::ON_CURVE_POINT),
+            on_curve_point: self.last_flags.on_curve_point(),
         })
     }
-}
-
-fn get_glyph_coord(
-    flags: SimpleGlyphFlags,
-    short_vector: SimpleGlyphFlags,
-    is_same_or_positive_short_vector: SimpleGlyphFlags,
-    coords: &mut Stream,
-) -> Option<i16> {
-    let flags = (
-        flags.contains(short_vector),
-        flags.contains(is_same_or_positive_short_vector),
-    );
-
-    Some(match flags {
-        (true, true) => {
-            coords.read::<u8>()? as i16
-        }
-        (true, false) => {
-            -(coords.read::<u8>()? as i16)
-        }
-        (false, true) => {
-            // Keep previous coordinate.
-            0
-        }
-        (false, false) => {
-            coords.read()?
-        }
-    })
 }
 
 

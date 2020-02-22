@@ -124,6 +124,19 @@ pub struct ScriptMetrics {
 }
 
 
+// https://docs.microsoft.com/en-us/typography/opentype/spec/os2#fsselection
+#[derive(Clone, Copy)]
+struct SelectionFlags(u16);
+
+impl SelectionFlags {
+    #[inline] fn italic(&self) -> bool { self.0 & (1 << 0) != 0 }
+    #[inline] fn bold(&self) -> bool { self.0 & (1 << 5) != 0 }
+    #[inline] fn regular(&self) -> bool { self.0 & (1 << 6) != 0 }
+    #[inline] fn use_typo_metrics(&self) -> bool { self.0 & (1 << 7) != 0 }
+    #[inline] fn oblique(&self) -> bool { self.0 & (1 << 9) != 0 }
+}
+
+
 #[derive(Clone, Copy)]
 pub(crate) struct Table<'a> {
     version: u8,
@@ -203,8 +216,8 @@ impl<'a> Font<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_regular(&self) -> bool {
-        const REGULAR_FLAG: u16 = 6;
-        self.get_fs_selection(REGULAR_FLAG)
+        let table = try_opt_or!(self.os_2, false);
+        SelectionFlags(table.fs_selection()).regular()
     }
 
     /// Checks that font is marked as *Italic*.
@@ -212,8 +225,8 @@ impl<'a> Font<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_italic(&self) -> bool {
-        const ITALIC_FLAG: u16 = 0;
-        self.get_fs_selection(ITALIC_FLAG)
+        let table = try_opt_or!(self.os_2, false);
+        SelectionFlags(table.fs_selection()).italic()
     }
 
     /// Checks that font is marked as *Bold*.
@@ -221,8 +234,8 @@ impl<'a> Font<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_bold(&self) -> bool {
-        const BOLD_FLAG: u16 = 5;
-        self.get_fs_selection(BOLD_FLAG)
+        let table = try_opt_or!(self.os_2, false);
+        SelectionFlags(table.fs_selection()).bold()
     }
 
     /// Checks that font is marked as *Oblique*.
@@ -235,8 +248,7 @@ impl<'a> Font<'a> {
             return false;
         }
 
-        const OBLIQUE_FLAG: u16 = 9;
-        self.get_fs_selection(OBLIQUE_FLAG)
+        SelectionFlags(table.fs_selection()).oblique()
     }
 
     #[inline]
@@ -246,14 +258,7 @@ impl<'a> Font<'a> {
             return false;
         }
 
-        const USE_TYPO_METRICS: u16 = 7;
-        self.get_fs_selection(USE_TYPO_METRICS)
-    }
-
-    #[inline]
-    fn get_fs_selection(&self, bit: u16) -> bool {
-        let table = try_opt_or!(self.os_2, false);
-        (table.fs_selection() >> bit) & 1 == 1
+        SelectionFlags(table.fs_selection()).use_typo_metrics()
     }
 
     /// Parses font's X height.

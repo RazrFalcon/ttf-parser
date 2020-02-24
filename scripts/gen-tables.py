@@ -449,34 +449,10 @@ GDEF_RANGE_RECORD = [
     TableRow(False, TtfUInt16(),                'startCoverageIndex'),
 ]
 
-# https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord
-FVAR_VARIATION_AXIS_RECORD = [
-    TableRow(True,  TtfTag(),       'axisTag'),
-    TableRow(True,  TtfInt32(),     'minValue'),      # This three values actually have type Fixed,
-    TableRow(True,  TtfInt32(),     'defaultValue'),  # but we need to compare them later,
-    TableRow(True,  TtfInt32(),     'maxValue'),      # and Rust doesn't implement Ord for f32.
-    TableRow(True,  TtfUInt16(),    'flags'),
-    TableRow(True,  TtfUInt16(),    'axisNameID'),
-]
-
 # https://docs.microsoft.com/en-us/typography/opentype/spec/vorg#vertical-origin-table-format
 VERT_ORIGIN_Y_METRICS = [
     TableRow(True,  TtfGlyphId(),  'glyphIndex'),
     TableRow(True,  TtfInt16(),    'vertOriginY'),
-]
-
-# https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
-MVAR_VALUE_RECORD = [
-    TableRow(True,  TtfTag(),      'valueTag'),
-    TableRow(True,  TtfUInt16(),   'deltaSetOuterIndex'),
-    TableRow(True,  TtfUInt16(),   'deltaSetInnerIndex'),
-]
-
-# https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#variation-regions
-MVAR_REGION_AXIS_COORDINATES_RECORD = [
-    TableRow(True,  TtfInt16(), 'startCoord'),  #
-    TableRow(True,  TtfInt16(), 'peakCoord'),   # Use i16 instead of F2DOT14 to simplify calculations.
-    TableRow(True,  TtfInt16(), 'endCoord'),    #
 ]
 
 GSUB_GPOS_RECORD = [
@@ -718,26 +694,10 @@ print()
 generate_table(GSUB_GPOS_FEATURE_VARIATION_RECORD, 'FeatureVariationRecord', owned=True, impl_from_data=True)
 print('}')
 print()
-print('pub mod fvar {')
-print('use crate::Tag;')
-print('use crate::parser::FromData;')
-print()
-generate_table(FVAR_VARIATION_AXIS_RECORD, 'VariationAxisRecord', owned=True, impl_from_data=True)
-print('}')
-print()
 print('pub mod vorg {')
 print('use crate::GlyphId;')
 print('use crate::parser::FromData;')
 print()
 generate_table(VERT_ORIGIN_Y_METRICS, 'VertOriginYMetrics', owned=True, impl_from_data=True)
-print('}')
-print()
-print('pub mod mvar {')
-print('use crate::Tag;')
-print('use crate::parser::FromData;')
-print()
-generate_table(MVAR_VALUE_RECORD, 'ValueRecord', owned=True, impl_from_data=True)
-print()
-generate_table(MVAR_REGION_AXIS_COORDINATES_RECORD, 'RegionAxisCoordinatesRecord', owned=True, impl_from_data=True)
 print('}')
 print()

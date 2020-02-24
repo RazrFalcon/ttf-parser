@@ -55,7 +55,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 ## Supported OpenType features
 
 - (`CFF `) Glyph outlining using [outline_glyph()] method.
-- (`CFF2`) Glyph outlining using [outline_glyph()] method.
 - (`OS/2`) Retrieving font's kind using [is_regular()], [is_italic()],
   [is_bold()] and [is_oblique()] methods.
 - (`OS/2`) Retrieving font's weight using [weight()] method.
@@ -67,14 +66,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`GDEF`) Retrieving glyph's class using [glyph_class()] method.
 - (`GDEF`) Retrieving glyph's mark attachment class using [glyph_mark_attachment_class()] method.
 - (`GDEF`) Checking that glyph is a mark using [is_mark_glyph()] method.
-- (`avar`) Variation coordinates normalization using [map_variation_coordinates()] method.
-- (`fvar`) Variation axis parsing using [variation_axis()] method.
 - (`VORG`) Retrieving glyph's vertical origin using [glyph_y_origin()] method.
-- (`MVAR`) Retrieving font's metrics variation using [metrics_variation()] method.
-- (`HVAR`) Retrieving glyph's variation offset for horizontal advance using [glyph_hor_advance_variation()] method.
-- (`HVAR`) Retrieving glyph's variation offset for horizontal side bearing using [glyph_hor_side_bearing_variation()] method.
-- (`VVAR`) Retrieving glyph's variation offset for vertical advance using [glyph_ver_advance_variation()] method.
-- (`VVAR`) Retrieving glyph's variation offset for vertical side bearing using [glyph_ver_side_bearing_variation()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -89,14 +81,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_class
 [glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
 [is_mark_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_mark_glyph
-[map_variation_coordinates()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.map_variation_coordinates
-[variation_axis()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.variation_axis
 [glyph_y_origin()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_y_origin
-[metrics_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.metrics_variation
-[glyph_hor_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_advance_variation
-[glyph_hor_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_side_bearing_variation
-[glyph_ver_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance_variation
-[glyph_ver_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing_variation
 
 ## Error handling
 
@@ -117,7 +102,6 @@ The second one is basically a tiny language with a stack-based VM, which makes i
 
 ```text
 test outline_cff  ... bench:   1,293,929 ns/iter (+/- 7,798)
-test outline_cff2 ... bench:   1,847,932 ns/iter (+/- 13,006)
 test outline_glyf ... bench:     764,206 ns/iter (+/- 5,716)
 ```
 
@@ -196,11 +180,8 @@ macro_rules! warn {
     ($($arg:tt)+) => () // do nothing
 }
 
-mod avar;
-mod cff2;
 mod cff;
 mod cmap;
-mod fvar;
 mod gdef;
 mod ggg;
 mod glyf;
@@ -209,11 +190,9 @@ mod gsub;
 mod head;
 mod hhea;
 mod hmtx;
-mod hvar;
 mod kern;
 mod loca;
 mod maxp;
-mod mvar;
 mod name;
 mod os2;
 mod parser;
@@ -222,13 +201,11 @@ mod raw;
 mod vhea;
 mod vmtx;
 mod vorg;
-mod vvar;
 
 #[cfg(feature = "std")]
 mod writer;
 
 use parser::{Stream, SafeStream, Offset};
-pub use fvar::VariationAxis;
 pub use gdef::GlyphClass;
 pub use ggg::*;
 pub use gpos::PositioningTable;
@@ -433,11 +410,8 @@ pub trait OutlineBuilder {
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
 pub enum TableName {
-    AxisVariations,
     CharacterToGlyphIndexMapping,
     CompactFontFormat,
-    CompactFontFormat2,
-    FontVariations,
     GlyphData,
     GlyphDefinition,
     GlyphPositioning,
@@ -445,16 +419,13 @@ pub enum TableName {
     Header,
     HorizontalHeader,
     HorizontalMetrics,
-    HorizontalMetricsVariations,
     IndexToLocation,
     Kerning,
     MaximumProfile,
-    MetricsVariations,
     Naming,
     PostScript,
     VerticalHeader,
     VerticalMetrics,
-    VerticalMetricsVariations,
     VerticalOrigin,
     WindowsMetrics,
 }
@@ -463,11 +434,8 @@ pub enum TableName {
 /// A font data handle.
 #[derive(Clone)]
 pub struct Font<'a> {
-    avar: Option<&'a [u8]>,
     cff_: Option<cff::Metadata<'a>>,
-    cff2: Option<cff2::Metadata<'a>>,
     cmap: Option<&'a [u8]>,
-    fvar: Option<fvar::Table<'a>>,
     gdef: Option<gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
     gpos: Option<ggg::GsubGposTable<'a>>,
@@ -475,17 +443,14 @@ pub struct Font<'a> {
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
     hmtx: Option<hmtx::Table<'a>>,
-    hvar: Option<&'a [u8]>,
     kern: Option<&'a [u8]>,
     loca: Option<loca::Table<'a>>,
-    mvar: Option<&'a [u8]>,
     name: Option<name::Names<'a>>,
     os_2: Option<os2::Table<'a>>,
     post: Option<post::Table<'a>>,
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<hmtx::Table<'a>>,
     vorg: Option<&'a [u8]>,
-    vvar: Option<&'a [u8]>,
     number_of_glyphs: NonZeroU16,
 }
 
@@ -537,18 +502,12 @@ impl<'a> Font<'a> {
         let tables = s.read_array::<raw::TableRecord, u16>(num_tables)?;
 
         let mut cff_ = None;
-        let mut cff2 = None;
         let mut gdef = None;
         let mut gpos = None;
         let mut gsub = None;
-        let mut hvar = None;
-        let mut mvar = None;
         let mut os_2 = None;
         let mut vorg = None;
-        let mut vvar = None;
-        let mut avar = None;
         let mut cmap = None;
-        let mut fvar = None;
         let mut glyf = None;
         let mut head = None;
         let mut hhea = None;
@@ -569,18 +528,12 @@ impl<'a> Font<'a> {
             // rather than `&[u8]` with `&[u8]`.
             match &table.table_tag().to_bytes() {
                 b"CFF " => cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
-                b"CFF2" => cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
                 b"GDEF" => gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
                 b"GPOS" => gpos = data.get(range).and_then(|data| ggg::GsubGposTable::parse(data)),
                 b"GSUB" => gsub = data.get(range).and_then(|data| ggg::GsubGposTable::parse(data)),
-                b"HVAR" => hvar = data.get(range),
-                b"MVAR" => mvar = data.get(range),
                 b"OS/2" => os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
                 b"VORG" => vorg = data.get(range),
-                b"VVAR" => vvar = data.get(range),
-                b"avar" => avar = data.get(range),
                 b"cmap" => cmap = data.get(range),
-                b"fvar" => fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
                 b"glyf" => glyf = data.get(range),
                 b"head" => head = data.get(range).and_then(|data| raw::head::Table::parse(data)),
                 b"hhea" => hhea = data.get(range).and_then(|data| raw::hhea::Table::parse(data)),
@@ -603,11 +556,8 @@ impl<'a> Font<'a> {
         let number_of_glyphs = maxp.number_of_glyphs;
 
         let mut font = Font {
-            avar,
             cff_,
-            cff2,
             cmap,
-            fvar,
             gdef,
             glyf,
             gpos,
@@ -615,17 +565,14 @@ impl<'a> Font<'a> {
             head,
             hhea,
             hmtx: None,
-            hvar,
             kern,
             loca: None,
-            mvar,
             name,
             os_2,
             post,
             vhea,
             vmtx: None,
             vorg,
-            vvar,
             number_of_glyphs,
         };
 
@@ -659,25 +606,19 @@ impl<'a> Font<'a> {
             TableName::Header                       => true,
             TableName::HorizontalHeader             => true,
             TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => self.avar.is_some(),
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
             TableName::CompactFontFormat            => self.cff_.is_some(),
-            TableName::CompactFontFormat2           => self.cff2.is_some(),
-            TableName::FontVariations               => self.fvar.is_some(),
             TableName::GlyphData                    => self.glyf.is_some(),
             TableName::GlyphDefinition              => self.gdef.is_some(),
             TableName::GlyphPositioning             => self.gpos.is_some(),
             TableName::GlyphSubstitution            => self.gsub.is_some(),
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
-            TableName::HorizontalMetricsVariations  => self.hvar.is_some(),
             TableName::IndexToLocation              => self.loca.is_some(),
             TableName::Kerning                      => self.kern.is_some(),
-            TableName::MetricsVariations            => self.mvar.is_some(),
             TableName::Naming                       => self.name.is_some(),
             TableName::PostScript                   => self.post.is_some(),
             TableName::VerticalHeader               => self.vhea.is_some(),
             TableName::VerticalMetrics              => self.vmtx.is_some(),
-            TableName::VerticalMetricsVariations    => self.vvar.is_some(),
             TableName::VerticalOrigin               => self.vorg.is_some(),
             TableName::WindowsMetrics               => self.os_2.is_some(),
         }
@@ -755,10 +696,6 @@ impl<'a> Font<'a> {
             return self.cff_glyph_outline(metadata, glyph_id, builder);
         }
 
-        if let Some(ref metadata) = self.cff2 {
-            return self.cff2_glyph_outline(metadata, glyph_id, builder);
-        }
-
         None
     }
 
@@ -787,10 +724,6 @@ impl<'a> Font<'a> {
 
         if let Some(ref metadata) = self.cff_ {
             return self.cff_glyph_outline(metadata, glyph_id, &mut DummyOutline);
-        }
-
-        if let Some(ref metadata) = self.cff2 {
-            return self.cff2_glyph_outline(metadata, glyph_id, &mut DummyOutline);
         }
 
         None

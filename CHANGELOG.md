@@ -9,28 +9,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 **A major rewrite.**
 
 ### Added
-- Basic CFF2 support.
 - `Font::glyph_bounding_box`
 - `Font::glyph_name`
 - `Font::has_glyph_classes`
 - `Font::glyph_class`
 - `Font::glyph_mark_attachment_class`
 - `Font::is_mark_glyph`
-- `Font::variation_axes_count`
-- `Font::variation_axis`
-- `Font::map_variation_coordinates`
 - `Font::glyph_y_origin`
-- `Font::metrics_variation`
-- `Font::glyph_hor_advance_variation`
-- `Font::glyph_hor_side_bearing_variation`
-- `Font::glyph_ver_advance_variation`
-- `Font::glyph_ver_side_bearing_variation`
 - `Font::vertical_ascender`
 - `Font::vertical_descender`
 - `Font::vertical_height`
 - `Font::vertical_line_gap`
 - `Tag` type.
-- Initial GSUB/GPOS support.
 - Optional `log` dependency.
 
 ### Changed

@@ -20,7 +20,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::vertical_descender`
 - `Font::vertical_height`
 - `Font::vertical_line_gap`
-- `Tag` type.
 - Optional `log` dependency.
 
 ### Changed

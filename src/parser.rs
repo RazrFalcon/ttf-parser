@@ -294,9 +294,6 @@ impl<'a, T: FromData, Idx: ArraySize> IntoIterator for LazyArray<'a, T, Idx> {
 /// An alias to `LazyArray` with max length equal to `u16`.
 pub type LazyArray16<'a, T> = LazyArray<'a, T, u16>;
 
-/// An alias to `LazyArray` with max length equal to `u32`.
-pub type LazyArray32<'a, T> = LazyArray<'a, T, u32>;
-
 /// An iterator over `LazyArray`.
 #[derive(Clone, Copy)]
 pub struct LazyArrayIter<'a, T, Idx: ArraySize> {
@@ -418,13 +415,6 @@ impl<'a> Stream<'a> {
         let count: u32 = self.read()?;
         self.read_array(count)
     }
-
-    #[inline]
-    pub fn read_offsets16(&mut self, data: &'a [u8]) -> Option<Offsets16<'a>> {
-        let count: u16 = self.read()?;
-        let offsets = self.read_array(count)?;
-        Some(Offsets16 { data, offsets })
-    }
 }
 
 
@@ -526,76 +516,5 @@ impl FromData for Option<Offset32> {
     fn parse(data: &[u8]) -> Self {
         let offset = Offset32::parse(data);
         if offset.0 != 0 { Some(offset) } else { None }
-    }
-}
-
-
-/// Array of offsets from beginning of `data`.
-#[derive(Clone, Copy)]
-pub struct Offsets<'a, T: Offset, Idx: ArraySize> {
-    data: &'a [u8],
-    offsets: LazyArray<'a, T, Idx>, // [Offset16/Offset32]
-}
-
-pub type Offsets16<'a> = Offsets<'a, Offset16, u16>;
-//pub type Offsets32<'a> = Offsets<'a, Offset32, u16>;
-
-impl<'a, T: Offset + FromData> Offsets<'a, T, u16> {
-    pub fn len(&self) -> u16 {
-        self.offsets.len() as u16
-    }
-
-    fn at(&self, index: u16) -> T {
-        self.offsets.at(index)
-    }
-
-    pub fn slice(&self, index: u16) -> Option<&'a [u8]> {
-        let offset = self.offsets.at(index).to_usize();
-        self.data.get(offset..self.data.len())
-    }
-}
-
-impl<'a, T: Offset + FromData + Copy + core::fmt::Debug> core::fmt::Debug for Offsets<'a, T, u16> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "{:?}", self.offsets)
-    }
-}
-
-
-pub struct OffsetsIter<'a, T: Offset + FromData> {
-    offsets: Offsets<'a, T, u16>,
-    index: u16,
-}
-
-impl<'a, T: Offset + FromData> IntoIterator for Offsets<'a, T, u16> {
-    type Item = &'a [u8];
-    type IntoIter = OffsetsIter<'a, T>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        OffsetsIter {
-            offsets: self,
-            index: 0,
-        }
-    }
-}
-
-impl<'a, T: Offset + FromData> Iterator for OffsetsIter<'a, T> {
-    type Item = &'a [u8];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.offsets.len() {
-            let idx = self.index;
-            self.index += 1;
-
-            // Skip NULL offsets.
-            if self.offsets.at(idx).is_null() {
-                return self.next();
-            }
-
-            self.offsets.slice(idx)
-        } else {
-            None
-        }
     }
 }

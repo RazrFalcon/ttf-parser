@@ -185,8 +185,6 @@ mod cmap;
 mod gdef;
 mod ggg;
 mod glyf;
-mod gpos;
-mod gsub;
 mod head;
 mod hhea;
 mod hmtx;
@@ -205,15 +203,12 @@ mod vorg;
 #[cfg(feature = "std")]
 mod writer;
 
-use parser::{Stream, SafeStream, Offset};
+use parser::{Stream, SafeStream, Offset, FromData};
 pub use gdef::GlyphClass;
 pub use ggg::*;
-pub use gpos::PositioningTable;
-pub use gsub::SubstitutionTable;
 pub use head::IndexToLocationFormat;
 pub use name::*;
 pub use os2::*;
-pub use parser::{FromData, ArraySize, LazyArray, LazyArray16, LazyArray32, LazyArrayIter};
 
 
 /// A type-safe wrapper for glyph ID.
@@ -233,130 +228,6 @@ impl Default for GlyphId {
         GlyphId(0)
     }
 }
-
-
-/// A 4-byte tag.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Tag(pub u32);
-
-impl Tag {
-    /// Creates a `Tag` from bytes.
-    pub const fn from_bytes(bytes: &[u8; 4]) -> Self {
-        Tag(((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16) |
-            ((bytes[2] as u32) << 8) | (bytes[3] as u32))
-    }
-
-    /// Creates a `Tag` from bytes.
-    ///
-    /// In case of empty data will return `Tag` set to 0.
-    ///
-    /// When `bytes` are shorter than 4, will set missing bytes to ` `.
-    ///
-    /// Data after first 4 bytes is ignored.
-    pub fn from_bytes_lossy(bytes: &[u8]) -> Self {
-        if bytes.is_empty() {
-            return Tag::from_bytes(&[0, 0, 0, 0]);
-        }
-
-        let mut iter = bytes.iter().cloned().chain(core::iter::repeat(b' '));
-        Tag::from_bytes(&[
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-        ])
-    }
-
-    /// Returns tag as 4-element byte array.
-    pub const fn to_bytes(self) -> [u8; 4] {
-        [
-            (self.0 >> 24 & 0xff) as u8,
-            (self.0 >> 16 & 0xff) as u8,
-            (self.0 >> 8 & 0xff) as u8,
-            (self.0 >> 0 & 0xff) as u8,
-        ]
-    }
-
-    /// Returns tag as 4-element byte array.
-    pub const fn to_chars(self) -> [char; 4] {
-        [
-            (self.0 >> 24 & 0xff) as u8 as char,
-            (self.0 >> 16 & 0xff) as u8 as char,
-            (self.0 >> 8 & 0xff) as u8 as char,
-            (self.0 >> 0 & 0xff) as u8 as char,
-        ]
-    }
-
-    /// Returns tag for a default script.
-    pub const fn default_script() -> Self {
-        Tag::from_bytes(b"DFLT")
-    }
-
-    /// Returns tag for a default language.
-    pub const fn default_language() -> Self {
-        Tag::from_bytes(b"dflt")
-    }
-
-    /// Checks if tag is null / `[0, 0, 0, 0]`.
-    pub const fn is_null(&self) -> bool {
-        self.0 == 0
-    }
-
-    /// Returns tag value as `u32` number.
-    pub const fn as_u32(&self) -> u32 {
-        self.0
-    }
-
-    /// Converts tag to lowercase.
-    pub fn to_lowercase(&self) -> Self {
-        let b = self.to_bytes();
-        Tag::from_bytes(&[
-            b[0].to_ascii_lowercase(),
-            b[1].to_ascii_lowercase(),
-            b[2].to_ascii_lowercase(),
-            b[3].to_ascii_lowercase(),
-        ])
-    }
-
-    /// Converts tag to uppercase.
-    pub fn to_uppercase(&self) -> Self {
-        let b = self.to_bytes();
-        Tag::from_bytes(&[
-            b[0].to_ascii_uppercase(),
-            b[1].to_ascii_uppercase(),
-            b[2].to_ascii_uppercase(),
-            b[3].to_ascii_uppercase(),
-        ])
-    }
-}
-
-impl core::fmt::Debug for Tag {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Tag({})", self)
-    }
-}
-
-impl core::fmt::Display for Tag {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let b = self.to_chars();
-        write!(
-            f,
-            "{}{}{}{}",
-            b.get(0).unwrap_or(&' '),
-            b.get(1).unwrap_or(&' '),
-            b.get(2).unwrap_or(&' '),
-            b.get(3).unwrap_or(&' ')
-        )
-    }
-}
-
-impl FromData for Tag {
-    #[inline]
-    fn parse(data: &[u8]) -> Self {
-        Tag(u32::parse(data))
-    }
-}
-
 
 
 /// A line metrics.
@@ -414,8 +285,6 @@ pub enum TableName {
     CompactFontFormat,
     GlyphData,
     GlyphDefinition,
-    GlyphPositioning,
-    GlyphSubstitution,
     Header,
     HorizontalHeader,
     HorizontalMetrics,
@@ -438,8 +307,6 @@ pub struct Font<'a> {
     cmap: Option<&'a [u8]>,
     gdef: Option<gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
-    gpos: Option<ggg::GsubGposTable<'a>>,
-    gsub: Option<ggg::GsubGposTable<'a>>,
     head: raw::head::Table<'a>,
     hhea: raw::hhea::Table<'a>,
     hmtx: Option<hmtx::Table<'a>>,
@@ -503,8 +370,6 @@ impl<'a> Font<'a> {
 
         let mut cff_ = None;
         let mut gdef = None;
-        let mut gpos = None;
-        let mut gsub = None;
         let mut os_2 = None;
         let mut vorg = None;
         let mut cmap = None;
@@ -526,11 +391,9 @@ impl<'a> Font<'a> {
 
             // It's way faster to compare `[u8; 4]` with `&[u8]`
             // rather than `&[u8]` with `&[u8]`.
-            match &table.table_tag().to_bytes() {
+            match &table.table_tag() {
                 b"CFF " => cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
                 b"GDEF" => gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
-                b"GPOS" => gpos = data.get(range).and_then(|data| ggg::GsubGposTable::parse(data)),
-                b"GSUB" => gsub = data.get(range).and_then(|data| ggg::GsubGposTable::parse(data)),
                 b"OS/2" => os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
                 b"VORG" => vorg = data.get(range),
                 b"cmap" => cmap = data.get(range),
@@ -560,8 +423,6 @@ impl<'a> Font<'a> {
             cmap,
             gdef,
             glyf,
-            gpos,
-            gsub,
             head,
             hhea,
             hmtx: None,
@@ -610,8 +471,6 @@ impl<'a> Font<'a> {
             TableName::CompactFontFormat            => self.cff_.is_some(),
             TableName::GlyphData                    => self.glyf.is_some(),
             TableName::GlyphDefinition              => self.gdef.is_some(),
-            TableName::GlyphPositioning             => self.gpos.is_some(),
-            TableName::GlyphSubstitution            => self.gsub.is_some(),
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
             TableName::IndexToLocation              => self.loca.is_some(),
             TableName::Kerning                      => self.kern.is_some(),
@@ -743,7 +602,7 @@ impl fmt::Debug for Font<'_> {
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     let table = raw::TTCHeader::new(data.get(0..raw::TTCHeader::SIZE)?);
 
-    if &table.ttc_tag().to_bytes() != b"ttcf" {
+    if &table.ttc_tag() != b"ttcf" {
         return None;
     }
 

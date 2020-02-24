@@ -3,9 +3,9 @@
 use core::num::NonZeroU16;
 use core::ops::Range;
 
-use crate::parser::Stream;
+use crate::parser::{Stream, LazyArray16};
 use crate::head::IndexToLocationFormat;
-use crate::{Font, GlyphId, LazyArray16};
+use crate::{Font, GlyphId};
 
 #[derive(Clone, Copy)]
 pub enum Table<'a> {

@@ -1,9 +1,25 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
-use crate::parser::{Stream, Offset};
+use crate::parser::{Stream, Offset, LazyArray16};
 use crate::{Font, GlyphId, PlatformId};
 use crate::raw::cmap as raw;
 
+#[derive(Clone, Copy)]
+pub struct Table<'a> {
+    data: &'a [u8],
+    records: LazyArray16<'a, raw::EncodingRecord>,
+}
+
+impl<'a> Table<'a> {
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        s.skip::<u16>(); // version
+        Some(Table {
+            data,
+            records: s.read_array16()?,
+        })
+    }
+}
 
 impl<'a> Font<'a> {
     /// Resolves Glyph ID for code point.
@@ -12,12 +28,9 @@ impl<'a> Font<'a> {
     ///
     /// All subtable formats except Mixed Coverage (8) are supported.
     pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
-        let data = self.cmap?;
-        let mut s = Stream::new(data);
-        s.skip::<u16>(); // version
-        let records = s.read_array16::<raw::EncodingRecord>()?;
-        for record in records {
-            let subtable_data = data.get(record.offset().0 as usize..)?;
+        let table = self.cmap?;
+        for record in table.records {
+            let subtable_data = table.data.get(record.offset().0 as usize..)?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
@@ -79,12 +92,9 @@ impl<'a> Font<'a> {
     ///
     /// Returns `None` instead of `0` when glyph is not found.
     pub fn glyph_variation_index(&self, c: char, variation: char) -> Option<GlyphId> {
-        let data = self.cmap?;
-        let mut s = Stream::new(data);
-        s.skip::<u16>(); // version
-        let records = s.read_array16::<raw::EncodingRecord>()?;
-        for record in records {
-            let subtable_data = data.get(record.offset().to_usize()..)?;
+        let table = self.cmap?;
+        for record in table.records {
+            let subtable_data = table.data.get(record.offset().to_usize()..)?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,

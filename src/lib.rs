@@ -91,6 +91,8 @@ error handling will boil down to `Option::None`. So you will not get a detailed 
 By doing so we can simplify an API quite a lot since otherwise, we will have to use
 `Result<Option<T>, Error>`.
 
+Some methods may print warnings, when the `logging` feature is enabled.
+
 ## Methods' computational complexity
 
 TrueType fonts designed for fast querying, so most of the methods are very fast.
@@ -203,7 +205,6 @@ mod writer;
 use parser::{Stream, SafeStream, Offset, FromData};
 pub use gdef::GlyphClass;
 pub use ggg::*;
-pub use head::IndexToLocationFormat;
 pub use name::*;
 pub use os2::*;
 
@@ -301,7 +302,7 @@ pub enum TableName {
 #[derive(Clone)]
 pub struct Font<'a> {
     cff_: Option<cff::Metadata<'a>>,
-    cmap: Option<&'a [u8]>,
+    cmap: Option<cmap::Table<'a>>,
     gdef: Option<gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
     head: raw::head::Table<'a>,
@@ -314,7 +315,7 @@ pub struct Font<'a> {
     post: Option<post::Table<'a>>,
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<hmtx::Table<'a>>,
-    vorg: Option<&'a [u8]>,
+    vorg: Option<vorg::Table<'a>>,
     number_of_glyphs: NonZeroU16,
 }
 
@@ -392,8 +393,8 @@ impl<'a> Font<'a> {
                 b"CFF " => cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
                 b"GDEF" => gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
                 b"OS/2" => os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
-                b"VORG" => vorg = data.get(range),
-                b"cmap" => cmap = data.get(range),
+                b"VORG" => vorg = data.get(range).and_then(|data| vorg::Table::parse(data)),
+                b"cmap" => cmap = data.get(range).and_then(|data| cmap::Table::parse(data)),
                 b"glyf" => glyf = data.get(range),
                 b"head" => head = data.get(range).and_then(|data| raw::head::Table::parse(data)),
                 b"hhea" => hhea = data.get(range).and_then(|data| raw::hhea::Table::parse(data)),

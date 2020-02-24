@@ -4,7 +4,7 @@ use crate::Font;
 
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum IndexToLocationFormat {
+pub(crate) enum IndexToLocationFormat {
     Short,
     Long,
 }
@@ -12,7 +12,7 @@ pub enum IndexToLocationFormat {
 impl<'a> Font<'a> {
     /// Parses glyphs index to location format.
     #[inline]
-    pub fn index_to_location_format(&self) -> Option<IndexToLocationFormat> {
+    pub(crate) fn index_to_location_format(&self) -> Option<IndexToLocationFormat> {
         match self.head.index_to_loc_format() {
             0 => Some(IndexToLocationFormat::Short),
             1 => Some(IndexToLocationFormat::Long),

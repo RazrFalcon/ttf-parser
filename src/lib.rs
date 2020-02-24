@@ -101,35 +101,32 @@ The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
 ```text
-test outline_cff  ... bench:   1,293,929 ns/iter (+/- 7,798)
-test outline_glyf ... bench:     764,206 ns/iter (+/- 5,716)
+test outline_cff  ... bench:   1,298,871 ns/iter (+/- 11,846)
+test outline_glyf ... bench:     837,958 ns/iter (+/- 6,261)
 ```
 
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:         877 ns/iter (+/- 265)
-test outline_glyph_276_from_cff2 ... bench:         779 ns/iter (+/- 122)
-test from_data_otf_cff2          ... bench:         675 ns/iter (+/- 8)
-test outline_glyph_276_from_glyf ... bench:         623 ns/iter (+/- 77)
-test from_data_otf_cff           ... bench:         562 ns/iter (+/- 7)
-test outline_glyph_8_from_cff2   ... bench:         531 ns/iter (+/- 118)
-test outline_glyph_8_from_cff    ... bench:         322 ns/iter (+/- 7)
-test from_data_ttf               ... bench:         313 ns/iter (+/- 4)
-test outline_glyph_8_from_glyf   ... bench:         285 ns/iter (+/- 10)
-test glyph_name_276              ... bench:         214 ns/iter (+/- 3)
-test family_name                 ... bench:         170 ns/iter (+/- 12)
+test outline_glyph_276_from_cff  ... bench:       1,041 ns/iter (+/- 71)
+test outline_glyph_276_from_glyf ... bench:         674 ns/iter (+/- 15)
+test from_data_otf_cff           ... bench:         403 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         339 ns/iter (+/- 44)
+test outline_glyph_8_from_glyf   ... bench:         295 ns/iter (+/- 16)
+test glyph_name_276              ... bench:         214 ns/iter (+/- 1)
+test from_data_ttf               ... bench:         169 ns/iter (+/- 3)
+test family_name                 ... bench:         155 ns/iter (+/- 5)
 test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
 test glyph_name_8                ... bench:           1 ns/iter (+/- 0)
 test underline_metrics           ... bench:         0.5 ns/iter (+/- 0)
 test units_per_em                ... bench:         0.5 ns/iter (+/- 0)
 test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 0)
+test x_height                    ... bench:         0.4 ns/iter (+/- 0)
 test ascender                    ... bench:         0.2 ns/iter (+/- 0)
 test hor_advance                 ... bench:         0.2 ns/iter (+/- 0)
 test hor_side_bearing            ... bench:         0.2 ns/iter (+/- 0)
 test subscript_metrics           ... bench:         0.2 ns/iter (+/- 0)
 test width                       ... bench:         0.2 ns/iter (+/- 0)
-test x_height                    ... bench:         0.2 ns/iter (+/- 0)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data

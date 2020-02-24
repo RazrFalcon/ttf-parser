@@ -61,7 +61,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 ### Supported OpenType features
 
 - (`CFF `) Glyph outlining using [outline_glyph()] method.
-- (`CFF2`) Glyph outlining using [outline_glyph()] method.
 - (`OS/2`) Retrieving font's kind using [is_regular()], [is_italic()],
   [is_bold()] and [is_oblique()] methods.
 - (`OS/2`) Retrieving font's weight using [weight()] method.
@@ -73,14 +72,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - (`GDEF`) Retrieving glyph's class using [glyph_class()] method.
 - (`GDEF`) Retrieving glyph's mark attachment class using [glyph_mark_attachment_class()] method.
 - (`GDEF`) Checking that glyph is a mark using [is_mark_glyph()] method.
-- (`avar`) Variation coordinates normalization using [map_variation_coordinates()] method.
-- (`fvar`) Variation axis parsing using [variation_axis()] method.
 - (`VORG`) Retrieving glyph's vertical origin using [glyph_y_origin()] method.
-- (`MVAR`) Retrieving font's metrics variation using [metrics_variation()] method.
-- (`HVAR`) Retrieving glyph's variation offset for horizontal advance using [glyph_hor_advance_variation()] method.
-- (`HVAR`) Retrieving glyph's variation offset for horizontal side bearing using [glyph_hor_side_bearing_variation()] method.
-- (`VVAR`) Retrieving glyph's variation offset for vertical advance using [glyph_ver_advance_variation()] method.
-- (`VVAR`) Retrieving glyph's variation offset for vertical side bearing using [glyph_ver_side_bearing_variation()] method.
 
 [is_regular()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_regular
 [is_italic()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_italic
@@ -95,14 +87,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 [glyph_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_class
 [glyph_mark_attachment_class()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_mark_attachment_class
 [is_mark_glyph()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.is_mark_glyph
-[map_variation_coordinates()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.map_variation_coordinates
-[variation_axis()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.variation_axis
 [glyph_y_origin()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_y_origin
-[metrics_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.metrics_variation
-[glyph_hor_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_advance_variation
-[glyph_hor_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_hor_side_bearing_variation
-[glyph_ver_advance_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_advance_variation
-[glyph_ver_side_bearing_variation()]: https://docs.rs/ttf-parser/0.3.0/ttf_parser/struct.Font.html#method.glyph_ver_side_bearing_variation
 
 ### Error handling
 
@@ -122,36 +107,32 @@ The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
 ```
-test outline_cff  ... bench:   1,293,929 ns/iter (+/- 7,798)
-test outline_cff2 ... bench:   1,847,932 ns/iter (+/- 13,006)
-test outline_glyf ... bench:     764,206 ns/iter (+/- 5,716)
+test outline_cff  ... bench:   1,298,871 ns/iter (+/- 11,846)
+test outline_glyf ... bench:     837,958 ns/iter (+/- 6,261)
 ```
 
 Here is some methods benchmarks:
 
 ```
-test outline_glyph_276_from_cff  ... bench:         877 ns/iter (+/- 265)
-test outline_glyph_276_from_cff2 ... bench:         779 ns/iter (+/- 122)
-test from_data_otf_cff2          ... bench:         675 ns/iter (+/- 8)
-test outline_glyph_276_from_glyf ... bench:         623 ns/iter (+/- 77)
-test from_data_otf_cff           ... bench:         562 ns/iter (+/- 7)
-test outline_glyph_8_from_cff2   ... bench:         531 ns/iter (+/- 118)
-test outline_glyph_8_from_cff    ... bench:         322 ns/iter (+/- 7)
-test from_data_ttf               ... bench:         313 ns/iter (+/- 4)
-test outline_glyph_8_from_glyf   ... bench:         285 ns/iter (+/- 10)
-test glyph_name_276              ... bench:         214 ns/iter (+/- 3)
-test family_name                 ... bench:         170 ns/iter (+/- 12)
+test outline_glyph_276_from_cff  ... bench:       1,041 ns/iter (+/- 71)
+test outline_glyph_276_from_glyf ... bench:         674 ns/iter (+/- 15)
+test from_data_otf_cff           ... bench:         403 ns/iter (+/- 3)
+test outline_glyph_8_from_cff    ... bench:         339 ns/iter (+/- 44)
+test outline_glyph_8_from_glyf   ... bench:         295 ns/iter (+/- 16)
+test glyph_name_276              ... bench:         214 ns/iter (+/- 1)
+test from_data_ttf               ... bench:         169 ns/iter (+/- 3)
+test family_name                 ... bench:         155 ns/iter (+/- 5)
 test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
 test glyph_name_8                ... bench:           1 ns/iter (+/- 0)
 test underline_metrics           ... bench:         0.5 ns/iter (+/- 0)
 test units_per_em                ... bench:         0.5 ns/iter (+/- 0)
 test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 0)
+test x_height                    ... bench:         0.4 ns/iter (+/- 0)
 test ascender                    ... bench:         0.2 ns/iter (+/- 0)
 test hor_advance                 ... bench:         0.2 ns/iter (+/- 0)
 test hor_side_bearing            ... bench:         0.2 ns/iter (+/- 0)
 test subscript_metrics           ... bench:         0.2 ns/iter (+/- 0)
 test width                       ... bench:         0.2 ns/iter (+/- 0)
-test x_height                    ... bench:         0.2 ns/iter (+/- 0)
 ```
 
 `family_name` is expensive, because it allocates a `String` and the original data

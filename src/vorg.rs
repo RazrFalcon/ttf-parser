@@ -14,9 +14,8 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
-        let major_version: u16 = s.read()?;
-        let minor_version: u16 = s.read()?;
-        if !(major_version == 1 && minor_version == 0) {
+        let version: u32 = s.read()?;
+        if version != 0x00010000 {
             return None;
         }
 

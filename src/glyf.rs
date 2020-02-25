@@ -198,13 +198,10 @@ impl<'a> Font<'a> {
         let points_total = {
             let last_point = endpoints.last()?;
             // Prevent overflow.
-            if last_point == core::u16::MAX {
-                return None;
-            }
-
-            last_point + 1
+            last_point.checked_add(1)?
         };
 
+        // Skip instructions byte code.
         let instructions_len: u16 = s.read()?;
         s.advance(instructions_len);
 
@@ -242,7 +239,7 @@ impl<'a> Font<'a> {
 
             // Contour must have at least 2 points.
             if n >= 2 {
-                Self::parse_contour(points.by_ref().take(n as usize), builder);
+                Self::points_to_contour(points.by_ref().take(n as usize), builder);
             }
 
             total += n;
@@ -274,11 +271,9 @@ impl<'a> Font<'a> {
             if flags.x_short() {
                 // Coordinate is 1 byte long.
                 x_coords_len = x_coords_len.checked_add(repeats)?;
-            } else {
-                if !flags.x_is_same_or_positive_short() {
-                    // Coordinate is 2 bytes long.
-                    x_coords_len = x_coords_len.checked_add(repeats * 2)?;
-                }
+            } else if !flags.x_is_same_or_positive_short() {
+                // Coordinate is 2 bytes long.
+                x_coords_len = x_coords_len.checked_add(repeats * 2)?;
             }
 
             // Check for overflow.
@@ -293,7 +288,11 @@ impl<'a> Font<'a> {
         Some(x_coords_len)
     }
 
-    fn parse_contour(
+    /// Useful links:
+    ///
+    /// - https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
+    /// - https://stackoverflow.com/a/20772557
+    fn points_to_contour(
         points: core::iter::Take<&mut GlyphPoints>,
         builder: &mut Builder,
     ) {
@@ -307,16 +306,13 @@ impl<'a> Font<'a> {
                     first_oncurve = Some(p);
                     builder.move_to(p.x, p.y);
                 } else {
-                    match first_offcurve {
-                        Some(offcurve) => {
-                            let mid = offcurve.lerp(p, 0.5);
-                            first_oncurve = Some(mid);
-                            last_offcurve = Some(p);
-                            builder.move_to(mid.x, mid.y);
-                        }
-                        None => {
-                            first_offcurve = Some(p);
-                        }
+                    if let Some(offcurve) = first_offcurve {
+                        let mid = offcurve.lerp(p, 0.5);
+                        first_oncurve = Some(mid);
+                        last_offcurve = Some(p);
+                        builder.move_to(mid.x, mid.y);
+                    } else {
+                        first_offcurve = Some(p);
                     }
                 }
             } else {
@@ -341,30 +337,20 @@ impl<'a> Font<'a> {
         }
 
         loop {
-            match (first_offcurve, last_offcurve) {
-                (Some(offcurve1), Some(offcurve2)) => {
-                    last_offcurve = None;
-                    let mid = offcurve2.lerp(offcurve1, 0.5);
-                    builder.quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
+            if let (Some(offcurve1), Some(offcurve2)) = (first_offcurve, last_offcurve) {
+                last_offcurve = None;
+                let mid = offcurve2.lerp(offcurve1, 0.5);
+                builder.quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
+            } else {
+                if let (Some(p), Some(offcurve1)) = (first_oncurve, first_offcurve) {
+                    builder.quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
+                } else if let (Some(p), Some(offcurve2)) = (first_oncurve, last_offcurve) {
+                    builder.quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
+                } else if let Some(p) = first_oncurve {
+                    builder.line_to(p.x, p.y);
                 }
-                (Some(offcurve1), None) => {
-                    if let Some(p) = first_oncurve {
-                        builder.quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
-                    }
-                    break;
-                }
-                (None, Some(offcurve2)) => {
-                    if let Some(p) = first_oncurve {
-                        builder.quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
-                    }
-                    break;
-                }
-                (None, None) => {
-                    if let Some(p) = first_oncurve {
-                        builder.line_to(p.x, p.y);
-                    }
-                    break;
-                }
+
+                break;
             }
         }
 
@@ -408,6 +394,8 @@ impl<'a> Font<'a> {
             ts.a = s.read::<F2DOT14>()?.0;
             ts.d = s.read::<F2DOT14>()?.0;
         } else if flags.we_have_a_scale() {
+            // 'If the bit WE_HAVE_A_SCALE is set, the scale value is read in 2.14 format.
+            // The value can be between -2 to almost +2.'
             ts.a = f32_bound(-2.0, s.read::<F2DOT14>()?.0, 2.0);
             ts.d = ts.a;
         }
@@ -491,6 +479,8 @@ impl core::fmt::Debug for Transform {
 struct GlyphPoint {
     x: i16,
     y: i16,
+    /// Indicates that a point is a point on curve
+    /// and not a control point.
     on_curve_point: bool,
 }
 

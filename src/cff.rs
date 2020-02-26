@@ -209,6 +209,7 @@ impl<'a> Font<'a> {
         let data = metadata.char_strings.get(glyph_id.0)?;
         match parse_char_string(data, metadata, builder) {
             Ok(bbox) => Some(bbox),
+            Err(CFFError::ZeroBBox) => None,
             #[allow(unused_variables)]
             Err(e) => {
                 warn!("Glyph {} parsing failed cause {}.", glyph_id.0, e);

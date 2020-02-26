@@ -22,6 +22,7 @@ log = { version = "0.4.8", optional = true }
 
 [dev-dependencies]
 bencher = "0.1"
+env_logger = { version = "0.7", default-features = false }
 svgtypes = "0.5"
 xmlwriter = "0.1"
 

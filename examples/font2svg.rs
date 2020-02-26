@@ -5,6 +5,9 @@ const FONT_SIZE: f64 = 128.0;
 const COLUMNS: u32 = 50;
 
 fn main() {
+    std::env::set_var("RUST_LOG", "warn");
+    env_logger::init();
+
     if let Err(e) = process() {
         eprintln!("Error: {}.", e);
         std::process::exit(1);

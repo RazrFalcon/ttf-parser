@@ -72,12 +72,9 @@ impl<'a> Font<'a> {
             }
         };
 
-        // TODO: use Range::is_empty as soon as it became stable
-        if range.start == range.end {
-            // No outline.
-            None
-        } else if range.start > range.end {
+        if range.start >= range.end {
             // 'The offsets must be in ascending order.'
+            // And range cannot be empty.
             None
         } else {
             Some(range)

@@ -110,7 +110,7 @@ test outline_glyf ... bench:     837,958 ns/iter (+/- 6,261)
 Here is some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:       1,041 ns/iter (+/- 71)
+test outline_glyph_276_from_cff  ... bench:         841 ns/iter (+/- 53)
 test outline_glyph_276_from_glyf ... bench:         674 ns/iter (+/- 15)
 test from_data_otf_cff           ... bench:         403 ns/iter (+/- 3)
 test outline_glyph_8_from_cff    ... bench:         339 ns/iter (+/- 44)

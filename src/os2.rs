@@ -24,7 +24,7 @@ pub enum Weight {
 impl Weight {
     /// Returns a numeric representation of a weight.
     #[inline]
-    pub fn to_number(&self) -> u16 {
+    pub fn to_number(self) -> u16 {
         match self {
             Weight::Thin        => 100,
             Weight::ExtraLight  => 200,
@@ -35,7 +35,7 @@ impl Weight {
             Weight::Bold        => 700,
             Weight::ExtraBold   => 800,
             Weight::Black       => 900,
-            Weight::Other(n)    => *n,
+            Weight::Other(n)    => n,
         }
     }
 }
@@ -84,7 +84,7 @@ pub enum Width {
 impl Width {
     /// Returns a numeric representation of a width.
     #[inline]
-    pub fn to_number(&self) -> u16 {
+    pub fn to_number(self) -> u16 {
         match self {
             Width::UltraCondensed   => 1,
             Width::ExtraCondensed   => 2,
@@ -129,11 +129,11 @@ pub struct ScriptMetrics {
 struct SelectionFlags(u16);
 
 impl SelectionFlags {
-    #[inline] fn italic(&self) -> bool { self.0 & (1 << 0) != 0 }
-    #[inline] fn bold(&self) -> bool { self.0 & (1 << 5) != 0 }
-    #[inline] fn regular(&self) -> bool { self.0 & (1 << 6) != 0 }
-    #[inline] fn use_typo_metrics(&self) -> bool { self.0 & (1 << 7) != 0 }
-    #[inline] fn oblique(&self) -> bool { self.0 & (1 << 9) != 0 }
+    #[inline] fn italic(self) -> bool { self.0 & (1 << 0) != 0 }
+    #[inline] fn bold(self) -> bool { self.0 & (1 << 5) != 0 }
+    #[inline] fn regular(self) -> bool { self.0 & (1 << 6) != 0 }
+    #[inline] fn use_typo_metrics(self) -> bool { self.0 & (1 << 7) != 0 }
+    #[inline] fn oblique(self) -> bool { self.0 & (1 << 9) != 0 }
 }
 
 

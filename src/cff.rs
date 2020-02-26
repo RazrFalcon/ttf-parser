@@ -1309,7 +1309,7 @@ pub struct Operator(pub u16);
 
 impl Operator {
     #[inline]
-    pub fn get(&self) -> u16 { self.0 }
+    pub fn get(self) -> u16 { self.0 }
 }
 
 

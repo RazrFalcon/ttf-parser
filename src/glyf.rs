@@ -62,12 +62,12 @@ impl<'a> OutlineBuilderInner for Builder<'a> {
 struct SimpleGlyphFlags(u8);
 
 impl SimpleGlyphFlags {
-    #[inline] fn on_curve_point(&self) -> bool { self.0 & 0x01 != 0 }
-    #[inline] fn x_short(&self) -> bool { self.0 & 0x02 != 0 }
-    #[inline] fn y_short(&self) -> bool { self.0 & 0x04 != 0 }
-    #[inline] fn repeat_flag(&self) -> bool { self.0 & 0x08 != 0 }
-    #[inline] fn x_is_same_or_positive_short(&self) -> bool { self.0 & 0x10 != 0 }
-    #[inline] fn y_is_same_or_positive_short(&self) -> bool { self.0 & 0x20 != 0 }
+    #[inline] fn on_curve_point(self) -> bool { self.0 & 0x01 != 0 }
+    #[inline] fn x_short(self) -> bool { self.0 & 0x02 != 0 }
+    #[inline] fn y_short(self) -> bool { self.0 & 0x04 != 0 }
+    #[inline] fn repeat_flag(self) -> bool { self.0 & 0x08 != 0 }
+    #[inline] fn x_is_same_or_positive_short(self) -> bool { self.0 & 0x10 != 0 }
+    #[inline] fn y_is_same_or_positive_short(self) -> bool { self.0 & 0x20 != 0 }
 }
 
 impl FromData for SimpleGlyphFlags {
@@ -83,12 +83,12 @@ impl FromData for SimpleGlyphFlags {
 struct CompositeGlyphFlags(u16);
 
 impl CompositeGlyphFlags {
-    #[inline] fn arg_1_and_2_are_words(&self) -> bool { self.0 & 0x0001 != 0 }
-    #[inline] fn args_are_xy_values(&self) -> bool { self.0 & 0x0002 != 0 }
-    #[inline] fn we_have_a_scale(&self) -> bool { self.0 & 0x0008 != 0 }
-    #[inline] fn more_components(&self) -> bool { self.0 & 0x0020 != 0 }
-    #[inline] fn we_have_an_x_and_y_scale(&self) -> bool { self.0 & 0x0040 != 0 }
-    #[inline] fn we_have_a_two_by_two(&self) -> bool { self.0 & 0x0080 != 0 }
+    #[inline] fn arg_1_and_2_are_words(self) -> bool { self.0 & 0x0001 != 0 }
+    #[inline] fn args_are_xy_values(self) -> bool { self.0 & 0x0002 != 0 }
+    #[inline] fn we_have_a_scale(self) -> bool { self.0 & 0x0008 != 0 }
+    #[inline] fn more_components(self) -> bool { self.0 & 0x0020 != 0 }
+    #[inline] fn we_have_an_x_and_y_scale(self) -> bool { self.0 & 0x0040 != 0 }
+    #[inline] fn we_have_a_two_by_two(self) -> bool { self.0 & 0x0080 != 0 }
 }
 
 impl FromData for CompositeGlyphFlags {
@@ -566,7 +566,7 @@ struct Point {
 
 impl Point {
     #[inline]
-    fn lerp(&self, other: Point, t: f32) -> Point {
+    fn lerp(self, other: Point, t: f32) -> Point {
         Point {
             x: self.x + t * (other.x - self.x),
             y: self.y + t * (other.y - self.y),

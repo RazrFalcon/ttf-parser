@@ -133,12 +133,8 @@ fn glyph_to_path(
         None => return,
     };
 
-    let advance = match font.glyph_hor_advance(glyph_id) {
-        Some(v) => v,
-        _ => return,
-    };
-
-    let dx = (cell_size - advance as f64 * scale) / 2.0;
+    let bbox_w = (bbox.x_max as f64 - bbox.x_min as f64) * scale;
+    let dx = (cell_size - bbox_w) / 2.0;
     let y = y + cell_size + font.descender() as f64 * scale;
 
     let mut ts = svgtypes::Transform::default();
@@ -152,10 +148,9 @@ fn glyph_to_path(
     svg.end_element();
 
     {
-        let bbox_w = (bbox.x_max as f64 - bbox.x_min as f64) * scale;
         let bbox_h = (bbox.y_max as f64 - bbox.y_min as f64) * scale;
         let bbox_x = x + dx + bbox.x_min as f64 * scale;
-        let bbox_y = y - bbox.y_min as f64 * scale - bbox_h;
+        let bbox_y = y - bbox.y_max as f64 * scale;
 
         svg.start_element("rect");
         svg.write_attribute("x", &bbox_x);

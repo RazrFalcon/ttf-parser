@@ -358,20 +358,12 @@ pub struct RectF {
     pub y_max: f32,
 }
 
-pub trait OutlineBuilderInner {
-    fn update_bbox(&mut self, x: f32, y: f32);
-    fn move_to(&mut self, x: f32, y: f32);
-    fn line_to(&mut self, x: f32, y: f32);
-    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32);
-    fn close(&mut self);
-}
-
 pub struct Builder<'a> {
     pub builder: &'a mut dyn OutlineBuilder,
     pub bbox: RectF,
 }
 
-impl<'a> OutlineBuilderInner for Builder<'a> {
+impl<'a> Builder<'a> {
     #[inline]
     fn update_bbox(&mut self, x: f32, y: f32) {
         self.bbox.x_min = self.bbox.x_min.min(x);

@@ -7,21 +7,13 @@ use core::num::NonZeroU16;
 use crate::parser::{Stream, F2DOT14, FromData};
 use crate::{Font, GlyphId, OutlineBuilder, Rect};
 
-/// A wrapper that transforms segments before passing them to `OutlineBuilder`.
-trait OutlineBuilderInner {
-    fn move_to(&mut self, x: f32, y: f32);
-    fn line_to(&mut self, x: f32, y: f32);
-    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32);
-    fn close(&mut self);
-}
-
 struct Builder<'a> {
     builder: &'a mut dyn OutlineBuilder,
     transform: Transform,
     is_default_ts: bool, // `bool` is faster than `Option` or `is_default`.
 }
 
-impl<'a> OutlineBuilderInner for Builder<'a> {
+impl<'a> Builder<'a> {
     #[inline]
     fn move_to(&mut self, mut x: f32, mut y: f32) {
         if !self.is_default_ts {

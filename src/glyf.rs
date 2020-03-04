@@ -328,22 +328,18 @@ impl<'a> Font<'a> {
             }
         }
 
-        loop {
-            if let (Some(offcurve1), Some(offcurve2)) = (first_offcurve, last_offcurve) {
-                last_offcurve = None;
-                let mid = offcurve2.lerp(offcurve1, 0.5);
-                builder.quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
-            } else {
-                if let (Some(p), Some(offcurve1)) = (first_oncurve, first_offcurve) {
-                    builder.quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
-                } else if let (Some(p), Some(offcurve2)) = (first_oncurve, last_offcurve) {
-                    builder.quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
-                } else if let Some(p) = first_oncurve {
-                    builder.line_to(p.x, p.y);
-                }
+        if let (Some(offcurve1), Some(offcurve2)) = (first_offcurve, last_offcurve) {
+            last_offcurve = None;
+            let mid = offcurve2.lerp(offcurve1, 0.5);
+            builder.quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
+        }
 
-                break;
-            }
+        if let (Some(p), Some(offcurve1)) = (first_oncurve, first_offcurve) {
+            builder.quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
+        } else if let (Some(p), Some(offcurve2)) = (first_oncurve, last_offcurve) {
+            builder.quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
+        } else if let Some(p) = first_oncurve {
+            builder.line_to(p.x, p.y);
         }
 
         builder.close();

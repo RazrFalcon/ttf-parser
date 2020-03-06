@@ -290,30 +290,6 @@ fn superscript_metrics() {
 }
 
 #[test]
-fn glyph_hor_metrics_1() {
-    let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_hor_advance(GlyphId(0)), Some(653));
-    assert_eq!(font.glyph_hor_side_bearing(GlyphId(0)), Some(89));
-}
-
-#[test]
-fn glyph_ver_metrics_1() {
-    let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_ver_advance(GlyphId(0)), Some(1000));
-    assert_eq!(font.glyph_ver_side_bearing(GlyphId(0)), Some(666));
-}
-
-#[test]
-fn glyph_ver_metrics_2() {
-    let data = fs::read("tests/fonts/vmtx.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-    assert_eq!(font.glyph_ver_advance(GlyphId(1)), Some(1000));
-    assert_eq!(font.glyph_ver_side_bearing(GlyphId(1)), Some(83));
-}
-
-#[test]
 fn glyph_class_1() {
     let data = fs::read("tests/fonts/TestGPOSThree.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
@@ -453,36 +429,4 @@ fn glyphs_kerning_02() {
     // Random GID's.
     assert_eq!(font.glyphs_kerning(GlyphId(0), GlyphId(0)), None);
     assert_eq!(font.glyphs_kerning(GlyphId(0), GlyphId(100)), None);
-}
-
-// An attempt to check that table slices are still valid after moving.
-#[test]
-fn slicing() {
-    #[inline(never)]
-    fn subslice1(font: &Font) {
-        assert_eq!(font.ascender(), 984);
-    }
-
-    #[inline(never)]
-    fn subslice2(font: Font) {
-        assert_eq!(font.ascender(), 984);
-    }
-
-    let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-
-    subslice1(&font);
-    subslice2(font.clone());
-    subslice2(font);
-}
-
-#[test]
-fn glyph_name_01() {
-    let data = fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = Font::from_data(&data, 0).unwrap();
-
-    assert_eq!(font.glyph_name(GlyphId(0)), Some(".notdef"));
-    assert_eq!(font.glyph_name(GlyphId(59)), Some("Amacron"));
-    assert_eq!(font.glyph_name(GlyphId(285)), Some("uni01050301"));
-    assert_eq!(font.glyph_name(GlyphId(10000)), None);
 }

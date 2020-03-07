@@ -114,12 +114,17 @@ and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
-The benchmark tests how long it takes to outline all glyphs in the font.
+The [benchmark](./benches/outline/) tests how long it takes to outline all glyphs in the font.
 
 ```text
-test outline_cff  ... bench:   1,298,871 ns/iter (+/- 11,846)
-test outline_glyf ... bench:     837,958 ns/iter (+/- 6,261)
+ttf_parser_outline_glyf     851740 ns
+freetype_outline_glyf      1240367 ns
+
+ttf_parser_outline_cff     1371774 ns
+freetype_outline_cff       5892730 ns
 ```
+
+**Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
 
 And here are some methods benchmarks:
 

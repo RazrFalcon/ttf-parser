@@ -200,7 +200,7 @@ impl<'a> Font<'a> {
         let flags_offset = s.offset();
         let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)?;
         let x_coords_offset = s.offset();
-        let y_coords_offset = x_coords_offset + x_coords_len as usize;
+        let y_coords_offset = x_coords_offset + usize::from(x_coords_len);
 
         let mut points = GlyphPoints {
             flags: Stream::new(glyph_data.get(flags_offset..x_coords_offset)?),
@@ -231,7 +231,7 @@ impl<'a> Font<'a> {
 
             // Contour must have at least 2 points.
             if n >= 2 {
-                Self::points_to_contour(points.by_ref().take(n as usize), builder);
+                Self::points_to_contour(points.by_ref().take(usize::from(n)), builder);
             }
 
             total += n;
@@ -255,7 +255,7 @@ impl<'a> Font<'a> {
             // The number of times a glyph point repeats.
             let repeats = if flags.repeat_flag() {
                 let repeats: u8 = s.read()?;
-                repeats as u16 + 1
+                u16::from(repeats) + 1
             } else {
                 1
             };
@@ -292,7 +292,7 @@ impl<'a> Font<'a> {
         let mut first_offcurve: Option<Point> = None;
         let mut last_offcurve: Option<Point> = None;
         for point in points {
-            let p = Point { x: point.x as f32, y: point.y as f32 };
+            let p = Point { x: f32::from(point.x), y: f32::from(point.y) };
             if first_oncurve.is_none() {
                 if point.on_curve_point {
                     first_oncurve = Some(p);
@@ -365,11 +365,11 @@ impl<'a> Font<'a> {
 
         if flags.args_are_xy_values() {
             if flags.arg_1_and_2_are_words() {
-                ts.e = s.read::<i16>()? as f32;
-                ts.f = s.read::<i16>()? as f32;
+                ts.e = f32::from(s.read::<i16>()?);
+                ts.f = f32::from(s.read::<i16>()?);
             } else {
-                ts.e = s.read::<i8>()? as f32;
-                ts.f = s.read::<i8>()? as f32;
+                ts.e = f32::from(s.read::<i8>()?);
+                ts.f = f32::from(s.read::<i8>()?);
             }
         }
 
@@ -503,10 +503,10 @@ impl<'a> Iterator for GlyphPoints<'a> {
 
         let x = match (self.last_flags.x_short(), self.last_flags.x_is_same_or_positive_short()) {
             (true, true) => {
-                self.x_coords.read::<u8>()? as i16
+                i16::from(self.x_coords.read::<u8>()?)
             }
             (true, false) => {
-                -(self.x_coords.read::<u8>()? as i16)
+                -i16::from(self.x_coords.read::<u8>()?)
             }
             (false, true) => {
                 // Keep previous coordinate.
@@ -520,10 +520,10 @@ impl<'a> Iterator for GlyphPoints<'a> {
 
         let y = match (self.last_flags.y_short(), self.last_flags.y_is_same_or_positive_short()) {
             (true, true) => {
-                self.y_coords.read::<u8>()? as i16
+                i16::from(self.y_coords.read::<u8>()?)
             }
             (true, false) => {
-                -(self.y_coords.read::<u8>()? as i16)
+                -i16::from(self.y_coords.read::<u8>()?)
             }
             (false, true) => {
                 // Keep previous coordinate.

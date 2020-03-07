@@ -1,5 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 
+use core::convert::TryFrom;
+
 use crate::parser::{Stream, Offset, LazyArray16};
 use crate::{Font, GlyphId, PlatformId};
 use crate::raw::cmap as raw;
@@ -30,7 +32,7 @@ impl<'a> Font<'a> {
     pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
         let table = self.cmap?;
         for record in table.records {
-            let subtable_data = table.data.get(record.offset().0 as usize..)?;
+            let subtable_data = table.data.get(record.offset().to_usize()..)?;
             let mut s = Stream::new(subtable_data);
             let format = match parse_format(s.read()?) {
                 Some(format) => format,
@@ -46,7 +48,7 @@ impl<'a> Font<'a> {
                 continue;
             }
 
-            let c = c as u32;
+            let c = u32::from(c);
             let glyph = match format {
                 Format::ByteEncodingTable => {
                     parse_byte_encoding_table(&mut s, c)
@@ -105,7 +107,7 @@ impl<'a> Font<'a> {
                 continue;
             }
 
-            return self.parse_unicode_variation_sequences(subtable_data, c, variation as u32);
+            return self.parse_unicode_variation_sequences(subtable_data, c, u32::from(variation));
         }
 
         None
@@ -117,7 +119,7 @@ impl<'a> Font<'a> {
         c: char,
         variation: u32,
     ) -> Option<GlyphId> {
-        let cp = c as u32;
+        let cp = u32::from(c);
 
         let mut s = Stream::new(data);
         s.skip::<u16>(); // format
@@ -159,9 +161,9 @@ fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Option<u16> {
     let length: u16 = s.read()?;
     s.skip::<u16>(); // language
 
-    if code_point < (length as u32) {
+    if code_point < u32::from(length) {
         s.advance(code_point);
-        Some(s.read::<u8>()? as u16)
+        Some(u16::from(s.read::<u8>()?))
     } else {
         None
     }
@@ -174,13 +176,11 @@ fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Option<u16> {
 // https://github.com/fonttools/fonttools/blob/a360252709a3d65f899915db0a5bd753007fdbb7/Lib/fontTools/ttLib/tables/_c_m_a_p.py#L360
 fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option<u16> {
     // This subtable supports code points only in a u16 range.
-    if code_point > 0xffff {
-        return None;
-    }
+    let code_point = u16::try_from(code_point).ok()?;
 
-    let code_point = code_point as u16;
-    let high_byte = (code_point >> 8) as u16;
-    let low_byte = (code_point & 0x00FF) as u16;
+    let code_point = code_point;
+    let high_byte = code_point >> 8;
+    let low_byte = code_point & 0x00FF;
 
     let mut s = Stream::new(data);
     s.skip::<u16>(); // format
@@ -212,18 +212,18 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
 
     // SubHeaderRecord::id_range_offset points to SubHeaderRecord::first_code
     // in the glyphIndexArray. So we have to advance to our code point.
-    let index_offset = (low_byte - first_code) as usize * core::mem::size_of::<u16>();
+    let index_offset = usize::from(low_byte.checked_sub(first_code)?) * core::mem::size_of::<u16>();
 
     // 'The value of the idRangeOffset is the number of bytes
     // past the actual location of the idRangeOffset'.
     let offset =
           sub_headers_offset
         // Advance to required subheader.
-        + raw::SubHeaderRecord::SIZE * (i + 1) as usize
+        + raw::SubHeaderRecord::SIZE * usize::from(i + 1)
         // Move back to idRangeOffset start.
         - core::mem::size_of::<u16>()
         // Use defined offset.
-        + sub_header.id_range_offset() as usize
+        + usize::from(sub_header.id_range_offset())
         // Advance to required index in the glyphIndexArray.
         + index_offset;
 
@@ -232,28 +232,24 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
         return None;
     }
 
-    let glyph = ((glyph as i32 + sub_header.id_delta() as i32) % 65536) as u16;
+    let glyph = ((i32::from(glyph) + i32::from(sub_header.id_delta())) % 65536) as u16;
     Some(glyph)
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
 fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option<u16> {
     // This subtable supports code points only in a u16 range.
-    if code_point > 0xffff {
-        return None;
-    }
-
-    let code_point = code_point as u16;
+    let code_point = u16::try_from(code_point).ok()?;
 
     let mut s = Stream::new(data);
-    s.advance(6 as u32); // format + length + language
+    s.advance(6u32); // format + length + language
     let seg_count_x2: u16 = s.read()?;
     if seg_count_x2 < 2 {
         return None;
     }
 
     let seg_count = seg_count_x2 / 2;
-    s.advance(6 as u32); // searchRange + entrySelector + rangeShift
+    s.advance(6u32); // searchRange + entrySelector + rangeShift
 
     let end_codes = s.read_array::<u16, u16>(seg_count)?;
     s.skip::<u16>(); // reservedPad
@@ -280,12 +276,7 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
                 }
 
                 let delta = (code_point as u32 - start_value as u32) * 2;
-                // Check for overflow.
-                if delta > core::u16::MAX as u32 {
-                    return None;
-                }
-                // `delta` must be u16.
-                let delta = delta as u16;
+                let delta = u16::try_from(delta).ok()?;
 
                 let id_range_offset_pos = (id_range_offset_pos + index as usize * 2) as u16;
                 let pos = id_range_offset_pos.wrapping_add(delta);
@@ -309,23 +300,14 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-6-trimmed-table-mapping
 fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Option<u16> {
     // This subtable supports code points only in a u16 range.
-    if code_point > 0xffff {
-        return None;
-    }
+    let code_point = u16::try_from(code_point).ok()?;
 
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
     let first_code_point: u16 = s.read()?;
     let glyphs = s.read_array16::<u16>()?;
 
-    let code_point = code_point as u16;
-
-    // Check for overflow.
-    if code_point < first_code_point {
-        return None;
-    }
-
-    let idx = code_point - first_code_point;
+    let idx = code_point.checked_sub(first_code_point)?;
     glyphs.get(idx)
 }
 
@@ -337,12 +319,7 @@ fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Option<u16> {
     let first_code_point: u32 = s.read()?;
     let glyphs = s.read_array32::<u16>()?;
 
-    // Check for overflow.
-    if code_point < first_code_point {
-        return None;
-    }
-
-    let idx = code_point - first_code_point;
+    let idx = code_point.checked_sub(first_code_point)?;
     glyphs.get(idx)
 }
 
@@ -357,13 +334,13 @@ fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> 
     for group in groups {
         let start_char_code = group.start_char_code();
         if code_point >= start_char_code && code_point <= group.end_char_code() {
-            if format == Format::SegmentedCoverage {
-                let id = group.start_glyph_id() + code_point - start_char_code;
-                return Some(id as u16);
+            let id = if format == Format::SegmentedCoverage {
+                group.start_glyph_id().checked_add(code_point)?.checked_sub(start_char_code)?
             } else {
-                // TODO: what if start_glyph_id is > u16::MAX
-                return Some(group.start_glyph_id() as u16);
-            }
+                group.start_glyph_id()
+            };
+
+            return u16::try_from(id).ok();
         }
     }
 
@@ -402,8 +379,8 @@ fn parse_format(v: u16) -> Option<Format> {
 impl raw::UnicodeRangeRecord {
     fn contains(&self, c: char) -> bool {
         let start_unicode_value = self.start_unicode_value();
-        let end = start_unicode_value + self.additional_count() as u32;
-        start_unicode_value >= (c as u32) && (c as u32) < end
+        let end = start_unicode_value + u32::from(self.additional_count());
+        start_unicode_value >= u32::from(c) && u32::from(c) < end
     }
 }
 

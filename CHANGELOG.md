@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - C API.
 
+### Fixed
+- Multiple issues due to arithmetic overflow.
+
 ## [0.4.0] - 2020-02-24
 
 **A major rewrite.**

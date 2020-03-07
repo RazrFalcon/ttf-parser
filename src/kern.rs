@@ -47,7 +47,7 @@ fn parse_format1(s: &mut Stream, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Opti
     s.advance(6u32); // search_range (u16) + entry_selector (u16) + range_shift (u16)
     let pairs = s.read_array::<KerningRecord, u16>(number_of_pairs)?;
 
-    let needle = (glyph_id1.0 as u32) << 16 | glyph_id2.0 as u32;
+    let needle = u32::from(glyph_id1.0) << 16 | u32::from(glyph_id2.0);
     pairs.binary_search_by(|v| v.pair.cmp(&needle)).map(|(_, v)| v.value)
 }
 

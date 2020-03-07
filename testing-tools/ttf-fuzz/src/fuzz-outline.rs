@@ -1,6 +1,6 @@
 fn main() {
     afl::fuzz!(|data: &[u8]| {
-        if let Ok(font) = ttf_parser::Font::from_data(data, 0) {
+        if let Some(font) = ttf_parser::Font::from_data(data, 0) {
             for id in 0..font.number_of_glyphs() {
                 let _ = font.outline_glyph(ttf_parser::GlyphId(id), &mut Builder(0));
             }

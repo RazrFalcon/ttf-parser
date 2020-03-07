@@ -119,8 +119,8 @@ impl<'a> Name<'a> {
     ///
     /// Can be empty.
     pub fn name(&self) -> &'a [u8] {
-        let start = self.data.offset() as usize;
-        let end = start + self.data.length() as usize;
+        let start = usize::from(self.data.offset());
+        let end = start + usize::from(self.data.length());
         self.strings.get(start..end).unwrap_or(&[])
     }
 
@@ -213,12 +213,12 @@ impl Default for Names<'_> {
 }
 
 impl<'a> Names<'a> {
-    fn new(names: &'a [u8], storage: &'a [u8]) -> Self {
+    fn new(names: &'a [u8], storage: &'a [u8], total: u16) -> Self {
         Names {
             names,
             storage,
             index: 0,
-            total: (names.len() / raw::NameRecord::SIZE) as u16,
+            total,
         }
     }
 }
@@ -229,14 +229,14 @@ impl<'a> Iterator for Names<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.total {
             self.index += 1;
-            self.nth(self.index as usize - 1)
+            self.nth(usize::from(self.index) - 1)
         } else {
             None
         }
     }
 
     fn count(self) -> usize {
-        self.total as usize
+        usize::from(self.total)
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
@@ -263,13 +263,15 @@ pub(crate) fn parse(data: &[u8]) -> Option<Names> {
     s.skip::<u16>(); // offset
 
     if format == 0 {
-        Some(Names::new(s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?, s.tail()?))
+        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?;
+        Some(Names::new(names_data, s.tail()?, count))
     } else if format == 1 {
         let lang_tag_count: u16 = s.read()?;
         let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
 
         s.advance(lang_tag_len); // langTagRecords
-        Some(Names::new(s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?, s.tail()?))
+        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?;
+        Some(Names::new(names_data, s.tail()?, count))
     } else {
         warn!("{} is an unsupported name table format.", format);
         None

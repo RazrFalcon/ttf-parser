@@ -327,8 +327,8 @@ impl<'a> Font<'a> {
 
         // 'If the name index is between 0 and 257, treat the name index
         // as a glyph index in the Macintosh standard order.'
-        if (index as usize) < MACINTOSH_NAMES.len() {
-            Some(MACINTOSH_NAMES[index as usize])
+        if usize::from(index) < MACINTOSH_NAMES.len() {
+            Some(MACINTOSH_NAMES[usize::from(index)])
         } else {
             // 'If the name index is between 258 and 65535, then subtract 258 and use that
             // to index into the list of Pascal strings at the end of the table.'
@@ -344,11 +344,11 @@ impl<'a> Font<'a> {
                         // Empty name is an error.
                         break;
                     } else {
-                        let name = s.read_bytes(len as u16)?;
+                        let name = s.read_bytes(u16::from(len))?;
                         return core::str::from_utf8(name).ok();
                     }
                 } else {
-                    s.advance(len as u16);
+                    s.advance(u16::from(len));
                 }
 
                 i += 1;

@@ -7,17 +7,29 @@
 
 A high-level, safe, zero-allocation TrueType font parser.
 
+Can be used as Rust and as C library.
+
 ### Features
 
 - A high-level API, for people who doesn't know how TrueType works internally.
   Basically, no direct access to font tables.
+- A [C API](./c-api).
 - Zero heap allocations.
 - Zero unsafe.
 - Zero required dependencies. Logging is enabled by default.
 - `no_std` compatible.
-- Fast.
+- Fast. Set the *Performance* section.
 - Stateless. No mutable methods.
 - Simple and maintainable code (no magic numbers).
+
+### Safety
+
+- The library must not panic. Any panic considered as a critical bug and should be reported.
+- The library forbids the unsafe code.
+- No heap allocations, so crash due to OOM is not possible.
+- All recursive methods have a depth limit.
+- Technically, should use less than 64KiB of stack in worst case scenario.
+- Most of arithmetic operations are checked.
 
 ### Supported TrueType features
 
@@ -144,11 +156,6 @@ is stored as UTF-16 BE.
 
 `glyph_name_8` is faster that `glyph_name_276`, because for glyph indexes lower than 258
 we are using predefined names, so no parsing is involved.
-
-### Safety
-
-- The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library forbids the unsafe code.
 
 ### Alternatives
 

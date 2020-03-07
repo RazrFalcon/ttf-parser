@@ -22,7 +22,7 @@ impl<'a> Table<'a> {
 }
 
 impl<'a> Font<'a> {
-    /// Resolves Glyph ID for code point.
+    /// Resolves a Glyph ID for a code point.
     ///
     /// Returns `None` instead of `0` when glyph is not found.
     ///

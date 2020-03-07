@@ -3,7 +3,4 @@ rust:
   - 1.35.0
   - stable
 script:
-  - set -e
-  - cargo build --no-default-features --verbose --all
-  - cargo build --verbose --all
-  - cargo test --verbose --all
+  - test-all.sh

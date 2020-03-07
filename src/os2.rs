@@ -108,6 +108,7 @@ impl Default for Width {
 
 
 /// A script metrics used by subscript and superscript.
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct ScriptMetrics {
     /// Horizontal font size.

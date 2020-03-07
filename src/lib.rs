@@ -1,17 +1,29 @@
 /*!
 A high-level, safe, zero-allocation TrueType font parser.
 
+Can be used as Rust and as C library.
+
 ## Features
 
 - A high-level API, for people who doesn't know how TrueType works internally.
   Basically, no direct access to font tables.
+- A [C API](./c-api).
 - Zero heap allocations.
 - Zero unsafe.
 - Zero required dependencies. Logging is enabled by default.
 - `no_std` compatible.
-- Fast.
+- Fast. Set the *Performance* section.
 - Stateless. No mutable methods.
 - Simple and maintainable code (no magic numbers).
+
+## Safety
+
+- The library must not panic. Any panic considered as a critical bug and should be reported.
+- The library forbids the unsafe code.
+- No heap allocations, so crash due to OOM is not possible.
+- All recursive methods have a depth limit.
+- Technically, should use less than 64KiB of stack in worst case scenario.
+- Most of arithmetic operations are checked.
 
 ## Supported TrueType features
 
@@ -138,11 +150,6 @@ is stored as UTF-16 BE.
 
 `glyph_name_8` is faster that `glyph_name_276`, because for glyph indexes lower than 258
 we are using predefined names, so no parsing is involved.
-
-## Safety
-
-- The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library forbids the unsafe code.
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.4.0")]
@@ -212,6 +219,7 @@ pub use os2::*;
 
 
 /// A type-safe wrapper for glyph ID.
+#[repr(C)]
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct GlyphId(pub u16);
 
@@ -233,6 +241,7 @@ impl Default for GlyphId {
 /// A line metrics.
 ///
 /// Used for underline and strikeout.
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct LineMetrics {
     /// Line position.
@@ -244,6 +253,7 @@ pub struct LineMetrics {
 
 
 /// A rectangle.
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
 pub struct Rect {
@@ -278,10 +288,11 @@ pub trait OutlineBuilder {
 
 
 /// A table name.
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
 pub enum TableName {
-    CharacterToGlyphIndexMapping,
+    CharacterToGlyphIndexMapping = 0,
     CompactFontFormat,
     GlyphData,
     GlyphDefinition,
@@ -500,7 +511,7 @@ impl<'a> Font<'a> {
     /// You must check `outline_glyph()` result for error before using
     /// `OutlineBuilder`'s output.
     ///
-    /// This method supports `glyf`, `CFF` and `CFF2` tables.
+    /// This method supports `glyf` and `CFF` tables.
     ///
     /// Returns `None` when glyph has no outline.
     ///
@@ -562,9 +573,9 @@ impl<'a> Font<'a> {
     ///
     /// Note that this method's performance depends on a table type the current font is using.
     /// In case of a `glyf` table, it's basically free, since this table stores
-    /// bounding box separately. In case of `CFF` and `CFF2`, we should actually outline
+    /// bounding box separately. In case of `CFF` we should actually outline
     /// a glyph and then calculate its bounding box. So if you need an outline and
-    /// a bounding box and you have an OpenType font (which uses CFF/CFF2)
+    /// a bounding box and you have an OpenType font (which uses CFF)
     /// then prefer `outline_glyph()` method.
     #[inline]
     pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Option<Rect> {

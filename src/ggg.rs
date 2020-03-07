@@ -34,6 +34,7 @@ impl<'a> CoverageTable<'a> {
 
 
 /// A value of [Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table).
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Class(pub u16);
 

@@ -1,0 +1,23 @@
+[package]
+name = "ttf-parser-capi"
+version = "0.1.0"
+authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
+license = "MIT"
+edition = "2018"
+
+[lib]
+name = "ttfparser"
+path = "lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+ttf-parser = { path = "../", default-features = false }
+log = { version = "0.4.8", optional = true }
+
+[features]
+default = ["logging"]
+logging = ["ttf-parser/logging", "log"]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1

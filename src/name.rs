@@ -235,6 +235,10 @@ impl<'a> Iterator for Names<'a> {
         }
     }
 
+    fn count(self) -> usize {
+        self.total as usize
+    }
+
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let start = raw::NameRecord::SIZE * n;
         let end = start + raw::NameRecord::SIZE;

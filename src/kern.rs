@@ -6,7 +6,7 @@ use crate::{Font, GlyphId};
 impl<'a> Font<'a> {
     /// Parses a glyphs pair kerning.
     ///
-    /// Only horizontal kerning is supported.
+    /// Only a horizontal kerning is supported.
     pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {
         let data = self.kern?;
 

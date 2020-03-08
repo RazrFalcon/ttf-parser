@@ -2462,6 +2462,52 @@ mod tests {
                    (5, Some(2147483647..4294967294)));
     }
 
+    #[test]
+    fn private_dict_negative_char_strings_offset() {
+        let data = writer::convert(&[
+            UInt16(1), // count
+            UInt8(1), // offset size
+            UInt8(1), // index[0]
+            UInt8(14), // index[1]
+            // Item 0
+            CFFInt(-1),
+            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
+        ]);
+
+        assert!(parse_top_dict(&mut Stream::new(&data)).is_none());
+    }
+
+    #[test]
+    fn private_dict_no_char_strings_offset_operand() {
+        let data = writer::convert(&[
+            UInt16(1), // count
+            UInt8(1), // offset size
+            UInt8(1), // index[0]
+            UInt8(14), // index[1]
+            // Item 0
+            // <-- No number here.
+            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
+        ]);
+
+        assert!(parse_top_dict(&mut Stream::new(&data)).is_none());
+    }
+
+    #[test]
+    fn negative_private_dict_offset_and_size() {
+        let data = writer::convert(&[
+            UInt16(1), // count
+            UInt8(1), // offset size
+            UInt8(1), // index[0]
+            UInt8(14), // index[1]
+            // Item 0
+            CFFInt(-1),
+            CFFInt(-1),
+            UInt8(top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET as u8),
+        ]);
+
+        assert!(parse_top_dict(&mut Stream::new(&data)).is_none());
+    }
+
     // TODO: return from main
     // TODO: return without endchar
     // TODO: data after return

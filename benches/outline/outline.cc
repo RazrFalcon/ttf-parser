@@ -12,6 +12,8 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+#include <hb.h>
+
 namespace FT {
 struct Outliner
 {
@@ -141,6 +143,84 @@ public:
 private:
     std::vector<char> m_fontData;
     stbtt_fontinfo m_font;
+};
+}
+
+
+namespace HB {
+struct Outliner
+{
+    static void moveToFn(hb_position_t x, hb_position_t y, void *user)
+    {
+        auto self = static_cast<Outliner *>(user);
+        self->counter += 1;
+    }
+
+    static void lineToFn(hb_position_t x, hb_position_t y, void *user)
+    {
+        auto self = static_cast<Outliner *>(user);
+        self->counter += 1;
+    }
+
+    static void quadToFn(hb_position_t c_x, hb_position_t c_y, hb_position_t x, hb_position_t y, void *user)
+    {
+        auto self = static_cast<Outliner *>(user);
+        self->counter += 1;
+    }
+
+    static void cubicToFn(hb_position_t c1_x, hb_position_t c1_y, hb_position_t c2_x, hb_position_t c2_y, hb_position_t x, hb_position_t y, void *user)
+    {
+        auto self = static_cast<Outliner *>(user);
+        self->counter += 1;
+    }
+
+    uint32_t counter = 0;
+};
+
+class Font
+{
+public:
+    Font(const std::string &path, const uint32_t index = 0)
+    {
+        std::ifstream s(path);
+        std::vector<char> data((std::istreambuf_iterator<char>(s)),
+                                std::istreambuf_iterator<char>());
+        m_fontData = std::move(data);
+
+        funcs = hb_draw_funcs_create();
+        hb_draw_funcs_set_move_to_func(funcs, (hb_draw_move_to_func_t) Outliner::moveToFn);
+        hb_draw_funcs_set_line_to_func(funcs, (hb_draw_line_to_func_t) Outliner::lineToFn);
+        hb_draw_funcs_set_quadratic_to_func(funcs, (hb_draw_quadratic_to_func_t) Outliner::quadToFn);
+        hb_draw_funcs_set_cubic_to_func(funcs, (hb_draw_cubic_to_func_t) Outliner::cubicToFn);
+        hb_blob_t *blob = hb_blob_create((const char *)m_fontData.data (), m_fontData.size (), HB_MEMORY_MODE_WRITABLE, nullptr, nullptr);
+        hb_face_t *face = hb_face_create(blob, 0);
+        hb_blob_destroy(blob);
+        font = hb_font_create (face);
+        hb_face_destroy(face);
+    }
+
+    uint16_t numberOfGlyphs() const
+    {
+        return hb_face_get_glyph_count(hb_font_get_face(font));
+    }
+
+    uint32_t outline(const uint16_t gid) const
+    {
+        Outliner outliner = {0};
+        hb_font_draw_glyph(font, gid, funcs, &outliner);
+        return outliner.counter;
+    }
+
+    ~Font()
+    {
+        hb_font_destroy(font);
+        hb_draw_funcs_destroy(funcs);
+    }
+
+private:
+    hb_font_t *font;
+    std::vector<char> m_fontData;
+    hb_draw_funcs_t *funcs;
 };
 }
 
@@ -300,5 +380,27 @@ static void ttf_parser_outline_cff(benchmark::State &state)
     }
 }
 BENCHMARK(ttf_parser_outline_cff);
+
+static void harfbuzz_outline_glyf(benchmark::State &state)
+{
+    HB::Font font("../fonts/SourceSansPro-Regular.ttf", 0);
+    for (auto _ : state) {
+        for (uint i = 0; i < font.numberOfGlyphs(); i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(harfbuzz_outline_glyf);
+
+static void harfbuzz_outline_cff(benchmark::State &state)
+{
+    HB::Font font("../fonts/SourceSansPro-Regular.otf", 0);
+    for (auto _ : state) {
+        for (uint i = 0; i < font.numberOfGlyphs(); i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(harfbuzz_outline_cff);
 
 BENCHMARK_MAIN();

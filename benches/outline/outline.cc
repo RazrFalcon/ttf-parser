@@ -9,6 +9,9 @@
 
 #include <ttfparser.h>
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
 namespace FT {
 struct Outliner
 {
@@ -103,6 +106,41 @@ private:
     std::vector<char> m_fontData;
     FT_Library m_library = nullptr;
     FT_Face m_face = nullptr;
+};
+}
+
+namespace STB {
+class Font
+{
+public:
+    Font(const std::string &path, const uint32_t index = 0)
+    {
+        std::ifstream s(path);
+        std::vector<char> data((std::istreambuf_iterator<char>(s)),
+                                std::istreambuf_iterator<char>());
+        m_fontData = std::move(data);
+
+        if (!stbtt_InitFont(&m_font, (const uint8_t *)m_fontData.data(), 0)) {
+            throw "failed to open a font";
+        }
+    }
+
+    uint16_t numberOfGlyphs() const
+    {
+        return (uint16_t)m_font.numGlyphs;
+    }
+
+    uint32_t outline(const uint16_t gid) const
+    {
+        stbtt_vertex *vertices;
+        const auto num_verts = stbtt_GetGlyphShape(&m_font, gid, &vertices);
+        stbtt_FreeShape(&m_font, vertices);
+        return num_verts;
+    }
+
+private:
+    std::vector<char> m_fontData;
+    stbtt_fontinfo m_font;
 };
 }
 
@@ -214,6 +252,30 @@ static void freetype_outline_cff(benchmark::State &state)
     }
 }
 BENCHMARK(freetype_outline_cff);
+
+static void stb_truetype_outline_glyf(benchmark::State &state)
+{
+    STB::Font font("../fonts/SourceSansPro-Regular.ttf", 0);
+    const auto numberOfGlyphs = font.numberOfGlyphs();
+    for (auto _ : state) {
+        for (uint i = 0; i < numberOfGlyphs; i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(stb_truetype_outline_glyf);
+
+static void stb_truetype_outline_cff(benchmark::State &state)
+{
+    STB::Font font("../fonts/SourceSansPro-Regular.otf", 0);
+    const auto numberOfGlyphs = font.numberOfGlyphs();
+    for (auto _ : state) {
+        for (uint i = 0; i < numberOfGlyphs; i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(stb_truetype_outline_cff);
 
 static void ttf_parser_outline_glyf(benchmark::State &state)
 {

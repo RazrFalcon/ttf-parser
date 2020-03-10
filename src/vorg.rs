@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vorg
 
-use crate::{Font, GlyphId};
+use crate::GlyphId;
 use crate::parser::{Stream, LazyArray16};
 use crate::raw::vorg as raw;
 
@@ -24,15 +24,10 @@ impl<'a> Table<'a> {
             origins: s.read_array16()?,
         })
     }
-}
 
-impl<'a> Font<'a> {
-    /// Parses a vertical origin of a glyph according to
-    /// [Vertical Origin Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vorg).
-    pub fn glyph_y_origin(&self, glyph: GlyphId) -> Option<i16> {
-        let table = self.vorg?;
-        Some(table.origins.binary_search_by(|m| m.glyph_index().cmp(&glyph))
+    pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> Option<i16> {
+        Some(self.origins.binary_search_by(|m| m.glyph_index().cmp(&glyph_id))
             .map(|(_, m)| m.vert_origin_y())
-            .unwrap_or(table.default_y))
+            .unwrap_or(self.default_y))
     }
 }

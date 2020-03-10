@@ -2,7 +2,7 @@
 
 use core::num::NonZeroU16;
 
-use crate::{Font, GlyphId};
+use crate::GlyphId;
 use crate::parser::{Stream, LazyArray16};
 use crate::raw::hmtx as raw;
 
@@ -68,22 +68,6 @@ impl<'a> Table<'a> {
         } else {
             None
         }
-    }
-}
-
-impl<'a> Font<'a> {
-    /// Parses glyph's horizontal advance using
-    /// [Horizontal Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx).
-    #[inline]
-    pub fn glyph_hor_advance(&self, glyph_id: GlyphId) -> Option<u16> {
-        self.hmtx.and_then(|hmtx| hmtx.advance(glyph_id))
-    }
-
-    /// Parses glyph's horizontal side bearing using
-    /// [Horizontal Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx).
-    #[inline]
-    pub fn glyph_hor_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
-        self.hmtx.and_then(|hmtx| hmtx.side_bearing(glyph_id))
     }
 }
 

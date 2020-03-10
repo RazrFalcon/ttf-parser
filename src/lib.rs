@@ -169,6 +169,9 @@ we are using predefined names, so no parsing is involved.
 #[macro_use]
 extern crate std;
 
+#[cfg(feature = "std")]
+use std::string::String;
+
 use core::fmt;
 use core::num::NonZeroU16;
 
@@ -198,8 +201,6 @@ mod cmap;
 mod gdef;
 mod ggg;
 mod glyf;
-mod head;
-mod hhea;
 mod hmtx;
 mod kern;
 mod loca;
@@ -209,8 +210,6 @@ mod os2;
 mod parser;
 mod post;
 mod raw;
-mod vhea;
-mod vmtx;
 mod vorg;
 
 #[cfg(feature = "std")]
@@ -289,6 +288,14 @@ pub trait OutlineBuilder {
     ///
     /// End of a contour.
     fn close(&mut self);
+}
+
+
+#[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(crate) enum IndexToLocationFormat {
+    Short,
+    Long,
 }
 
 
@@ -499,6 +506,241 @@ impl<'a> Font<'a> {
         }
     }
 
+    /// Returns an iterator over [Name Records].
+    ///
+    /// An iterator can be empty.
+    ///
+    /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
+    #[inline]
+    pub fn names(&self) -> Names {
+        self.name.unwrap_or_default()
+    }
+
+    /// Returns font's family name.
+    ///
+    /// *Typographic Family* is preferred over *Family*.
+    ///
+    /// Note that font can have multiple names. You can use [`names()`] to list them all.
+    ///
+    /// [`names()`]: #method.names
+    #[cfg(feature = "std")]
+    #[inline]
+    pub fn family_name(&self) -> Option<String> {
+        let mut idx = None;
+        let mut iter = self.names();
+        for (i, name) in iter.enumerate() {
+            if name.name_id() == name_id::TYPOGRAPHIC_FAMILY && name.is_unicode() {
+                // Break the loop as soon as we reached 'Typographic Family'.
+                idx = Some(i);
+                break;
+            } else if name.name_id() == name_id::FAMILY && name.is_unicode() {
+                idx = Some(i);
+                // Do not break the loop since 'Typographic Family' can be set later
+                // and it has a higher priority.
+            }
+        }
+
+        iter.nth(idx?).and_then(|name| name.name_from_utf16_be())
+    }
+
+    /// Returns font's PostScript name.
+    ///
+    /// Note that font can have multiple names. You can use [`names()`] to list them all.
+    ///
+    /// [`names()`]: #method.names
+    #[cfg(feature = "std")]
+    #[inline]
+    pub fn post_script_name(&self) -> Option<String> {
+        self.names()
+            .find(|name| name.name_id() == name_id::POST_SCRIPT_NAME && name.is_unicode())
+            .and_then(|name| name.name_from_utf16_be())
+    }
+
+    /// Checks that font is marked as *Regular*.
+    ///
+    /// Returns `false` when OS/2 table is not present.
+    #[inline]
+    pub fn is_regular(&self) -> bool {
+        try_opt_or!(self.os_2, false).is_regular()
+    }
+
+    /// Checks that font is marked as *Italic*.
+    ///
+    /// Returns `false` when OS/2 table is not present.
+    #[inline]
+    pub fn is_italic(&self) -> bool {
+        try_opt_or!(self.os_2, false).is_italic()
+    }
+
+    /// Checks that font is marked as *Bold*.
+    ///
+    /// Returns `false` when OS/2 table is not present.
+    #[inline]
+    pub fn is_bold(&self) -> bool {
+        try_opt_or!(self.os_2, false).is_bold()
+    }
+
+    /// Checks that font is marked as *Oblique*.
+    ///
+    /// Returns `false` when OS/2 table is not present or when its version is < 4.
+    #[inline]
+    pub fn is_oblique(&self) -> bool {
+        try_opt_or!(self.os_2, false).is_oblique()
+    }
+
+    /// Parses font's weight.
+    ///
+    /// Returns `Weight::Normal` when OS/2 table is not present.
+    #[inline]
+    pub fn weight(&self) -> Weight {
+        try_opt_or!(self.os_2, Weight::default()).weight()
+    }
+
+    /// Parses font's width.
+    ///
+    /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
+    #[inline]
+    pub fn width(&self) -> Width {
+        try_opt_or!(self.os_2, Width::default()).width()
+    }
+
+    /// Parses font's ascender value.
+    #[inline]
+    pub fn ascender(&self) -> i16 {
+        if let Some(os_2) = self.os_2 {
+            if os_2.is_use_typo_metrics() {
+                return os_2.s_typo_ascender();
+            }
+        }
+
+        self.hhea.ascender()
+    }
+
+    /// Parses font's descender value.
+    #[inline]
+    pub fn descender(&self) -> i16 {
+        if let Some(os_2) = self.os_2 {
+            if os_2.is_use_typo_metrics() {
+                return os_2.s_typo_descender();
+            }
+        }
+
+        self.hhea.descender()
+    }
+
+    /// Parses font's height.
+    #[inline]
+    pub fn height(&self) -> i16 {
+        self.ascender() - self.descender()
+    }
+
+    /// Parses font's line gap.
+    #[inline]
+    pub fn line_gap(&self) -> i16 {
+        if let Some(os_2) = self.os_2 {
+            if os_2.is_use_typo_metrics() {
+                return os_2.s_typo_line_gap();
+            }
+        }
+
+        self.hhea.line_gap()
+    }
+
+    // TODO: should we automatically use the vhea?
+
+    /// Parses font's vertical ascender value.
+    ///
+    /// Returns `None` when `vhea` table is not present.
+    #[inline]
+    pub fn vertical_ascender(&self) -> Option<i16> {
+        self.vhea.map(|table| table.ascender())
+    }
+
+    /// Parses font's vertical descender value.
+    ///
+    /// Returns `None` when `vhea` table is not present.
+    #[inline]
+    pub fn vertical_descender(&self) -> Option<i16> {
+        self.vhea.map(|table| table.descender())
+    }
+
+    /// Parses font's vertical height.
+    ///
+    /// Returns `None` when `vhea` table is not present.
+    #[inline]
+    pub fn vertical_height(&self) -> Option<i16> {
+        Some(self.vertical_ascender()? - self.vertical_descender()?)
+    }
+
+    /// Parses font's vertical line gap.
+    ///
+    /// Returns `None` when `vhea` table is not present.
+    #[inline]
+    pub fn vertical_line_gap(&self) -> Option<i16> {
+        self.vhea.map(|table| table.line_gap())
+    }
+
+    /// Parses glyphs index to location format.
+    #[inline]
+    pub(crate) fn index_to_location_format(&self) -> Option<IndexToLocationFormat> {
+        match self.head.index_to_loc_format() {
+            0 => Some(IndexToLocationFormat::Short),
+            1 => Some(IndexToLocationFormat::Long),
+            _ => None,
+        }
+    }
+
+    /// Parses font's units per EM.
+    ///
+    /// Returns `None` when value is not in a 16..=16384 range.
+    #[inline]
+    pub fn units_per_em(&self) -> Option<u16> {
+        let num = self.head.units_per_em();
+        if num >= 16 && num <= 16384 {
+            Some(num)
+        } else {
+            None
+        }
+    }
+
+    /// Parses font's X height.
+    ///
+    /// Returns `None` when OS/2 table is not present or when its version is < 2.
+    #[inline]
+    pub fn x_height(&self) -> Option<i16> {
+        self.os_2.and_then(|os_2| os_2.x_height())
+    }
+
+    /// Returns font's underline metrics.
+    #[inline]
+    pub fn underline_metrics(&self) -> Option<LineMetrics> {
+        self.post.and_then(|post| post.underline_metrics())
+    }
+
+    /// Parses font's strikeout metrics.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
+        self.os_2.and_then(|os_2| os_2.strikeout_metrics())
+    }
+
+    /// Parses font's subscript metrics.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
+        self.os_2.and_then(|os_2| os_2.subscript_metrics())
+    }
+
+    /// Parses font's superscript metrics.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
+        self.os_2.and_then(|os_2| os_2.superscript_metrics())
+    }
+
     /// Returns a total number of glyphs in the font.
     ///
     /// Never zero.
@@ -507,6 +749,114 @@ impl<'a> Font<'a> {
     #[inline]
     pub fn number_of_glyphs(&self) -> u16 {
         self.number_of_glyphs.get()
+    }
+
+    /// Resolves a Glyph ID for a code point.
+    ///
+    /// Returns `None` instead of `0` when glyph is not found.
+    ///
+    /// All subtable formats except Mixed Coverage (8) are supported.
+    #[inline]
+    pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
+        cmap::glyph_index(self.cmap.as_ref()?, c)
+    }
+
+    /// Resolves a variation of a Glyph ID from two code points.
+    ///
+    /// Implemented according to
+    /// [Unicode Variation Sequences](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences).
+    ///
+    /// Returns `None` instead of `0` when glyph is not found.
+    #[inline]
+    pub fn glyph_variation_index(&self, c: char, variation: char) -> Option<GlyphId> {
+        cmap::glyph_variation_index(self.cmap.as_ref()?, c, variation)
+    }
+
+    /// Returns glyph's horizontal advance using
+    /// [Horizontal Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx).
+    #[inline]
+    pub fn glyph_hor_advance(&self, glyph_id: GlyphId) -> Option<u16> {
+        self.hmtx.and_then(|hmtx| hmtx.advance(glyph_id))
+    }
+
+    /// Returns glyph's horizontal side bearing using
+    /// [Horizontal Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx).
+    #[inline]
+    pub fn glyph_hor_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+        self.hmtx.and_then(|hmtx| hmtx.side_bearing(glyph_id))
+    }
+
+    /// Returns glyph's vertical advance using
+    /// [Vertical Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx).
+    #[inline]
+    pub fn glyph_ver_advance(&self, glyph_id: GlyphId) -> Option<u16> {
+        self.vmtx.and_then(|vmtx| vmtx.advance(glyph_id))
+    }
+
+    /// Returns glyph's vertical side bearing using
+    /// [Vertical Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vmtx).
+    #[inline]
+    pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+        self.vmtx.and_then(|vmtx| vmtx.side_bearing(glyph_id))
+    }
+
+    /// Returns a vertical origin of a glyph according to
+    /// [Vertical Origin Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vorg).
+    pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> Option<i16> {
+        self.vorg.and_then(|vorg| vorg.glyph_y_origin(glyph_id))
+    }
+
+    /// Returns glyph's name.
+    ///
+    /// Uses the `post` table as a source.
+    ///
+    /// Returns `None` when no name is associated with a `glyph`.
+    #[inline]
+    pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&str> {
+        self.post.and_then(|post| post.glyph_name(glyph_id))
+    }
+
+    /// Checks that font has
+    /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
+    pub fn has_glyph_classes(&self) -> bool {
+        self.glyph_class(GlyphId(0)).is_some()
+    }
+
+    /// Parses glyph's class according to
+    /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
+    ///
+    /// Returns `None` when *Glyph Class Definition Table* is not set
+    /// or glyph class is not set or invalid.
+    pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
+        self.gdef.and_then(|gdef| gdef.glyph_class(glyph_id))
+    }
+
+    /// Parses glyph's mark attachment class according to
+    /// [Mark Attachment Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-attachment-class-definition-table).
+    ///
+    /// All glyphs not assigned to a class fall into Class 0.
+    pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Class {
+        try_opt_or!(self.gdef, Class(0)).glyph_mark_attachment_class(glyph_id)
+    }
+
+    /// Checks that glyph is a mark according to
+    /// [Mark Glyph Sets Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-glyph-sets-table).
+    ///
+    /// `set_index` allows checking a specific glyph coverage set.
+    /// Otherwise all sets will be checked.
+    ///
+    /// Returns `Ok(false)` when *Mark Glyph Sets Table* is not set.
+    #[inline]
+    pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u16>) -> bool {
+        try_opt_or!(self.gdef, false).is_mark_glyph(glyph_id, set_index)
+    }
+
+    /// Returns a glyphs pair kerning.
+    ///
+    /// Only a horizontal kerning is supported.
+    pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {
+        kern::glyphs_kerning(self.kern?, glyph_id1, glyph_id2)
     }
 
     /// Outlines a glyph and returns its tight bounding box.
@@ -563,12 +913,12 @@ impl<'a> Font<'a> {
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
     ) -> Option<Rect> {
-        if self.glyf.is_some() {
-            return self.glyf_glyph_outline(glyph_id, builder);
+        if let Some(glyf_table) = self.glyf {
+            return glyf::outline(self.loca?, glyf_table, glyph_id, builder);
         }
 
         if let Some(ref metadata) = self.cff_ {
-            return self.cff_glyph_outline(metadata, glyph_id, builder);
+            return cff::outline(metadata, glyph_id, builder);
         }
 
         None
@@ -593,12 +943,12 @@ impl<'a> Font<'a> {
             fn close(&mut self) {}
         }
 
-        if self.glyf.is_some() {
-            return self.glyf_glyph_bbox(glyph_id);
+        if let Some(glyf_table) = self.glyf {
+            return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
         }
 
         if let Some(ref metadata) = self.cff_ {
-            return self.cff_glyph_outline(metadata, glyph_id, &mut DummyOutline);
+            return cff::outline(metadata, glyph_id, &mut DummyOutline);
         }
 
         None
@@ -611,7 +961,7 @@ impl fmt::Debug for Font<'_> {
     }
 }
 
-/// Parses the number of fonts stored in a TrueType font collection.
+/// Returns the number of fonts stored in a TrueType font collection.
 ///
 /// Returns `None` if a provided data is not a TrueType font collection.
 #[inline]

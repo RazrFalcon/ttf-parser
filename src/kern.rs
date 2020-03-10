@@ -1,45 +1,39 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/kern
 
+use crate::GlyphId;
 use crate::parser::{Stream, FromData, SafeStream};
-use crate::{Font, GlyphId};
 
-impl<'a> Font<'a> {
-    /// Parses a glyphs pair kerning.
-    ///
-    /// Only a horizontal kerning is supported.
-    pub fn glyphs_kerning(&self, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {
-        let data = self.kern?;
 
-        let mut s = Stream::new(data);
+pub fn glyphs_kerning(kern_table: &[u8], glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {
+    let mut s = Stream::new(kern_table);
 
-        let version: u16 = s.read()?;
-        if version != 0 {
-            return None;
-        }
-
-        let number_of_subtables: u16 = s.read()?;
-
-        // TODO: Technically, we have to iterate over all tables,
-        //       but I'm not sure how exactly this should be implemented.
-        //       Also, I have to find a font, that actually has more that one table.
-        if number_of_subtables == 0 {
-            return None;
-        }
-
-        s.skip::<u16>(); // subtable_version
-        s.skip::<u16>(); // length
-        let coverage: Coverage = s.read()?;
-
-        if !coverage.is_horizontal() {
-            return None;
-        }
-
-        if coverage.format != 0 {
-            return None;
-        }
-
-        parse_format1(&mut s, glyph_id1, glyph_id2)
+    let version: u16 = s.read()?;
+    if version != 0 {
+        return None;
     }
+
+    let number_of_subtables: u16 = s.read()?;
+
+    // TODO: Technically, we have to iterate over all tables,
+    //       but I'm not sure how exactly this should be implemented.
+    //       Also, I have to find a font, that actually has more that one table.
+    if number_of_subtables == 0 {
+        return None;
+    }
+
+    s.skip::<u16>(); // subtable_version
+    s.skip::<u16>(); // length
+    let coverage: Coverage = s.read()?;
+
+    if !coverage.is_horizontal() {
+        return None;
+    }
+
+    if coverage.format != 0 {
+        return None;
+    }
+
+    parse_format1(&mut s, glyph_id1, glyph_id2)
 }
 
 fn parse_format1(s: &mut Stream, glyph_id1: GlyphId, glyph_id2: GlyphId) -> Option<i16> {

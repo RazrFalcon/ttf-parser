@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/os2
 
+use crate::LineMetrics;
 use crate::parser::Stream;
-use crate::{Font, LineMetrics};
 use crate::raw::os_2 as raw;
 
 
@@ -179,26 +179,15 @@ impl<'a> Table<'a> {
             table: raw::Table::new(&data[0..78]),
         })
     }
-}
 
-
-impl<'a> Font<'a> {
-    /// Parses font's weight.
-    ///
-    /// Returns `Weight::Normal` when OS/2 table is not present.
     #[inline]
     pub fn weight(&self) -> Weight {
-        let table = try_opt_or!(self.os_2, Weight::default());
-        Weight::from(table.us_weight_class())
+        Weight::from(self.us_weight_class())
     }
 
-    /// Parses font's width.
-    ///
-    /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
     #[inline]
     pub fn width(&self) -> Width {
-        let table = try_opt_or!(self.os_2, Width::default());
-        match table.us_width_class() {
+        match self.us_width_class() {
             1 => Width::UltraCondensed,
             2 => Width::ExtraCondensed,
             3 => Width::Condensed,
@@ -212,107 +201,74 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Checks that font is marked as *Regular*.
-    ///
-    /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_regular(&self) -> bool {
-        let table = try_opt_or!(self.os_2, false);
-        SelectionFlags(table.fs_selection()).regular()
+        SelectionFlags(self.fs_selection()).regular()
     }
 
-    /// Checks that font is marked as *Italic*.
-    ///
-    /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_italic(&self) -> bool {
-        let table = try_opt_or!(self.os_2, false);
-        SelectionFlags(table.fs_selection()).italic()
+        SelectionFlags(self.fs_selection()).italic()
     }
 
-    /// Checks that font is marked as *Bold*.
-    ///
-    /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_bold(&self) -> bool {
-        let table = try_opt_or!(self.os_2, false);
-        SelectionFlags(table.fs_selection()).bold()
+        SelectionFlags(self.fs_selection()).bold()
     }
 
-    /// Checks that font is marked as *Oblique*.
-    ///
-    /// Returns `false` when OS/2 table is not present or when its version is < 4.
     #[inline]
     pub fn is_oblique(&self) -> bool {
-        let table = try_opt_or!(self.os_2, false);
-        if table.version < 4 {
-            return false;
+        if self.version < 4 {
+            false
+        } else {
+            SelectionFlags(self.fs_selection()).oblique()
         }
-
-        SelectionFlags(table.fs_selection()).oblique()
     }
 
     #[inline]
     pub(crate) fn is_use_typo_metrics(&self) -> bool {
-        let table = try_opt_or!(self.os_2, false);
-        if table.version < 4 {
-            return false;
+        if self.version < 4 {
+            false
+        } else {
+            SelectionFlags(self.fs_selection()).use_typo_metrics()
         }
-
-        SelectionFlags(table.fs_selection()).use_typo_metrics()
     }
 
-    /// Parses font's X height.
-    ///
-    /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
-        let table = self.os_2?;
-        if table.version < 2 {
-            return None;
+        if self.version < 2 {
+            None
+        } else {
+            // We cannot use SafeStream here, because X height is an optional data.
+            Stream::read_at(self.data, raw::SX_HEIGHT_OFFSET)
         }
-
-        // We cannot use SafeStream here, because X height is an optional data.
-        Stream::read_at(table.data, raw::SX_HEIGHT_OFFSET)
     }
 
-    /// Parses font's strikeout metrics.
-    ///
-    /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
-        let table = self.os_2?;
         Some(LineMetrics {
-            thickness: table.y_strikeout_size(),
-            position: table.y_strikeout_position(),
+            thickness: self.y_strikeout_size(),
+            position: self.y_strikeout_position(),
         })
     }
 
-    /// Parses font's subscript metrics.
-    ///
-    /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
-        let table = self.os_2?;
         Some(ScriptMetrics {
-            x_size: table.y_subscript_x_size(),
-            y_size: table.y_subscript_y_size(),
-            x_offset: table.y_subscript_x_offset(),
-            y_offset: table.y_subscript_y_offset(),
+            x_size: self.y_subscript_x_size(),
+            y_size: self.y_subscript_y_size(),
+            x_offset: self.y_subscript_x_offset(),
+            y_offset: self.y_subscript_y_offset(),
         })
     }
 
-    /// Parses font's superscript metrics.
-    ///
-    /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
-        let table = self.os_2?;
         Some(ScriptMetrics {
-            x_size: table.y_superscript_x_size(),
-            y_size: table.y_superscript_y_size(),
-            x_offset: table.y_superscript_x_offset(),
-            y_offset: table.y_superscript_y_offset(),
+            x_size: self.y_superscript_x_size(),
+            y_size: self.y_superscript_y_size(),
+            x_offset: self.y_superscript_x_offset(),
+            y_offset: self.y_superscript_y_offset(),
         })
     }
 }

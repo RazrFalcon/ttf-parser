@@ -3,7 +3,7 @@
 use core::convert::TryFrom;
 
 use crate::parser::{Stream, Offset, LazyArray16};
-use crate::{Font, GlyphId, PlatformId};
+use crate::{GlyphId, PlatformId};
 use crate::raw::cmap as raw;
 
 #[derive(Clone, Copy)]
@@ -23,137 +23,121 @@ impl<'a> Table<'a> {
     }
 }
 
-impl<'a> Font<'a> {
-    /// Resolves a Glyph ID for a code point.
-    ///
-    /// Returns `None` instead of `0` when glyph is not found.
-    ///
-    /// All subtable formats except Mixed Coverage (8) are supported.
-    pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
-        let table = self.cmap?;
-        for record in table.records {
-            let subtable_data = table.data.get(record.offset().to_usize()..)?;
-            let mut s = Stream::new(subtable_data);
-            let format = match parse_format(s.read()?) {
-                Some(format) => format,
-                None => continue,
-            };
-
-            let platform_id = match PlatformId::from_u16(record.platform_id()) {
-                Some(v) => v,
-                None => continue,
-            };
-
-            if !is_unicode_encoding(format, platform_id, record.encoding_id()) {
-                continue;
-            }
-
-            let c = u32::from(c);
-            let glyph = match format {
-                Format::ByteEncodingTable => {
-                    parse_byte_encoding_table(&mut s, c)
-                }
-                Format::HighByteMappingThroughTable => {
-                    parse_high_byte_mapping_through_table(subtable_data, c)
-                }
-                Format::SegmentMappingToDeltaValues => {
-                    parse_segment_mapping_to_delta_values(subtable_data, c)
-                }
-                Format::TrimmedTableMapping => {
-                    parse_trimmed_table_mapping(&mut s, c)
-                }
-                Format::MixedCoverage => {
-                    // Unsupported.
-                    continue;
-                }
-                Format::TrimmedArray => {
-                    parse_trimmed_array(&mut s, c)
-                }
-                Format::SegmentedCoverage | Format::ManyToOneRangeMappings => {
-                    parse_segmented_coverage(&mut s, c, format)
-                }
-                Format::UnicodeVariationSequences => {
-                    // This subtable is used only by glyph_variation_index().
-                    continue;
-                }
-            };
-
-            if let Some(id) = glyph {
-                return Some(GlyphId(id));
-            }
-        }
-
-        None
-    }
-
-    /// Resolves a variation of a Glyph ID from two code points.
-    ///
-    /// Implemented according to
-    /// [Unicode Variation Sequences](
-    /// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences).
-    ///
-    /// Returns `None` instead of `0` when glyph is not found.
-    pub fn glyph_variation_index(&self, c: char, variation: char) -> Option<GlyphId> {
-        let table = self.cmap?;
-        for record in table.records {
-            let subtable_data = table.data.get(record.offset().to_usize()..)?;
-            let mut s = Stream::new(subtable_data);
-            let format = match parse_format(s.read()?) {
-                Some(format) => format,
-                None => continue,
-            };
-
-            if format != Format::UnicodeVariationSequences {
-                continue;
-            }
-
-            return self.parse_unicode_variation_sequences(subtable_data, c, u32::from(variation));
-        }
-
-        None
-    }
-
-    fn parse_unicode_variation_sequences(
-        &self,
-        data: &[u8],
-        c: char,
-        variation: u32,
-    ) -> Option<GlyphId> {
-        let cp = u32::from(c);
-
-        let mut s = Stream::new(data);
-        s.skip::<u16>(); // format
-        s.skip::<u32>(); // length
-        let records = s.read_array32::<raw::VariationSelectorRecord>()?;
-
-        let (_, record) = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
-            Some(v) => v,
-            None => return None,
+pub fn glyph_index(table: &Table, c: char) -> Option<GlyphId> {
+    for record in table.records {
+        let subtable_data = table.data.get(record.offset().to_usize()..)?;
+        let mut s = Stream::new(subtable_data);
+        let format = match parse_format(s.read()?) {
+            Some(format) => format,
+            None => continue,
         };
 
-        if let Some(offset) = record.default_uvs_offset() {
-            let data = data.get(offset.to_usize()..)?;
-            let mut s = Stream::new(data);
-            let ranges = s.read_array32::<raw::UnicodeRangeRecord>()?;
-            for range in ranges {
-                if range.contains(c) {
-                    // This is a default glyph.
-                    return self.glyph_index(c);
-                }
-            }
+        let platform_id = match PlatformId::from_u16(record.platform_id()) {
+            Some(v) => v,
+            None => continue,
+        };
+
+        if !is_unicode_encoding(format, platform_id, record.encoding_id()) {
+            continue;
         }
 
-        if let Some(offset) = record.non_default_uvs_offset() {
-            let data = data.get(offset.to_usize()..)?;
-            let mut s = Stream::new(data);
-            let uvs_mappings = s.read_array32::<raw::UVSMappingRecord>()?;
-            if let Some((_, mapping)) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
-                return Some(mapping.glyph_id());
+        let c = u32::from(c);
+        let glyph = match format {
+            Format::ByteEncodingTable => {
+                parse_byte_encoding_table(&mut s, c)
             }
-        }
+            Format::HighByteMappingThroughTable => {
+                parse_high_byte_mapping_through_table(subtable_data, c)
+            }
+            Format::SegmentMappingToDeltaValues => {
+                parse_segment_mapping_to_delta_values(subtable_data, c)
+            }
+            Format::TrimmedTableMapping => {
+                parse_trimmed_table_mapping(&mut s, c)
+            }
+            Format::MixedCoverage => {
+                // Unsupported.
+                continue;
+            }
+            Format::TrimmedArray => {
+                parse_trimmed_array(&mut s, c)
+            }
+            Format::SegmentedCoverage | Format::ManyToOneRangeMappings => {
+                parse_segmented_coverage(&mut s, c, format)
+            }
+            Format::UnicodeVariationSequences => {
+                // This subtable is used only by glyph_variation_index().
+                continue;
+            }
+        };
 
-        None
+        if let Some(id) = glyph {
+            return Some(GlyphId(id));
+        }
     }
+
+    None
+}
+
+pub fn glyph_variation_index(table: &Table, c: char, variation: char) -> Option<GlyphId> {
+    for record in table.records {
+        let subtable_data = table.data.get(record.offset().to_usize()..)?;
+        let mut s = Stream::new(subtable_data);
+        let format = match parse_format(s.read()?) {
+            Some(format) => format,
+            None => continue,
+        };
+
+        if format != Format::UnicodeVariationSequences {
+            continue;
+        }
+
+        return parse_unicode_variation_sequences(table, subtable_data, c, u32::from(variation));
+    }
+
+    None
+}
+
+fn parse_unicode_variation_sequences(
+    table: &Table,
+    data: &[u8],
+    c: char,
+    variation: u32,
+) -> Option<GlyphId> {
+    let cp = u32::from(c);
+
+    let mut s = Stream::new(data);
+    s.skip::<u16>(); // format
+    s.skip::<u32>(); // length
+    let records = s.read_array32::<raw::VariationSelectorRecord>()?;
+
+    let (_, record) = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
+        Some(v) => v,
+        None => return None,
+    };
+
+    if let Some(offset) = record.default_uvs_offset() {
+        let data = data.get(offset.to_usize()..)?;
+        let mut s = Stream::new(data);
+        let ranges = s.read_array32::<raw::UnicodeRangeRecord>()?;
+        for range in ranges {
+            if range.contains(c) {
+                // This is a default glyph.
+                return glyph_index(table, c);
+            }
+        }
+    }
+
+    if let Some(offset) = record.non_default_uvs_offset() {
+        let data = data.get(offset.to_usize()..)?;
+        let mut s = Stream::new(data);
+        let uvs_mappings = s.read_array32::<raw::UVSMappingRecord>()?;
+        if let Some((_, mapping)) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
+            return Some(mapping.glyph_id());
+        }
+    }
+
+    None
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table

@@ -3,9 +3,8 @@
 use core::num::NonZeroU16;
 use core::ops::Range;
 
+use crate::{GlyphId, IndexToLocationFormat};
 use crate::parser::{Stream, LazyArray16};
-use crate::head::IndexToLocationFormat;
-use crate::{Font, GlyphId};
 
 #[derive(Clone, Copy)]
 pub enum Table<'a> {
@@ -46,23 +45,20 @@ impl<'a> Table<'a> {
             Table::Long(ref array) => array.len(),
         }
     }
-}
 
-impl<'a> Font<'a> {
-    pub(crate) fn glyph_range(&self, glyph_id: GlyphId) -> Option<Range<usize>> {
-        let table = self.loca?;
-
+    #[inline]
+    pub fn glyph_range(&self, glyph_id: GlyphId) -> Option<Range<usize>> {
         let glyph_id = glyph_id.0;
         if glyph_id == core::u16::MAX {
             return None;
         }
 
         // Glyph ID must be smaller than total number of values in a `loca` array.
-        if glyph_id + 1 >= table.len() {
+        if glyph_id + 1 >= self.len() {
             return None;
         }
 
-        let range = match table {
+        let range = match self {
             Table::Short(ref array) => {
                 // 'The actual local offset divided by 2 is stored.'
                 array.at(glyph_id) as usize * 2 .. array.at(glyph_id + 1) as usize * 2

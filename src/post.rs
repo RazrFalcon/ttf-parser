@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
-use crate::{Font, LineMetrics, GlyphId};
+use crate::{LineMetrics, GlyphId};
 use crate::parser::{Stream, LazyArray16};
 use crate::raw;
 
@@ -279,8 +279,8 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let version: u32 = Stream::new(data).read()?;
         if !(version == 0x00010000 || version == 0x00020000 ||
-             version == 0x00025000 || version == 0x00030000 ||
-             version == 0x00040000)
+            version == 0x00025000 || version == 0x00030000 ||
+            version == 0x00040000)
         {
             return None;
         }
@@ -301,29 +301,18 @@ impl<'a> Table<'a> {
             names,
         })
     }
-}
 
-
-impl<'a> Font<'a> {
-    /// Parses font's underline metrics.
     #[inline]
     pub fn underline_metrics(&self) -> Option<LineMetrics> {
-        let table = self.post?.table;
         Some(LineMetrics {
-            position: table.underline_position(),
-            thickness: table.underline_thickness(),
+            position: self.table.underline_position(),
+            thickness: self.table.underline_thickness(),
         })
     }
 
-    /// Parses glyph's name.
-    ///
-    /// Uses the `post` table as a source.
-    ///
-    /// Returns `None` when no name is associated with a `glyph`.
     #[inline]
-    pub fn glyph_name(&self, glyph: GlyphId) -> Option<&str> {
-        let table = self.post?;
-        let mut index = table.name_indexes.get(glyph.0)?;
+    pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
+        let mut index = self.name_indexes.get(glyph_id.0)?;
 
         // 'If the name index is between 0 and 257, treat the name index
         // as a glyph index in the Macintosh standard order.'
@@ -334,7 +323,7 @@ impl<'a> Font<'a> {
             // to index into the list of Pascal strings at the end of the table.'
             index -= MACINTOSH_NAMES.len() as u16;
 
-            let mut s = Stream::new(table.names);
+            let mut s = Stream::new(self.names);
             let mut i = 0;
             while !s.at_end() && i < core::u16::MAX {
                 let len: u8 = s.read()?;

@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 
-use crate::{Font, GlyphId};
+use crate::GlyphId;
 use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16};
 use crate::ggg::{Class, ClassDefinitionTable, CoverageTable};
 
@@ -72,23 +72,10 @@ impl<'a> Table<'a> {
 
         Some(table)
     }
-}
 
-
-impl<'a> Font<'a> {
-    /// Checks that font has
-    /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
-    pub fn has_glyph_classes(&self) -> bool {
-        self.gdef.map(|gdef| gdef.glyph_classes.is_some()).unwrap_or(false)
-    }
-
-    /// Parses glyph's class according to
-    /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
-    ///
-    /// Returns `None` when *Glyph Class Definition Table* is not set
-    /// or glyph class is not set or invalid.
+    #[inline]
     pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
-        match self.gdef?.glyph_classes?.get(glyph_id).0 {
+        match self.glyph_classes?.get(glyph_id).0 {
             1 => Some(GlyphClass::Base),
             2 => Some(GlyphClass::Ligature),
             3 => Some(GlyphClass::Mark),
@@ -97,36 +84,26 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Parses glyph's mark attachment class according to
-    /// [Mark Attachment Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-attachment-class-definition-table).
-    ///
-    /// All glyphs not assigned to a class fall into Class 0.
+    #[inline]
     pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Class {
-        self.gdef.and_then(|gdef| gdef.mark_attach_classes)
+        self.mark_attach_classes
             .map(|def| def.get(glyph_id))
             .unwrap_or(Class(0))
     }
 
-    /// Checks that glyph is a mark according to
-    /// [Mark Glyph Sets Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-glyph-sets-table).
-    ///
-    /// `set_index` allows checking a specific glyph coverage set.
-    /// Otherwise all sets will be checked.
-    ///
-    /// Returns `Ok(false)` when *Mark Glyph Sets Table* is not set.
     #[inline]
     pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u16>) -> bool {
-        is_mark_glyph_impl(self.gdef.as_ref(), glyph_id, set_index).is_some()
+        is_mark_glyph_impl(self, glyph_id, set_index).is_some()
     }
 }
 
 #[inline(never)]
 fn is_mark_glyph_impl(
-    table: Option<&Table>,
+    table: &Table,
     glyph_id: GlyphId,
     set_index: Option<u16>,
 ) -> Option<()> {
-    let (data, offsets) = table?.mark_glyph_coverage_offsets?;
+    let (data, offsets) = table.mark_glyph_coverage_offsets?;
 
     if let Some(set_index) = set_index {
         if let Some(offset) = offsets.get(set_index) {

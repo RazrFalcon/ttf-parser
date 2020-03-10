@@ -5,7 +5,7 @@
 use core::num::NonZeroU16;
 
 use crate::parser::{Stream, F2DOT14, FromData};
-use crate::{Font, GlyphId, OutlineBuilder, Rect};
+use crate::{loca, GlyphId, OutlineBuilder, Rect};
 
 struct Builder<'a> {
     builder: &'a mut dyn OutlineBuilder,
@@ -109,286 +109,293 @@ fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
 // It's not defined in the spec, so we are using our own value.
 const MAX_COMPONENTS: u8 = 32;
 
-impl<'a> Font<'a> {
-    pub(crate) fn glyf_glyph_outline(
-        &self,
-        glyph_id: GlyphId,
-        builder: &mut dyn OutlineBuilder,
-    ) -> Option<Rect> {
-        let mut b = Builder {
-            builder,
-            transform: Transform::default(),
-            is_default_ts: true,
-        };
+#[inline]
+pub fn outline(
+    loca_table: loca::Table,
+    glyf_table: &[u8],
+    glyph_id: GlyphId,
+    builder: &mut dyn OutlineBuilder,
+) -> Option<Rect> {
+    let mut b = Builder {
+        builder,
+        transform: Transform::default(),
+        is_default_ts: true,
+    };
 
-        let glyph_data = self.glyph_data(glyph_id)?;
-        self.outline_impl(glyph_data, 0, &mut b)
+    let range = loca_table.glyph_range(glyph_id)?;
+    let glyph_data = glyf_table.get(range)?;
+
+    outline_impl(loca_table, glyf_table, glyph_data, 0, &mut b)
+}
+
+#[inline]
+pub fn glyph_bbox(
+    loca_table: loca::Table,
+    glyf_table: &[u8],
+    glyph_id: GlyphId,
+) -> Option<Rect> {
+    let range = loca_table.glyph_range(glyph_id)?;
+    let glyph_data = glyf_table.get(range)?;
+    let mut s = Stream::new(glyph_data);
+    s.skip::<i16>(); // number_of_contours
+    // It's faster to parse the rect directly, instead of using `FromData`.
+    Some(Rect {
+        x_min: s.read()?,
+        y_min: s.read()?,
+        x_max: s.read()?,
+        y_max: s.read()?,
+    })
+}
+
+
+fn outline_impl(
+    loca_table: loca::Table,
+    glyf_table: &[u8],
+    data: &[u8],
+    depth: u8,
+    builder: &mut Builder,
+) -> Option<Rect> {
+    if depth >= MAX_COMPONENTS {
+        warn!("Recursion detected in the 'glyf' table.");
+        return None;
     }
 
-    pub(crate) fn glyf_glyph_bbox(&self, glyph_id: GlyphId) -> Option<Rect> {
-        let glyph_data = self.glyph_data(glyph_id)?;
-        let mut s = Stream::new(glyph_data);
-        s.skip::<i16>(); // number_of_contours
-        // It's faster to parse the rect directly, instead of using `FromData`.
-        Some(Rect {
-            x_min: s.read()?,
-            y_min: s.read()?,
-            x_max: s.read()?,
-            y_max: s.read()?,
-        })
+    let mut s = Stream::new(data);
+    let number_of_contours: i16 = s.read()?;
+    // It's faster to parse the rect directly, instead of using `FromData`.
+    let rect = Rect {
+        x_min: s.read()?,
+        y_min: s.read()?,
+        x_max: s.read()?,
+        y_max: s.read()?,
+    };
+
+    if number_of_contours > 0 {
+        let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
+        parse_simple_outline(s.tail()?, number_of_contours, builder)?;
+    } else if number_of_contours < 0 {
+        parse_composite_outline(loca_table, glyf_table, s.tail()?, depth + 1, builder)?;
+    } else {
+        // An empty glyph.
+        return None;
     }
 
-    fn glyph_data(&self, glyph_id: GlyphId) -> Option<&[u8]> {
-        let range = self.glyph_range(glyph_id)?;
-        let data = self.glyf?;
-        data.get(range)
-    }
+    Some(rect)
+}
 
-    fn outline_impl(
-        &self,
-        data: &[u8],
-        depth: u8,
-        builder: &mut Builder,
-    ) -> Option<Rect> {
-        if depth >= MAX_COMPONENTS {
-            warn!("Recursion detected in the 'glyf' table.");
-            return None;
+#[inline(never)]
+fn parse_simple_outline(
+    glyph_data: &[u8],
+    number_of_contours: NonZeroU16,
+    builder: &mut Builder,
+) -> Option<()> {
+    let mut s = Stream::new(glyph_data);
+    let endpoints = s.read_array::<u16, u16>(number_of_contours.get())?;
+
+    let points_total = {
+        let last_point = endpoints.last()?;
+        // Prevent overflow.
+        last_point.checked_add(1)?
+    };
+
+    // Skip instructions byte code.
+    let instructions_len: u16 = s.read()?;
+    s.advance(instructions_len);
+
+    let flags_offset = s.offset();
+    let x_coords_len = resolve_x_coords_len(&mut s, points_total)?;
+    let x_coords_offset = s.offset();
+    let y_coords_offset = x_coords_offset + usize::from(x_coords_len);
+
+    let mut points = GlyphPoints {
+        flags: Stream::new(glyph_data.get(flags_offset..x_coords_offset)?),
+        x_coords: Stream::new(glyph_data.get(x_coords_offset..y_coords_offset)?),
+        y_coords: Stream::new(glyph_data.get(y_coords_offset..glyph_data.len())?),
+        points_left: points_total,
+        flag_repeats: 0,
+        last_flags: SimpleGlyphFlags(0),
+        x: 0,
+        y: 0,
+    };
+
+    let mut total = 0u16;
+    let mut last = 0u16;
+    for n in endpoints {
+        if n < last {
+            // Endpoints must be in increasing order.
+            break;
+        }
+        last = n;
+
+        // Check for overflow.
+        if n == core::u16::MAX {
+            break;
         }
 
-        let mut s = Stream::new(data);
-        let number_of_contours: i16 = s.read()?;
-        // It's faster to parse the rect directly, instead of using `FromData`.
-        let rect = Rect {
-            x_min: s.read()?,
-            y_min: s.read()?,
-            x_max: s.read()?,
-            y_max: s.read()?,
-        };
+        let n = n + 1 - total;
 
-        if number_of_contours > 0 {
-            let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
-            Self::parse_simple_outline(s.tail()?, number_of_contours, builder)?;
-        } else if number_of_contours < 0 {
-            self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
+        // Contour must have at least 2 points.
+        if n >= 2 {
+            points_to_contour(points.by_ref().take(usize::from(n)), builder);
+        }
+
+        total += n;
+    }
+
+    Some(())
+}
+
+/// Resolves the X coordinates length.
+///
+/// The length depends on *Simple Glyph Flags*, so we have to process them all to find it.
+fn resolve_x_coords_len(
+    s: &mut Stream,
+    points_total: u16,
+) -> Option<u16> {
+    let mut flags_left = points_total;
+    let mut x_coords_len = 0u16;
+    while flags_left > 0 {
+        let flags: SimpleGlyphFlags = s.read()?;
+
+        // The number of times a glyph point repeats.
+        let repeats = if flags.repeat_flag() {
+            let repeats: u8 = s.read()?;
+            u16::from(repeats) + 1
         } else {
-            // An empty glyph.
+            1
+        };
+
+        if flags.x_short() {
+            // Coordinate is 1 byte long.
+            x_coords_len = x_coords_len.checked_add(repeats)?;
+        } else if !flags.x_is_same_or_positive_short() {
+            // Coordinate is 2 bytes long.
+            x_coords_len = x_coords_len.checked_add(repeats * 2)?;
+        }
+
+        // Check for overflow.
+        // Do not use checked_sub, because it's very slow for some reasons.
+        if repeats <= flags_left {
+            flags_left -= repeats;
+        } else {
             return None;
         }
-
-        Some(rect)
     }
 
-    #[inline(never)]
-    fn parse_simple_outline(
-        glyph_data: &[u8],
-        number_of_contours: NonZeroU16,
-        builder: &mut Builder,
-    ) -> Option<()> {
-        let mut s = Stream::new(glyph_data);
-        let endpoints = s.read_array::<u16, u16>(number_of_contours.get())?;
+    Some(x_coords_len)
+}
 
-        let points_total = {
-            let last_point = endpoints.last()?;
-            // Prevent overflow.
-            last_point.checked_add(1)?
-        };
-
-        // Skip instructions byte code.
-        let instructions_len: u16 = s.read()?;
-        s.advance(instructions_len);
-
-        let flags_offset = s.offset();
-        let x_coords_len = Self::resolve_x_coords_len(&mut s, points_total)?;
-        let x_coords_offset = s.offset();
-        let y_coords_offset = x_coords_offset + usize::from(x_coords_len);
-
-        let mut points = GlyphPoints {
-            flags: Stream::new(glyph_data.get(flags_offset..x_coords_offset)?),
-            x_coords: Stream::new(glyph_data.get(x_coords_offset..y_coords_offset)?),
-            y_coords: Stream::new(glyph_data.get(y_coords_offset..glyph_data.len())?),
-            points_left: points_total,
-            flag_repeats: 0,
-            last_flags: SimpleGlyphFlags(0),
-            x: 0,
-            y: 0,
-        };
-
-        let mut total = 0u16;
-        let mut last = 0u16;
-        for n in endpoints {
-            if n < last {
-                // Endpoints must be in increasing order.
-                break;
-            }
-            last = n;
-
-            // Check for overflow.
-            if n == core::u16::MAX {
-                break;
-            }
-
-            let n = n + 1 - total;
-
-            // Contour must have at least 2 points.
-            if n >= 2 {
-                Self::points_to_contour(points.by_ref().take(usize::from(n)), builder);
-            }
-
-            total += n;
-        }
-
-        Some(())
-    }
-
-    /// Resolves the X coordinates length.
-    ///
-    /// The length depends on *Simple Glyph Flags*, so we have to process them all to find it.
-    fn resolve_x_coords_len(
-        s: &mut Stream,
-        points_total: u16,
-    ) -> Option<u16> {
-        let mut flags_left = points_total;
-        let mut x_coords_len = 0u16;
-        while flags_left > 0 {
-            let flags: SimpleGlyphFlags = s.read()?;
-
-            // The number of times a glyph point repeats.
-            let repeats = if flags.repeat_flag() {
-                let repeats: u8 = s.read()?;
-                u16::from(repeats) + 1
+/// Useful links:
+///
+/// - https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
+/// - https://stackoverflow.com/a/20772557
+fn points_to_contour(
+    points: core::iter::Take<&mut GlyphPoints>,
+    builder: &mut Builder,
+) {
+    let mut first_oncurve: Option<Point> = None;
+    let mut first_offcurve: Option<Point> = None;
+    let mut last_offcurve: Option<Point> = None;
+    for point in points {
+        let p = Point { x: f32::from(point.x), y: f32::from(point.y) };
+        if first_oncurve.is_none() {
+            if point.on_curve_point {
+                first_oncurve = Some(p);
+                builder.move_to(p.x, p.y);
             } else {
-                1
-            };
-
-            if flags.x_short() {
-                // Coordinate is 1 byte long.
-                x_coords_len = x_coords_len.checked_add(repeats)?;
-            } else if !flags.x_is_same_or_positive_short() {
-                // Coordinate is 2 bytes long.
-                x_coords_len = x_coords_len.checked_add(repeats * 2)?;
-            }
-
-            // Check for overflow.
-            // Do not use checked_sub, because it's very slow for some reasons.
-            if repeats <= flags_left {
-                flags_left -= repeats;
-            } else {
-                return None;
-            }
-        }
-
-        Some(x_coords_len)
-    }
-
-    /// Useful links:
-    ///
-    /// - https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
-    /// - https://stackoverflow.com/a/20772557
-    fn points_to_contour(
-        points: core::iter::Take<&mut GlyphPoints>,
-        builder: &mut Builder,
-    ) {
-        let mut first_oncurve: Option<Point> = None;
-        let mut first_offcurve: Option<Point> = None;
-        let mut last_offcurve: Option<Point> = None;
-        for point in points {
-            let p = Point { x: f32::from(point.x), y: f32::from(point.y) };
-            if first_oncurve.is_none() {
-                if point.on_curve_point {
-                    first_oncurve = Some(p);
-                    builder.move_to(p.x, p.y);
+                if let Some(offcurve) = first_offcurve {
+                    let mid = offcurve.lerp(p, 0.5);
+                    first_oncurve = Some(mid);
+                    last_offcurve = Some(p);
+                    builder.move_to(mid.x, mid.y);
                 } else {
-                    if let Some(offcurve) = first_offcurve {
-                        let mid = offcurve.lerp(p, 0.5);
-                        first_oncurve = Some(mid);
-                        last_offcurve = Some(p);
-                        builder.move_to(mid.x, mid.y);
-                    } else {
-                        first_offcurve = Some(p);
-                    }
+                    first_offcurve = Some(p);
                 }
-            } else {
-                match (last_offcurve, point.on_curve_point) {
-                    (Some(offcurve), true) => {
-                        last_offcurve = None;
-                        builder.quad_to(offcurve.x, offcurve.y, p.x, p.y);
-                    }
-                    (Some(offcurve), false) => {
-                        last_offcurve = Some(p);
-                        let mid = offcurve.lerp(p, 0.5);
-                        builder.quad_to(offcurve.x, offcurve.y, mid.x, mid.y);
-                    }
-                    (None, true) => {
-                        builder.line_to(p.x, p.y);
-                    }
-                    (None, false) => {
-                        last_offcurve = Some(p);
-                    }
+            }
+        } else {
+            match (last_offcurve, point.on_curve_point) {
+                (Some(offcurve), true) => {
+                    last_offcurve = None;
+                    builder.quad_to(offcurve.x, offcurve.y, p.x, p.y);
+                }
+                (Some(offcurve), false) => {
+                    last_offcurve = Some(p);
+                    let mid = offcurve.lerp(p, 0.5);
+                    builder.quad_to(offcurve.x, offcurve.y, mid.x, mid.y);
+                }
+                (None, true) => {
+                    builder.line_to(p.x, p.y);
+                }
+                (None, false) => {
+                    last_offcurve = Some(p);
                 }
             }
         }
-
-        if let (Some(offcurve1), Some(offcurve2)) = (first_offcurve, last_offcurve) {
-            last_offcurve = None;
-            let mid = offcurve2.lerp(offcurve1, 0.5);
-            builder.quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
-        }
-
-        if let (Some(p), Some(offcurve1)) = (first_oncurve, first_offcurve) {
-            builder.quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
-        } else if let (Some(p), Some(offcurve2)) = (first_oncurve, last_offcurve) {
-            builder.quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
-        } else if let Some(p) = first_oncurve {
-            builder.line_to(p.x, p.y);
-        }
-
-        builder.close();
     }
 
-    #[inline(never)]
-    fn parse_composite_outline(
-        &self,
-        glyph_data: &[u8],
-        depth: u8,
-        builder: &mut Builder,
-    ) -> Option<()> {
-        if depth >= MAX_COMPONENTS {
-            warn!("Recursion detected in the 'glyf' table.");
-            return None;
+    if let (Some(offcurve1), Some(offcurve2)) = (first_offcurve, last_offcurve) {
+        last_offcurve = None;
+        let mid = offcurve2.lerp(offcurve1, 0.5);
+        builder.quad_to(offcurve2.x, offcurve2.y, mid.x, mid.y);
+    }
+
+    if let (Some(p), Some(offcurve1)) = (first_oncurve, first_offcurve) {
+        builder.quad_to(offcurve1.x, offcurve1.y, p.x, p.y);
+    } else if let (Some(p), Some(offcurve2)) = (first_oncurve, last_offcurve) {
+        builder.quad_to(offcurve2.x, offcurve2.y, p.x, p.y);
+    } else if let Some(p) = first_oncurve {
+        builder.line_to(p.x, p.y);
+    }
+
+    builder.close();
+}
+
+#[inline(never)]
+fn parse_composite_outline(
+    loca_table: loca::Table,
+    glyf_table: &[u8],
+    glyph_data: &[u8],
+    depth: u8,
+    builder: &mut Builder,
+) -> Option<()> {
+    if depth >= MAX_COMPONENTS {
+        warn!("Recursion detected in the 'glyf' table.");
+        return None;
+    }
+
+    let mut s = Stream::new(glyph_data);
+    let flags: CompositeGlyphFlags = s.read()?;
+    let glyph_id: GlyphId = s.read()?;
+
+    let mut ts = Transform::default();
+
+    if flags.args_are_xy_values() {
+        if flags.arg_1_and_2_are_words() {
+            ts.e = f32::from(s.read::<i16>()?);
+            ts.f = f32::from(s.read::<i16>()?);
+        } else {
+            ts.e = f32::from(s.read::<i8>()?);
+            ts.f = f32::from(s.read::<i8>()?);
         }
+    }
 
-        let mut s = Stream::new(glyph_data);
-        let flags: CompositeGlyphFlags = s.read()?;
-        let glyph_id: GlyphId = s.read()?;
+    if flags.we_have_a_two_by_two() {
+        ts.a = s.read::<F2DOT14>()?.0;
+        ts.b = s.read::<F2DOT14>()?.0;
+        ts.c = s.read::<F2DOT14>()?.0;
+        ts.d = s.read::<F2DOT14>()?.0;
+    } else if flags.we_have_an_x_and_y_scale() {
+        ts.a = s.read::<F2DOT14>()?.0;
+        ts.d = s.read::<F2DOT14>()?.0;
+    } else if flags.we_have_a_scale() {
+        // 'If the bit WE_HAVE_A_SCALE is set, the scale value is read in 2.14 format.
+        // The value can be between -2 to almost +2.'
+        ts.a = f32_bound(-2.0, s.read::<F2DOT14>()?.0, 2.0);
+        ts.d = ts.a;
+    }
 
-        let mut ts = Transform::default();
-
-        if flags.args_are_xy_values() {
-            if flags.arg_1_and_2_are_words() {
-                ts.e = f32::from(s.read::<i16>()?);
-                ts.f = f32::from(s.read::<i16>()?);
-            } else {
-                ts.e = f32::from(s.read::<i8>()?);
-                ts.f = f32::from(s.read::<i8>()?);
-            }
-        }
-
-        if flags.we_have_a_two_by_two() {
-            ts.a = s.read::<F2DOT14>()?.0;
-            ts.b = s.read::<F2DOT14>()?.0;
-            ts.c = s.read::<F2DOT14>()?.0;
-            ts.d = s.read::<F2DOT14>()?.0;
-        } else if flags.we_have_an_x_and_y_scale() {
-            ts.a = s.read::<F2DOT14>()?.0;
-            ts.d = s.read::<F2DOT14>()?.0;
-        } else if flags.we_have_a_scale() {
-            // 'If the bit WE_HAVE_A_SCALE is set, the scale value is read in 2.14 format.
-            // The value can be between -2 to almost +2.'
-            ts.a = f32_bound(-2.0, s.read::<F2DOT14>()?.0, 2.0);
-            ts.d = ts.a;
-        }
-
-        if let Some(glyph_data) = self.glyph_data(glyph_id) {
+    if let Some(range) = loca_table.glyph_range(glyph_id) {
+        if let Some(glyph_data) = glyf_table.get(range) {
             let transform = Transform::combine(builder.transform, ts);
             let mut b = Builder {
                 builder: builder.builder,
@@ -396,17 +403,17 @@ impl<'a> Font<'a> {
                 is_default_ts: transform.is_default(),
             };
 
-            self.outline_impl(glyph_data, depth + 1, &mut b)?;
+            outline_impl(loca_table, glyf_table, glyph_data, depth + 1, &mut b)?;
         }
-
-        if flags.more_components() {
-            if depth < MAX_COMPONENTS {
-                self.parse_composite_outline(s.tail()?, depth + 1, builder)?;
-            }
-        }
-
-        Some(())
     }
+
+    if flags.more_components() {
+        if depth < MAX_COMPONENTS {
+            parse_composite_outline(loca_table, glyf_table, s.tail()?, depth + 1, builder)?;
+        }
+    }
+
+    Some(())
 }
 
 

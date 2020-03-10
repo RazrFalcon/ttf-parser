@@ -8,7 +8,6 @@ use std::string::String;
 #[cfg(feature = "std")]
 use crate::parser::LazyArray;
 
-use crate::Font;
 use crate::parser::Stream;
 use crate::raw::name as raw;
 
@@ -144,13 +143,13 @@ impl<'a> Name<'a> {
 
     #[cfg(feature = "std")]
     #[inline]
-    fn is_unicode(&self) -> bool {
+    pub(crate) fn is_unicode(&self) -> bool {
         is_unicode_encoding(self.platform_id().unwrap(), self.encoding_id())
     }
 
     #[cfg(feature = "std")]
     #[inline(never)]
-    fn name_from_utf16_be(&self) -> Option<String> {
+    pub(crate) fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
         for c in LazyArray::<u16, u16>::new(self.name()) {
             name.push(c);
@@ -275,55 +274,5 @@ pub(crate) fn parse(data: &[u8]) -> Option<Names> {
     } else {
         warn!("{} is an unsupported name table format.", format);
         None
-    }
-}
-
-impl<'a> Font<'a> {
-    /// Returns an iterator over [Name Records].
-    ///
-    /// An iterator can be empty.
-    ///
-    /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
-    #[inline]
-    pub fn names(&self) -> Names {
-        self.name.unwrap_or_default()
-    }
-
-    /// Parses font's family name.
-    ///
-    /// *Typographic Family* is preferred over *Family*.
-    ///
-    /// Note that font can have multiple names. You can use [`names()`] to list them all.
-    ///
-    /// [`names()`]: #method.names
-    #[cfg(feature = "std")]
-    pub fn family_name(&self) -> Option<String> {
-        let mut idx = None;
-        let mut iter = self.names();
-        for (i, name) in iter.enumerate() {
-            if name.name_id() == name_id::TYPOGRAPHIC_FAMILY && name.is_unicode() {
-                // Break the loop as soon as we reached 'Typographic Family'.
-                idx = Some(i);
-                break;
-            } else if name.name_id() == name_id::FAMILY && name.is_unicode() {
-                idx = Some(i);
-                // Do not break the loop since 'Typographic Family' can be set later
-                // and it has a higher priority.
-            }
-        }
-
-        iter.nth(idx?).and_then(|name| name.name_from_utf16_be())
-    }
-
-    /// Parses font's PostScript name.
-    ///
-    /// Note that font can have multiple names. You can use [`names()`] to list them all.
-    ///
-    /// [`names()`]: #method.names
-    #[cfg(feature = "std")]
-    pub fn post_script_name(&self) -> Option<String> {
-        self.names()
-            .find(|name| name.name_id() == name_id::POST_SCRIPT_NAME && name.is_unicode())
-            .and_then(|name| name.name_from_utf16_be())
     }
 }

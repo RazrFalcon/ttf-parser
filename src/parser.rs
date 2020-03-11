@@ -80,14 +80,19 @@ impl FromData for U24 {
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
 #[derive(Clone, Copy, Debug)]
-pub struct F2DOT14(pub f32);
+pub struct F2DOT14(pub i16);
+
+impl F2DOT14 {
+    #[inline]
+    pub fn to_float(&self) -> f32 {
+        self.0 as f32 / 16384.0
+    }
+}
 
 impl FromData for F2DOT14 {
-    const SIZE: usize = 2;
-
     #[inline]
     fn parse(data: &[u8]) -> Self {
-        F2DOT14(f32::from(i16::parse(data)) / 16384.0)
+        F2DOT14(i16::parse(data))
     }
 }
 
@@ -302,12 +307,21 @@ pub struct LazyArrayIter<'a, T, Idx: ArraySize> {
     index: Idx,
 }
 
+impl<T, Idx: ArraySize> Default for LazyArrayIter<'_, T, Idx> {
+    fn default() -> Self {
+        LazyArrayIter {
+            data: LazyArray::default(),
+            index: Idx::ZERO,
+        }
+    }
+}
+
 impl<'a, T: FromData, Idx: ArraySize> Iterator for LazyArrayIter<'a, T, Idx> {
     type Item = T;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.index += Idx::ONE;
+        self.index += Idx::ONE; // TODO: check
         self.data.get(self.index - Idx::ONE)
     }
 
@@ -324,7 +338,7 @@ impl<T: FromData, Idx: ArraySize> core::fmt::Debug for LazyArrayIter<'_, T, Idx>
 }
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Stream<'a> {
     data: &'a [u8],
     offset: usize,
@@ -349,7 +363,12 @@ impl<'a> Stream<'a> {
 
     #[inline]
     pub fn at_end(&self) -> bool {
-        self.offset == self.data.len()
+        self.offset >= self.data.len()
+    }
+
+    #[inline]
+    pub fn jump_to_end(&mut self) {
+        self.offset = self.data.len();
     }
 
     #[inline]
@@ -430,7 +449,7 @@ impl<'a> Stream<'a> {
 ///
 /// It's still not 100% guarantee, but it makes code easier to read and a bit faster.
 /// And we still backed by the Rust's bounds checking.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct SafeStream<'a> {
     data: &'a [u8],
     offset: usize,
@@ -447,14 +466,12 @@ impl<'a> SafeStream<'a> {
 
     #[inline]
     pub fn read<T: FromData>(&mut self) -> T {
-        T::parse(self.read_bytes(T::SIZE as u32))
-    }
+        let start = self.offset;
+        self.offset += T::SIZE;
+        let end = self.offset;
 
-    #[inline]
-    pub fn read_bytes<L: ArraySize>(&mut self, len: L) -> &'a [u8] {
-        let offset = self.offset;
-        self.offset += len.to_usize();
-        &self.data[offset..(offset + len.to_usize())]
+        let data = &self.data[start..end];
+        T::parse(data)
     }
 }
 

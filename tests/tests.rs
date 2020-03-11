@@ -85,7 +85,7 @@ fn outline_glyph_composite() {
 }
 
 #[test]
-fn outline_glyph_single_point() {
+fn outline_glyph_single_point_1() {
     let data = fs::read("tests/fonts/glyphs.ttf").unwrap();
     let font = Font::from_data(&data, 0).unwrap();
     let mut builder = Builder::new();

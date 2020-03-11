@@ -81,7 +81,7 @@ public:
 
     uint32_t outline(const uint16_t gid) const
     {
-        if (FT_Load_Glyph(m_face, gid, FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP)) {
+        if (FT_Load_Glyph(m_face, gid, FT_LOAD_NO_SCALE)) {
             throw "failed to load a glyph";
         }
 

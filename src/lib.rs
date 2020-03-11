@@ -118,10 +118,10 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 
 ```text
 stb_truetype_outline_glyf     695873 ns
-ttf_parser_outline_glyf       785392 ns
+ttf_parser_outline_glyf       765007 ns
 freetype_outline_glyf        1194395 ns
 
-ttf_parser_outline_cff       1316206 ns
+ttf_parser_outline_cff       1165904 ns
 stb_truetype_outline_cff     2862264 ns
 freetype_outline_cff         5806994 ns
 ```
@@ -155,7 +155,7 @@ test width                       ... bench:         0.2 ns/iter (+/- 0)
 `family_name` is expensive, because it allocates a `String` and the original data
 is stored as UTF-16 BE.
 
-`glyph_name_8` is faster that `glyph_name_276`, because for glyph indexes lower than 258
+`glyph_name_8` is faster than `glyph_name_276`, because for glyph indexes lower than 258
 we are using predefined names, so no parsing is involved.
 */
 

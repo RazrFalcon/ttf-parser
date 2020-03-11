@@ -176,35 +176,35 @@ There are roughly three types of TrueType tables:
 - A table that contains multiple subtables (`cmap`, `kern`, `GPOS`, etc.).<br/>
   Can be partially supported and we note which subtables are actually supported.
 
-| Feature/Crate    | ttf-parser             | FreeType            | stb_truetype                   |
-| ---------------- | :--------------------: | :-----------------: | :----------------------------: |
-| Memory safe      | ✓                      |                     |                                |
-| Zero allocation  | ✓                      |                     |                                |
-| `CFF ` table     | ✓                      | ✓                   | ✓                              |
-| `cmap` table     | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
-| `gasp` table     |                        | ✓                   |                                |
-| `GDEF` table     | ~                      |                     |                                |
-| `glyf` table     | ✓                      | ✓                   | ✓                              |
-| `GPOS` table     |                        |                     | ~ (only 2)                     |
-| `GSUB` table     |                        |                     |                                |
-| `head` table     | ✓                      | ✓                   | ✓                              |
-| `hhea` table     | ✓                      | ✓                   | ✓                              |
-| `hmtx` table     | ✓                      | ✓                   | ✓                              |
-| `kern` table     | ~                      | ~                   | ~                              |
-| `maxp` table     | ✓                      | ✓                   | ✓                              |
-| `name` table     | ✓                      | ✓                   |                                |
-| `OS/2` table     | ✓                      | ✓                   |                                |
-| `post` table     | ✓                      | ✓                   |                                |
-| `SVG ` table     |                        |                     | ✓                              |
-| `vhea` table     | ✓                      | ✓                   |                                |
-| `vmtx` table     | ✓                      | ✓                   |                                |
-| `VORG` table     | ✓                      | ✓                   |                                |
-| Variable fonts   |                        | ✓                   |                                |
-| Rendering        |                        | ✓                   | ~<sup>1</sup>                  |
-| Language         | Rust + C API           | C                   | C                              |
-| Dynamic lib size | ~250KiB                | ~760KiB<sup>2</sup> | ? (header-only)                |
-| Tested version   | 0.4.0                  | 2.9.1               | 1.24                           |
-| License          | MIT / Apache-2.0       | FTL/GPLv2           | public domain                  |
+| Feature/Library   | ttf-parser             | FreeType            | stb_truetype                   |
+| ----------------- | :--------------------: | :-----------------: | :----------------------------: |
+| Memory safe       | ✓                      |                     |                                |
+| Zero allocation   | ✓                      |                     |                                |
+| `CFF `&nbsp;table | ✓                      | ✓                   | ✓                              |
+| `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
+| `gasp` table      |                        | ✓                   |                                |
+| `GDEF` table      | ~                      |                     |                                |
+| `glyf` table      | ✓                      | ✓                   | ✓                              |
+| `GPOS` table      |                        |                     | ~ (only 2)                     |
+| `GSUB` table      |                        |                     |                                |
+| `head` table      | ✓                      | ✓                   | ✓                              |
+| `hhea` table      | ✓                      | ✓                   | ✓                              |
+| `hmtx` table      | ✓                      | ✓                   | ✓                              |
+| `kern` table      | ~                      | ~                   | ~                              |
+| `maxp` table      | ✓                      | ✓                   | ✓                              |
+| `name` table      | ✓                      | ✓                   |                                |
+| `OS/2` table      | ✓                      | ✓                   |                                |
+| `post` table      | ✓                      | ✓                   |                                |
+| `SVG `&nbsp;table |                        |                     | ✓                              |
+| `vhea` table      | ✓                      | ✓                   |                                |
+| `vmtx` table      | ✓                      | ✓                   |                                |
+| `VORG` table      | ✓                      | ✓                   |                                |
+| Variable fonts    |                        | ✓                   |                                |
+| Rendering         |                        | ✓                   | ~<sup>1</sup>                  |
+| Language          | Rust + C API           | C                   | C                              |
+| Dynamic lib size  | ~250KiB                | ~760KiB<sup>2</sup> | ? (header-only)                |
+| Tested version    | 0.4.0                  | 2.9.1               | 1.24                           |
+| License           | MIT / Apache-2.0       | FTL/GPLv2           | public domain                  |
 
 Legend:
 

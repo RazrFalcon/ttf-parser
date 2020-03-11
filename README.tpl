@@ -22,6 +22,7 @@ There are roughly three types of TrueType tables:
 | Feature/Library   | ttf-parser             | FreeType            | stb_truetype                   |
 | ----------------- | :--------------------: | :-----------------: | :----------------------------: |
 | Memory safe       | ✓                      |                     |                                |
+| Thread safe       | ✓                      |                     |                                |
 | Zero allocation   | ✓                      |                     |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ✓                              |
 | `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |

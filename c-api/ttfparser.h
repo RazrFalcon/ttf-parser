@@ -178,36 +178,20 @@ uint16_t ttfp_get_glyph_index(const ttfp_font *font, uint32_t codepoint);
 uint16_t ttfp_get_glyph_var_index(const ttfp_font *font, uint32_t codepoint, uint32_t variation);
 
 /**
- * @brief Returns glyph's horizontal advance.
+ * @brief Returns glyph's advance.
  *
  * @param glyph_id A glyph ID.
  * @return Glyph's horizontal advance or 0 when not set.
  */
-uint16_t ttfp_get_glyph_hor_advance(const ttfp_font *font, uint16_t glyph_id);
+uint16_t ttfp_get_glyph_advance(const ttfp_font *font, uint16_t glyph_id);
 
 /**
- * @brief Returns glyph's horizontal side bearing.
+ * @brief Returns glyph's side bearing.
  *
  * @param glyph_id A glyph ID.
  * @return Glyph's horizontal side bearing or 0 when not set.
  */
-int16_t ttfp_get_glyph_hor_side_bearing(const ttfp_font *font, uint16_t glyph_id);
-
-/**
- * @brief Returns glyph's vertical advance.
- *
- * @param glyph_id A glyph ID.
- * @return Glyph's vertical advance or 0 when not set.
- */
-uint16_t ttfp_get_glyph_ver_advance(const ttfp_font *font, uint16_t glyph_id);
-
-/**
- * @brief Returns glyph's vertical side bearing.
- *
- * @param glyph_id A glyph ID.
- * @return Glyph's vertical side bearing or 0 when not set.
- */
-int16_t ttfp_get_glyph_ver_side_bearing(const ttfp_font *font, uint16_t glyph_id);
+int16_t ttfp_get_glyph_side_bearing(const ttfp_font *font, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's vertical origin.

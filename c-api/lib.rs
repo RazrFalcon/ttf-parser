@@ -119,23 +119,13 @@ pub extern "C" fn ttfp_get_glyph_var_index(
 }
 
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_hor_advance(font: *const ttfp_font, glyph_id: GlyphId) -> u16 {
-    font_from_ptr(font).glyph_hor_advance(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_advance(font: *const ttfp_font, glyph_id: GlyphId) -> u16 {
+    font_from_ptr(font).glyph_advance(glyph_id).unwrap_or(0)
 }
 
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_hor_side_bearing(font: *const ttfp_font, glyph_id: GlyphId) -> i16 {
-    font_from_ptr(font).glyph_hor_side_bearing(glyph_id).unwrap_or(0)
-}
-
-#[no_mangle]
-pub extern "C" fn ttfp_get_glyph_ver_advance(font: *const ttfp_font, glyph_id: GlyphId) -> u16 {
-    font_from_ptr(font).glyph_ver_advance(glyph_id).unwrap_or(0)
-}
-
-#[no_mangle]
-pub extern "C" fn ttfp_get_glyph_ver_side_bearing(font: *const ttfp_font, glyph_id: GlyphId) -> i16 {
-    font_from_ptr(font).glyph_ver_side_bearing(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_side_bearing(font: *const ttfp_font, glyph_id: GlyphId) -> i16 {
+    font_from_ptr(font).glyph_side_bearing(glyph_id).unwrap_or(0)
 }
 
 #[no_mangle]

@@ -8,11 +8,6 @@ bencher = "0.1"
 ttf-parser = { path = "../" }
 
 [[bench]]
-name = "outline"
-path = "outline.rs"
-harness = false
-
-[[bench]]
 name = "methods_perf"
 path = "methods_perf.rs"
 harness = false

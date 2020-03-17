@@ -239,36 +239,36 @@ impl<'a> Table<'a> {
         if self.version < 2 {
             None
         } else {
-            // We cannot use SafeStream here, because X height is an optional data.
+            // We cannot use SafeStream here, because x height is an optional data.
             Stream::read_at(self.data, raw::SX_HEIGHT_OFFSET)
         }
     }
 
     #[inline]
-    pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
-        Some(LineMetrics {
+    pub fn strikeout_metrics(&self) -> LineMetrics {
+        LineMetrics {
             thickness: self.y_strikeout_size(),
             position: self.y_strikeout_position(),
-        })
+        }
     }
 
     #[inline]
-    pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
-        Some(ScriptMetrics {
+    pub fn subscript_metrics(&self) -> ScriptMetrics {
+        ScriptMetrics {
             x_size: self.y_subscript_x_size(),
             y_size: self.y_subscript_y_size(),
             x_offset: self.y_subscript_x_offset(),
             y_offset: self.y_subscript_y_offset(),
-        })
+        }
     }
 
     #[inline]
-    pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
-        Some(ScriptMetrics {
+    pub fn superscript_metrics(&self) -> ScriptMetrics {
+        ScriptMetrics {
             x_size: self.y_superscript_x_size(),
             y_size: self.y_superscript_y_size(),
             x_offset: self.y_superscript_x_offset(),
             y_offset: self.y_superscript_y_offset(),
-        })
+        }
     }
 }

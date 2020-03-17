@@ -576,7 +576,7 @@ impl<'a> Font<'a> {
     /// Returns font's underline metrics.
     #[inline]
     pub fn underline_metrics(&self) -> Option<LineMetrics> {
-        self.post.and_then(|post| post.underline_metrics())
+        self.post.map(|post| post.underline_metrics())
     }
 
     /// Returns font's strikeout metrics.
@@ -584,7 +584,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
-        self.os_2.and_then(|os_2| os_2.strikeout_metrics())
+        self.os_2.map(|os_2| os_2.strikeout_metrics())
     }
 
     /// Returns font's subscript metrics.
@@ -592,7 +592,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
-        self.os_2.and_then(|os_2| os_2.subscript_metrics())
+        self.os_2.map(|os_2| os_2.subscript_metrics())
     }
 
     /// Returns font's superscript metrics.
@@ -600,7 +600,7 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
-        self.os_2.and_then(|os_2| os_2.superscript_metrics())
+        self.os_2.map(|os_2| os_2.superscript_metrics())
     }
 
     /// Returns a total number of glyphs in the font.

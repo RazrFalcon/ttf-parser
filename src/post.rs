@@ -303,11 +303,11 @@ impl<'a> Table<'a> {
     }
 
     #[inline]
-    pub fn underline_metrics(&self) -> Option<LineMetrics> {
-        Some(LineMetrics {
+    pub fn underline_metrics(&self) -> LineMetrics {
+        LineMetrics {
             position: self.table.underline_position(),
             thickness: self.table.underline_thickness(),
-        })
+        }
     }
 
     #[inline]

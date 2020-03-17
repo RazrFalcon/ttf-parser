@@ -43,6 +43,8 @@ Can be used as Rust and as C library.
 - (`head`) Retrieving font's units per EM value using [units_per_em()] method.
 - (`hhea`) Retrieving generic font info using: [ascender()], [descender()], [height()]
   and [line_gap()] methods.
+- (`vhea`) Retrieving generic font info using: [ascender()], [descender()], [height()]
+  and [line_gap()] methods.
 
 [glyph_index()]: https://docs.rs/ttf-parser/0.4.0/ttf_parser/struct.Font.html#method.glyph_index
 [glyph_variation_index()]: https://docs.rs/ttf-parser/0.4.0/ttf_parser/struct.Font.html#method.glyph_variation_index
@@ -103,7 +105,7 @@ By doing so we can simplify an API quite a lot since otherwise, we will have to 
 
 Some methods may print warnings, when the `logging` feature is enabled.
 
-## Methods' computational complexity
+## Performance
 
 TrueType fonts designed for fast querying, so most of the methods are very fast.
 The main exception is glyph outlining. Glyphs can be stored using two different methods:
@@ -689,7 +691,7 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Returns font's X height.
+    /// Returns font's x height.
     ///
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
@@ -761,7 +763,7 @@ impl<'a> Font<'a> {
 
     // TODO: maybe fallback to bbox when no hmtx/vmtx?
 
-    /// Returns glyph's advance using.
+    /// Returns glyph's advance.
     ///
     /// Supports both horizontal and vertical fonts.
     #[inline]
@@ -773,7 +775,7 @@ impl<'a> Font<'a> {
         }
     }
 
-    /// Returns glyph's side bearing using.
+    /// Returns glyph's side bearing.
     ///
     /// Supports both horizontal and vertical fonts.
     #[inline]

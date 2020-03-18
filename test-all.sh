@@ -16,4 +16,4 @@ env LD_LIBRARY_PATH=./target/debug/ ./test
 cd ..
 
 cd benches
-cargo build
+cargo bench dummy # `cargo build` will not actually build it

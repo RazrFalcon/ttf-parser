@@ -21,10 +21,10 @@ impl<'a> CoverageTable<'a> {
 
         match format {
             1 => {
-                s.read_array16::<GlyphId>().unwrap().binary_search(&glyph_id).is_some()
+                s.read_count_and_array16::<GlyphId>().unwrap().binary_search(&glyph_id).is_some()
             }
             2 => {
-                let records = try_opt_or!(s.read_array16::<crate::raw::gdef::RangeRecord>(), false);
+                let records = try_opt_or!(s.read_count_and_array16::<crate::raw::gdef::RangeRecord>(), false);
                 records.into_iter().any(|r| r.range().contains(&glyph_id))
             }
             _ => false,
@@ -73,11 +73,11 @@ impl<'a> ClassDefinitionTable<'a> {
                     return None;
                 }
 
-                let classes = s.read_array16::<Class>()?;
+                let classes = s.read_count_and_array16::<Class>()?;
                 classes.get(glyph_id.0 - start_glyph_id.0)
             }
             2 => {
-                let records = s.read_array16::<crate::raw::gdef::ClassRangeRecord>()?;
+                let records = s.read_count_and_array16::<crate::raw::gdef::ClassRangeRecord>()?;
                 records.into_iter().find(|r| r.range().contains(&glyph_id))
                     .map(|record| Class(record.class()))
             }

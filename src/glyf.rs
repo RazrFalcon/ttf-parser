@@ -563,7 +563,7 @@ fn parse_simple_outline(
     number_of_contours: NonZeroU16,
 ) -> Option<GlyphPointsIter> {
     let mut s = Stream::new(glyph_data);
-    let endpoints = s.read_array::<u16, u16>(number_of_contours.get())?;
+    let endpoints = s.read_array16::<u16>(number_of_contours.get())?;
 
     let points_total = endpoints.last()?.checked_add(1)?;
 
@@ -575,7 +575,7 @@ fn parse_simple_outline(
 
     // Skip instructions byte code.
     let instructions_len: u16 = s.read()?;
-    s.advance(instructions_len);
+    s.advance(usize::from(instructions_len));
 
     let flags_offset = s.offset();
     let (x_coords_len, y_coords_len) = resolve_coords_len(&mut s, points_total)?;

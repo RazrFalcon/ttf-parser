@@ -70,22 +70,22 @@ fn x_height(bencher: &mut bencher::Bencher) {
     })
 }
 
-fn hor_advance(bencher: &mut bencher::Bencher) {
+fn glyph_advance(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = ttf::Font::from_data(&font_data, 0).unwrap();
     bencher.iter(|| {
         for _ in 0..1000 {
-            bencher::black_box(font.glyph_hor_advance(ttf::GlyphId(2)).unwrap());
+            bencher::black_box(font.glyph_advance(ttf::GlyphId(2)).unwrap());
         }
     })
 }
 
-fn hor_side_bearing(bencher: &mut bencher::Bencher) {
+fn glyph_side_bearing(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let font = ttf::Font::from_data(&font_data, 0).unwrap();
     bencher.iter(|| {
         for _ in 0..1000 {
-            bencher::black_box(font.glyph_hor_side_bearing(ttf::GlyphId(2)).unwrap());
+            bencher::black_box(font.glyph_side_bearing(ttf::GlyphId(2)).unwrap());
         }
     })
 }
@@ -98,7 +98,7 @@ bencher::benchmark_group!(perf,
     strikeout_metrics,
     subscript_metrics,
     x_height,
-    hor_advance,
-    hor_side_bearing
+    glyph_advance,
+    glyph_side_bearing
 );
 bencher::benchmark_main!(perf);

@@ -2,7 +2,7 @@
 
 use core::convert::TryFrom;
 
-use crate::parser::{Stream, Offset, LazyArray16};
+use crate::parser::{Stream, Offset, LazyArray16, NumConv};
 use crate::{GlyphId, PlatformId};
 use crate::raw::cmap as raw;
 
@@ -18,7 +18,7 @@ impl<'a> Table<'a> {
         s.skip::<u16>(); // version
         Some(Table {
             data,
-            records: s.read_array16()?,
+            records: s.read_count_and_array16()?,
         })
     }
 }
@@ -109,7 +109,7 @@ fn parse_unicode_variation_sequences(
     let mut s = Stream::new(data);
     s.skip::<u16>(); // format
     s.skip::<u32>(); // length
-    let records = s.read_array32::<raw::VariationSelectorRecord>()?;
+    let records = s.read_count_and_array32::<raw::VariationSelectorRecord>()?;
 
     let (_, record) = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
         Some(v) => v,
@@ -119,7 +119,7 @@ fn parse_unicode_variation_sequences(
     if let Some(offset) = record.default_uvs_offset() {
         let data = data.get(offset.to_usize()..)?;
         let mut s = Stream::new(data);
-        let ranges = s.read_array32::<raw::UnicodeRangeRecord>()?;
+        let ranges = s.read_count_and_array32::<raw::UnicodeRangeRecord>()?;
         for range in ranges {
             if range.contains(c) {
                 // This is a default glyph.
@@ -131,7 +131,7 @@ fn parse_unicode_variation_sequences(
     if let Some(offset) = record.non_default_uvs_offset() {
         let data = data.get(offset.to_usize()..)?;
         let mut s = Stream::new(data);
-        let uvs_mappings = s.read_array32::<raw::UVSMappingRecord>()?;
+        let uvs_mappings = s.read_count_and_array32::<raw::UVSMappingRecord>()?;
         if let Some((_, mapping)) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
             return Some(mapping.glyph_id());
         }
@@ -146,7 +146,7 @@ fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Option<u16> {
     s.skip::<u16>(); // language
 
     if code_point < u32::from(length) {
-        s.advance(code_point);
+        s.advance(usize::num_from(code_point));
         Some(u16::from(s.read::<u8>()?))
     } else {
         None
@@ -170,13 +170,13 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
     s.skip::<u16>(); // format
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
-    let sub_header_keys = s.read_array::<u16, u16>(256)?;
+    let sub_header_keys = s.read_array16::<u16>(256)?;
     // The maximum index in a sub_header_keys is a sub_headers count.
     let sub_headers_count = sub_header_keys.into_iter().map(|n| n / 8).max()? + 1;
 
     // Remember sub_headers offset before reading. Will be used later.
     let sub_headers_offset = s.offset();
-    let sub_headers = s.read_array::<raw::SubHeaderRecord, u16>(sub_headers_count)?;
+    let sub_headers = s.read_array16::<raw::SubHeaderRecord>(sub_headers_count)?;
 
     let i = if code_point < 0xff {
         // 'SubHeader 0 is special: it is used for single-byte character codes.'
@@ -225,21 +225,21 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
     let code_point = u16::try_from(code_point).ok()?;
 
     let mut s = Stream::new(data);
-    s.advance(6u32); // format + length + language
+    s.advance(6); // format + length + language
     let seg_count_x2: u16 = s.read()?;
     if seg_count_x2 < 2 {
         return None;
     }
 
     let seg_count = seg_count_x2 / 2;
-    s.advance(6u32); // searchRange + entrySelector + rangeShift
+    s.advance(6); // searchRange + entrySelector + rangeShift
 
-    let end_codes = s.read_array::<u16, u16>(seg_count)?;
+    let end_codes = s.read_array16::<u16>(seg_count)?;
     s.skip::<u16>(); // reservedPad
-    let start_codes = s.read_array::<u16, u16>(seg_count)?;
-    let id_deltas = s.read_array::<i16, u16>(seg_count)?;
+    let start_codes = s.read_array16::<u16>(seg_count)?;
+    let id_deltas = s.read_array16::<i16>(seg_count)?;
     let id_range_offset_pos = s.offset();
-    let id_range_offsets = s.read_array::<u16, u16>(seg_count)?;
+    let id_range_offsets = s.read_array16::<u16>(seg_count)?;
 
     // A custom binary search.
     let mut start = 0;
@@ -288,7 +288,7 @@ fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Option<u16> {
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
     let first_code_point: u16 = s.read()?;
-    let glyphs = s.read_array16::<u16>()?;
+    let glyphs = s.read_count_and_array16::<u16>()?;
 
     let idx = code_point.checked_sub(first_code_point)?;
     glyphs.get(idx)
@@ -300,7 +300,7 @@ fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Option<u16> {
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
     let first_code_point: u32 = s.read()?;
-    let glyphs = s.read_array32::<u16>()?;
+    let glyphs = s.read_count_and_array32::<u16>()?;
 
     let idx = code_point.checked_sub(first_code_point)?;
     glyphs.get(idx)
@@ -313,7 +313,7 @@ fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> 
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
-    let groups = s.read_array32::<raw::SequentialMapGroup>()?;
+    let groups = s.read_count_and_array32::<raw::SequentialMapGroup>()?;
     for group in groups {
         let start_char_code = group.start_char_code();
         if code_point >= start_char_code && code_point <= group.end_char_code() {

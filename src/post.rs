@@ -291,7 +291,7 @@ impl<'a> Table<'a> {
         // Only version 2.0 of the table has data at the end.
         if version == 0x00020000 {
             let mut s = Stream::new_at(data, raw::post::Table::SIZE);
-            name_indexes = s.read_array16()?;
+            name_indexes = s.read_count_and_array16()?;
             names = s.tail()?;
         }
 
@@ -333,11 +333,11 @@ impl<'a> Table<'a> {
                         // Empty name is an error.
                         break;
                     } else {
-                        let name = s.read_bytes(u16::from(len))?;
+                        let name = s.read_bytes(usize::from(len))?;
                         return core::str::from_utf8(name).ok();
                     }
                 } else {
-                    s.advance(u16::from(len));
+                    s.advance(usize::from(len));
                 }
 
                 i += 1;

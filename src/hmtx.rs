@@ -19,13 +19,13 @@ impl<'a> Table<'a> {
         number_of_glyphs: NonZeroU16,
     ) -> Option<Self> {
         let mut s = Stream::new(data);
-        let metrics = s.read_array(number_of_hmetrics.get())?;
+        let metrics = s.read_array16(number_of_hmetrics.get())?;
 
         // 'If the number_of_hmetrics is less than the total number of glyphs,
         // then that array is followed by an array for the left side bearing values
         // of the remaining glyphs.'
         let bearings = if number_of_hmetrics < number_of_glyphs {
-            s.read_array(number_of_glyphs.get() - number_of_hmetrics.get())
+            s.read_array16(number_of_glyphs.get() - number_of_hmetrics.get())
         } else {
             None
         };

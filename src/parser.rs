@@ -169,103 +169,44 @@ impl TryNumConv<f32> for i32 {
 }
 
 
-/// A u16/u32 length type used by `LazyArray`.
-pub trait ArraySize
-    : core::ops::Add<Output=Self>
-    + core::ops::AddAssign
-    + core::ops::Sub<Output=Self>
-    + core::ops::SubAssign
-    + core::ops::Div<Output=Self>
-    + PartialOrd
-    + Sized
-    + Copy
-{
-    /// Associated 0.
-    const ZERO: Self;
-    /// Associated 1.
-    const ONE: Self;
-    /// Associated 2.
-    const TWO: Self;
-
-    /// Creates `ArraySize` from `usize`;
-    fn from_usize(n: usize) -> Self;
-
-    /// Converts `ArraySize` to `usize`.
-    fn to_usize(&self) -> usize;
-}
-
-impl ArraySize for u16 {
-    const ZERO: Self = 0;
-    const ONE: Self = 1;
-    const TWO: Self = 2;
-
-    #[inline]
-    fn from_usize(n: usize) -> Self {
-        debug_assert!(n <= core::u16::MAX as usize);
-        n as u16
-    }
-
-    #[inline]
-    fn to_usize(&self) -> usize { usize::from(*self) }
-}
-
-impl ArraySize for u32 {
-    const ZERO: Self = 0;
-    const ONE: Self = 1;
-    const TWO: Self = 2;
-
-    #[inline]
-    fn from_usize(n: usize) -> Self {
-        debug_assert!(n <= core::u32::MAX as usize);
-        n as u32
-    }
-
-    #[inline]
-    fn to_usize(&self) -> usize { usize::num_from(*self) }
-}
-
-
 /// A slice-like container that converts internal binary data only on access.
 ///
 /// This is a low-level, internal structure that should not be used directly.
 #[derive(Clone, Copy)]
-pub struct LazyArray<'a, T, Idx> {
+pub struct LazyArray16<'a, T> {
     data: &'a [u8],
     data_type: core::marker::PhantomData<T>,
-    len_type: core::marker::PhantomData<Idx>,
 }
 
-impl<T, Idx> Default for LazyArray<'_, T, Idx> {
+impl<T> Default for LazyArray16<'_, T> {
     fn default() -> Self {
-        LazyArray {
+        LazyArray16 {
             data: &[],
             data_type: core::marker::PhantomData,
-            len_type: core::marker::PhantomData,
         }
     }
 }
 
-impl<'a, T: FromData, Idx: ArraySize> LazyArray<'a, T, Idx> {
+impl<'a, T: FromData> LazyArray16<'a, T> {
     /// Creates a new `LazyArray`.
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
-        LazyArray {
+        LazyArray16 {
             data,
             data_type: core::marker::PhantomData,
-            len_type: core::marker::PhantomData,
         }
     }
 
-    pub(crate) fn at(&self, index: Idx) -> T {
-        let start = index.to_usize() * T::SIZE;
+    pub(crate) fn at(&self, index: u16) -> T {
+        let start = usize::from(index) * T::SIZE;
         let end = start + T::SIZE;
         T::parse(&self.data[start..end])
     }
 
     /// Returns a value at `index`.
-    pub fn get(&self, index: Idx) -> Option<T> {
+    pub fn get(&self, index: u16) -> Option<T> {
         if index < self.len() {
-            let start = index.to_usize() * T::SIZE;
+            let start = usize::from(index) * T::SIZE;
             let end = start + T::SIZE;
             Some(T::parse(&self.data[start..end]))
         } else {
@@ -277,7 +218,7 @@ impl<'a, T: FromData, Idx: ArraySize> LazyArray<'a, T, Idx> {
     #[inline]
     pub fn last(&self) -> Option<T> {
         if !self.is_empty() {
-            self.get(self.len() - Idx::ONE)
+            self.get(self.len() - 1)
         } else {
             None
         }
@@ -285,19 +226,19 @@ impl<'a, T: FromData, Idx: ArraySize> LazyArray<'a, T, Idx> {
 
     /// Returns array's length.
     #[inline]
-    pub fn len(&self) -> Idx {
-        Idx::from_usize(self.data.len() / T::SIZE)
+    pub fn len(&self) -> u16 {
+        (self.data.len() / T::SIZE) as u16
     }
 
     /// Checks if array is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == Idx::ZERO
+        self.len() == 0
     }
 
     /// Performs a binary search by specified `key`.
     #[inline]
-    pub fn binary_search(&self, key: &T) -> Option<(Idx, T)>
+    pub fn binary_search(&self, key: &T) -> Option<(u16, T)>
         where T: Ord
     {
         self.binary_search_by(|p| p.cmp(key))
@@ -305,7 +246,7 @@ impl<'a, T: FromData, Idx: ArraySize> LazyArray<'a, T, Idx> {
 
     /// Performs a binary search using specified closure.
     #[inline]
-    pub fn binary_search_by<F>(&self, mut f: F) -> Option<(Idx, T)>
+    pub fn binary_search_by<F>(&self, mut f: F) -> Option<(u16, T)>
         where F: FnMut(&T) -> core::cmp::Ordering
     {
         // Based on Rust std implementation.
@@ -313,13 +254,13 @@ impl<'a, T: FromData, Idx: ArraySize> LazyArray<'a, T, Idx> {
         use core::cmp::Ordering;
 
         let mut size = self.len();
-        if size == Idx::ZERO {
+        if size == 0 {
             return None;
         }
 
-        let mut base = Idx::ZERO;
-        while size > Idx::ONE {
-            let half = size / Idx::TWO;
+        let mut base = 0;
+        while size > 1 {
+            let half = size / 2;
             let mid = base + half;
             // mid is always in [0, size), that means mid is >= 0 and < size.
             // mid >= 0: by definition
@@ -335,62 +276,162 @@ impl<'a, T: FromData, Idx: ArraySize> LazyArray<'a, T, Idx> {
     }
 }
 
-impl<'a, T: FromData + core::fmt::Debug + Copy, Idx: ArraySize> core::fmt::Debug for LazyArray<'a, T, Idx> {
+impl<'a, T: FromData + core::fmt::Debug + Copy> core::fmt::Debug for LazyArray16<'a, T> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.debug_list().entries(self.into_iter()).finish()
     }
 }
 
-impl<'a, T: FromData, Idx: ArraySize> IntoIterator for LazyArray<'a, T, Idx> {
+impl<'a, T: FromData> IntoIterator for LazyArray16<'a, T> {
     type Item = T;
-    type IntoIter = LazyArrayIter<'a, T, Idx>;
+    type IntoIter = LazyArrayIter16<'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        LazyArrayIter {
+        LazyArrayIter16 {
             data: self,
-            index: Idx::ZERO,
+            index: 0,
         }
     }
 }
 
-/// An alias to `LazyArray` with max length equal to `u16`.
-pub type LazyArray16<'a, T> = LazyArray<'a, T, u16>;
 
-/// An iterator over `LazyArray`.
+/// An iterator over `LazyArray16`.
 #[derive(Clone, Copy)]
-pub struct LazyArrayIter<'a, T, Idx: ArraySize> {
-    data: LazyArray<'a, T, Idx>,
-    index: Idx,
+pub struct LazyArrayIter16<'a, T> {
+    data: LazyArray16<'a, T>,
+    index: u16,
 }
 
-impl<T, Idx: ArraySize> Default for LazyArrayIter<'_, T, Idx> {
-    fn default() -> Self {
-        LazyArrayIter {
-            data: LazyArray::default(),
-            index: Idx::ZERO,
-        }
-    }
-}
-
-impl<'a, T: FromData, Idx: ArraySize> Iterator for LazyArrayIter<'a, T, Idx> {
+impl<'a, T: FromData> Iterator for LazyArrayIter16<'a, T> {
     type Item = T;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.index += Idx::ONE; // TODO: check
-        self.data.get(self.index - Idx::ONE)
+        self.index += 1; // TODO: check
+        self.data.get(self.index - 1)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.data.get(ArraySize::from_usize(n))
+        self.data.get(u16::try_from(n).ok()?)
     }
 }
 
-impl<T: FromData, Idx: ArraySize> core::fmt::Debug for LazyArrayIter<'_, T, Idx> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "LazyArrayIter()")
+
+/// A slice-like container that converts internal binary data only on access.
+///
+/// This is a low-level, internal structure that should not be used directly.
+#[derive(Clone, Copy)]
+pub struct LazyArray32<'a, T> {
+    data: &'a [u8],
+    data_type: core::marker::PhantomData<T>,
+}
+
+impl<'a, T: FromData> LazyArray32<'a, T> {
+    /// Creates a new `LazyArray`.
+    #[inline]
+    pub fn new(data: &'a [u8]) -> Self {
+        LazyArray32 {
+            data,
+            data_type: core::marker::PhantomData,
+        }
+    }
+
+    pub(crate) fn at(&self, index: u32) -> T {
+        let start = usize::num_from(index) * T::SIZE;
+        let end = start + T::SIZE;
+        T::parse(&self.data[start..end])
+    }
+
+    /// Returns a value at `index`.
+    pub fn get(&self, index: u32) -> Option<T> {
+        if index < self.len() {
+            let start = usize::num_from(index) * T::SIZE;
+            let end = start + T::SIZE;
+            Some(T::parse(&self.data[start..end]))
+        } else {
+            None
+        }
+    }
+
+    /// Returns array's length.
+    #[inline]
+    pub fn len(&self) -> u32 {
+        (self.data.len() / T::SIZE) as u32
+    }
+
+    /// Performs a binary search using specified closure.
+    #[inline]
+    pub fn binary_search_by<F>(&self, mut f: F) -> Option<(u32, T)>
+        where F: FnMut(&T) -> core::cmp::Ordering
+    {
+        // Based on Rust std implementation.
+
+        use core::cmp::Ordering;
+
+        let mut size = self.len();
+        if size == 0 {
+            return None;
+        }
+
+        let mut base = 0;
+        while size > 1 {
+            let half = size / 2;
+            let mid = base + half;
+            // mid is always in [0, size), that means mid is >= 0 and < size.
+            // mid >= 0: by definition
+            // mid < size: mid = size / 2 + size / 4 + size / 8 ...
+            let cmp = f(&self.at(mid));
+            base = if cmp == Ordering::Greater { base } else { mid };
+            size -= half;
+        }
+
+        // base is always in [0, size) because base <= mid.
+        let value = self.at(base);
+        if f(&value) == Ordering::Equal { Some((base, value)) } else { None }
+    }
+}
+
+impl<'a, T: FromData + core::fmt::Debug + Copy> core::fmt::Debug for LazyArray32<'a, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_list().entries(self.into_iter()).finish()
+    }
+}
+
+impl<'a, T: FromData> IntoIterator for LazyArray32<'a, T> {
+    type Item = T;
+    type IntoIter = LazyArrayIter32<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        LazyArrayIter32 {
+            data: self,
+            index: 0,
+        }
+    }
+}
+
+
+/// An iterator over `LazyArray32`.
+#[derive(Clone, Copy)]
+pub struct LazyArrayIter32<'a, T> {
+    data: LazyArray32<'a, T>,
+    index: u32,
+}
+
+impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1; // TODO: check
+        self.data.get(self.index - 1)
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.data.get(u32::try_from(n).ok()?)
     }
 }
 
@@ -444,8 +485,8 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn advance<L: ArraySize>(&mut self, len: L) {
-        self.offset += len.to_usize();
+    pub fn advance(&mut self, len: usize) {
+        self.offset += len;
     }
 
     #[inline]
@@ -469,29 +510,44 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn read_bytes<L: ArraySize>(&mut self, len: L) -> Option<&'a [u8]> {
-        let offset = self.offset;
-        self.offset += len.to_usize();
-        self.data.get(offset..(offset + len.to_usize()))
+    pub fn read_bytes(&mut self, len: usize) -> Option<&'a [u8]> {
+        let start = self.offset;
+        self.offset += len;
+        self.data.get(start..self.offset)
     }
 
     #[inline]
-    pub fn read_array<T: FromData, Idx: ArraySize>(&mut self, len: Idx) -> Option<LazyArray<'a, T, Idx>> {
-        let len = len.to_usize() * T::SIZE;
-        let len = u32::try_from(len).ok()?;
-        let data = self.read_bytes(len)?;
-        Some(LazyArray::new(data))
+    pub fn read_array16<T: FromData>(&mut self, count: u16) -> Option<LazyArray16<'a, T>> {
+        let len = usize::from(count) * T::SIZE;
+
+        let start = self.offset;
+        self.offset += len;
+        let data = self.data.get(start..self.offset)?;
+
+        Some(LazyArray16::new(data))
     }
 
     #[inline]
-    pub fn read_array16<T: FromData>(&mut self) -> Option<LazyArray<'a, T, u16>> {
+    pub fn read_count_and_array16<T: FromData>(&mut self) -> Option<LazyArray16<'a, T>> {
         let count: u16 = self.read()?;
-        self.read_array(count)
+        self.read_array16(count)
     }
 
-    pub fn read_array32<T: FromData>(&mut self) -> Option<LazyArray<'a, T, u32>> {
+    #[inline]
+    pub fn read_array32<T: FromData>(&mut self, count: u32) -> Option<LazyArray32<'a, T>> {
+        let len = usize::num_from(count) * T::SIZE;
+
+        let start = self.offset;
+        self.offset += len;
+        let data = self.data.get(start..self.offset)?;
+
+        Some(LazyArray32::new(data))
+    }
+
+    #[inline]
+    pub fn read_count_and_array32<T: FromData>(&mut self) -> Option<LazyArray32<'a, T>> {
         let count: u32 = self.read()?;
-        self.read_array(count)
+        self.read_array32(count)
     }
 }
 

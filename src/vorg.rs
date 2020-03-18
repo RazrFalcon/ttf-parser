@@ -21,7 +21,7 @@ impl<'a> Table<'a> {
 
         Some(Table {
             default_y: s.read()?,
-            origins: s.read_array16()?,
+            origins: s.read_count_and_array16()?,
         })
     }
 

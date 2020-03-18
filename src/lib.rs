@@ -265,8 +265,8 @@ impl<'a> Font<'a> {
         }
 
         let num_tables: u16 = s.read()?;
-        s.advance(6u32); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
-        let tables = s.read_array::<raw::TableRecord, u16>(num_tables)?;
+        s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
+        let tables = s.read_array16::<raw::TableRecord>(num_tables)?;
 
         let mut cff_ = None;
         let mut gdef = None;

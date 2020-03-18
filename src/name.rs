@@ -6,7 +6,7 @@ use std::vec::Vec;
 use std::string::String;
 
 #[cfg(feature = "std")]
-use crate::parser::LazyArray;
+use crate::parser::LazyArray16;
 
 use crate::parser::Stream;
 use crate::raw::name as raw;
@@ -151,7 +151,7 @@ impl<'a> Name<'a> {
     #[inline(never)]
     pub(crate) fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
-        for c in LazyArray::<u16, u16>::new(self.name()) {
+        for c in LazyArray16::<u16>::new(self.name()) {
             name.push(c);
         }
 
@@ -262,14 +262,14 @@ pub(crate) fn parse(data: &[u8]) -> Option<Names> {
     s.skip::<u16>(); // offset
 
     if format == 0 {
-        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * u32::from(count))?;
+        let names_data = s.read_bytes(raw::NameRecord::SIZE * usize::from(count))?;
         Some(Names::new(names_data, s.tail()?, count))
     } else if format == 1 {
         let lang_tag_count: u16 = s.read()?;
         let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
 
-        s.advance(lang_tag_len); // langTagRecords
-        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * u32::from(count))?;
+        s.advance(usize::from(lang_tag_len)); // langTagRecords
+        let names_data = s.read_bytes(raw::NameRecord::SIZE * usize::from(count))?;
         Some(Names::new(names_data, s.tail()?, count))
     } else {
         warn!("{} is an unsupported name table format.", format);

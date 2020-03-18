@@ -6,7 +6,7 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::parser::{Stream, U24, Fixed, FromData, TryNumConv};
+use crate::parser::{Stream, U24, Fixed, FromData, NumConv, TryNumConv};
 use crate::{GlyphId, OutlineBuilder, Rect};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
@@ -151,7 +151,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
 
     // Jump to Name INDEX. It's not necessarily right after the header.
     if header_size > s.offset() as u8 {
-        s.advance(u32::from(header_size) - s.offset() as u32);
+        s.advance(usize::from(header_size) - s.offset());
     }
 
     // Skip Name INDEX.
@@ -743,7 +743,7 @@ fn _parse_char_string(
 
                 ctx.stems_len += len as u32 >> 1;
 
-                s.advance((ctx.stems_len + 7) >> 3);
+                s.advance(usize::num_from((ctx.stems_len + 7) >> 3));
             }
             operator::MOVE_TO => {
                 // dx1 dy1
@@ -1109,14 +1109,14 @@ pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<DataIndex<
     let offset_size: OffsetSize = try_parse_offset_size(s)?;
     let offsets_len = (count + 1).checked_mul(offset_size.to_u32())?;
     let offsets = VarOffsets {
-        data: &s.read_bytes(offsets_len)?,
+        data: &s.read_bytes(usize::num_from(offsets_len))?,
         offset_size,
     };
 
     // Last offset indicates a Data Index size.
     match offsets.last() {
         Some(last_offset) => {
-            let data = s.read_bytes(last_offset)?;
+            let data = s.read_bytes(usize::num_from(last_offset))?;
             Some(DataIndex { data, offsets })
         }
         None => {
@@ -1131,12 +1131,12 @@ fn skip_index(s: &mut Stream) -> Option<()> {
         let offset_size: OffsetSize = try_parse_offset_size(s)?;
         let offsets_len = (u32::from(count) + 1).checked_mul(offset_size.to_u32())?;
         let offsets = VarOffsets {
-            data: &s.read_bytes(offsets_len)?,
+            data: &s.read_bytes(usize::num_from(offsets_len))?,
             offset_size,
         };
 
         if let Some(last_offset) = offsets.last() {
-            s.advance(last_offset);
+            s.advance(usize::num_from(last_offset));
         }
     }
 

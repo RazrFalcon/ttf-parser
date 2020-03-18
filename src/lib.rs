@@ -73,25 +73,15 @@ macro_rules! warn {
     ($($arg:tt)+) => () // do nothing
 }
 
-mod cff;
-mod cmap;
-mod gdef;
 mod ggg;
-mod glyf;
-mod hmtx;
-mod kern;
-mod loca;
-mod maxp;
-mod name;
-mod os2;
 mod parser;
-mod post;
 mod raw;
-mod vorg;
+mod tables;
 
 #[cfg(feature = "std")]
 mod writer;
 
+use tables::*;
 use parser::{Stream, SafeStream, Offset, FromData, NumConv};
 pub use gdef::GlyphClass;
 pub use ggg::*;

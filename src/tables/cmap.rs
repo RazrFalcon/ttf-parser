@@ -16,9 +16,12 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
+        let count: u16 = s.read()?;
+        let records = s.read_array16(count)?;
+
         Some(Table {
             data,
-            records: s.read_count_and_array16()?,
+            records,
         })
     }
 }
@@ -109,7 +112,8 @@ fn parse_unicode_variation_sequences(
     let mut s = Stream::new(data);
     s.skip::<u16>(); // format
     s.skip::<u32>(); // length
-    let records = s.read_count_and_array32::<raw::VariationSelectorRecord>()?;
+    let count: u32 = s.read()?;
+    let records = s.read_array32::<raw::VariationSelectorRecord>(count)?;
 
     let (_, record) = match records.binary_search_by(|v| v.var_selector().cmp(&variation)) {
         Some(v) => v,
@@ -119,7 +123,8 @@ fn parse_unicode_variation_sequences(
     if let Some(offset) = record.default_uvs_offset() {
         let data = data.get(offset.to_usize()..)?;
         let mut s = Stream::new(data);
-        let ranges = s.read_count_and_array32::<raw::UnicodeRangeRecord>()?;
+        let count: u32 = s.read()?;
+        let ranges = s.read_array32::<raw::UnicodeRangeRecord>(count)?;
         for range in ranges {
             if range.contains(c) {
                 // This is a default glyph.
@@ -131,7 +136,8 @@ fn parse_unicode_variation_sequences(
     if let Some(offset) = record.non_default_uvs_offset() {
         let data = data.get(offset.to_usize()..)?;
         let mut s = Stream::new(data);
-        let uvs_mappings = s.read_count_and_array32::<raw::UVSMappingRecord>()?;
+        let count: u32 = s.read()?;
+        let uvs_mappings = s.read_array32::<raw::UVSMappingRecord>(count)?;
         if let Some((_, mapping)) = uvs_mappings.binary_search_by(|v| v.unicode_value().cmp(&cp)) {
             return Some(mapping.glyph_id());
         }
@@ -288,7 +294,8 @@ fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Option<u16> {
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
     let first_code_point: u16 = s.read()?;
-    let glyphs = s.read_count_and_array16::<u16>()?;
+    let count: u16 = s.read()?;
+    let glyphs = s.read_array16::<u16>(count)?;
 
     let idx = code_point.checked_sub(first_code_point)?;
     glyphs.get(idx)
@@ -300,7 +307,8 @@ fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Option<u16> {
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
     let first_code_point: u32 = s.read()?;
-    let glyphs = s.read_count_and_array32::<u16>()?;
+    let count: u32 = s.read()?;
+    let glyphs = s.read_array32::<u16>(count)?;
 
     let idx = code_point.checked_sub(first_code_point)?;
     glyphs.get(idx)
@@ -313,7 +321,8 @@ fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> 
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
-    let groups = s.read_count_and_array32::<raw::SequentialMapGroup>()?;
+    let count: u32 = s.read()?;
+    let groups = s.read_array32::<raw::SequentialMapGroup>(count)?;
     for group in groups {
         let start_char_code = group.start_char_code();
         if code_point >= start_char_code && code_point <= group.end_char_code() {

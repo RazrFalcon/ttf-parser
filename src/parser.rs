@@ -528,12 +528,6 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
-    pub fn read_count_and_array16<T: FromData>(&mut self) -> Option<LazyArray16<'a, T>> {
-        let count: u16 = self.read()?;
-        self.read_array16(count)
-    }
-
-    #[inline]
     pub fn read_array32<T: FromData>(&mut self, count: u32) -> Option<LazyArray32<'a, T>> {
         let len = usize::num_from(count) * T::SIZE;
 
@@ -542,12 +536,6 @@ impl<'a> Stream<'a> {
         let data = self.data.get(start..self.offset)?;
 
         Some(LazyArray32::new(data))
-    }
-
-    #[inline]
-    pub fn read_count_and_array32<T: FromData>(&mut self) -> Option<LazyArray32<'a, T>> {
-        let count: u32 = self.read()?;
-        self.read_array32(count)
     }
 }
 

@@ -63,8 +63,10 @@ impl<'a> Table<'a> {
                 let mut s = Stream::new(subdata);
                 let format: u16 = s.read()?;
                 if format == 1 {
-                    if let Some(array) = s.read_count_and_array16() {
-                        table.mark_glyph_coverage_offsets = Some((subdata, array));
+                    if let Some(count) = s.read::<u16>() {
+                        if let Some(array) = s.read_array16(count) {
+                            table.mark_glyph_coverage_offsets = Some((subdata, array));
+                        }
                     }
                 }
             }

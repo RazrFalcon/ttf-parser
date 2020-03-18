@@ -19,9 +19,13 @@ impl<'a> Table<'a> {
             return None;
         }
 
+        let default_y: i16 = s.read()?;
+        let count: u16 = s.read()?;
+        let origins = s.read_array16(count)?;
+
         Some(Table {
-            default_y: s.read()?,
-            origins: s.read_count_and_array16()?,
+            default_y,
+            origins,
         })
     }
 

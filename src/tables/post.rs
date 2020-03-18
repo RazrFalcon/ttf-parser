@@ -291,7 +291,8 @@ impl<'a> Table<'a> {
         // Only version 2.0 of the table has data at the end.
         if version == 0x00020000 {
             let mut s = Stream::new_at(data, raw::post::Table::SIZE);
-            name_indexes = s.read_count_and_array16()?;
+            let count: u16 = s.read()?;
+            name_indexes = s.read_array16(count)?;
             names = s.tail()?;
         }
 

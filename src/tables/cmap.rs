@@ -47,7 +47,7 @@ pub fn glyph_index(table: &Table, c: char) -> Option<GlyphId> {
         let c = u32::from(c);
         let glyph = match format {
             Format::ByteEncodingTable => {
-                parse_byte_encoding_table(&mut s, c)
+                parse_byte_encoding_table(s, c)
             }
             Format::HighByteMappingThroughTable => {
                 parse_high_byte_mapping_through_table(subtable_data, c)
@@ -56,17 +56,17 @@ pub fn glyph_index(table: &Table, c: char) -> Option<GlyphId> {
                 parse_segment_mapping_to_delta_values(subtable_data, c)
             }
             Format::TrimmedTableMapping => {
-                parse_trimmed_table_mapping(&mut s, c)
+                parse_trimmed_table_mapping(s, c)
             }
             Format::MixedCoverage => {
                 // Unsupported.
                 continue;
             }
             Format::TrimmedArray => {
-                parse_trimmed_array(&mut s, c)
+                parse_trimmed_array(s, c)
             }
             Format::SegmentedCoverage | Format::ManyToOneRangeMappings => {
-                parse_segmented_coverage(&mut s, c, format)
+                parse_segmented_coverage(s, c, format)
             }
             Format::UnicodeVariationSequences => {
                 // This subtable is used only by glyph_variation_index().
@@ -147,7 +147,7 @@ fn parse_unicode_variation_sequences(
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table
-fn parse_byte_encoding_table(s: &mut Stream, code_point: u32) -> Option<u16> {
+fn parse_byte_encoding_table(mut s: Stream, code_point: u32) -> Option<u16> {
     let length: u16 = s.read()?;
     s.skip::<u16>(); // language
 
@@ -287,7 +287,7 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-6-trimmed-table-mapping
-fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Option<u16> {
+fn parse_trimmed_table_mapping(mut s: Stream, code_point: u32) -> Option<u16> {
     // This subtable supports code points only in a u16 range.
     let code_point = u16::try_from(code_point).ok()?;
 
@@ -302,7 +302,7 @@ fn parse_trimmed_table_mapping(s: &mut Stream, code_point: u32) -> Option<u16> {
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-10-trimmed-array
-fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Option<u16> {
+fn parse_trimmed_array(mut s: Stream, code_point: u32) -> Option<u16> {
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language
@@ -317,7 +317,7 @@ fn parse_trimmed_array(s: &mut Stream, code_point: u32) -> Option<u16> {
 // + ManyToOneRangeMappings
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-13-many-to-one-range-mappings
-fn parse_segmented_coverage(s: &mut Stream, code_point: u32, format: Format) -> Option<u16> {
+fn parse_segmented_coverage(mut s: Stream, code_point: u32, format: Format) -> Option<u16> {
     s.skip::<u16>(); // reserved
     s.skip::<u32>(); // length
     s.skip::<u32>(); // language

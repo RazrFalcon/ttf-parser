@@ -655,7 +655,7 @@ impl<'a> Font<'a> {
     /// Returns a vertical origin of a glyph according to
     /// [Vertical Origin Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vorg).
     pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> Option<i16> {
-        self.vorg.and_then(|vorg| vorg.glyph_y_origin(glyph_id))
+        self.vorg.map(|vorg| vorg.glyph_y_origin(glyph_id))
     }
 
     /// Returns glyph's name.

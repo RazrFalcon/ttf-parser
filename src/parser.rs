@@ -86,7 +86,7 @@ pub struct F2DOT14(pub i16);
 
 impl F2DOT14 {
     #[inline]
-    pub fn to_float(&self) -> f32 {
+    pub fn to_f32(&self) -> f32 {
         f32::from(self.0) / 16384.0
     }
 }

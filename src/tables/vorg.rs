@@ -29,9 +29,9 @@ impl<'a> Table<'a> {
         })
     }
 
-    pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> Option<i16> {
-        Some(self.origins.binary_search_by(|m| m.glyph_index().cmp(&glyph_id))
+    pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> i16 {
+        self.origins.binary_search_by(|m| m.glyph_index().cmp(&glyph_id))
             .map(|(_, m)| m.vert_origin_y())
-            .unwrap_or(self.default_y))
+            .unwrap_or(self.default_y)
     }
 }

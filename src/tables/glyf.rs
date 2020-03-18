@@ -158,12 +158,12 @@ impl Transform {
     #[inline]
     fn is_default(&self) -> bool {
         // A direct float comparison is fine in our case.
-        self.a == 1.0
-            && self.b == 0.0
-            && self.c == 0.0
-            && self.d == 1.0
-            && self.e == 0.0
-            && self.f == 0.0
+           self.a == 1.0
+        && self.b == 0.0
+        && self.c == 0.0
+        && self.d == 1.0
+        && self.e == 0.0
+        && self.f == 0.0
     }
 }
 
@@ -220,17 +220,17 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
         }
 
         if flags.we_have_a_two_by_two() {
-            ts.a = self.stream.read::<F2DOT14>()?.to_float();
-            ts.b = self.stream.read::<F2DOT14>()?.to_float();
-            ts.c = self.stream.read::<F2DOT14>()?.to_float();
-            ts.d = self.stream.read::<F2DOT14>()?.to_float();
+            ts.a = self.stream.read::<F2DOT14>()?.to_f32();
+            ts.b = self.stream.read::<F2DOT14>()?.to_f32();
+            ts.c = self.stream.read::<F2DOT14>()?.to_f32();
+            ts.d = self.stream.read::<F2DOT14>()?.to_f32();
         } else if flags.we_have_an_x_and_y_scale() {
-            ts.a = self.stream.read::<F2DOT14>()?.to_float();
-            ts.d = self.stream.read::<F2DOT14>()?.to_float();
+            ts.a = self.stream.read::<F2DOT14>()?.to_f32();
+            ts.d = self.stream.read::<F2DOT14>()?.to_f32();
         } else if flags.we_have_a_scale() {
             // 'If the bit WE_HAVE_A_SCALE is set, the scale value is read in 2.14 format.
             // The value can be between -2 to almost +2.'
-            ts.a = f32_bound(-2.0, self.stream.read::<F2DOT14>()?.to_float(), 2.0);
+            ts.a = f32_bound(-2.0, self.stream.read::<F2DOT14>()?.to_f32(), 2.0);
             ts.d = ts.a;
         }
 

@@ -46,8 +46,10 @@ There are roughly three types of TrueType tables:
 | Feature/Library   | ttf-parser             | FreeType            | stb_truetype                   |
 | ----------------- | :--------------------: | :-----------------: | :----------------------------: |
 | Memory safe       | ✓                      |                     |                                |
-| Thread safe       | ✓                      |                     |                                |
+| Thread safe       | ✓                      |                     | ~<sup>1</sup>                  |
 | Zero allocation   | ✓                      |                     |                                |
+| Variable fonts    |                        | ✓                   |                                |
+| Rendering         |                        | ✓                   | ~<sup>2</sup>                  |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ✓                              |
 | `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
 | `gasp` table      |                        | ✓                   |                                |
@@ -67,10 +69,8 @@ There are roughly three types of TrueType tables:
 | `vhea` table      | ✓                      | ✓                   |                                |
 | `vmtx` table      | ✓                      | ✓                   |                                |
 | `VORG` table      | ✓                      | ✓                   |                                |
-| Variable fonts    |                        | ✓                   |                                |
-| Rendering         |                        | ✓                   | ~<sup>1</sup>                  |
 | Language          | Rust + C API           | C                   | C                              |
-| Dynamic lib size  | ~250KiB                | ~760KiB<sup>2</sup> | ? (header-only)                |
+| Dynamic lib size  | ~250KiB                | ~760KiB<sup>3</sup> | ? (header-only)                |
 | Tested version    | 0.4.0                  | 2.9.1               | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL/GPLv2           | public domain                  |
 
@@ -82,8 +82,9 @@ Legend:
 
 Notes:
 
-1. Very primitive.
-2. Depends on build flags.
+1. `stb_truetype` outline parsing method is reentrant.
+2. Very primitive.
+3. Depends on build flags.
 
 ## Performance
 

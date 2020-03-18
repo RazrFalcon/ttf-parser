@@ -678,13 +678,15 @@ impl<'a> Font<'a> {
     }
 
     /// Checks that font has
-    /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
+    /// [Glyph Class Definition Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
     pub fn has_glyph_classes(&self) -> bool {
         self.glyph_class(GlyphId(0)).is_some()
     }
 
     /// Returns glyph's class according to
-    /// [Glyph Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
+    /// [Glyph Class Definition Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
     ///
     /// Returns `None` when *Glyph Class Definition Table* is not set
     /// or glyph class is not set or invalid.
@@ -693,7 +695,8 @@ impl<'a> Font<'a> {
     }
 
     /// Returns glyph's mark attachment class according to
-    /// [Mark Attachment Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-attachment-class-definition-table).
+    /// [Mark Attachment Class Definition Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-attachment-class-definition-table).
     ///
     /// All glyphs not assigned to a class fall into Class 0.
     pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Class {
@@ -701,7 +704,8 @@ impl<'a> Font<'a> {
     }
 
     /// Checks that glyph is a mark according to
-    /// [Mark Glyph Sets Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-glyph-sets-table).
+    /// [Mark Glyph Sets Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-glyph-sets-table).
     ///
     /// `set_index` allows checking a specific glyph coverage set.
     /// Otherwise all sets will be checked.

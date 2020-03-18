@@ -755,12 +755,12 @@ impl<'a> Font<'a> {
     ///     }
     /// }
     ///
-    /// let data = std::fs::read("tests/fonts/glyphs.ttf").unwrap();
+    /// let data = std::fs::read("fonts/SourceSansPro-Regular-Tiny.ttf").unwrap();
     /// let font = ttf_parser::Font::from_data(&data, 0).unwrap();
     /// let mut builder = Builder(String::new());
-    /// let bbox = font.outline_glyph(ttf_parser::GlyphId(0), &mut builder).unwrap();
-    /// assert_eq!(builder.0, "M 50 0 L 50 750 L 450 750 L 450 0 L 50 0 Z ");
-    /// assert_eq!(bbox, ttf_parser::Rect { x_min: 50, y_min: 0, x_max: 450, y_max: 750 });
+    /// let bbox = font.outline_glyph(ttf_parser::GlyphId(13), &mut builder).unwrap();
+    /// assert_eq!(builder.0, "M 90 0 L 90 656 L 173 656 L 173 71 L 460 71 L 460 0 L 90 0 Z ");
+    /// assert_eq!(bbox, ttf_parser::Rect { x_min: 90, y_min: 0, x_max: 460, y_max: 656 });
     /// ```
     #[inline]
     pub fn outline_glyph(

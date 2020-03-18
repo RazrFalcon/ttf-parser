@@ -78,7 +78,7 @@ impl FromData for U24 {
 }
 
 
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+/// A 16-bit signed fixed number with the low 14 bits of fraction (2.14).
 #[derive(Clone, Copy, Debug)]
 pub struct F2DOT14(pub i16);
 
@@ -97,7 +97,7 @@ impl FromData for F2DOT14 {
 }
 
 
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+/// A 32-bit signed fixed-point number (16.16).
 #[derive(Clone, Copy, Debug)]
 pub struct Fixed(pub f32);
 

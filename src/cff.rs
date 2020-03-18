@@ -6,7 +6,7 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::parser::{Stream, U24, FromData};
+use crate::parser::{Stream, U24, Fixed, FromData};
 use crate::{GlyphId, OutlineBuilder, Rect};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
@@ -1076,8 +1076,8 @@ fn _parse_char_string(
                 stack.push(n as f32)?;
             }
             operator::FIXED_16_16 => {
-                let n = s.read::<u32>().ok_or(CFFError::ReadOutOfBounds)? as i32 as f32 / 65536.0;
-                stack.push(n)?;
+                let n = s.read::<Fixed>().ok_or(CFFError::ReadOutOfBounds)?;
+                stack.push(n.0)?;
             }
         }
     }

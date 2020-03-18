@@ -30,6 +30,7 @@ Can be used as Rust and as C library.
 - All recursive methods have a depth limit.
 - Technically, should use less than 64KiB of stack in worst case scenario.
 - Most of arithmetic operations are checked.
+- Most of numeric casts are checked.
 
 ### Alternatives
 

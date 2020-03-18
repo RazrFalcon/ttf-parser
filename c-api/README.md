@@ -26,4 +26,5 @@ env LD_LIBRARY_PATH=./target/debug/ ./test
 - All methods are thread-safe.
 - All recursive methods have a depth limit.
 - Most of arithmetic operations are checked.
+- Most of numeric casts are checked.
 - Rust panics are catched on the FFI boundary.

@@ -1,3 +1,5 @@
+use core::convert::TryFrom;
+
 /// A trait for parsing raw binary data.
 ///
 /// This is a low-level, internal trait that should not be used directly.
@@ -73,7 +75,7 @@ impl FromData for U24 {
 
     #[inline]
     fn parse(data: &[u8]) -> Self {
-        U24((data[0] as u32) << 16 | (data[1] as u32) << 8 | data[2] as u32)
+        U24(u32::from(data[0]) << 16 | u32::from(data[1]) << 8 | u32::from(data[2]))
     }
 }
 
@@ -85,7 +87,7 @@ pub struct F2DOT14(pub i16);
 impl F2DOT14 {
     #[inline]
     pub fn to_float(&self) -> f32 {
-        self.0 as f32 / 16384.0
+        f32::from(self.0) / 16384.0
     }
 }
 
@@ -106,8 +108,63 @@ impl FromData for Fixed {
 
     #[inline]
     fn parse(data: &[u8]) -> Self {
-        // TODO: cast should be checked?
+        // TODO: is it safe to cast?
         Fixed(i32::parse(data) as f32 / 65536.0)
+    }
+}
+
+
+pub trait NumConv<T>: Sized {
+    fn num_from(_: T) -> Self;
+}
+
+// Rust doesn't implement `From<u32> for usize`,
+// because it has to support 16 bit targets.
+// We don't, so we can allow this.
+impl NumConv<u32> for usize {
+    #[inline]
+    fn num_from(v: u32) -> Self {
+        debug_assert!(core::mem::size_of::<usize>() >= 4);
+        v as usize
+    }
+}
+
+
+/// Just like TryFrom<N>, but for numeric types not supported by the Rust's std.
+pub trait TryNumConv<T>: Sized {
+    fn try_num_from(_: T) -> Option<Self>;
+}
+
+impl TryNumConv<f32> for i16 {
+    #[inline]
+    fn try_num_from(v: f32) -> Option<Self> {
+        i32::try_num_from(v).and_then(|v| i16::try_from(v).ok())
+    }
+}
+
+impl TryNumConv<f32> for u16 {
+    #[inline]
+    fn try_num_from(v: f32) -> Option<Self> {
+        i32::try_num_from(v).and_then(|v| u16::try_from(v).ok())
+    }
+}
+
+impl TryNumConv<f32> for i32 {
+    #[inline]
+    fn try_num_from(v: f32) -> Option<Self> {
+        // Based on https://github.com/rust-num/num-traits/blob/master/src/cast.rs
+
+        // We can't represent `MIN-1` exactly, but there's no fractional part
+        // at this magnitude, so we can just use a `MIN` inclusive boundary.
+        const MIN: f32 = core::i32::MIN as f32;
+        // We can't represent `MAX` exactly, but it will round up to exactly
+        // `MAX+1` (a power of two) when we cast it.
+        const MAX_P1: f32 = core::i32::MAX as f32;
+        if v >= MIN && v < MAX_P1 {
+            Some(v as i32)
+        } else {
+            None
+        }
     }
 }
 
@@ -149,7 +206,7 @@ impl ArraySize for u16 {
     }
 
     #[inline]
-    fn to_usize(&self) -> usize { *self as usize }
+    fn to_usize(&self) -> usize { usize::from(*self) }
 }
 
 impl ArraySize for u32 {
@@ -164,7 +221,7 @@ impl ArraySize for u32 {
     }
 
     #[inline]
-    fn to_usize(&self) -> usize { *self as usize }
+    fn to_usize(&self) -> usize { usize::num_from(*self) }
 }
 
 
@@ -421,7 +478,8 @@ impl<'a> Stream<'a> {
     #[inline]
     pub fn read_array<T: FromData, Idx: ArraySize>(&mut self, len: Idx) -> Option<LazyArray<'a, T, Idx>> {
         let len = len.to_usize() * T::SIZE;
-        let data = self.read_bytes(len as u32)?;
+        let len = u32::try_from(len).ok()?;
+        let data = self.read_bytes(len)?;
         Some(LazyArray::new(data))
     }
 
@@ -515,7 +573,7 @@ pub struct Offset32(pub u32);
 impl Offset for Offset32 {
     #[inline]
     fn to_usize(&self) -> usize {
-        self.0 as usize
+        usize::num_from(self.0)
     }
 }
 

@@ -262,14 +262,14 @@ pub(crate) fn parse(data: &[u8]) -> Option<Names> {
     s.skip::<u16>(); // offset
 
     if format == 0 {
-        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?;
+        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * u32::from(count))?;
         Some(Names::new(names_data, s.tail()?, count))
     } else if format == 1 {
         let lang_tag_count: u16 = s.read()?;
         let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
 
         s.advance(lang_tag_len); // langTagRecords
-        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * count as u32)?;
+        let names_data = s.read_bytes(raw::NameRecord::SIZE as u32 * u32::from(count))?;
         Some(Names::new(names_data, s.tail()?, count))
     } else {
         warn!("{} is an unsupported name table format.", format);

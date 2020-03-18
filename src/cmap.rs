@@ -216,8 +216,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
         return None;
     }
 
-    let glyph = ((i32::from(glyph) + i32::from(sub_header.id_delta())) % 65536) as u16;
-    Some(glyph)
+    u16::try_from((i32::from(glyph) + i32::from(sub_header.id_delta())) % 65536).ok()
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
@@ -259,19 +258,19 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
                     return Some(code_point.wrapping_add(id_delta as u16));
                 }
 
-                let delta = (code_point as u32 - start_value as u32) * 2;
+                let delta = (u32::from(code_point) - u32::from(start_value)) * 2;
                 let delta = u16::try_from(delta).ok()?;
 
-                let id_range_offset_pos = (id_range_offset_pos + index as usize * 2) as u16;
+                let id_range_offset_pos = (id_range_offset_pos + usize::from(index) * 2) as u16;
                 let pos = id_range_offset_pos.wrapping_add(delta);
                 let pos = pos.wrapping_add(id_range_offset);
-                let glyph_array_value: u16 = Stream::read_at(data, pos as usize)?;
+                let glyph_array_value: u16 = Stream::read_at(data, usize::from(pos))?;
                 if glyph_array_value == 0 {
                     return None;
                 }
 
                 let glyph_id = (glyph_array_value as i16).wrapping_add(id_delta);
-                return Some(glyph_id as u16);
+                return u16::try_from(glyph_id).ok();
             }
         } else {
             start = index + 1;

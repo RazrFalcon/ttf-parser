@@ -21,6 +21,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - All recursive methods have a depth limit.
 - Technically, should use less than 64KiB of stack in worst case scenario.
 - Most of arithmetic operations are checked.
+- Most of numeric casts are checked.
 
 ## Error handling
 
@@ -91,7 +92,7 @@ mod vorg;
 #[cfg(feature = "std")]
 mod writer;
 
-use parser::{Stream, SafeStream, Offset, FromData};
+use parser::{Stream, SafeStream, Offset, FromData, NumConv};
 pub use gdef::GlyphClass;
 pub use ggg::*;
 pub use name::*;
@@ -236,9 +237,9 @@ impl<'a> Font<'a> {
             if index < n {
                 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
                 const OFFSET_32_SIZE: usize = 4;
-                let offset = raw::TTCHeader::SIZE + OFFSET_32_SIZE * index as usize;
+                let offset = raw::TTCHeader::SIZE + OFFSET_32_SIZE * usize::num_from(index);
                 let font_offset: u32 = Stream::read_at(data, offset)?;
-                data.get(font_offset as usize .. data.len())?
+                data.get(usize::num_from(font_offset) .. data.len())?
             } else {
                 return None;
             }
@@ -285,7 +286,7 @@ impl<'a> Font<'a> {
         let mut vmtx = None;
         for table in tables {
             let offset = table.offset().to_usize();
-            let length = table.length() as usize;
+            let length = usize::num_from(table.length());
             let range = offset..(offset + length);
 
             // It's way faster to compare `[u8; 4]` with `&[u8]`

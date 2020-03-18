@@ -6,11 +6,11 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::parser::{Stream, U24, Fixed, FromData};
+use crate::parser::{Stream, U24, Fixed, FromData, TryNumConv};
 use crate::{GlyphId, OutlineBuilder, Rect};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
-const MAX_OPERANDS_LEN: usize = 48;
+const MAX_OPERANDS_LEN: u8 = 48;
 
 // Limits according to the Adobe Technical Note #5177 Appendix B.
 const STACK_LIMIT: u8 = 10;
@@ -334,20 +334,11 @@ fn parse_char_string(
     }
 
     Ok(Rect {
-        x_min: try_f32_to_i16(bbox.x_min)?,
-        y_min: try_f32_to_i16(bbox.y_min)?,
-        x_max: try_f32_to_i16(bbox.x_max)?,
-        y_max: try_f32_to_i16(bbox.y_max)?,
+        x_min: i16::try_num_from(bbox.x_min).ok_or(CFFError::BboxOverflow)?,
+        y_min: i16::try_num_from(bbox.y_min).ok_or(CFFError::BboxOverflow)?,
+        x_max: i16::try_num_from(bbox.x_max).ok_or(CFFError::BboxOverflow)?,
+        y_max: i16::try_num_from(bbox.y_max).ok_or(CFFError::BboxOverflow)?,
     })
-}
-
-pub fn try_f32_to_i16(n: f32) -> Result<i16, CFFError> {
-    // There is no i16::try_from(f32) so we have to write one ourselves.
-    if n >= core::i16::MIN as f32 && n <= core::i16::MAX as f32 {
-        Ok(n as i16)
-    } else {
-        Err(CFFError::BboxOverflow)
-    }
 }
 
 
@@ -577,8 +568,7 @@ fn _parse_char_string(
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len());
-                let index = stack.pop() as i32 + i32::from(subroutine_bias);
-                let index = u16::try_from(index).map_err(|_| CFFError::InvalidSubroutineIndex)?;
+                let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
                 let char_string = ctx.metadata.local_subrs.get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
@@ -955,8 +945,7 @@ fn _parse_char_string(
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.global_subrs.len());
-                let index = stack.pop() as i32 + i32::from(subroutine_bias);
-                let index = u16::try_from(index).map_err(|_| CFFError::InvalidSubroutineIndex)?;
+                let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
                 let char_string = ctx.metadata.global_subrs.get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
@@ -1060,20 +1049,20 @@ fn _parse_char_string(
                 debug_assert!(stack.is_empty());
             }
             32..=246 => {
-                let n = op as i32 - 139;
-                stack.push(n as f32)?;
+                let n = i16::from(op) - 139;
+                stack.push(f32::from(n))?;
             }
             247..=250 => {
-                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
-                let n = (op as i32 - 247) * 256 + b1 + 108;
+                let b1: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+                let n = (i16::from(op) - 247) * 256 + i16::from(b1) + 108;
                 debug_assert!((108..=1131).contains(&n));
-                stack.push(n as f32)?;
+                stack.push(f32::from(n))?;
             }
             251..=254 => {
-                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
-                let n = -(op as i32 - 251) * 256 - b1 - 108;
+                let b1: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+                let n = -(i16::from(op) - 251) * 256 - i16::from(b1) - 108;
                 debug_assert!((-1131..=-108).contains(&n));
-                stack.push(n as f32)?;
+                stack.push(f32::from(n))?;
             }
             operator::FIXED_16_16 => {
                 let n = s.read::<Fixed>().ok_or(CFFError::ReadOutOfBounds)?;
@@ -1085,6 +1074,13 @@ fn _parse_char_string(
     // TODO: 'A charstring subroutine must end with either an endchar or a return operator.'
 
     Ok((x, y))
+}
+
+#[inline]
+fn conv_subroutine_index(index: f32, bias: u16) -> Result<u16, CFFError> {
+    let mut index = i32::try_num_from(index).ok_or(CFFError::InvalidSubroutineIndex)?;
+    index += i32::from(bias);
+    u16::try_from(index).map_err(|_| CFFError::InvalidSubroutineIndex)
 }
 
 // Adobe Technical Note #5176, Chapter 16 "Local / Global Subrs INDEXes"
@@ -1111,7 +1107,7 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
 #[inline]
 pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
     let offset_size: OffsetSize = try_parse_offset_size(s)?;
-    let offsets_len = (count + 1).checked_mul(offset_size as u32)?;
+    let offsets_len = (count + 1).checked_mul(offset_size.to_u32())?;
     let offsets = VarOffsets {
         data: &s.read_bytes(offsets_len)?,
         offset_size,
@@ -1133,7 +1129,7 @@ fn skip_index(s: &mut Stream) -> Option<()> {
     let count: u16 = s.read()?;
     if count != 0 && count != core::u16::MAX {
         let offset_size: OffsetSize = try_parse_offset_size(s)?;
-        let offsets_len = u32::from(count + 1) * offset_size as u32;
+        let offsets_len = (u32::from(count) + 1).checked_mul(offset_size.to_u32())?;
         let offsets = VarOffsets {
             data: &s.read_bytes(offsets_len)?,
             offset_size,
@@ -1160,8 +1156,8 @@ impl<'a> VarOffsets<'a> {
             return None;
         }
 
-        let start = usize::from(index) * self.offset_size as usize;
-        let end = start + self.offset_size as usize;
+        let start = usize::from(index) * self.offset_size.to_usize();
+        let end = start + self.offset_size.to_usize();
         let data = self.data.get(start..end)?;
         let n: u32 = match self.offset_size {
             OffsetSize::Size1 => u32::from(u8::parse(data)),
@@ -1287,6 +1283,11 @@ pub enum OffsetSize {
     Size4 = 4,
 }
 
+impl OffsetSize {
+    #[inline] fn to_u32(self) -> u32 { self as u32 }
+    #[inline] fn to_usize(self) -> usize { self as usize }
+}
+
 #[inline]
 fn try_parse_offset_size(s: &mut Stream) -> Option<OffsetSize> {
     match s.read::<u8>()? {
@@ -1315,7 +1316,7 @@ struct DictionaryParser<'a> {
     // Offset to the last operands start.
     operands_offset: usize,
     // Actual operands.
-    operands: [i32; MAX_OPERANDS_LEN], // 192B
+    operands: [i32; MAX_OPERANDS_LEN as usize], // 192B
     // An amount of operands in the `operands` array.
     operands_len: u8,
 }
@@ -1327,7 +1328,7 @@ impl<'a> DictionaryParser<'a> {
             data,
             offset: 0,
             operands_offset: 0,
-            operands: [0; MAX_OPERANDS_LEN],
+            operands: [0; MAX_OPERANDS_LEN as usize],
             operands_len: 0,
         }
     }
@@ -1382,7 +1383,7 @@ impl<'a> DictionaryParser<'a> {
                 self.operands[usize::from(self.operands_len)] = op;
                 self.operands_len += 1;
 
-                if self.operands_len >= MAX_OPERANDS_LEN as u8 {
+                if self.operands_len >= MAX_OPERANDS_LEN {
                     break;
                 }
             }

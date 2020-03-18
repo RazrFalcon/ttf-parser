@@ -190,7 +190,7 @@ public:
                                 std::istreambuf_iterator<char>());
         m_fontData = std::move(data);
 
-        m_font = ttfp_create_font((const uint8_t *)m_fontData.data(), m_fontData.size(), index);
+        m_font = ttfp_create_font(m_fontData.data(), m_fontData.size(), index);
         if (!m_font) {
             throw "failed to parse a font";
         }
@@ -219,7 +219,7 @@ public:
         builder.curve_to = outliner.curveToFn;
         builder.close_path = outliner.closePathFn;
 
-        ttfp_bbox bbox;
+        ttfp_rect bbox;
         ttfp_outline_glyph(m_font, builder, &outliner, gid, &bbox);
 
         return outliner.counter;

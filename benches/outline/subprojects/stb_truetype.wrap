@@ -1,0 +1,3 @@
+[wrap-git]
+url = https://github.com/RazrFalcon/stb_truetype_meson.git
+revision = head

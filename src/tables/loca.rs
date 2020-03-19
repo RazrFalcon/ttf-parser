@@ -7,7 +7,7 @@ use crate::{GlyphId, IndexToLocationFormat};
 use crate::parser::{Stream, LazyArray16, NumConv};
 
 #[derive(Clone, Copy)]
-pub enum Table<'a> {
+pub(crate) enum Table<'a> {
     Short(LazyArray16<'a, u16>),
     Long(LazyArray16<'a, u32>),
 }

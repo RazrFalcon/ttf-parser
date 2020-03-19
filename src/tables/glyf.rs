@@ -496,7 +496,7 @@ impl CompositeGlyphFlags {
 pub const MAX_COMPONENTS: u8 = 32;
 
 #[inline]
-pub fn outline(
+pub(crate) fn outline(
     loca_table: loca::Table,
     glyf_table: &[u8],
     glyph_id: GlyphId,
@@ -509,7 +509,7 @@ pub fn outline(
 }
 
 #[inline]
-pub fn glyph_bbox(
+pub(crate) fn glyph_bbox(
     loca_table: loca::Table,
     glyf_table: &[u8],
     glyph_id: GlyphId,

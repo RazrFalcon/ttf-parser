@@ -34,7 +34,7 @@ By doing so we can simplify an API quite a lot since otherwise, we will have to 
 Some methods may print warnings, when the `logging` feature is enabled.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.4.0")]
+#![doc(html_root_url = "https://docs.rs/ttf-parser/0.5.0")]
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -83,13 +83,12 @@ mod var_store;
 mod writer;
 
 use tables::*;
-use parser::{Stream, SafeStream, Offset, NumConv, TryNumConv, i16_bound, f32_bound};
+use parser::{Stream, SafeStream, FromData, Offset, NumConv, TryNumConv, i16_bound, f32_bound};
 pub use fvar::{VariationAxes, VariationAxis};
 pub use gdef::GlyphClass;
 pub use ggg::*;
 pub use name::*;
 pub use os2::*;
-pub use parser::{FromData, LazyArray16, LazyArray32, LazyArrayIter16, LazyArrayIter32};
 
 
 /// A type-safe wrapper for glyph ID.
@@ -407,7 +406,7 @@ impl OutlineBuilder for DummyOutline {
 
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum IndexToLocationFormat {
+pub(crate) enum IndexToLocationFormat {
     Short,
     Long,
 }

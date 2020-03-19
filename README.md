@@ -78,8 +78,8 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Dynamic lib size  | ~250KiB                | ~760KiB<sup>3</sup> | ? (header-only)                |
-| Tested version    | 0.4.0                  | 2.9.1               | 1.24                           |
+| Dynamic lib size  | ~300KiB                | ~760KiB<sup>3</sup> | ? (header-only)                |
+| Tested version    | 0.5.0                  | 2.9.1               | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL/GPLv2           | public domain                  |
 
 Legend:

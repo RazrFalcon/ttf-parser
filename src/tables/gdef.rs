@@ -76,6 +76,11 @@ impl<'a> Table<'a> {
     }
 
     #[inline]
+    pub fn has_glyph_classes(&self) -> bool {
+        self.glyph_classes.is_some()
+    }
+
+    #[inline]
     pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
         match self.glyph_classes?.get(glyph_id).0 {
             1 => Some(GlyphClass::Base),

@@ -3,7 +3,7 @@
 use std::convert::TryFrom;
 use std::os::raw::{c_void, c_char};
 
-use ttf_parser::GlyphId;
+use ttf_parser::{GlyphId, Tag};
 
 /// @brief An opaque pointer to the font structure.
 #[repr(C)]
@@ -72,6 +72,10 @@ pub enum ttfp_glyph_class {
 
 fn font_from_ptr(font: *const ttfp_font) -> &'static ttf_parser::Font<'static> {
     unsafe { &*(font as *const ttf_parser::Font) }
+}
+
+fn font_from_mut_ptr(font: *const ttfp_font) -> &'static mut ttf_parser::Font<'static> {
+    unsafe { &mut *(font as *mut ttf_parser::Font) }
 }
 
 /// @brief Initializes the library log.
@@ -247,6 +251,14 @@ pub extern "C" fn ttfp_is_oblique(font: *const ttfp_font) -> bool {
     font_from_ptr(font).is_oblique()
 }
 
+/// @brief Checks that font is variable.
+///
+/// Simply checks the presence of a `fvar` table.
+#[no_mangle]
+pub extern "C" fn ttfp_is_variable(font: *const ttfp_font) -> bool {
+    font_from_ptr(font).is_variable()
+}
+
 /// @brief Returns font's weight.
 ///
 /// @return Font's weight or `400` when OS/2 table is not present.
@@ -265,30 +277,40 @@ pub extern "C" fn ttfp_get_width(font: *const ttfp_font) -> u16 {
 }
 
 /// @brief Returns a horizontal font ascender.
+///
+/// This function is affected by variation axes.
 #[no_mangle]
 pub extern "C" fn ttfp_get_ascender(font: *const ttfp_font) -> i16 {
     font_from_ptr(font).ascender()
 }
 
 /// @brief Returns a horizontal font descender.
+///
+/// This function is affected by variation axes.
 #[no_mangle]
 pub extern "C" fn ttfp_get_descender(font: *const ttfp_font) -> i16 {
     font_from_ptr(font).descender()
 }
 
 /// @brief Returns a horizontal font height.
+///
+/// This function is affected by variation axes.
 #[no_mangle]
 pub extern "C" fn ttfp_get_height(font: *const ttfp_font) -> i16 {
     font_from_ptr(font).height()
 }
 
 /// @brief Returns a horizontal font line gap.
+///
+/// This function is affected by variation axes.
 #[no_mangle]
 pub extern "C" fn ttfp_get_line_gap(font: *const ttfp_font) -> i16 {
     font_from_ptr(font).line_gap()
 }
 
 /// @brief Returns a vertical font ascender.
+///
+/// This function is affected by variation axes.
 ///
 /// @return `0` when `vhea` table is not present.
 #[no_mangle]
@@ -298,6 +320,8 @@ pub extern "C" fn ttfp_get_vertical_ascender(font: *const ttfp_font) -> i16 {
 
 /// @brief Returns a vertical font descender.
 ///
+/// This function is affected by variation axes.
+///
 /// @return `0` when `vhea` table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_vertical_descender(font: *const ttfp_font) -> i16 {
@@ -306,6 +330,8 @@ pub extern "C" fn ttfp_get_vertical_descender(font: *const ttfp_font) -> i16 {
 
 /// @brief Returns a vertical font height.
 ///
+/// This function is affected by variation axes.
+///
 /// @return `0` when `vhea` table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_vertical_height(font: *const ttfp_font) -> i16 {
@@ -313,6 +339,8 @@ pub extern "C" fn ttfp_get_vertical_height(font: *const ttfp_font) -> i16 {
 }
 
 /// @brief Returns a vertical font line gap.
+///
+/// This function is affected by variation axes.
 ///
 /// @return `0` when `vhea` table is not present.
 #[no_mangle]
@@ -330,6 +358,8 @@ pub extern "C" fn ttfp_get_units_per_em(font: *const ttfp_font) -> u16 {
 
 /// @brief Returns font's x height.
 ///
+/// This function is affected by variation axes.
+///
 /// @return x height or 0 when OS/2 table is not present or when its version is < 2.
 #[no_mangle]
 pub extern "C" fn ttfp_get_x_height(font: *const ttfp_font) -> i16 {
@@ -337,6 +367,10 @@ pub extern "C" fn ttfp_get_x_height(font: *const ttfp_font) -> i16 {
 }
 
 /// @brief Returns font's underline metrics.
+///
+/// This function is affected by variation axes.
+///
+/// @return `false` when `post` table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_underline_metrics(
     font: *const ttfp_font,
@@ -352,6 +386,8 @@ pub extern "C" fn ttfp_get_underline_metrics(
 }
 
 /// @brief Returns font's strikeout metrics.
+///
+/// This function is affected by variation axes.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
@@ -370,6 +406,8 @@ pub extern "C" fn ttfp_get_strikeout_metrics(
 
 /// @brief Returns font's subscript metrics.
 ///
+/// This function is affected by variation axes.
+///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_subscript_metrics(
@@ -386,6 +424,8 @@ pub extern "C" fn ttfp_get_subscript_metrics(
 }
 
 /// @brief Returns font's superscript metrics.
+///
+/// This function is affected by variation axes.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
@@ -462,6 +502,8 @@ pub extern "C" fn ttfp_get_glyph_hor_advance(font: *const ttfp_font, glyph_id: G
 
 /// @brief Returns glyph's vertical advance.
 ///
+/// This function is affected by variation axes.
+///
 /// @return Glyph's advance or 0 when not set.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_ver_advance(font: *const ttfp_font, glyph_id: GlyphId) -> u16 {
@@ -477,6 +519,8 @@ pub extern "C" fn ttfp_get_glyph_hor_side_bearing(font: *const ttfp_font, glyph_
 }
 
 /// @brief Returns glyph's vertical side bearing.
+///
+/// This function is affected by variation axes.
 ///
 /// @return Glyph's side bearing or 0 when not set.
 #[no_mangle]
@@ -566,14 +610,18 @@ pub extern "C" fn ttfp_get_glyphs_kerning(
     font_from_ptr(font).glyphs_kerning(glyph_id1, glyph_id2).unwrap_or(0)
 }
 
-/// @brief Outlines a glyph using provided outline builder and returns its tight bounding box.
+/// @brief Outlines a glyph and returns its tight bounding box.
 ///
-/// **Warning**: since `ttfparser` is a pull parser,
-/// #ttfp_outline_builder will emit segments even when outline is partially malformed.
-/// You must check #ttfp_outline_glyph result for error before using
-/// #ttfp_outline_builder's output.
+/// **Warning**: since `ttf-parser` is a pull parser,
+/// `OutlineBuilder` will emit segments even when outline is partially malformed.
+/// You must check #ttfp_outline_glyph() result before using
+/// #ttfp_outline_builder 's output.
 ///
-/// This method supports `glyf` and `CFF` tables.
+/// `glyf`, `gvar`, `CFF` and `CFF2` tables are supported.
+///
+/// This function is affected by variation axes.
+///
+/// @return `false` when glyph has no outline or on error.
 #[no_mangle]
 pub extern "C" fn ttfp_outline_glyph(
     font: *const ttfp_font,
@@ -597,12 +645,11 @@ pub extern "C" fn ttfp_outline_glyph(
 
 /// @brief Returns a tight glyph bounding box.
 ///
-/// Note that this method's performance depends on a table type the current font is using.
-/// In case of a `glyf` table, it's basically free, since this table stores
-/// bounding box separately. In case of `CFF` we should actually outline
-/// a glyph and then calculate its bounding box. So if you need an outline and
-/// a bounding box and you have an OpenType font (which uses CFF)
-/// then prefer #ttfp_outline_glyph method.
+/// Unless the current font has a `glyf` table, this is just a shorthand for `outline_glyph()`
+/// since only the `glyf` table stores a bounding box. In case of CFF and variable fonts
+/// we have to actually outline a glyph to find it's bounding box.
+///
+/// This function is affected by variation axes.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_bbox(
     font: *const ttfp_font,
@@ -619,6 +666,60 @@ pub extern "C" fn ttfp_get_glyph_bbox(
             None => false,
         }
     }).unwrap_or(false)
+}
+
+/// @brief Returns the amount of variation axes.
+#[no_mangle]
+pub extern "C" fn ttfp_get_variation_axes_count(font: *const ttfp_font) -> u16 {
+    font_from_ptr(font).variation_axes().count() as u16
+}
+
+/// @brief Returns a variation axis by index.
+#[no_mangle]
+pub extern "C" fn ttfp_get_variation_axis(
+    font: *const ttfp_font,
+    index: u16,
+    axis: *mut ttf_parser::VariationAxis,
+) -> bool {
+    match font_from_ptr(font).variation_axes().nth(index as usize) {
+        Some(a) => {
+            unsafe { *axis = a };
+            true
+        }
+        None => false,
+    }
+}
+
+/// @brief Returns a variation axis by tag.
+#[no_mangle]
+pub extern "C" fn ttfp_get_variation_axis_by_tag(
+    font: *const ttfp_font,
+    tag: ttf_parser::Tag,
+    axis: *mut ttf_parser::VariationAxis,
+) -> bool {
+    match font_from_ptr(font).variation_axes().find(|axis| axis.tag == tag) {
+        Some(a) => {
+            unsafe { *axis = a };
+            true
+        }
+        None => false,
+    }
+}
+
+/// @brief Sets a variation axis coordinate.
+///
+/// This is the only mutable function in the library.
+/// We can simplify the API a lot by storing the variable coordinates
+/// in the font object itself.
+///
+/// This function is reentrant.
+///
+/// Since coordinates are stored on the stack, we allow only 32 of them.
+///
+/// @return `false` when font is not variable or doesn't have such axis.
+#[no_mangle]
+pub extern "C" fn ttfp_set_variation(font: *mut ttfp_font, axis: Tag, value: f32) -> bool {
+    font_from_mut_ptr(font).set_variation(axis, value).is_some()
 }
 
 #[cfg(feature = "logging")]

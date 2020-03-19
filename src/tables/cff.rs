@@ -6,8 +6,8 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
+use crate::{GlyphId, OutlineBuilder, Rect, BBox};
 use crate::parser::{Stream, U24, Fixed, FromData, NumConv, TryNumConv};
-use crate::{GlyphId, OutlineBuilder, Rect};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: u8 = 48;
@@ -82,6 +82,9 @@ pub enum CFFError {
     BboxOverflow,
     MissingMoveTo,
     InvalidSubroutineIndex,
+    InvalidItemVariationDataIndex,
+    InvalidNumberOfBlendOperands,
+    BlendRegionsLimitReached,
 }
 
 #[cfg(feature = "logging")]
@@ -123,6 +126,15 @@ impl core::fmt::Display for CFFError {
             }
             CFFError::InvalidSubroutineIndex => {
                 write!(f, "an invalid subroutine index")
+            }
+            CFFError::InvalidItemVariationDataIndex => {
+                write!(f, "no ItemVariationData with required index")
+            }
+            CFFError::InvalidNumberOfBlendOperands => {
+                write!(f, "an invalid number of blend operands")
+            }
+            CFFError::BlendRegionsLimitReached => {
+                write!(f, "only up to 64 blend regions are supported")
             }
         }
     }
@@ -303,16 +315,11 @@ fn parse_char_string(
 
     let mut inner_builder = Builder {
         builder,
-        bbox: RectF {
-            x_min: core::f32::MAX,
-            y_min: core::f32::MAX,
-            x_max: core::f32::MIN,
-            y_max: core::f32::MIN,
-        }
+        bbox: BBox::new(),
     };
 
     let mut stack = ArgumentsStack {
-        data: &mut [0.0; MAX_ARGUMENTS_STACK_LEN],
+        data: &mut [0.0; MAX_ARGUMENTS_STACK_LEN], // 192B
         len: 0,
         max_len: MAX_ARGUMENTS_STACK_LEN,
     };
@@ -325,67 +332,42 @@ fn parse_char_string(
     let bbox = inner_builder.bbox;
 
     // Check that bbox was changed.
-    if bbox.x_min == core::f32::MAX &&
-       bbox.y_min == core::f32::MAX &&
-       bbox.x_max == core::f32::MIN &&
-       bbox.y_max == core::f32::MIN
-    {
+    if bbox.is_default() {
         return Err(CFFError::ZeroBBox);
     }
 
-    Ok(Rect {
-        x_min: i16::try_num_from(bbox.x_min).ok_or(CFFError::BboxOverflow)?,
-        y_min: i16::try_num_from(bbox.y_min).ok_or(CFFError::BboxOverflow)?,
-        x_max: i16::try_num_from(bbox.x_max).ok_or(CFFError::BboxOverflow)?,
-        y_max: i16::try_num_from(bbox.y_max).ok_or(CFFError::BboxOverflow)?,
-    })
+    bbox.to_rect().ok_or(CFFError::BboxOverflow)
 }
 
 
-pub struct RectF {
-    pub x_min: f32,
-    pub y_min: f32,
-    pub x_max: f32,
-    pub y_max: f32,
-}
-
-pub struct Builder<'a> {
+pub(crate) struct Builder<'a> {
     pub builder: &'a mut dyn OutlineBuilder,
-    pub bbox: RectF,
+    pub bbox: BBox,
 }
 
 impl<'a> Builder<'a> {
     #[inline]
-    fn update_bbox(&mut self, x: f32, y: f32) {
-        self.bbox.x_min = self.bbox.x_min.min(x);
-        self.bbox.y_min = self.bbox.y_min.min(y);
-
-        self.bbox.x_max = self.bbox.x_max.max(x);
-        self.bbox.y_max = self.bbox.y_max.max(y);
-    }
-
-    #[inline]
-    fn move_to(&mut self, x: f32, y: f32) {
-        self.update_bbox(x, y);
+    pub fn move_to(&mut self, x: f32, y: f32) {
+        self.bbox.extend_by(x, y);
         self.builder.move_to(x, y);
     }
 
     #[inline]
-    fn line_to(&mut self, x: f32, y: f32) {
-        self.update_bbox(x, y);
+    pub fn line_to(&mut self, x: f32, y: f32) {
+        self.bbox.extend_by(x, y);
         self.builder.line_to(x, y);
     }
 
     #[inline]
-    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        self.update_bbox(x1, y1);
-        self.update_bbox(x2, y2);
-        self.update_bbox(x, y);
+    pub fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.bbox.extend_by(x1, y1);
+        self.bbox.extend_by(x2, y2);
+        self.bbox.extend_by(x, y);
         self.builder.curve_to(x1, y1, x2, y2, x, y);
     }
 
     #[inline]
-    fn close(&mut self) {
+    pub fn close(&mut self) {
         self.builder.close();
     }
 }
@@ -929,11 +911,8 @@ fn _parse_char_string(
                 stack.clear();
             }
             operator::SHORT_INT => {
-                let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
-                let b2 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)? as i32;
-                let n = ((b1 << 24) | (b2 << 16)) >> 16;
-                debug_assert!((-32768..=32767).contains(&n));
-                stack.push(n as f32)?;
+                let n = s.read::<i16>().ok_or(CFFError::ReadOutOfBounds)?;
+                stack.push(f32::from(n))?;
             }
             operator::CALL_GLOBAL_SUBROUTINE => {
                 if stack.is_empty() {
@@ -1077,7 +1056,7 @@ fn _parse_char_string(
 }
 
 #[inline]
-fn conv_subroutine_index(index: f32, bias: u16) -> Result<u16, CFFError> {
+pub fn conv_subroutine_index(index: f32, bias: u16) -> Result<u16, CFFError> {
     let mut index = i32::try_num_from(index).ok_or(CFFError::InvalidSubroutineIndex)?;
     index += i32::from(bias);
     u16::try_from(index).map_err(|_| CFFError::InvalidSubroutineIndex)

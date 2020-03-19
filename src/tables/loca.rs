@@ -13,7 +13,7 @@ pub enum Table<'a> {
 }
 
 impl<'a> Table<'a> {
-    pub(crate) fn parse(
+    pub fn parse(
         data: &'a [u8],
         number_of_glyphs: NonZeroU16,
         format: IndexToLocationFormat,

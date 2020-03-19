@@ -1,0 +1,107 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/avar
+
+use core::convert::TryFrom;
+use core::num::NonZeroU16;
+
+use crate::NormalizedCoord;
+use crate::parser::{Stream, LazyArray16};
+use crate::raw::avar as raw;
+
+#[derive(Clone, Copy)]
+pub(crate) struct Table<'a> {
+    axis_count: NonZeroU16,
+    data: &'a [u8],
+}
+
+impl<'a> Table<'a> {
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+
+        let version: u32 = s.read()?;
+        if version != 0x00010000 {
+            return None;
+        }
+
+        s.skip::<u16>(); // reserved
+        // TODO: check that `axisCount` is the same as in `fvar`?
+        let axis_count: u16 = s.read()?;
+        let axis_count = NonZeroU16::new(axis_count)?;
+
+        let data = s.tail()?;
+
+        // Sanitize records.
+        for _ in 0..axis_count.get() {
+            let count: u16 = s.read()?;
+            s.advance_checked(raw::AxisValueMapRecord::SIZE * usize::from(count))?;
+        }
+
+        Some(Table {
+            axis_count,
+            data,
+        })
+    }
+
+    pub fn map_coordinates(&self, coordinates: &mut [NormalizedCoord]) -> Option<()> {
+        if usize::from(self.axis_count.get()) != coordinates.len() {
+            return None;
+        }
+
+        let mut s = Stream::new(self.data);
+        for coord in coordinates {
+            let count: u16 = s.read()?;
+            let map = s.read_array16::<raw::AxisValueMapRecord>(count)?;
+            *coord = NormalizedCoord::from(map_value(&map, coord.0));
+        }
+
+        Some(())
+    }
+}
+
+fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> i16 {
+    // This code is based on harfbuzz implementation.
+
+    if map.len() == 0 {
+        return value;
+    } else if map.len() == 1 {
+        let record = map.at(0);
+        return value - record.from_coordinate() + record.to_coordinate();
+    }
+
+    let record_0 = map.at(0);
+    if value <= record_0.from_coordinate() {
+        return value - record_0.from_coordinate() + record_0.to_coordinate();
+    }
+
+    let mut i = 1;
+    while i < map.len() && value > map.at(i).from_coordinate() {
+        i += 1;
+    }
+
+    if i == map.len() {
+        i -= 1;
+    }
+
+    let record_curr = map.at(i);
+    let curr_from = record_curr.from_coordinate();
+    let curr_to = record_curr.to_coordinate();
+    if value >= curr_from {
+        return value - curr_from + curr_to;
+    }
+
+    let record_prev = map.at(i - 1);
+    let prev_from = record_prev.from_coordinate();
+    let prev_to = record_prev.to_coordinate();
+    if prev_from == curr_from {
+        return prev_to;
+    }
+
+    let curr_from = i32::from(curr_from);
+    let curr_to = i32::from(curr_to);
+    let prev_from = i32::from(prev_from);
+    let prev_to = i32::from(prev_to);
+
+    let denom = curr_from - prev_from;
+    let k = (curr_to - prev_to) * (i32::from(value) - prev_from) + denom / 2;
+    let value = prev_to + k / denom;
+    i16::try_from(value).unwrap_or(0)
+}

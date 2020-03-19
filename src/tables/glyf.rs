@@ -4,13 +4,14 @@
 
 use core::num::NonZeroU16;
 
-use crate::parser::{Stream, SafeStream, F2DOT14, LazyArray16, NumConv};
-use crate::{loca, GlyphId, OutlineBuilder, Rect};
+use crate::parser::{Stream, SafeStream, F2DOT14, LazyArray16, NumConv, f32_bound};
+use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox};
 
-struct Builder<'a> {
-    builder: &'a mut dyn OutlineBuilder,
-    transform: Transform,
+pub(crate) struct Builder<'a> {
+    pub builder: &'a mut dyn OutlineBuilder,
+    pub transform: Transform,
     is_default_ts: bool, // `bool` is faster than `Option` or `is_default`.
+    pub bbox: Option<BBox>, // Used only by `gvar`.
     first_on_curve: Option<Point>,
     first_off_curve: Option<Point>,
     last_off_curve: Option<Point>,
@@ -18,11 +19,16 @@ struct Builder<'a> {
 
 impl<'a> Builder<'a> {
     #[inline]
-    pub fn new(transform: Transform, builder: &'a mut dyn OutlineBuilder) -> Self {
+    pub fn new(
+        transform: Transform,
+        bbox: Option<BBox>,
+        builder: &'a mut dyn OutlineBuilder,
+    ) -> Self {
         Builder {
             builder,
             transform,
             is_default_ts: transform.is_default(),
+            bbox,
             first_on_curve: None,
             first_off_curve: None,
             last_off_curve: None,
@@ -35,6 +41,10 @@ impl<'a> Builder<'a> {
             self.transform.apply_to(&mut x, &mut y);
         }
 
+        if let Some(ref mut bbox) = self.bbox {
+            bbox.extend_by(x, y);
+        }
+
         self.builder.move_to(x, y);
     }
 
@@ -42,6 +52,10 @@ impl<'a> Builder<'a> {
     fn line_to(&mut self, mut x: f32, mut y: f32) {
         if !self.is_default_ts {
             self.transform.apply_to(&mut x, &mut y);
+        }
+
+        if let Some(ref mut bbox) = self.bbox {
+            bbox.extend_by(x, y);
         }
 
         self.builder.line_to(x, y);
@@ -52,6 +66,11 @@ impl<'a> Builder<'a> {
         if !self.is_default_ts {
             self.transform.apply_to(&mut x1, &mut y1);
             self.transform.apply_to(&mut x, &mut y);
+        }
+
+        if let Some(ref mut bbox) = self.bbox {
+            bbox.extend_by(x1, y1);
+            bbox.extend_by(x, y);
         }
 
         self.builder.quad_to(x1, y1, x, y);
@@ -129,14 +148,19 @@ impl<'a> Builder<'a> {
 
 
 #[derive(Clone, Copy)]
-struct Transform {
-    a: f32, b: f32, c: f32,
-    d: f32, e: f32, f: f32,
+pub struct Transform {
+    pub a: f32, pub b: f32, pub c: f32,
+    pub d: f32, pub e: f32, pub f: f32,
 }
 
 impl Transform {
     #[inline]
-    fn combine(ts1: Self, ts2: Self) -> Self {
+    pub fn new_translate(tx: f32, ty: f32) -> Self {
+        Transform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: tx, f: ty }
+    }
+
+    #[inline]
+    pub fn combine(ts1: Self, ts2: Self) -> Self {
         Transform {
             a: ts1.a * ts2.a + ts1.c * ts2.b,
             b: ts1.b * ts2.a + ts1.d * ts2.b,
@@ -181,20 +205,22 @@ impl core::fmt::Debug for Transform {
 }
 
 
-struct CompositeGlyphInfo {
-    glyph_id: GlyphId,
-    transform: Transform,
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct CompositeGlyphInfo {
+    pub glyph_id: GlyphId,
+    pub transform: Transform,
+    pub flags: CompositeGlyphFlags,
 }
 
 
 #[derive(Clone)]
-struct CompositeGlyphIter<'a> {
+pub(crate) struct CompositeGlyphIter<'a> {
     stream: Stream<'a>,
 }
 
 impl<'a> CompositeGlyphIter<'a> {
     #[inline]
-    fn new(data: &'a [u8]) -> Self {
+    pub fn new(data: &'a [u8]) -> Self {
         CompositeGlyphIter { stream: Stream::new(data) }
     }
 }
@@ -242,6 +268,7 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
         Some(CompositeGlyphInfo {
             glyph_id,
             transform: ts,
+            flags,
         })
     }
 }
@@ -252,23 +279,30 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
 // I guess it's due to the fact that with i16 the struct
 // fits into the machine word.
 #[derive(Clone, Copy, Debug)]
-struct GlyphPoint {
-    x: i16,
-    y: i16,
+pub struct GlyphPoint {
+    pub x: i16,
+    pub y: i16,
     /// Indicates that a point is a point on curve
     /// and not a control point.
-    on_curve_point: bool,
-    last_point: bool,
+    pub on_curve_point: bool,
+    pub last_point: bool,
 }
 
 
 #[derive(Clone, Default)]
-struct GlyphPointsIter<'a> {
+pub struct GlyphPointsIter<'a> {
     endpoints: EndpointsIter<'a>,
     flags: FlagsIter<'a>,
     x_coords: CoordsIter<'a>,
     y_coords: CoordsIter<'a>,
-    points_left: u16, // Number of points left in the glyph.
+    pub points_left: u16, // Number of points left in the glyph.
+}
+
+impl GlyphPointsIter<'_> {
+    #[inline]
+    pub fn current_contour(&self) -> u16 {
+        self.endpoints.index - 1
+    }
 }
 
 impl<'a> Iterator for GlyphPointsIter<'a> {
@@ -322,9 +356,11 @@ impl<'a> EndpointsIter<'a> {
                 // so we have to use checked_sub.
                 self.left = end.checked_sub(prev).unwrap_or(0);
                 self.left = self.left.checked_sub(1).unwrap_or(0);
-                if let Some(n) = self.index.checked_add(1) {
-                    self.index = n;
-                }
+            }
+
+            // Always advance the index, so we can check the current contour number.
+            if let Some(n) = self.index.checked_add(1) {
+                self.index = n;
             }
 
             true
@@ -443,36 +479,21 @@ impl SimpleGlyphFlags {
 
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
-#[derive(Clone, Copy)]
-struct CompositeGlyphFlags(u16);
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct CompositeGlyphFlags(u16);
 
 impl CompositeGlyphFlags {
-    #[inline] fn arg_1_and_2_are_words(self) -> bool { self.0 & 0x0001 != 0 }
-    #[inline] fn args_are_xy_values(self) -> bool { self.0 & 0x0002 != 0 }
-    #[inline] fn we_have_a_scale(self) -> bool { self.0 & 0x0008 != 0 }
-    #[inline] fn more_components(self) -> bool { self.0 & 0x0020 != 0 }
-    #[inline] fn we_have_an_x_and_y_scale(self) -> bool { self.0 & 0x0040 != 0 }
-    #[inline] fn we_have_a_two_by_two(self) -> bool { self.0 & 0x0080 != 0 }
+    #[inline] pub fn arg_1_and_2_are_words(self) -> bool { self.0 & 0x0001 != 0 }
+    #[inline] pub fn args_are_xy_values(self) -> bool { self.0 & 0x0002 != 0 }
+    #[inline] pub fn we_have_a_scale(self) -> bool { self.0 & 0x0008 != 0 }
+    #[inline] pub fn more_components(self) -> bool { self.0 & 0x0020 != 0 }
+    #[inline] pub fn we_have_an_x_and_y_scale(self) -> bool { self.0 & 0x0040 != 0 }
+    #[inline] pub fn we_have_a_two_by_two(self) -> bool { self.0 & 0x0080 != 0 }
 }
 
-
-#[inline]
-fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
-    debug_assert!(min.is_finite());
-    debug_assert!(val.is_finite());
-    debug_assert!(max.is_finite());
-
-    if val > max {
-        return max;
-    } else if val < min {
-        return min;
-    }
-
-    val
-}
 
 // It's not defined in the spec, so we are using our own value.
-const MAX_COMPONENTS: u8 = 32;
+pub const MAX_COMPONENTS: u8 = 32;
 
 #[inline]
 pub fn outline(
@@ -481,7 +502,7 @@ pub fn outline(
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
-    let mut b = Builder::new(Transform::default(), builder);
+    let mut b = Builder::new(Transform::default(), None, builder);
     let range = loca_table.glyph_range(glyph_id)?;
     let glyph_data = glyf_table.get(range)?;
     outline_impl(loca_table, glyf_table, glyph_data, 0, &mut b)
@@ -544,7 +565,7 @@ fn outline_impl(
             if let Some(range) = loca_table.glyph_range(comp.glyph_id) {
                 if let Some(glyph_data) = glyf_table.get(range) {
                     let transform = Transform::combine(builder.transform, comp.transform);
-                    let mut b = Builder::new(transform, builder.builder);
+                    let mut b = Builder::new(transform, None, builder.builder);
                     outline_impl(loca_table, glyf_table, glyph_data, depth + 1, &mut b)?;
                 }
             }
@@ -558,7 +579,7 @@ fn outline_impl(
 }
 
 #[inline]
-fn parse_simple_outline(
+pub fn parse_simple_outline(
     glyph_data: &[u8],
     number_of_contours: NonZeroU16,
 ) -> Option<GlyphPointsIter> {

@@ -6,7 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
+- Variable fonts support.
 - C API.
+- `gvar`, `CFF2`, `avar`, `fvar`, `HVAR`, `VVAR` and `MVAR` tables support.
+- `Font::variation_axes`
+- `Font::set_variation`
+- `Font::is_variable`
+- `Tag` type.
+- Initial GSUB/GPOS support.
 
 ### Fixed
 - Multiple issues due to arithmetic overflow.

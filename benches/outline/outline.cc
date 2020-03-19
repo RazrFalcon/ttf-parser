@@ -6,6 +6,7 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_OUTLINE_H
+#include FT_MULTIPLE_MASTERS_H
 
 #include <ttfparser.h>
 
@@ -77,6 +78,14 @@ public:
     uint16_t numberOfGlyphs() const
     {
         return (uint16_t)m_face->num_glyphs;
+    }
+
+    void setVariations()
+    {
+        FT_Fixed coords[1] = {500 * 65536L};
+        if (FT_Set_Var_Design_Coordinates(m_face, 1, coords)) {
+            throw "failed to set veriations";
+        }
     }
 
     uint32_t outline(const uint16_t gid) const
@@ -208,6 +217,13 @@ public:
         return ttfp_get_number_of_glyphs(m_font);
     }
 
+    void setVariations()
+    {
+        if (!ttfp_set_variation(m_font, TTFP_TAG('w', 'g', 'h', 't'), 500)) {
+            throw "failed to set veriations";
+        }
+    }
+
     uint32_t outline(const uint16_t gid) const
     {
         Outliner outliner;
@@ -242,6 +258,18 @@ static void freetype_outline_glyf(benchmark::State &state)
 }
 BENCHMARK(freetype_outline_glyf);
 
+static void freetype_outline_gvar(benchmark::State &state)
+{
+    FT::Font font("../fonts/SourceSansVariable-Roman.ttf", 0);
+    font.setVariations();
+    for (auto _ : state) {
+        for (uint i = 0; i < font.numberOfGlyphs(); i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(freetype_outline_gvar);
+
 static void freetype_outline_cff(benchmark::State &state)
 {
     FT::Font font("../fonts/SourceSansPro-Regular.otf", 0);
@@ -252,6 +280,18 @@ static void freetype_outline_cff(benchmark::State &state)
     }
 }
 BENCHMARK(freetype_outline_cff);
+
+static void freetype_outline_cff2(benchmark::State &state)
+{
+    FT::Font font("../fonts/SourceSansVariable-Roman.otf", 0);
+    font.setVariations();
+    for (auto _ : state) {
+        for (uint i = 0; i < font.numberOfGlyphs(); i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(freetype_outline_cff2);
 
 static void stb_truetype_outline_glyf(benchmark::State &state)
 {
@@ -289,6 +329,19 @@ static void ttf_parser_outline_glyf(benchmark::State &state)
 }
 BENCHMARK(ttf_parser_outline_glyf);
 
+static void ttf_parser_outline_gvar(benchmark::State &state)
+{
+    TTFP::Font font("../fonts/SourceSansVariable-Roman.ttf", 0);
+    font.setVariations();
+    const auto numberOfGlyphs = font.numberOfGlyphs();
+    for (auto _ : state) {
+        for (uint i = 0; i < numberOfGlyphs; i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(ttf_parser_outline_gvar);
+
 static void ttf_parser_outline_cff(benchmark::State &state)
 {
     TTFP::Font font("../fonts/SourceSansPro-Regular.otf", 0);
@@ -300,5 +353,18 @@ static void ttf_parser_outline_cff(benchmark::State &state)
     }
 }
 BENCHMARK(ttf_parser_outline_cff);
+
+static void ttf_parser_outline_cff2(benchmark::State &state)
+{
+    TTFP::Font font("../fonts/SourceSansVariable-Roman.otf", 0);
+    font.setVariations();
+    const auto numberOfGlyphs = font.numberOfGlyphs();
+    for (auto _ : state) {
+        for (uint i = 0; i < numberOfGlyphs; i++) {
+            font.outline(i);
+        }
+    }
+}
+BENCHMARK(ttf_parser_outline_cff2);
 
 BENCHMARK_MAIN();

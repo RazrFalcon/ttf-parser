@@ -35,6 +35,15 @@ fn main() {
     println!("Strikeout: {:?}", font.strikeout_metrics());
     println!("Subscript: {:?}", font.subscript_metrics());
     println!("Superscript: {:?}", font.superscript_metrics());
+    println!("Variable: {:?}", font.is_variable());
+
+    if font.is_variable() {
+        println!("Variation axes:");
+        for axis in font.variation_axes() {
+            println!("  {} {}..{}, default {}",
+                     axis.tag, axis.min_value, axis.max_value, axis.def_value);
+        }
+    }
 
     println!("Elapsed: {}us", now.elapsed().as_micros());
 }

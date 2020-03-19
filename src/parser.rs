@@ -1,3 +1,4 @@
+use core::ops::Range;
 use core::convert::TryFrom;
 
 /// A trait for parsing raw binary data.
@@ -85,6 +86,7 @@ impl FromData for U24 {
 pub struct F2DOT14(pub i16);
 
 impl F2DOT14 {
+    /// Converts i16 to f32.
     #[inline]
     pub fn to_f32(&self) -> f32 {
         f32::from(self.0) / 16384.0
@@ -179,6 +181,7 @@ pub struct LazyArray16<'a, T> {
 }
 
 impl<T> Default for LazyArray16<'_, T> {
+    #[inline]
     fn default() -> Self {
         LazyArray16 {
             data: &[],
@@ -222,6 +225,17 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
         } else {
             None
         }
+    }
+
+    /// Returns array's length.
+    #[inline]
+    pub fn slice(&self, range: Range<u16>) -> Option<Self> {
+        let start = usize::from(range.start) * T::SIZE;
+        let end = usize::from(range.end) * T::SIZE;
+        Some(LazyArray16 {
+            data: self.data.get(start..end)?,
+            ..LazyArray16::default()
+        })
     }
 
     /// Returns array's length.
@@ -298,9 +312,19 @@ impl<'a, T: FromData> IntoIterator for LazyArray16<'a, T> {
 
 /// An iterator over `LazyArray16`.
 #[derive(Clone, Copy)]
+#[allow(missing_debug_implementations)]
 pub struct LazyArrayIter16<'a, T> {
     data: LazyArray16<'a, T>,
     index: u16,
+}
+
+impl<T: FromData> Default for LazyArrayIter16<'_, T> {
+    fn default() -> Self {
+        LazyArrayIter16 {
+            data: LazyArray16::new(&[]),
+            index: 0,
+        }
+    }
 }
 
 impl<'a, T: FromData> Iterator for LazyArrayIter16<'a, T> {
@@ -326,6 +350,16 @@ impl<'a, T: FromData> Iterator for LazyArrayIter16<'a, T> {
 pub struct LazyArray32<'a, T> {
     data: &'a [u8],
     data_type: core::marker::PhantomData<T>,
+}
+
+impl<T> Default for LazyArray32<'_, T> {
+    #[inline]
+    fn default() -> Self {
+        LazyArray32 {
+            data: &[],
+            data_type: core::marker::PhantomData,
+        }
+    }
 }
 
 impl<'a, T: FromData> LazyArray32<'a, T> {
@@ -415,6 +449,7 @@ impl<'a, T: FromData> IntoIterator for LazyArray32<'a, T> {
 
 /// An iterator over `LazyArray32`.
 #[derive(Clone, Copy)]
+#[allow(missing_debug_implementations)]
 pub struct LazyArrayIter32<'a, T> {
     data: LazyArray32<'a, T>,
     index: u32,
@@ -427,6 +462,11 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         self.index += 1; // TODO: check
         self.data.get(self.index - 1)
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        usize::num_from(self.data.len())
     }
 
     #[inline]
@@ -487,6 +527,16 @@ impl<'a> Stream<'a> {
     #[inline]
     pub fn advance(&mut self, len: usize) {
         self.offset += len;
+    }
+
+    #[inline]
+    pub fn advance_checked(&mut self, len: usize) -> Option<()> {
+        if self.offset + len <= self.data.len() {
+            self.offset += len;
+            Some(())
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -637,4 +687,26 @@ impl FromData for Option<Offset32> {
         let offset = Offset32::parse(data);
         if offset.0 != 0 { Some(offset) } else { None }
     }
+}
+
+
+#[inline]
+pub fn i16_bound(min: i16, val: i16, max: i16) -> i16 {
+    use core::cmp;
+    cmp::max(min, cmp::min(max, val))
+}
+
+#[inline]
+pub fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
+    debug_assert!(min.is_finite());
+    debug_assert!(val.is_finite());
+    debug_assert!(max.is_finite());
+
+    if val > max {
+        return max;
+    } else if val < min {
+        return min;
+    }
+
+    val
 }

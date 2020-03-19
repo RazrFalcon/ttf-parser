@@ -1,32 +1,94 @@
+use std::path::PathBuf;
+
 use ttf_parser as ttf;
 use svgtypes::WriteBuffer;
 
 const FONT_SIZE: f64 = 128.0;
-const COLUMNS: u32 = 50;
+const COLUMNS: u32 = 100;
+
+const HELP: &str = "\
+Usage:
+    font2svg font.ttf out.svg
+    font2svg --variations 'wght:500;wdth:200' font.ttf out.svg
+";
+
+struct Args {
+    variations: Vec<ttf::Variation>,
+    ttf_path: PathBuf,
+    svg_path: PathBuf,
+}
 
 fn main() {
     std::env::set_var("RUST_LOG", "warn");
     env_logger::init();
 
-    if let Err(e) = process() {
+    let args = match parse_args() {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Error: {}.", e);
+            print!("{}", HELP);
+            std::process::exit(1);
+        }
+    };
+
+    if let Err(e) = process(args) {
         eprintln!("Error: {}.", e);
         std::process::exit(1);
     }
 }
 
-fn process() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<_> = std::env::args().collect();
-    if args.len() != 3 {
-        println!("Usage:\n\tfont2svg font.ttf out.svg");
-        std::process::exit(1);
+fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
+    let mut args = pico_args::Arguments::from_env();
+
+    if args.contains(["-h", "--help"]) {
+        print!("{}", HELP);
+        std::process::exit(0);
     }
 
-    let font_data = std::fs::read(&args[1])?;
+    let variations = args.opt_value_from_fn("--variations", parse_variations)?;
+    let free = args.free()?;
+    if free.len() != 2 {
+        return Err("invalid number of arguments".into());
+    }
+
+    Ok(Args {
+        variations: variations.unwrap_or_default(),
+        ttf_path: PathBuf::from(&free[0]),
+        svg_path: PathBuf::from(&free[1]),
+    })
+}
+
+fn parse_variations(s: &str) -> Result<Vec<ttf::Variation>, &'static str> {
+    let mut variations = Vec::new();
+    for part in s.split(';') {
+        let mut iter = part.split(':');
+
+        let axis = iter.next().ok_or("failed to parse a variation")?;
+        let axis = ttf::Tag::from_bytes_lossy(axis.as_bytes());
+
+        let value = iter.next().ok_or("failed to parse a variation")?;
+        let value: f32 = value.parse().map_err(|_| "failed to parse a variation")?;
+
+        variations.push(ttf::Variation { axis, value });
+    }
+
+    Ok(variations)
+}
+
+fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
+    let font_data = std::fs::read(&args.ttf_path)?;
 
     // Exclude IO operations.
     let now = std::time::Instant::now();
 
-    let font = ttf::Font::from_data(&font_data, 0).ok_or("failed to open a font")?;
+    let mut font = ttf::Font::from_data(&font_data, 0).ok_or("failed to open a font")?;
+    if font.is_variable() {
+        for variation in args.variations {
+            font.set_variation(variation.axis, variation.value)
+                .ok_or("failed to create variation coordinates")?;
+        }
+    }
+
     let units_per_em = font.units_per_em().ok_or("invalid units per em")?;
     let scale = FONT_SIZE / units_per_em as f64;
 
@@ -70,7 +132,7 @@ fn process() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Elapsed: {}ms", now.elapsed().as_micros() as f64 / 1000.0);
 
-    std::fs::write(&args[2], &svg.end_document())?;
+    std::fs::write(&args.svg_path, &svg.end_document())?;
 
     Ok(())
 }

@@ -49,20 +49,26 @@ There are roughly three types of TrueType tables:
 | Memory safe       | ✓                      |                     |                                |
 | Thread safe       | ✓                      |                     | ~<sup>1</sup>                  |
 | Zero allocation   | ✓                      |                     |                                |
-| Variable fonts    |                        | ✓                   |                                |
+| Variable fonts    | ✓                      | ✓                   |                                |
 | Rendering         |                        | ✓                   | ~<sup>2</sup>                  |
+| `avar` table      | ✓                      | ✓                   |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ✓                              |
+| `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
+| `fvar` table      | ✓                      | ✓                   |                                |
 | `gasp` table      |                        | ✓                   |                                |
 | `GDEF` table      | ~                      |                     |                                |
 | `glyf` table      | ✓                      | ✓                   | ✓                              |
 | `GPOS` table      |                        |                     | ~ (only 2)                     |
 | `GSUB` table      |                        |                     |                                |
+| `gvar` table      | ✓                      | ✓                   |                                |
 | `head` table      | ✓                      | ✓                   | ✓                              |
 | `hhea` table      | ✓                      | ✓                   | ✓                              |
 | `hmtx` table      | ✓                      | ✓                   | ✓                              |
+| `HVAR` table      | ✓                      | ✓                   |                                |
 | `kern` table      | ~                      | ~                   | ~                              |
 | `maxp` table      | ✓                      | ✓                   | ✓                              |
+| `MVAR` table      | ✓                      | ✓                   |                                |
 | `name` table      | ✓                      | ✓                   |                                |
 | `OS/2` table      | ✓                      | ✓                   |                                |
 | `post` table      | ✓                      | ✓                   |                                |
@@ -70,6 +76,7 @@ There are roughly three types of TrueType tables:
 | `vhea` table      | ✓                      | ✓                   |                                |
 | `vmtx` table      | ✓                      | ✓                   |                                |
 | `VORG` table      | ✓                      | ✓                   |                                |
+| `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
 | Dynamic lib size  | ~250KiB                | ~760KiB<sup>3</sup> | ? (header-only)                |
 | Tested version    | 0.4.0                  | 2.9.1               | 1.24                           |
@@ -87,7 +94,7 @@ Notes:
 2. Very primitive.
 3. Depends on build flags.
 
-## Performance
+### Performance
 
 TrueType fonts designed for fast querying, so most of the methods are very fast.
 The main exception is glyph outlining. Glyphs can be stored using two different methods:
@@ -98,34 +105,39 @@ The second one is basically a tiny language with a stack-based VM, which makes i
 
 The [benchmark](./benches/outline/) tests how long it takes to outline all glyphs in the font.
 
-| Table/Library | ttf-parser       | FreeType     | stb_truetype    |
-| ------------- | ---------------: | -----------: | --------------: |
-| `glyf`        |    `765007 ns`   | `1194395 ns` | **`695873 ns`** |
-| `CFF`         | **`1165904 ns`** | `5806994 ns` |  `2862264 ns`   |
+| Table/Library | ttf-parser         | FreeType       | stb_truetype     |
+| ------------- | -----------------: | -------------: | ---------------: |
+| `glyf`        |     `786'180 ns`   | `1'194'395 ns` | **`695'873 ns`** |
+| `gvar`        | **`3'119'105 ns`** | `3'594'170 ns` |                - |
+| `CFF`         | **`1'237'364 ns`** | `5'806'994 ns` |  `2'862'264 ns`  |
+| `CFF2`        | **`1'893'664 ns`** | `6'782'960 ns` |                - |
 
 **Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
 
 And here are some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:         841 ns/iter (+/- 53)
-test outline_glyph_276_from_glyf ... bench:         674 ns/iter (+/- 15)
-test from_data_otf_cff           ... bench:         403 ns/iter (+/- 3)
-test outline_glyph_8_from_cff    ... bench:         339 ns/iter (+/- 44)
-test outline_glyph_8_from_glyf   ... bench:         295 ns/iter (+/- 16)
-test glyph_name_276              ... bench:         214 ns/iter (+/- 1)
-test from_data_ttf               ... bench:         169 ns/iter (+/- 3)
-test family_name                 ... bench:         155 ns/iter (+/- 5)
-test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
+test from_data_otf_cff2          ... bench:         775 ns/iter (+/- 75)
+test outline_glyph_276_from_cff2 ... bench:         763 ns/iter (+/- 59)
+test outline_glyph_276_from_cff  ... bench:         754 ns/iter (+/- 69)
+test from_data_otf_cff           ... bench:         618 ns/iter (+/- 8)
+test outline_glyph_276_from_glyf ... bench:         581 ns/iter (+/- 14)
+test outline_glyph_8_from_cff2   ... bench:         451 ns/iter (+/- 27)
+test from_data_ttf               ... bench:         400 ns/iter (+/- 9)
+test family_name                 ... bench:         392 ns/iter (+/- 7)
+test outline_glyph_8_from_cff    ... bench:         285 ns/iter (+/- 10)
+test outline_glyph_8_from_glyf   ... bench:         252 ns/iter (+/- 8)
+test glyph_name_276              ... bench:         220 ns/iter (+/- 2)
+test glyph_index_u41             ... bench:          13 ns/iter (+/- 0)
+test subscript_metrics           ... bench:           2 ns/iter (+/- 0)
+test glyph_advance               ... bench:           2 ns/iter (+/- 0)
+test glyph_side_bearing          ... bench:           2 ns/iter (+/- 0)
 test glyph_name_8                ... bench:           1 ns/iter (+/- 0)
-test underline_metrics           ... bench:         0.5 ns/iter (+/- 0)
+test ascender                    ... bench:           1 ns/iter (+/- 0)
+test underline_metrics           ... bench:           1 ns/iter (+/- 0)
+test strikeout_metrics           ... bench:           1 ns/iter (+/- 0)
+test x_height                    ... bench:           1 ns/iter (+/- 0)
 test units_per_em                ... bench:         0.5 ns/iter (+/- 0)
-test strikeout_metrics           ... bench:         0.5 ns/iter (+/- 0)
-test x_height                    ... bench:         0.4 ns/iter (+/- 0)
-test ascender                    ... bench:         0.2 ns/iter (+/- 0)
-test glyph_advance               ... bench:         0.2 ns/iter (+/- 0)
-test glyph_side_bearing          ... bench:         0.2 ns/iter (+/- 0)
-test subscript_metrics           ... bench:         0.2 ns/iter (+/- 0)
 test width                       ... bench:         0.2 ns/iter (+/- 0)
 ```
 

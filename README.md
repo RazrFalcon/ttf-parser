@@ -105,12 +105,12 @@ The second one is basically a tiny language with a stack-based VM, which makes i
 
 The [benchmark](./benches/outline/) tests how long it takes to outline all glyphs in the font.
 
-| Table/Library | ttf-parser         | FreeType       | stb_truetype     |
-| ------------- | -----------------: | -------------: | ---------------: |
-| `glyf`        |     `786'180 ns`   | `1'194'395 ns` | **`695'873 ns`** |
-| `gvar`        | **`3'119'105 ns`** | `3'594'170 ns` |                - |
-| `CFF`         | **`1'237'364 ns`** | `5'806'994 ns` |  `2'862'264 ns`  |
-| `CFF2`        | **`1'893'664 ns`** | `6'782'960 ns` |                - |
+| Table/Library | ttf-parser     | FreeType   | stb_truetype   |
+| ------------- | -------------: | ---------: | -------------: |
+| `glyf`        |   `0.786 ms`   | `1.194 ms` | **`0.695 ms`** |
+| `gvar`        | **`3.119 ms`** | `3.594 ms` |              - |
+| `CFF`         | **`1.237 ms`** | `5.806 ms` |   `2.862 ms`   |
+| `CFF2`        | **`1.893 ms`** | `6.782 ms` |              - |
 
 **Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
 

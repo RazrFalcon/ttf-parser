@@ -67,8 +67,10 @@ int main() {
     assert(ttfp_get_glyph_index(font, 0xFFFFFFFF) == 0);
     assert(ttfp_get_glyph_var_index(font, 0x0041, 0xFE03) == 0);
 
-    assert(ttfp_get_glyph_advance(font, 0x0041) == 544);
-    assert(ttfp_get_glyph_side_bearing(font, 0x0041) == 3);
+    assert(ttfp_get_glyph_hor_advance(font, 0x0041) == 544);
+    assert(ttfp_get_glyph_hor_side_bearing(font, 0x0041) == 3);
+    assert(ttfp_get_glyph_ver_advance(font, 0x0041) == 0);
+    assert(ttfp_get_glyph_ver_side_bearing(font, 0x0041) == 0);
     assert(ttfp_get_glyph_y_origin(font, a_gid) == 0);
     assert(ttfp_get_glyphs_kerning(font, 2, 3) == 0);
 

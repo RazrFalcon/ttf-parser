@@ -455,14 +455,6 @@ impl<'a> Font<'a> {
         try_opt_or!(self.os_2, false).is_oblique()
     }
 
-    /// Checks that font is vertical.
-    ///
-    /// Simply checks the presence of a `vhea` table.
-    #[inline]
-    pub fn is_vertical(&self) -> bool {
-        self.vhea.is_some()
-    }
-
     /// Returns font's weight.
     ///
     /// Returns `Weight::Normal` when OS/2 table is not present.
@@ -479,7 +471,7 @@ impl<'a> Font<'a> {
         try_opt_or!(self.os_2, Width::default()).width()
     }
 
-    /// Returns font's ascender value.
+    /// Returns a horizontal font ascender.
     #[inline]
     pub fn ascender(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
@@ -488,14 +480,10 @@ impl<'a> Font<'a> {
             }
         }
 
-        if let Some(vhea) = self.vhea {
-            vhea.ascender()
-        } else {
-            self.hhea.ascender()
-        }
+        self.hhea.ascender()
     }
 
-    /// Returns font's descender value.
+    /// Returns a horizontal font descender.
     #[inline]
     pub fn descender(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
@@ -504,20 +492,16 @@ impl<'a> Font<'a> {
             }
         }
 
-        if let Some(vhea) = self.vhea {
-            vhea.descender()
-        } else {
-            self.hhea.descender()
-        }
+        self.hhea.descender()
     }
 
-    /// Returns font's height.
+    /// Returns a horizontal font height.
     #[inline]
     pub fn height(&self) -> i16 {
         self.ascender() - self.descender()
     }
 
-    /// Returns font's line gap.
+    /// Returns a horizontal font line gap.
     #[inline]
     pub fn line_gap(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
@@ -526,11 +510,33 @@ impl<'a> Font<'a> {
             }
         }
 
-        if let Some(vhea) = self.vhea {
-            vhea.line_gap()
-        } else {
-            self.hhea.line_gap()
-        }
+        self.hhea.line_gap()
+    }
+
+    // TODO: does this affected by USE_TYPO_METRICS?
+
+    /// Returns a vertical font ascender.
+    #[inline]
+    pub fn vertical_ascender(&self) -> Option<i16> {
+        self.vhea.map(|vhea| vhea.ascender())
+    }
+
+    /// Returns a vertical font descender.
+    #[inline]
+    pub fn vertical_descender(&self) -> Option<i16> {
+        self.vhea.map(|vhea| vhea.descender())
+    }
+
+    /// Returns a vertical font height.
+    #[inline]
+    pub fn vertical_height(&self) -> Option<i16> {
+        Some(self.vertical_ascender()? - self.vertical_descender()?)
+    }
+
+    /// Returns a vertical font line gap.
+    #[inline]
+    pub fn vertical_line_gap(&self) -> Option<i16> {
+        self.vhea.map(|vhea| vhea.line_gap())
     }
 
     /// Returns glyphs index to location format.
@@ -626,33 +632,31 @@ impl<'a> Font<'a> {
         cmap::glyph_variation_index(self.cmap.as_ref()?, c, variation)
     }
 
-    // TODO: maybe fallback to bbox when no hmtx/vmtx?
-
-    /// Returns glyph's advance.
-    ///
-    /// Supports both horizontal and vertical fonts.
+    /// Returns glyph's horizontal advance.
     #[inline]
-    pub fn glyph_advance(&self, glyph_id: GlyphId) -> Option<u16> {
-        if self.is_vertical() {
-            self.vmtx.and_then(|vmtx| vmtx.advance(glyph_id))
-        } else {
-            self.hmtx.and_then(|hmtx| hmtx.advance(glyph_id))
-        }
+    pub fn glyph_hor_advance(&self, glyph_id: GlyphId) -> Option<u16> {
+        self.hmtx.and_then(|hmtx| hmtx.advance(glyph_id))
     }
 
-    /// Returns glyph's side bearing.
-    ///
-    /// Supports both horizontal and vertical fonts.
+    /// Returns glyph's vertical advance.
     #[inline]
-    pub fn glyph_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
-        if self.is_vertical() {
-            self.vmtx.and_then(|vmtx| vmtx.side_bearing(glyph_id))
-        } else {
-            self.hmtx.and_then(|hmtx| hmtx.side_bearing(glyph_id))
-        }
+    pub fn glyph_ver_advance(&self, glyph_id: GlyphId) -> Option<u16> {
+        self.vmtx.and_then(|vmtx| vmtx.advance(glyph_id))
     }
 
-    /// Returns a vertical origin of a glyph according to
+    /// Returns glyph's horizontal side bearing.
+    #[inline]
+    pub fn glyph_hor_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+        self.hmtx.and_then(|hmtx| hmtx.side_bearing(glyph_id))
+    }
+
+    /// Returns glyph's vertical side bearing.
+    #[inline]
+    pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+        self.vmtx.and_then(|vmtx| vmtx.side_bearing(glyph_id))
+    }
+
+    /// Returns glyph's vertical origin according to
     /// [Vertical Origin Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vorg).
     pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> Option<i16> {
         self.vorg.map(|vorg| vorg.glyph_y_origin(glyph_id))

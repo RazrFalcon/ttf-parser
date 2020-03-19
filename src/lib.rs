@@ -113,7 +113,7 @@ impl FromData for GlyphId {
 ///
 /// The number is stored as f2.16
 #[derive(Clone, Copy, PartialEq, Default, Debug)]
-pub struct NormalizedCoord(i16);
+struct NormalizedCoord(i16);
 
 impl From<i16> for NormalizedCoord {
     /// Creates a new coordinate.
@@ -1262,12 +1262,6 @@ impl<'a> Font<'a> {
         }
 
         Some(())
-    }
-
-    /// Returns current normalized variation coordinates.
-    #[inline]
-    pub fn variation_coordinates(&self) -> &[NormalizedCoord] {
-        self.coordinates.as_slice()
     }
 
     #[inline]

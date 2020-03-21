@@ -4,7 +4,7 @@
 
 use core::num::NonZeroU16;
 
-use crate::parser::{Stream, SafeStream, F2DOT14, LazyArray16, NumConv, f32_bound};
+use crate::parser::{Stream, F2DOT14, LazyArray16, NumConv, f32_bound};
 use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox};
 
 pub(crate) struct Builder<'a> {
@@ -414,7 +414,7 @@ impl<'a> Iterator for FlagsIter<'a> {
 
 #[derive(Clone, Default)]
 struct CoordsIter<'a> {
-    stream: SafeStream<'a>, // We've already checked the coords data, so it's safe to use SafeStream.
+    stream: Stream<'a>,
     prev: i16, // Points are stored as deltas, so we have to keep the previous one.
 }
 
@@ -422,7 +422,7 @@ impl<'a> CoordsIter<'a> {
     #[inline]
     fn new(data: &'a [u8]) -> Self {
         CoordsIter {
-            stream: SafeStream::new(data),
+            stream: Stream::new(data),
             prev: 0,
         }
     }
@@ -432,14 +432,16 @@ impl<'a> CoordsIter<'a> {
         // See https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#simple-glyph-description
         // for details about Simple Glyph Flags processing.
 
+        // We've already checked the coords data, so it's safe fallback to 0.
+
         let mut n = 0;
         if is_short {
-            n = i16::from(self.stream.read::<u8>());
+            n = i16::from(self.stream.read::<u8>().unwrap_or(0));
             if !is_same_or_short {
                 n = -n;
             }
         } else if !is_same_or_short {
-            n = self.stream.read();
+            n = self.stream.read().unwrap_or(0);
         }
 
         self.prev = self.prev.wrapping_add(n);

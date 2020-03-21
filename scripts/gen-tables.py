@@ -342,6 +342,21 @@ NAME_RECORD_TABLE = [
     TableRow(True,  TtfUInt16(),   'offset'),
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/kern
+# In the kern table, coverage is stored as uint16, but we are using two uint8 to simply the code.
+KERN_COVERAGE = [
+    TableRow(True,  TtfUInt8(),   'coverage'),
+    TableRow(True,  TtfUInt8(),   'format'),
+]
+
+# https://docs.microsoft.com/en-us/typography/opentype/spec/kern
+# In the kern table, a kerning pair is stored as two uint16, but we are using one uint32
+# so we can use binary search.
+KERNING_RECORD = [
+    TableRow(True,  TtfUInt32(),  'pair'),
+    TableRow(True,  TtfInt16(),   'value'),
+]
+
 # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#encoding-records-and-encodings
 CMAP_ENCODING_RECORD = [
     TableRow(True,  TtfUInt16(),   'platformID'),
@@ -683,6 +698,14 @@ print('}')
 print()
 print('pub mod name {')
 generate_table(NAME_RECORD_TABLE, 'NameRecord', owned=True)
+print('}')
+print()
+print('pub mod kern {')
+print('use crate::parser::FromData;')
+print()
+generate_table(KERN_COVERAGE, 'Coverage', owned=True, impl_from_data=True)
+print()
+generate_table(KERNING_RECORD, 'KerningRecord', owned=True, impl_from_data=True)
 print('}')
 print()
 print('pub mod gdef {')

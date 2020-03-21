@@ -83,7 +83,7 @@ mod var_store;
 mod writer;
 
 use tables::*;
-use parser::{Stream, SafeStream, FromData, Offset, NumConv, TryNumConv, i16_bound, f32_bound};
+use parser::{Stream, FromData, Offset, NumConv, TryNumConv, i16_bound, f32_bound};
 pub use fvar::{VariationAxes, VariationAxis};
 pub use gdef::GlyphClass;
 pub use ggg::*;
@@ -99,8 +99,7 @@ pub struct GlyphId(pub u16);
 impl FromData for GlyphId {
     #[inline]
     fn parse(data: &[u8]) -> Self {
-        let mut s = SafeStream::new(data);
-        GlyphId(s.read())
+        GlyphId(u16::parse(data))
     }
 }
 

@@ -42,7 +42,7 @@ pub struct Class(pub u16);
 
 impl FromData for Class {
     fn parse(data: &[u8]) -> Self {
-        Class(SafeStream::new(data).read())
+        Class(u16::parse(data))
     }
 }
 

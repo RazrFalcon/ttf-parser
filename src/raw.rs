@@ -672,6 +672,82 @@ pub mod name {
     }
 }
 
+pub mod kern {
+    use crate::parser::FromData;
+
+    #[derive(Clone, Copy)]
+    pub struct Coverage {
+        data: [u8; 2],
+    }
+
+    impl Coverage {
+        #[allow(dead_code)]
+        pub const SIZE: usize = 2;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            Coverage { data }
+        }
+
+        #[inline(always)]
+        pub fn coverage(&self) -> u8 {
+            self.data[0]
+        }
+
+        #[inline(always)]
+        pub fn format(&self) -> u8 {
+            self.data[1]
+        }
+    }
+
+    impl FromData for Coverage {
+        const SIZE: usize = Coverage::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct KerningRecord {
+        data: [u8; 6],
+    }
+
+    impl KerningRecord {
+        #[allow(dead_code)]
+        pub const SIZE: usize = 6;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Self {
+            let mut data = [0u8; Self::SIZE];
+            data.clone_from_slice(input);
+            KerningRecord { data }
+        }
+
+        #[inline(always)]
+        pub fn pair(&self) -> u32 {
+            u32::from_be_bytes([self.data[0], self.data[1], self.data[2], self.data[3]])
+        }
+
+        #[inline(always)]
+        pub fn value(&self) -> i16 {
+            i16::from_be_bytes([self.data[4], self.data[5]])
+        }
+    }
+
+    impl FromData for KerningRecord {
+        const SIZE: usize = KerningRecord::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Self {
+            Self::new(data)
+        }
+    }
+}
+
 pub mod gdef {
     use crate::parser::FromData;
     use crate::GlyphId;

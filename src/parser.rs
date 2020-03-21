@@ -538,11 +538,7 @@ impl<'a> Stream<'a> {
 
     #[inline]
     pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> Option<T> {
-        if offset + T::SIZE <= data.len() {
-            Some(T::parse(data))
-        } else {
-            None
-        }
+        Stream::new_at(data, offset).and_then(|mut s| s.read())
     }
 
     #[inline]
@@ -566,37 +562,6 @@ impl<'a> Stream<'a> {
 }
 
 
-/// A "safe" stream.
-///
-/// Unlike `Stream`, `SafeStream` doesn't perform bounds checking on each read.
-/// It leverages the type system, so we can sort of guarantee that
-/// we do not read past the bounds.
-///
-/// For example, if we are iterating a `LazyArray` we already checked it's size
-/// and we can't read past the bounds, so we can remove useless checks.
-///
-/// It's still not 100% guarantee, but it makes code easier to read and a bit faster.
-/// And we still backed by the Rust's bounds checking.
-#[derive(Clone, Copy, Default)]
-pub struct SafeStream<'a> {
-    data: &'a [u8],
-}
-
-impl<'a> SafeStream<'a> {
-    #[inline]
-    pub fn new(data: &'a [u8]) -> Self {
-        SafeStream { data }
-    }
-
-    #[inline]
-    pub fn read<T: FromData>(&mut self) -> T {
-        let old_data = self.data;
-        self.data = self.data.get(T::SIZE..self.data.len()).unwrap_or_default();
-        T::parse(old_data)
-    }
-}
-
-
 pub trait Offset {
     fn to_usize(&self) -> usize;
     fn is_null(&self) -> bool { self.to_usize() == 0 }
@@ -616,7 +581,7 @@ impl Offset for Offset16 {
 impl FromData for Offset16 {
     #[inline]
     fn parse(data: &[u8]) -> Self {
-        Offset16(SafeStream::new(data).read())
+        Offset16(u16::parse(data))
     }
 }
 
@@ -644,7 +609,7 @@ impl Offset for Offset32 {
 impl FromData for Offset32 {
     #[inline]
     fn parse(data: &[u8]) -> Self {
-        Offset32(SafeStream::new(data).read())
+        Offset32(u32::parse(data))
     }
 }
 

@@ -96,8 +96,8 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     }
 
     // Jump to Top DICT. It's not necessarily right after the header.
-    if header_size > s.offset() as u8 {
-        s.advance(usize::from(header_size) - s.offset());
+    if header_size > 5 {
+        s.advance(usize::from(header_size) - 5);
     }
 
     let top_dict_data = s.read_bytes(usize::from(top_dict_length))?;
@@ -109,19 +109,19 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     metadata.global_subrs = parse_index(&mut s)?;
 
     metadata.char_strings = {
-        let mut s = Stream::new_at(data, top_dict.char_strings_offset);
+        let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
         parse_index(&mut s)?
     };
 
     if let Some(offset) = top_dict.variation_store_offset {
-        let mut s = Stream::new_at(data, offset);
+        let mut s = Stream::new_at(data, offset)?;
         s.skip::<u16>(); // length
         metadata.item_variation_store = ItemVariationStore::parse(s)?;
     }
 
     // TODO: simplify
     if let Some(offset) = top_dict.font_dict_index_offset {
-        let mut s = Stream::new_at(data, offset);
+        let mut s = Stream::new_at(data, offset)?;
         'outer: for font_dict_data in parse_index(&mut s)? {
             if let Some(private_dict_range) = parse_font_dict(font_dict_data) {
                 // 'Private DICT size and offset, from start of the CFF2 table.'
@@ -1067,7 +1067,9 @@ impl<'a> DictionaryParser<'a> {
 
     #[inline(never)]
     fn parse_next(&mut self) -> Option<Operator> {
-        let mut s = Stream::new_at(self.data, self.offset);
+        let mut s = Stream::new(self.data.get(self.offset..)?);
+        let left = s.left();
+
         self.operands_offset = self.offset;
         while !s.at_end() {
             let b: u8 = s.read()?;
@@ -1081,7 +1083,7 @@ impl<'a> DictionaryParser<'a> {
                     operator = 1200 + u16::from(s.read::<u8>()?);
                 }
 
-                self.offset = s.offset();
+                self.offset += left - s.left();
                 return Some(Operator(operator));
             } else {
                 skip_number(b, &mut s)?;
@@ -1102,7 +1104,7 @@ impl<'a> DictionaryParser<'a> {
     /// We still have to "skip" operands during operators search (see `skip_number()`),
     /// but it's still faster that a naive method.
     fn parse_operands(&mut self) -> Option<()> {
-        let mut s = Stream::new_at(self.data, self.operands_offset);
+        let mut s = Stream::new(self.data.get(self.operands_offset..)?);
         self.operands_len = 0;
         while !s.at_end() {
             let b: u8 = s.read()?;

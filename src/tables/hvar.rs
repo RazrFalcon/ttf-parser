@@ -24,7 +24,7 @@ impl<'a> Table<'a> {
         }
 
         let variation_store_offset: Offset32 = s.read()?;
-        let var_store_s = Stream::new_at(data, variation_store_offset.to_usize());
+        let var_store_s = Stream::new_at(data, variation_store_offset.to_usize())?;
         let variation_store = ItemVariationStore::parse(var_store_s)?;
 
         Some(Table {

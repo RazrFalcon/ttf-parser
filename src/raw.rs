@@ -21,9 +21,12 @@ impl<'a> TTCHeader<'a> {
 
     #[inline(always)]
     pub fn ttc_tag(&self) -> Tag {
-        use core::convert::TryInto;
-        // Unwrap is safe, because an array and a slice have the same size.
-        Tag::from_bytes(&self.data[0..4].try_into().unwrap())
+        Tag(u32::from_be_bytes([
+            self.data[0],
+            self.data[1],
+            self.data[2],
+            self.data[3],
+        ]))
     }
 
     #[inline(always)]
@@ -50,9 +53,12 @@ impl TableRecord {
 
     #[inline(always)]
     pub fn table_tag(&self) -> Tag {
-        use core::convert::TryInto;
-        // Unwrap is safe, because an array and a slice have the same size.
-        Tag::from_bytes(&self.data[0..4].try_into().unwrap())
+        Tag(u32::from_be_bytes([
+            self.data[0],
+            self.data[1],
+            self.data[2],
+            self.data[3],
+        ]))
     }
 
     #[inline(always)]
@@ -411,7 +417,7 @@ pub mod cmap {
 
         #[inline(always)]
         pub fn start_unicode_value(&self) -> u32 {
-            (self.data[0] as u32) << 16 | (self.data[1] as u32) << 8 | self.data[2] as u32
+            u32::from_be_bytes([0, self.data[0], self.data[1], self.data[2]])
         }
 
         #[inline(always)]
@@ -447,7 +453,7 @@ pub mod cmap {
 
         #[inline(always)]
         pub fn unicode_value(&self) -> u32 {
-            (self.data[0] as u32) << 16 | (self.data[1] as u32) << 8 | self.data[2] as u32
+            u32::from_be_bytes([0, self.data[0], self.data[1], self.data[2]])
         }
 
         #[inline(always)]
@@ -483,7 +489,7 @@ pub mod cmap {
 
         #[inline(always)]
         pub fn var_selector(&self) -> u32 {
-            (self.data[0] as u32) << 16 | (self.data[1] as u32) << 8 | self.data[2] as u32
+            u32::from_be_bytes([0, self.data[0], self.data[1], self.data[2]])
         }
 
         #[inline(always)]
@@ -803,9 +809,12 @@ pub mod fvar {
 
         #[inline(always)]
         pub fn axis_tag(&self) -> Tag {
-            use core::convert::TryInto;
-            // Unwrap is safe, because an array and a slice have the same size.
-            Tag::from_bytes(&self.data[0..4].try_into().unwrap())
+            Tag(u32::from_be_bytes([
+                self.data[0],
+                self.data[1],
+                self.data[2],
+                self.data[3],
+            ]))
         }
 
         #[inline(always)]
@@ -910,9 +919,12 @@ pub mod mvar {
 
         #[inline(always)]
         pub fn value_tag(&self) -> Tag {
-            use core::convert::TryInto;
-            // Unwrap is safe, because an array and a slice have the same size.
-            Tag::from_bytes(&self.data[0..4].try_into().unwrap())
+            Tag(u32::from_be_bytes([
+                self.data[0],
+                self.data[1],
+                self.data[2],
+                self.data[3],
+            ]))
         }
 
         #[inline(always)]

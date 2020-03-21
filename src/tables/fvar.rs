@@ -63,7 +63,7 @@ impl<'a> Table<'a> {
         // any variation-specific tables or data is ignored.'
         let axis_count = NonZeroU16::new(axis_count)?;
 
-        let mut s = Stream::new_at(data, axes_array_offset.to_usize());
+        let mut s = Stream::new_at(data, axes_array_offset.to_usize())?;
         let axes = s.read_array16(axis_count.get())?;
 
         Some(Table { axes })

@@ -256,12 +256,14 @@ impl Tag {
 }
 
 impl core::fmt::Debug for Tag {
+    #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "Tag({})", self)
     }
 }
 
 impl core::fmt::Display for Tag {
+    #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let b = self.to_chars();
         write!(

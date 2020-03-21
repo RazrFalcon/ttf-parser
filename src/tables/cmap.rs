@@ -181,7 +181,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
     let sub_headers_count = sub_header_keys.into_iter().map(|n| n / 8).max()? + 1;
 
     // Remember sub_headers offset before reading. Will be used later.
-    let sub_headers_offset = s.offset();
+    let sub_headers_offset = data.len() - s.left();
     let sub_headers = s.read_array16::<raw::SubHeaderRecord>(sub_headers_count)?;
 
     let i = if code_point < 0xff {
@@ -244,7 +244,7 @@ fn parse_segment_mapping_to_delta_values(data: &[u8], code_point: u32) -> Option
     s.skip::<u16>(); // reservedPad
     let start_codes = s.read_array16::<u16>(seg_count)?;
     let id_deltas = s.read_array16::<i16>(seg_count)?;
-    let id_range_offset_pos = s.offset();
+    let id_range_offset_pos = data.len() - s.left();
     let id_range_offsets = s.read_array16::<u16>(seg_count)?;
 
     // A custom binary search.

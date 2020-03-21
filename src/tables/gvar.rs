@@ -50,7 +50,7 @@ impl<'a> Table<'a> {
         let axis_count = NonZeroU16::new(axis_count)?;
 
         let shared_tuple_records = {
-            let mut sub_s = Stream::new_at(data, shared_tuples_offset.to_usize());
+            let mut sub_s = Stream::new_at(data, shared_tuples_offset.to_usize())?;
             sub_s.read_array16(shared_tuple_count.checked_mul(axis_count.get())?)?
         };
 
@@ -165,7 +165,7 @@ fn outline_var_impl<'a>(
         // Simple glyph.
 
         let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
-        let mut glyph_points = glyf::parse_simple_outline(s.tail()?, number_of_contours)?;
+        let mut glyph_points = glyf::parse_simple_outline(s.tail(), number_of_contours)?;
         let all_glyph_points = glyph_points.clone();
         let points_len = glyph_points.points_left;
         gvar_table.parse_variation_data(glyph_id, coordinates, points_len, &mut tuples)?;
@@ -187,7 +187,7 @@ fn outline_var_impl<'a>(
         // Details:
         // https://docs.microsoft.com/en-us/typography/opentype/spec/gvar#point-numbers-and-processing-for-composite-glyphs
 
-        let mut components = glyf::CompositeGlyphIter::new(s.tail()?);
+        let mut components = glyf::CompositeGlyphIter::new(s.tail());
         let components_count = components.clone().count() as u16;
         gvar_table.parse_variation_data(glyph_id, coordinates, components_count, &mut tuples)?;
 
@@ -257,7 +257,7 @@ fn parse_variation_data<'a>(
     // Each tuple has it's own chunk in the serialized data.
     // Because of that, we are using two parsing streams: one for tuples and one for serialized data.
     // So we can parse them in parallel and avoid needless allocations.
-    let mut serialized_stream = Stream::new_at(data, data_offset.to_usize());
+    let mut serialized_stream = Stream::new_at(data, data_offset.to_usize())?;
 
     // All tuples in the variation data can reference the same point numbers,
     // which are defined at the start of the serialized data.
@@ -423,6 +423,8 @@ fn parse_variation_tuples<'a>(
 ) -> Option<()> {
     debug_assert!(core::mem::size_of::<VariationTuple>() <= 80);
 
+    let left = serialized_s.left();
+
     // `TupleVariationHeader` has a variable size, so we cannot use a `LazyArray`.
     for _ in 0..count {
         let header = parse_tuple_variation_header(coordinates, shared_tuple_records, &mut main_s)?;
@@ -432,7 +434,7 @@ fn parse_variation_tuples<'a>(
             continue;
         }
 
-        let serialized_data_start = serialized_s.offset();
+        let serialized_data_start = left - serialized_s.left();
 
         // Resolve point numbers source.
         let point_numbers = if header.has_private_point_numbers {
@@ -457,7 +459,7 @@ fn parse_variation_tuples<'a>(
         let deltas = {
             // Use `checked_sub` in case we went over the `serialized_data_len`.
             let left = usize::from(header.serialized_data_len)
-                .checked_sub(serialized_s.offset() - serialized_data_start)?;
+                .checked_sub((left - serialized_s.left()) - serialized_data_start)?;
             let deltas_data = serialized_s.read_bytes(left)?;
             PackedDeltasIter::new(header.scalar, deltas_count, deltas_data)
         };
@@ -608,6 +610,8 @@ mod packed_points {
 
     impl<'a> PackedPointsIter<'a> {
         pub fn new<'b>(s: &'b mut Stream<'a>) -> Option<Option<Self>> {
+            let left = s.left();
+
             // The total amount of points can be set as one or two bytes
             // depending on the first bit.
             let b1: u8 = s.read()?;
@@ -622,8 +626,8 @@ mod packed_points {
                 return Some(None);
             }
 
-            let start = s.offset();
-            let tail = s.tail()?;
+            let start = left - s.left();
+            let tail = s.tail();
 
             // The actual packed points data size is not stored,
             // so we have to parse the points first to advance the provided stream.
@@ -650,7 +654,7 @@ mod packed_points {
 
             // Check that points data size is smaller than the storage type
             // used by the iterator.
-            let data_len = s.offset() - start;
+            let data_len = (left - s.left()) - start;
             if data_len > usize::from(core::u16::MAX) {
                 return None;
             }
@@ -685,7 +689,7 @@ mod packed_points {
 
                 self.next()
             } else {
-                let mut s = Stream::new_at(self.data, usize::from(self.offset));
+                let mut s = Stream::new_at(self.data, usize::from(self.offset))?;
                 let point = if self.state == State::LongPoint {
                     self.offset += 2;
                     s.read::<u16>()?
@@ -836,7 +840,7 @@ mod packed_deltas {
                     return None;
                 }
 
-                let control = Control(data[usize::from(self.data_offset)]);
+                let control = Control(Stream::read_at(data, usize::from(self.data_offset))?);
                 self.data_offset += 1;
 
                 self.run_deltas_left = control.run_count();
@@ -850,7 +854,7 @@ mod packed_deltas {
 
                 self.next(data, scalar)
             } else {
-                let mut s = Stream::new_at(data, usize::from(self.data_offset));
+                let mut s = Stream::new_at(data, usize::from(self.data_offset))?;
                 let delta = if self.state == State::LongDelta {
                     self.data_offset += 2;
                     f32::from(s.read::<i16>()?) * scalar

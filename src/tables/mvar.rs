@@ -34,7 +34,7 @@ impl<'a> Table<'a> {
 
         let var_store_offset = s.read::<Option<Offset16>>()??.to_usize();
         let records = s.read_array16::<raw::ValueRecord>(count)?;
-        let variation_store = ItemVariationStore::parse(Stream::new_at(data, var_store_offset))?;
+        let variation_store = ItemVariationStore::parse(Stream::new_at(data, var_store_offset)?)?;
 
         Some(Table {
             variation_store,

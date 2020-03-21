@@ -28,8 +28,9 @@ impl<'a> Default for ItemVariationStore<'a> {
 }
 
 impl<'a> ItemVariationStore<'a> {
+    #[inline]
     pub fn parse(mut s: Stream) -> Option<ItemVariationStore> {
-        let data = s.tail()?;
+        let data = s.tail();
 
         let mut regions_s = s.clone();
         let format: u16 = s.read()?;
@@ -60,7 +61,7 @@ impl<'a> ItemVariationStore<'a> {
         // Offsets in bytes from the start of the item variation store
         // to each item variation data subtable.
         let offset = self.data_offsets.get(index)?;
-        let mut s = Stream::new_at(self.data, usize::num_from(offset));
+        let mut s = Stream::new_at(self.data, usize::num_from(offset))?;
         s.skip::<u16>(); // item_count
         s.skip::<u16>(); // short_delta_count
         let count: u16 = s.read()?;
@@ -74,7 +75,7 @@ impl<'a> ItemVariationStore<'a> {
         coordinates: &[NormalizedCoord],
     ) -> Option<f32> {
         let offset = self.data_offsets.get(outer_index)?;
-        let mut s = Stream::new_at(self.data, usize::num_from(offset));
+        let mut s = Stream::new_at(self.data, usize::num_from(offset))?;
         let item_count: u16 = s.read()?;
         let short_delta_count: u16 = s.read()?;
         let region_index_count: u16 = s.read()?;
@@ -113,6 +114,7 @@ pub struct VariationRegionList<'a> {
 }
 
 impl<'a> VariationRegionList<'a> {
+    #[inline]
     pub(crate) fn evaluate_region(
         &self,
         index: u16,
@@ -138,6 +140,7 @@ impl<'a> VariationRegionList<'a> {
 }
 
 impl raw::RegionAxisCoordinatesRecord {
+    #[inline]
     pub fn evaluate_axis(&self, coord: i16) -> f32 {
         let start = self.start_coord();
         let peak = self.peak_coord();

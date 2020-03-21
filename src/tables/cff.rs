@@ -162,8 +162,8 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     }
 
     // Jump to Name INDEX. It's not necessarily right after the header.
-    if header_size > s.offset() as u8 {
-        s.advance(usize::from(header_size) - s.offset());
+    if header_size > 4 {
+        s.advance(usize::from(header_size) - 4);
     }
 
     // Skip Name INDEX.
@@ -204,7 +204,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
 
     // TODO: check that index is not default
     metadata.char_strings = {
-        let mut s = Stream::new_at(data, char_strings_offset);
+        let mut s = Stream::new_at(data, char_strings_offset)?;
         parse_index(&mut s)?
     };
 
@@ -1314,7 +1314,9 @@ impl<'a> DictionaryParser<'a> {
 
     #[inline(never)]
     fn parse_next(&mut self) -> Option<Operator> {
-        let mut s = Stream::new_at(self.data, self.offset);
+        let mut s = Stream::new_at(self.data, self.offset)?;
+        let left = s.left();
+
         self.operands_offset = self.offset;
         while !s.at_end() {
             let b: u8 = s.read()?;
@@ -1329,7 +1331,7 @@ impl<'a> DictionaryParser<'a> {
                     operator = 1200 + u16::from(s.read::<u8>()?);
                 }
 
-                self.offset = s.offset();
+                self.offset += left - s.left();
                 return Some(Operator(operator));
             } else {
                 skip_number(b, &mut s)?;
@@ -1350,7 +1352,7 @@ impl<'a> DictionaryParser<'a> {
     /// We still have to "skip" operands during operators search (see `skip_number()`),
     /// but it's still faster that a naive method.
     fn parse_operands(&mut self) -> Option<()> {
-        let mut s = Stream::new_at(self.data, self.operands_offset);
+        let mut s = Stream::new_at(self.data, self.operands_offset)?;
         self.operands_len = 0;
         while !s.at_end() {
             let b: u8 = s.read()?;

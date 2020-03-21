@@ -85,8 +85,9 @@ class TtfUInt24(TtfType):
         return 3
 
     def print(self, offset: int) -> None:
-        print(f'(self.data[{offset}] as u32) << 16 | (self.data[{offset + 1}] as u32) << 8 '
-              f'| self.data[{offset + 2}] as u32')
+        print(f'u32::from_be_bytes(['
+              f'    0, self.data[{offset}], self.data[{offset + 1}], self.data[{offset + 2}]'
+              f'])')
 
 
 class TtfUInt32(TtfType):
@@ -191,9 +192,9 @@ class TtfTag(TtfType):
         return 4
 
     def print(self, offset: int) -> None:
-        print('use core::convert::TryInto;')
-        print('// Unwrap is safe, because an array and a slice have the same size.')
-        print(f'Tag::from_bytes(&self.data[{offset}..{offset + self.size()}].try_into().unwrap())')
+        print(f'Tag(u32::from_be_bytes(['
+              f'    self.data[{offset}], self.data[{offset + 1}], self.data[{offset + 2}], self.data[{offset + 3}]'
+              f']))')
 
 
 class TtfFixed(TtfType):

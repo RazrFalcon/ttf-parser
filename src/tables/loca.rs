@@ -61,10 +61,10 @@ impl<'a> Table<'a> {
         let range = match self {
             Table::Short(ref array) => {
                 // 'The actual local offset divided by 2 is stored.'
-                usize::from(array.at(glyph_id)) * 2 .. usize::from(array.at(glyph_id + 1)) * 2
+                usize::from(array.get(glyph_id)?) * 2 .. usize::from(array.get(glyph_id + 1)?) * 2
             }
             Table::Long(ref array) => {
-                usize::num_from(array.at(glyph_id)) .. usize::num_from(array.at(glyph_id + 1))
+                usize::num_from(array.get(glyph_id)?) .. usize::num_from(array.get(glyph_id + 1)?)
             }
         };
 

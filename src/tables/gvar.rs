@@ -524,14 +524,14 @@ fn parse_tuple_variation_header(
     let mut scalar = 1.0;
     for i in 0..axis_count {
         let v = coordinates[usize::from(i)].get();
-        let peak = peak_tuple.at(i).0;
+        let peak = peak_tuple.get(i)?.0;
         if peak == 0 || v == peak {
             continue;
         }
 
         if has_intermediate_region {
-            let start = start_tuple.at(i).0;
-            let end = end_tuple.at(i).0;
+            let start = start_tuple.get(i)?.0;
+            let end = end_tuple.get(i)?.0;
             if start > peak || peak > end || (start < 0 && end > 0 && peak != 0) {
                 continue;
             }
@@ -585,7 +585,7 @@ mod packed_points {
 
     impl FromData for Control {
         #[inline]
-        fn parse(data: &[u8]) -> Self { Control(data[0]) }
+        fn parse(data: &[u8]) -> Option<Self> { data.get(0).copied().map(Control) }
     }
 
 

@@ -352,7 +352,7 @@ impl<'a> EndpointsIter<'a> {
     fn next(&mut self) -> bool {
         if self.left == 0 {
             if let Some(end) = self.endpoints.get(self.index) {
-                let prev = self.endpoints.at(self.index - 1);
+                let prev = self.endpoints.get(self.index - 1).unwrap_or(0);
                 // Malformed font can have endpoints not in increasing order,
                 // so we have to use checked_sub.
                 self.left = end.checked_sub(prev).unwrap_or(0);

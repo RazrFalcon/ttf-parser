@@ -531,11 +531,9 @@ def print_struct_size(size: int) -> None:
 def print_constructor(name: str, size: int, owned: bool) -> None:
     print('#[inline(always)]')
     if owned:
-        print('pub fn new(input: &[u8]) -> Self {')
-        print('    let mut data = [0u8; Self::SIZE];')
-        # Do not use `copy_from_slice`, because it's slower.
-        print('    data.clone_from_slice(input);')
-        print(f'    {name} {{ data }}')
+        print('pub fn new(input: &[u8]) -> Option<Self> {')
+        print('    use core::convert::TryInto;')
+        print(f'    input.try_into().ok().map(|data| {name} {{ data }})')
         print('}')
     else:
         print('pub fn new(input: &\'a [u8]) -> Self {')
@@ -572,7 +570,7 @@ def print_impl_from_data(name: str) -> None:
     print(f'    const SIZE: usize = {name}::SIZE;')
     print()
     print('    #[inline]')
-    print('    fn parse(data: &[u8]) -> Self {')
+    print('    fn parse(data: &[u8]) -> Option<Self> {')
     print('        Self::new(data)')
     print('    }')
     print('}')

@@ -1139,10 +1139,10 @@ impl<'a> VarOffsets<'a> {
         let end = start + self.offset_size.to_usize();
         let data = self.data.get(start..end)?;
         let n: u32 = match self.offset_size {
-            OffsetSize::Size1 => u32::from(u8::parse(data)),
-            OffsetSize::Size2 => u32::from(u16::parse(data)),
-            OffsetSize::Size3 => U24::parse(data).0,
-            OffsetSize::Size4 => u32::parse(data),
+            OffsetSize::Size1 => u32::from(u8::parse(data)?),
+            OffsetSize::Size2 => u32::from(u16::parse(data)?),
+            OffsetSize::Size3 => U24::parse(data)?.0,
+            OffsetSize::Size4 => u32::parse(data)?,
         };
 
         // Offset must be positive.

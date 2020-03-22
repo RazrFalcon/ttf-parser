@@ -45,10 +45,9 @@ impl TableRecord {
     pub const SIZE: usize = 16;
 
     #[inline(always)]
-    pub fn new(input: &[u8]) -> Self {
-        let mut data = [0u8; Self::SIZE];
-        data.clone_from_slice(input);
-        TableRecord { data }
+    pub fn new(input: &[u8]) -> Option<Self> {
+        use core::convert::TryInto;
+        input.try_into().ok().map(|data| TableRecord { data })
     }
 
     #[inline(always)]
@@ -81,7 +80,7 @@ impl FromData for TableRecord {
     const SIZE: usize = TableRecord::SIZE;
 
     #[inline]
-    fn parse(data: &[u8]) -> Self {
+    fn parse(data: &[u8]) -> Option<Self> {
         Self::new(data)
     }
 }
@@ -167,10 +166,9 @@ pub mod hmtx {
         pub const SIZE: usize = 4;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            HorizontalMetrics { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| HorizontalMetrics { data })
         }
 
         #[inline(always)]
@@ -188,7 +186,7 @@ pub mod hmtx {
         const SIZE: usize = HorizontalMetrics::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -276,10 +274,9 @@ pub mod cmap {
         pub const SIZE: usize = 8;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            EncodingRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| EncodingRecord { data })
         }
 
         #[inline(always)]
@@ -307,7 +304,7 @@ pub mod cmap {
         const SIZE: usize = EncodingRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -322,10 +319,9 @@ pub mod cmap {
         pub const SIZE: usize = 8;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            SubHeaderRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| SubHeaderRecord { data })
         }
 
         #[inline(always)]
@@ -353,7 +349,7 @@ pub mod cmap {
         const SIZE: usize = SubHeaderRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -368,10 +364,12 @@ pub mod cmap {
         pub const SIZE: usize = 12;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            SequentialMapGroup { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input
+                .try_into()
+                .ok()
+                .map(|data| SequentialMapGroup { data })
         }
 
         #[inline(always)]
@@ -394,7 +392,7 @@ pub mod cmap {
         const SIZE: usize = SequentialMapGroup::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -409,10 +407,12 @@ pub mod cmap {
         pub const SIZE: usize = 4;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            UnicodeRangeRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input
+                .try_into()
+                .ok()
+                .map(|data| UnicodeRangeRecord { data })
         }
 
         #[inline(always)]
@@ -430,7 +430,7 @@ pub mod cmap {
         const SIZE: usize = UnicodeRangeRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -445,10 +445,9 @@ pub mod cmap {
         pub const SIZE: usize = 5;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            UVSMappingRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| UVSMappingRecord { data })
         }
 
         #[inline(always)]
@@ -466,7 +465,7 @@ pub mod cmap {
         const SIZE: usize = UVSMappingRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -481,10 +480,12 @@ pub mod cmap {
         pub const SIZE: usize = 11;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            VariationSelectorRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input
+                .try_into()
+                .ok()
+                .map(|data| VariationSelectorRecord { data })
         }
 
         #[inline(always)]
@@ -517,7 +518,7 @@ pub mod cmap {
         const SIZE: usize = VariationSelectorRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -634,10 +635,9 @@ pub mod name {
         pub const SIZE: usize = 12;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            NameRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| NameRecord { data })
         }
 
         #[inline(always)]
@@ -685,10 +685,9 @@ pub mod kern {
         pub const SIZE: usize = 2;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            Coverage { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| Coverage { data })
         }
 
         #[inline(always)]
@@ -706,7 +705,7 @@ pub mod kern {
         const SIZE: usize = Coverage::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -721,10 +720,9 @@ pub mod kern {
         pub const SIZE: usize = 6;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            KerningRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| KerningRecord { data })
         }
 
         #[inline(always)]
@@ -742,7 +740,7 @@ pub mod kern {
         const SIZE: usize = KerningRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -763,10 +761,9 @@ pub mod gdef {
         pub const SIZE: usize = 6;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            ClassRangeRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| ClassRangeRecord { data })
         }
 
         #[inline(always)]
@@ -785,7 +782,7 @@ pub mod gdef {
         const SIZE: usize = ClassRangeRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -800,10 +797,9 @@ pub mod gdef {
         pub const SIZE: usize = 6;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            RangeRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| RangeRecord { data })
         }
 
         #[inline(always)]
@@ -817,7 +813,7 @@ pub mod gdef {
         const SIZE: usize = RangeRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -836,10 +832,12 @@ pub mod avar {
         pub const SIZE: usize = 4;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            AxisValueMapRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input
+                .try_into()
+                .ok()
+                .map(|data| AxisValueMapRecord { data })
         }
 
         #[inline(always)]
@@ -857,7 +855,7 @@ pub mod avar {
         const SIZE: usize = AxisValueMapRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -877,10 +875,12 @@ pub mod fvar {
         pub const SIZE: usize = 20;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            VariationAxisRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input
+                .try_into()
+                .ok()
+                .map(|data| VariationAxisRecord { data })
         }
 
         #[inline(always)]
@@ -926,7 +926,7 @@ pub mod fvar {
         const SIZE: usize = VariationAxisRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -946,10 +946,12 @@ pub mod vorg {
         pub const SIZE: usize = 4;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            VertOriginYMetrics { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input
+                .try_into()
+                .ok()
+                .map(|data| VertOriginYMetrics { data })
         }
 
         #[inline(always)]
@@ -967,7 +969,7 @@ pub mod vorg {
         const SIZE: usize = VertOriginYMetrics::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -987,10 +989,9 @@ pub mod mvar {
         pub const SIZE: usize = 8;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            ValueRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| ValueRecord { data })
         }
 
         #[inline(always)]
@@ -1018,7 +1019,7 @@ pub mod mvar {
         const SIZE: usize = ValueRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }
@@ -1037,10 +1038,12 @@ pub mod var_store {
         pub const SIZE: usize = 6;
 
         #[inline(always)]
-        pub fn new(input: &[u8]) -> Self {
-            let mut data = [0u8; Self::SIZE];
-            data.clone_from_slice(input);
-            RegionAxisCoordinatesRecord { data }
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input
+                .try_into()
+                .ok()
+                .map(|data| RegionAxisCoordinatesRecord { data })
         }
 
         #[inline(always)]
@@ -1063,7 +1066,7 @@ pub mod var_store {
         const SIZE: usize = RegionAxisCoordinatesRecord::SIZE;
 
         #[inline]
-        fn parse(data: &[u8]) -> Self {
+        fn parse(data: &[u8]) -> Option<Self> {
             Self::new(data)
         }
     }

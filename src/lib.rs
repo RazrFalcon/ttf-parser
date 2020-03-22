@@ -98,8 +98,8 @@ pub struct GlyphId(pub u16);
 
 impl FromData for GlyphId {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
-        GlyphId(u16::parse(data))
+    fn parse(data: &[u8]) -> Option<Self> {
+        u16::parse(data).map(GlyphId)
     }
 }
 
@@ -278,8 +278,8 @@ impl core::fmt::Display for Tag {
 
 impl FromData for Tag {
     #[inline]
-    fn parse(data: &[u8]) -> Self {
-        Tag(u32::parse(data))
+    fn parse(data: &[u8]) -> Option<Self> {
+        u32::parse(data).map(Tag)
     }
 }
 

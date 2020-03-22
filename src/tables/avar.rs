@@ -50,30 +50,30 @@ impl<'a> Table<'a> {
         for coord in coordinates {
             let count: u16 = s.read()?;
             let map = s.read_array16::<raw::AxisValueMapRecord>(count)?;
-            *coord = NormalizedCoord::from(map_value(&map, coord.0));
+            *coord = NormalizedCoord::from(map_value(&map, coord.0)?);
         }
 
         Some(())
     }
 }
 
-fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> i16 {
+fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> Option<i16> {
     // This code is based on harfbuzz implementation.
 
     if map.len() == 0 {
-        return value;
+        return Some(value);
     } else if map.len() == 1 {
-        let record = map.at(0);
-        return value - record.from_coordinate() + record.to_coordinate();
+        let record = map.get(0)?;
+        return Some(value - record.from_coordinate() + record.to_coordinate());
     }
 
-    let record_0 = map.at(0);
+    let record_0 = map.get(0)?;
     if value <= record_0.from_coordinate() {
-        return value - record_0.from_coordinate() + record_0.to_coordinate();
+        return Some(value - record_0.from_coordinate() + record_0.to_coordinate());
     }
 
     let mut i = 1;
-    while i < map.len() && value > map.at(i).from_coordinate() {
+    while i < map.len() && value > map.get(i)?.from_coordinate() {
         i += 1;
     }
 
@@ -81,18 +81,18 @@ fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> i16 {
         i -= 1;
     }
 
-    let record_curr = map.at(i);
+    let record_curr = map.get(i)?;
     let curr_from = record_curr.from_coordinate();
     let curr_to = record_curr.to_coordinate();
     if value >= curr_from {
-        return value - curr_from + curr_to;
+        return Some(value - curr_from + curr_to);
     }
 
-    let record_prev = map.at(i - 1);
+    let record_prev = map.get(i - 1)?;
     let prev_from = record_prev.from_coordinate();
     let prev_to = record_prev.to_coordinate();
     if prev_from == curr_from {
-        return prev_to;
+        return Some(prev_to);
     }
 
     let curr_from = i32::from(curr_from);
@@ -103,5 +103,5 @@ fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> i16 {
     let denom = curr_from - prev_from;
     let k = (curr_to - prev_to) * (i32::from(value) - prev_from) + denom / 2;
     let value = prev_to + k / denom;
-    i16::try_from(value).unwrap_or(0)
+    i16::try_from(value).ok()
 }

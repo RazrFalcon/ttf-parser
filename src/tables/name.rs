@@ -244,7 +244,7 @@ impl<'a> Iterator for Names<'a> {
         let data = self.names.get(start..end)?;
 
         Some(Name {
-            data: raw::NameRecord::new(data),
+            data: raw::NameRecord::new(data)?,
             strings: self.storage,
         })
     }

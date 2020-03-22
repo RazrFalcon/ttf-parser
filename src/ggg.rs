@@ -41,8 +41,8 @@ impl<'a> CoverageTable<'a> {
 pub struct Class(pub u16);
 
 impl FromData for Class {
-    fn parse(data: &[u8]) -> Self {
-        Class(u16::parse(data))
+    fn parse(data: &[u8]) -> Option<Self> {
+        u16::parse(data).map(Class)
     }
 }
 

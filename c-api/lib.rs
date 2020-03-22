@@ -63,11 +63,11 @@ pub struct ttfp_name_record {
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ttfp_glyph_class {
-    TTFP_GLYPH_CLASS_UNKNOWN   = 0,
-    TTFP_GLYPH_CLASS_BASE      = 1,
-    TTFP_GLYPH_CLASS_LIGATURE  = 2,
-    TTFP_GLYPH_CLASS_MARK      = 3,
-    TTFP_GLYPH_CLASS_COMPONENT = 4,
+    Unknown = 0,
+    Base,
+    Ligature,
+    Mark,
+    Component,
 }
 
 fn font_from_ptr(font: *const ttfp_font) -> &'static ttf_parser::Font<'static> {
@@ -572,11 +572,11 @@ pub extern "C" fn ttfp_get_glyph_name(
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_class(font: *const ttfp_font, glyph_id: GlyphId) -> ttfp_glyph_class {
     match font_from_ptr(font).glyph_class(glyph_id) {
-        None => ttfp_glyph_class::TTFP_GLYPH_CLASS_UNKNOWN,
-        Some(ttf_parser::GlyphClass::Base) => ttfp_glyph_class::TTFP_GLYPH_CLASS_BASE,
-        Some(ttf_parser::GlyphClass::Ligature) => ttfp_glyph_class::TTFP_GLYPH_CLASS_LIGATURE,
-        Some(ttf_parser::GlyphClass::Mark) => ttfp_glyph_class::TTFP_GLYPH_CLASS_MARK,
-        Some(ttf_parser::GlyphClass::Component) => ttfp_glyph_class::TTFP_GLYPH_CLASS_COMPONENT,
+        None => ttfp_glyph_class::Unknown,
+        Some(ttf_parser::GlyphClass::Base) => ttfp_glyph_class::Base,
+        Some(ttf_parser::GlyphClass::Ligature) => ttfp_glyph_class::Ligature,
+        Some(ttf_parser::GlyphClass::Mark) => ttfp_glyph_class::Mark,
+        Some(ttf_parser::GlyphClass::Component) => ttfp_glyph_class::Component,
     }
 }
 

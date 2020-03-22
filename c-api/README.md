@@ -28,3 +28,8 @@ env LD_LIBRARY_PATH=./target/debug/ ./test
 - Most of arithmetic operations are checked.
 - Most of numeric casts are checked.
 - Rust panics are catched on the FFI boundary.
+
+## Header generation
+
+The `ttfparser.h` is generated via [cbindgen](https://github.com/eqrion/cbindgen)
+and then manually edited a bit.

@@ -59,8 +59,8 @@ int main() {
     ttfp_font *font = ttfp_create_font(font_data, fsize, 0);
     assert(font);
 
-    assert(ttfp_has_table(font, TTFP_TABLE_HEADER));
-    assert(!ttfp_has_table(font, TTFP_TABLE_VERTICAL_ORIGIN));
+    assert(ttfp_has_table(font, TTFP_TABLE_NAME_HEADER));
+    assert(!ttfp_has_table(font, TTFP_TABLE_NAME_VERTICAL_ORIGIN));
 
     uint16_t a_gid = ttfp_get_glyph_index(font, 0x0041); // A
     assert(a_gid == 2);

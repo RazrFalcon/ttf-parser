@@ -15,9 +15,45 @@
 #define TTFP_PATCH_VERSION 0
 #define TTFP_VERSION "0.5.0"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/**
+ * @brief A table name.
+ */
+typedef enum {
+    TTFP_TABLE_NAME_AXIS_VARIATIONS = 0,
+    TTFP_TABLE_NAME_CHARACTER_TO_GLYPH_INDEX_MAPPING,
+    TTFP_TABLE_NAME_COMPACT_FONT_FORMAT,
+    TTFP_TABLE_NAME_COMPACT_FONT_FORMAT2,
+    TTFP_TABLE_NAME_FONT_VARIATIONS,
+    TTFP_TABLE_NAME_GLYPH_DATA,
+    TTFP_TABLE_NAME_GLYPH_DEFINITION,
+    TTFP_TABLE_NAME_GLYPH_VARIATIONS,
+    TTFP_TABLE_NAME_HEADER,
+    TTFP_TABLE_NAME_HORIZONTAL_HEADER,
+    TTFP_TABLE_NAME_HORIZONTAL_METRICS,
+    TTFP_TABLE_NAME_HORIZONTAL_METRICS_VARIATIONS,
+    TTFP_TABLE_NAME_INDEX_TO_LOCATION,
+    TTFP_TABLE_NAME_KERNING,
+    TTFP_TABLE_NAME_MAXIMUM_PROFILE,
+    TTFP_TABLE_NAME_METRICS_VARIATIONS,
+    TTFP_TABLE_NAME_NAMING,
+    TTFP_TABLE_NAME_POST_SCRIPT,
+    TTFP_TABLE_NAME_VERTICAL_HEADER,
+    TTFP_TABLE_NAME_VERTICAL_METRICS,
+    TTFP_TABLE_NAME_VERTICAL_METRICS_VARIATIONS,
+    TTFP_TABLE_NAME_VERTICAL_ORIGIN,
+    TTFP_TABLE_NAME_WINDOWS_METRICS,
+} ttfp_table_name;
+
+/**
+ * @brief A list of glyph classes.
+ */
+typedef enum {
+    TTFP_GLYPH_CLASS_UNKNOWN = 0,
+    TTFP_GLYPH_CLASS_BASE,
+    TTFP_GLYPH_CLASS_LIGATURE,
+    TTFP_GLYPH_CLASS_MARK,
+    TTFP_GLYPH_CLASS_COMPONENT,
+} ttfp_glyph_class;
 
 /**
  * @brief An opaque pointer to the font structure.
@@ -25,7 +61,61 @@ extern "C" {
 typedef struct ttfp_font ttfp_font;
 
 /**
- * @brief A tag type.
+ * @brief A name record.
+ *
+ * https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
+ */
+typedef struct {
+    uint16_t platform_id;
+    uint16_t encoding_id;
+    uint16_t language_id;
+    uint16_t name_id;
+    uint16_t name_size;
+} ttfp_name_record;
+
+/**
+ * @brief A line metrics.
+ *
+ * Used for underline and strikeout.
+ */
+typedef struct {
+    int16_t position;
+    int16_t thickness;
+} ttfp_line_metrics;
+
+/**
+ * @brief A script metrics used by subscript and superscript.
+ */
+typedef struct {
+    int16_t x_size;
+    int16_t y_size;
+    int16_t x_offset;
+    int16_t y_offset;
+} ttfp_script_metrics;
+
+/**
+ * @brief An outline building interface.
+ */
+typedef struct {
+    void (*move_to)(float x, float y, void *data);
+    void (*line_to)(float x, float y, void *data);
+    void (*quad_to)(float x1, float y1, float x, float y, void *data);
+    void (*curve_to)(float x1, float y1, float x2, float y2, float x, float y, void *data);
+    void (*close_path)(void *data);
+} ttfp_outline_builder;
+
+/**
+ * @brief A rectangle.
+ */
+typedef struct {
+    int16_t x_min;
+    int16_t y_min;
+    int16_t x_max;
+    int16_t y_max;
+} ttfp_rect;
+
+/**
+ * @brief A 4-byte tag.
  */
 typedef uint32_t ttfp_tag;
 
@@ -36,50 +126,9 @@ typedef uint32_t ttfp_tag;
     ((uint32_t)(c4)&0xFF)))
 
 /**
- * @brief A glyph's tight bounding box.
- */
-typedef struct ttfp_rect {
-    int16_t x_min;
-    int16_t y_min;
-    int16_t x_max;
-    int16_t y_max;
-} ttfp_rect;
-
-/**
- * @brief A line metrics.
- */
-typedef struct ttfp_line_metrics {
-    int16_t position;
-    int16_t thickness;
-} ttfp_line_metrics;
-
-/**
- * @brief A script metrics.
- */
-typedef struct ttfp_script_metrics {
-    int16_t x_size;
-    int16_t y_size;
-    int16_t x_offset;
-    int16_t y_offset;
-} ttfp_script_metrics;
-
-/**
- * @brief A name record.
- *
- * https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
- */
-typedef struct ttfp_name_record {
-    uint16_t platform_id;
-    uint16_t encoding_id;
-    uint16_t language_id;
-    uint16_t name_id;
-    uint16_t name_size;
-} ttfp_name_record;
-
-/**
  * @brief A variation axis.
  */
-typedef struct ttfp_variation_axis {
+typedef struct {
     ttfp_tag tag;
     float min_value;
     float def_value;
@@ -88,56 +137,9 @@ typedef struct ttfp_variation_axis {
     bool hidden;
 } ttfp_variation_axis;
 
-/**
- * @brief An outline building interface.
- */
-typedef struct ttfp_outline_builder {
-    void (*move_to)(float x, float y, void *data);
-    void (*line_to)(float x, float y, void *data);
-    void (*quad_to)(float x1, float y1, float x, float y, void *data);
-    void (*curve_to)(float x1, float y1, float x2, float y2, float x, float y, void *data);
-    void (*close_path)(void *data);
-} ttfp_outline_builder;
-
-/**
- * @brief A list of supported tables.
- */
-typedef enum ttfp_table_name {
-    TTFP_TABLE_AXIS_VARIATIONS = 0,
-    TTFP_TABLE_CHARACTER_TO_GLYPH_INDEX_MAPPING,
-    TTFP_TABLE_COMPACT_FONT_FORMAT,
-    TTFP_TABLE_COMPACT_FONT_FORMAT_2,
-    TTFP_TABLE_FONT_VARIATIONS,
-    TTFP_TABLE_GLYPH_DATA,
-    TTFP_TABLE_GLYPH_DEFINITION,
-    TTFP_TABLE_GLYPH_VARIATIONS,
-    TTFP_TABLE_HEADER,
-    TTFP_TABLE_HORIZONTAL_HEADER,
-    TTFP_TABLE_HORIZONTAL_METRICS,
-    TTFP_TABLE_HORIZONTAL_METRICS_VARIATIONS,
-    TTFP_TABLE_INDEX_TO_LOCATION,
-    TTFP_TABLE_KERNING,
-    TTFP_TABLE_MAXIMUM_PROFILE,
-    TTFP_TABLE_METRICS_VARIATIONS,
-    TTFP_TABLE_NAMING,
-    TTFP_TABLE_POST_SCRIPT,
-    TTFP_TABLE_VERTICAL_HEADER,
-    TTFP_TABLE_VERTICAL_METRICS,
-    TTFP_TABLE_VERTICAL_METRICS_VARIATIONS,
-    TTFP_TABLE_VERTICAL_ORIGIN,
-    TTFP_TABLE_WINDOWS_METRICS,
-} ttfp_table_name;
-
-/**
- * @brief A list of glyph classes.
- */
-typedef enum ttfp_glyph_class {
-    TTFP_GLYPH_CLASS_UNKNOWN = 0,
-    TTFP_GLYPH_CLASS_BASE,
-    TTFP_GLYPH_CLASS_LIGATURE,
-    TTFP_GLYPH_CLASS_MARK,
-    TTFP_GLYPH_CLASS_COMPONENT,
-} ttfp_glyph_class;
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
 
 /**
  * @brief Initializes the library log.
@@ -545,7 +547,7 @@ bool ttfp_get_variation_axis_by_tag(const ttfp_font *font, ttfp_tag tag, ttfp_va
 bool ttfp_set_variation(ttfp_font *font, ttfp_tag axis, float value);
 
 #ifdef __cplusplus
-}
-#endif
+} // extern "C"
+#endif // __cplusplus
 
 #endif /* TTFP_H */

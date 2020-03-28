@@ -7,7 +7,6 @@ use ttf_parser::{GlyphId, Tag};
 
 /// @brief An opaque pointer to the font structure.
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub struct ttfp_font {
     _unused: [u8; 0],
 }
@@ -50,7 +49,6 @@ impl ttf_parser::OutlineBuilder for Builder {
 ///
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub struct ttfp_name_record {
     pub platform_id: u16,
     pub encoding_id: u16,
@@ -61,13 +59,39 @@ pub struct ttfp_name_record {
 
 /// @brief A list of glyph classes.
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ttfp_glyph_class {
     Unknown = 0,
     Base,
     Ligature,
     Mark,
     Component,
+}
+
+/// @brief A glyph image format.
+#[repr(C)]
+pub enum ttfp_image_format {
+    PNG = 0,
+    JPEG,
+    TIFF,
+    SVG,
+}
+
+/// @brief A glyph image.
+///
+/// An image offset and size isn't defined in all tables, so `x`, `y`, `width` and `height`
+/// can be set to 0.
+#[repr(C)]
+pub struct ttfp_glyph_image {
+    pub x: i16,
+    pub y: i16,
+    pub width: u16,
+    pub height: u16,
+
+    pub format: ttfp_image_format,
+
+    /// A raw image data as is. It's up to the caller to decode PNG, JPEG, etc.
+    pub data: *const c_char,
+    pub len: u32,
 }
 
 fn font_from_ptr(font: *const ttfp_font) -> &'static ttf_parser::Font<'static> {
@@ -666,6 +690,58 @@ pub extern "C" fn ttfp_get_glyph_bbox(
             None => false,
         }
     }).unwrap_or(false)
+}
+
+/// @brief Returns a reference to a glyph image.
+///
+/// A font can define a glyph using a raster or a vector image instead of a simple outline.
+/// Which is primarily used for emojis. This method should be used to access those images.
+///
+/// `pixels_per_em` allows selecting a preferred image size. While the chosen size will
+/// be closer to an upper one. So when font has 64px and 96px images and `pixels_per_em`
+/// is set to 72, 96px image will be returned.
+/// To get the largest image simply use `SHRT_MAX`.
+/// This property has no effect in case of SVG.
+///
+/// Note that this method will return an encoded image. It should be decoded
+/// (in case of PNG, JPEG, etc.), rendered (in case of SVG) or even decompressed
+/// (in case of SVGZ) by the caller. We don't validate or preprocess it in any way.
+///
+/// Also, a font can contain both: images and outlines. So when this method returns `None`
+/// you should also try `ttfp_outline_glyph()` afterwards.
+///
+/// There are multiple ways an image can be stored in a TrueType font
+/// and we support `sbix`, `CBLC`+`CBDT` and `SVG`.
+#[no_mangle]
+pub extern "C" fn ttfp_get_glyph_image(
+    font: *const ttfp_font,
+    glyph_id: GlyphId,
+    pixels_per_em: u16,
+    glyph_image: *mut ttfp_glyph_image,
+) -> bool {
+    match font_from_ptr(font).glyph_image(glyph_id, pixels_per_em) {
+        Some(image) => {
+            unsafe {
+                *glyph_image = ttfp_glyph_image {
+                    x: image.x.unwrap_or(0),
+                    y: image.y.unwrap_or(0),
+                    width: image.width.unwrap_or(0),
+                    height: image.height.unwrap_or(0),
+                    format: match image.format {
+                        ttf_parser::ImageFormat::PNG => ttfp_image_format::PNG,
+                        ttf_parser::ImageFormat::JPEG => ttfp_image_format::JPEG,
+                        ttf_parser::ImageFormat::TIFF => ttfp_image_format::TIFF,
+                        ttf_parser::ImageFormat::SVG => ttfp_image_format::SVG,
+                    },
+                    data: image.data.as_ptr() as _,
+                    len: image.data.len() as u32,
+                };
+            }
+
+            true
+        }
+        None => false,
+    }
 }
 
 /// @brief Returns the amount of variation axes.

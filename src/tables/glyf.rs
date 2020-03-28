@@ -4,7 +4,7 @@
 
 use core::num::NonZeroU16;
 
-use crate::parser::{Stream, F2DOT14, LazyArray16, NumConv, f32_bound};
+use crate::parser::{Stream, F2DOT14, LazyArray16, NumFrom, f32_bound};
 use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox};
 
 pub(crate) struct Builder<'a> {

@@ -5,7 +5,7 @@ use core::convert::TryFrom;
 use core::ops::Range;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoord};
-use crate::parser::{Stream, Fixed, NumConv, TryNumConv};
+use crate::parser::{Stream, Fixed, NumFrom, TryNumFrom};
 use crate::var_store::*;
 use crate::cff::{
     Builder, DataIndex, IsEven, Operator, ArgumentsStack, CFFError,

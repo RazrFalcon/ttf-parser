@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::io::Write;
 
 use ttf_parser as ttf;
 use svgtypes::WriteBuffer;
@@ -101,6 +102,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     );
     svg.start_element("svg");
     svg.write_attribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
     svg.write_attribute_fmt(
         "viewBox",
         format_args!("{} {} {} {}", 0, 0, cell_size * COLUMNS as f64, cell_size * rows as f64),
@@ -112,16 +114,60 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut row = 0;
     let mut column = 0;
     for id in 0..font.number_of_glyphs() {
-        glyph_to_path(
-            column as f64 * cell_size,
-            row as f64 * cell_size,
-            &font,
-            ttf::GlyphId(id),
-            cell_size,
-            scale,
-            &mut svg,
-            &mut path_buf,
-        );
+        let x = column as f64 * cell_size;
+        let y = row as f64 * cell_size;
+
+        svg.start_element("text");
+        svg.write_attribute("x", &(x + 2.0));
+        svg.write_attribute("y", &(y + cell_size - 4.0));
+        svg.write_attribute("font-size", "36");
+        svg.write_attribute("fill", "gray");
+        svg.write_text_fmt(format_args!("{}", &id));
+        svg.end_element();
+
+        if let Some(img) = font.glyph_image(ttf::GlyphId(id), std::u16::MAX) {
+            // TODO: figure out proper image positioning
+            svg.start_element("image");
+            svg.write_attribute("x", &(x + 2.0 + img.x.unwrap_or(0) as f64));
+            if font.has_table(ttf::TableName::StandardBitmapGraphics) {
+                svg.write_attribute("y", &y);
+            } else if font.has_table(ttf::TableName::ScalableVectorGraphics) {
+                svg.write_attribute("y", &(y + cell_size));
+                svg.write_attribute("width", &cell_size);
+                svg.write_attribute("height", &cell_size);
+            } else {
+                svg.write_attribute("y", &y);
+                svg.write_attribute("width", &img.width.unwrap_or(0));
+                svg.write_attribute("height", &img.height.unwrap_or(0));
+            }
+
+            svg.write_attribute_raw("xlink:href", |buf| {
+                buf.extend_from_slice(b"data:image/");
+                buf.extend_from_slice(match img.format {
+                    ttf::ImageFormat::PNG => b"png",
+                    ttf::ImageFormat::JPEG => b"jpg",
+                    ttf::ImageFormat::TIFF => b"tiff",
+                    ttf::ImageFormat::SVG => b"svg+xml",
+                });
+                buf.extend_from_slice(b";base64, ");
+
+                let mut enc = base64::write::EncoderWriter::new(buf, base64::STANDARD);
+                enc.write_all(img.data).unwrap();
+                enc.finish().unwrap();
+            });
+            svg.end_element();
+        } else {
+            glyph_to_path(
+                x,
+                y,
+                &font,
+                ttf::GlyphId(id),
+                cell_size,
+                scale,
+                &mut svg,
+                &mut path_buf,
+            );
+        }
 
         column += 1;
         if column == COLUMNS {
@@ -183,13 +229,7 @@ fn glyph_to_path(
     svg: &mut xmlwriter::XmlWriter,
     path_buf: &mut svgtypes::Path,
 ) {
-    svg.start_element("text");
-    svg.write_attribute("x", &(x + 2.0));
-    svg.write_attribute("y", &(y + cell_size - 4.0));
-    svg.write_attribute("font-size", "36");
-    svg.write_attribute("fill", "gray");
-    svg.write_text_fmt(format_args!("{}", glyph_id.0));
-    svg.end_element();
+
 
     path_buf.clear();
     let mut builder = Builder(path_buf);

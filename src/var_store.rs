@@ -3,7 +3,7 @@
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store
 
 use crate::NormalizedCoord;
-use crate::parser::{Stream, LazyArray16, NumConv};
+use crate::parser::{Stream, LazyArray16, NumFrom};
 use crate::raw::var_store as raw;
 
 #[derive(Clone, Copy)]

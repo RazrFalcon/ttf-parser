@@ -21,6 +21,7 @@ logging = ["log"]
 log = { version = "0.4.8", optional = true }
 
 [dev-dependencies]
+base64 = "0.12"
 env_logger = { version = "0.7", default-features = false }
 pico-args = "0.3.1"
 svgtypes = "0.5"

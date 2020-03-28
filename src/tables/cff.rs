@@ -7,7 +7,7 @@ use core::convert::TryFrom;
 use core::ops::Range;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox};
-use crate::parser::{Stream, U24, Fixed, FromData, NumConv, TryNumConv};
+use crate::parser::{Stream, U24, Fixed, FromData, NumFrom, TryNumFrom};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: u8 = 48;

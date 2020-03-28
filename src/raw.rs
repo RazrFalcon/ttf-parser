@@ -1071,3 +1071,58 @@ pub mod var_store {
         }
     }
 }
+
+pub mod svg {
+    use crate::parser::{FromData, Offset32};
+    use crate::GlyphId;
+
+    #[derive(Clone, Copy)]
+    pub struct SvgDocumentRecord {
+        data: [u8; 12],
+    }
+
+    impl SvgDocumentRecord {
+        #[allow(dead_code)]
+        pub const SIZE: usize = 12;
+
+        #[inline(always)]
+        pub fn new(input: &[u8]) -> Option<Self> {
+            use core::convert::TryInto;
+            input.try_into().ok().map(|data| SvgDocumentRecord { data })
+        }
+
+        #[inline(always)]
+        pub fn start_glyph_id(&self) -> GlyphId {
+            GlyphId(u16::from_be_bytes([self.data[0], self.data[1]]))
+        }
+
+        #[inline(always)]
+        pub fn end_glyph_id(&self) -> GlyphId {
+            GlyphId(u16::from_be_bytes([self.data[2], self.data[3]]))
+        }
+
+        #[inline(always)]
+        pub fn svg_doc_offset(&self) -> Option<Offset32> {
+            let n = u32::from_be_bytes([self.data[4], self.data[5], self.data[6], self.data[7]]);
+            if n != 0 {
+                Some(Offset32(n))
+            } else {
+                None
+            }
+        }
+
+        #[inline(always)]
+        pub fn svg_doc_length(&self) -> u32 {
+            u32::from_be_bytes([self.data[8], self.data[9], self.data[10], self.data[11]])
+        }
+    }
+
+    impl FromData for SvgDocumentRecord {
+        const SIZE: usize = SvgDocumentRecord::SIZE;
+
+        #[inline]
+        fn parse(data: &[u8]) -> Option<Self> {
+            Self::new(data)
+        }
+    }
+}

@@ -52,9 +52,15 @@ There are roughly three types of TrueType tables:
 | Variable fonts    | ✓                      | ✓                   |                                |
 | Rendering         |                        | ✓                   | ~<sup>2</sup>                  |
 | `avar` table      | ✓                      | ✓                   |                                |
+| `bdat` table      |                        | ✓                   |                                |
+| `bloc` table      |                        | ✓                   |                                |
+| `CBDT` table      | ✓                      | ✓                   |                                |
+| `CBLC` table      | ✓                      | ✓                   |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ✓                              |
 | `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
+| `EBDT` table      |                        | ✓                   |                                |
+| `EBLC` table      |                        | ✓                   |                                |
 | `fvar` table      | ✓                      | ✓                   |                                |
 | `gasp` table      |                        | ✓                   |                                |
 | `GDEF` table      | ~                      |                     |                                |
@@ -72,7 +78,8 @@ There are roughly three types of TrueType tables:
 | `name` table      | ✓                      | ✓                   |                                |
 | `OS/2` table      | ✓                      | ✓                   |                                |
 | `post` table      | ✓                      | ✓                   |                                |
-| `SVG `&nbsp;table |                        |                     | ✓                              |
+| `sbix` table      | ✓                      | ✓                   |                                |
+| `SVG `&nbsp;table | ✓                      |                     | ✓                              |
 | `vhea` table      | ✓                      | ✓                   |                                |
 | `vmtx` table      | ✓                      | ✓                   |                                |
 | `VORG` table      | ✓                      | ✓                   |                                |

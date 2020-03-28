@@ -501,6 +501,14 @@ VARIATION_STORE_REGION_AXIS_COORDINATES_RECORD = [
     TableRow(True,  TtfInt16(), 'endCoord'),    #
 ]
 
+# https://docs.microsoft.com/en-us/typography/opentype/spec/svg#svg-document-list
+SVG_DOC_RECORD = [
+    TableRow(True,  TtfGlyphId(),           'startGlyphID'),
+    TableRow(True,  TtfGlyphId(),           'endGlyphID'),
+    TableRow(True,  TtfOptionalOffset32(),  'svgDocOffset'),
+    TableRow(True,  TtfUInt32(),            'svgDocLength'),
+]
+
 # https://docs.microsoft.com/en-us/typography/opentype/spec/post
 POST_TABLE = [
     TableRow(False, TtfFixed(),     'version'),
@@ -748,5 +756,12 @@ print('use crate::parser::FromData;')
 print()
 generate_table(VARIATION_STORE_REGION_AXIS_COORDINATES_RECORD, 'RegionAxisCoordinatesRecord',
                owned=True, impl_from_data=True)
+print('}')
+print()
+print('pub mod svg {')
+print('use crate::GlyphId;')
+print('use crate::parser::{FromData, Offset32};')
+print()
+generate_table(SVG_DOC_RECORD, 'SvgDocumentRecord', owned=True, impl_from_data=True)
 print('}')
 print()

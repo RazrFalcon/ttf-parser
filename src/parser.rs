@@ -111,14 +111,14 @@ impl FromData for Fixed {
 }
 
 
-pub trait NumConv<T>: Sized {
+pub trait NumFrom<T>: Sized {
     fn num_from(_: T) -> Self;
 }
 
 // Rust doesn't implement `From<u32> for usize`,
 // because it has to support 16 bit targets.
 // We don't, so we can allow this.
-impl NumConv<u32> for usize {
+impl NumFrom<u32> for usize {
     #[inline]
     fn num_from(v: u32) -> Self {
         debug_assert!(core::mem::size_of::<usize>() >= 4);
@@ -128,28 +128,31 @@ impl NumConv<u32> for usize {
 
 
 /// Just like TryFrom<N>, but for numeric types not supported by the Rust's std.
-pub trait TryNumConv<T>: Sized {
+pub trait TryNumFrom<T>: Sized {
     fn try_num_from(_: T) -> Option<Self>;
 }
 
-impl TryNumConv<f32> for i16 {
+impl TryNumFrom<f32> for i16 {
     #[inline]
     fn try_num_from(v: f32) -> Option<Self> {
         i32::try_num_from(v).and_then(|v| i16::try_from(v).ok())
     }
 }
 
-impl TryNumConv<f32> for u16 {
+impl TryNumFrom<f32> for u16 {
     #[inline]
     fn try_num_from(v: f32) -> Option<Self> {
         i32::try_num_from(v).and_then(|v| u16::try_from(v).ok())
     }
 }
 
-impl TryNumConv<f32> for i32 {
+impl TryNumFrom<f32> for i32 {
     #[inline]
     fn try_num_from(v: f32) -> Option<Self> {
         // Based on https://github.com/rust-num/num-traits/blob/master/src/cast.rs
+
+        // Float as int truncates toward zero, so we want to allow values
+        // in the exclusive range `(MIN-1, MAX+1)`.
 
         // We can't represent `MIN-1` exactly, but there's no fractional part
         // at this magnitude, so we can just use a `MIN` inclusive boundary.
@@ -379,6 +382,14 @@ impl<'a, T: FromData> LazyArray32<'a, T> {
     #[inline]
     pub fn len(&self) -> u32 {
         (self.data.len() / T::SIZE) as u32
+    }
+
+    /// Performs a binary search by specified `key`.
+    #[inline]
+    pub fn binary_search(&self, key: &T) -> Option<(u32, T)>
+        where T: Ord
+    {
+        self.binary_search_by(|p| p.cmp(key))
     }
 
     /// Performs a binary search using specified closure.

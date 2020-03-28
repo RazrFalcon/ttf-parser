@@ -83,7 +83,7 @@ mod var_store;
 mod writer;
 
 use tables::*;
-use parser::{Stream, FromData, Offset, NumConv, TryNumConv, i16_bound, f32_bound};
+use parser::{Stream, FromData, Offset, NumFrom, TryNumFrom, i16_bound, f32_bound};
 pub use fvar::{VariationAxes, VariationAxis};
 pub use gdef::GlyphClass;
 pub use ggg::*;
@@ -405,6 +405,49 @@ impl OutlineBuilder for DummyOutline {
 }
 
 
+/// A glyph image format.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum ImageFormat {
+    PNG,
+    JPEG,
+    TIFF,
+    SVG,
+}
+
+
+/// A glyph image.
+///
+/// Note that different tables provide different glyph metrics,
+/// that's why `x`, `y`, `width` and `height` are optional.
+///
+/// Also note, that glyph metrics are in pixels and not in font units.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct GlyphImage<'a> {
+    /// Horizontal offset.
+    pub x: Option<i16>,
+
+    /// Vertical offset.
+    pub y: Option<i16>,
+
+    /// Image width.
+    ///
+    /// It doesn't guarantee that this value is the same as set in the `data`.
+    pub width: Option<u16>,
+
+    /// Image height.
+    ///
+    /// It doesn't guarantee that this value is the same as set in the `data`.
+    pub height: Option<u16>,
+
+    /// An image format.
+    pub format: ImageFormat,
+
+    /// A raw image data as is. It's up to the caller to decode PNG, JPEG, etc.
+    pub data: &'a [u8],
+}
+
+
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum IndexToLocationFormat {
@@ -420,6 +463,8 @@ pub(crate) enum IndexToLocationFormat {
 pub enum TableName {
     AxisVariations = 0,
     CharacterToGlyphIndexMapping,
+    ColorBitmapData,
+    ColorBitmapLocation,
     CompactFontFormat,
     CompactFontFormat2,
     FontVariations,
@@ -436,6 +481,8 @@ pub enum TableName {
     MetricsVariations,
     Naming,
     PostScript,
+    ScalableVectorGraphics,
+    StandardBitmapGraphics,
     VerticalHeader,
     VerticalMetrics,
     VerticalMetricsVariations,
@@ -470,6 +517,8 @@ impl VarCoords {
 #[derive(Clone)]
 pub struct Font<'a> {
     avar: Option<avar::Table<'a>>,
+    cbdt: Option<&'a [u8]>,
+    cblc: Option<&'a [u8]>,
     cff_: Option<cff::Metadata<'a>>,
     cff2: Option<cff2::Metadata<'a>>,
     cmap: Option<cmap::Table<'a>>,
@@ -489,6 +538,8 @@ pub struct Font<'a> {
     post: Option<post::Table<'a>>,
     vhea: Option<raw::vhea::Table<'a>>,
     vmtx: Option<hmtx::Table<'a>>,
+    sbix: Option<&'a [u8]>,
+    svg_: Option<&'a [u8]>,
     vorg: Option<vorg::Table<'a>>,
     vvar: Option<hvar::Table<'a>>,
     number_of_glyphs: NonZeroU16,
@@ -542,6 +593,8 @@ impl<'a> Font<'a> {
         s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
         let tables = s.read_array16::<raw::TableRecord>(num_tables)?;
 
+        let mut cbdt = None;
+        let mut cblc = None;
         let mut cff_ = None;
         let mut cff2 = None;
         let mut gdef = None;
@@ -563,6 +616,8 @@ impl<'a> Font<'a> {
         let mut maxp = None;
         let mut name = None;
         let mut post = None;
+        let mut sbix = None;
+        let mut svg_ = None;
         let mut vhea = None;
         let mut vmtx = None;
         for table in tables {
@@ -573,12 +628,15 @@ impl<'a> Font<'a> {
             // It's way faster to compare `[u8; 4]` with `&[u8]`
             // rather than `&[u8]` with `&[u8]`.
             match &table.table_tag().to_bytes() {
+                b"CBDT" => cbdt = data.get(range),
+                b"CBLC" => cblc = data.get(range),
                 b"CFF " => cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
                 b"CFF2" => cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
                 b"GDEF" => gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
                 b"HVAR" => hvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
                 b"MVAR" => mvar = data.get(range).and_then(|data| mvar::Table::parse(data)),
                 b"OS/2" => os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
+                b"SVG " => svg_ = data.get(range),
                 b"VORG" => vorg = data.get(range).and_then(|data| vorg::Table::parse(data)),
                 b"VVAR" => vvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
                 b"avar" => avar = data.get(range).and_then(|data| avar::Table::parse(data)),
@@ -594,6 +652,7 @@ impl<'a> Font<'a> {
                 b"maxp" => maxp = data.get(range).and_then(|data| maxp::parse(data)),
                 b"name" => name = data.get(range).and_then(|data| name::parse(data)),
                 b"post" => post = data.get(range).and_then(|data| post::Table::parse(data)),
+                b"sbix" => sbix = data.get(range),
                 b"vhea" => vhea = data.get(range).and_then(|data| raw::vhea::Table::parse(data)),
                 b"vmtx" => vmtx = data.get(range),
                 _ => {}
@@ -613,6 +672,8 @@ impl<'a> Font<'a> {
 
         let mut font = Font {
             avar,
+            cbdt,
+            cblc,
             cff_,
             cff2,
             cmap,
@@ -632,6 +693,8 @@ impl<'a> Font<'a> {
             post,
             vhea,
             vmtx: None,
+            sbix,
+            svg_,
             vorg,
             vvar,
             number_of_glyphs,
@@ -676,6 +739,8 @@ impl<'a> Font<'a> {
             TableName::MaximumProfile               => true,
             TableName::AxisVariations               => self.avar.is_some(),
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
+            TableName::ColorBitmapData              => self.cbdt.is_some(),
+            TableName::ColorBitmapLocation          => self.cblc.is_some(),
             TableName::CompactFontFormat            => self.cff_.is_some(),
             TableName::CompactFontFormat2           => self.cff2.is_some(),
             TableName::FontVariations               => self.fvar.is_some(),
@@ -689,6 +754,8 @@ impl<'a> Font<'a> {
             TableName::MetricsVariations            => self.mvar.is_some(),
             TableName::Naming                       => self.name.is_some(),
             TableName::PostScript                   => self.post.is_some(),
+            TableName::ScalableVectorGraphics       => self.svg_.is_some(),
+            TableName::StandardBitmapGraphics       => self.sbix.is_some(),
             TableName::VerticalHeader               => self.vhea.is_some(),
             TableName::VerticalMetrics              => self.vmtx.is_some(),
             TableName::VerticalMetricsVariations    => self.vvar.is_some(),
@@ -1213,6 +1280,10 @@ impl<'a> Font<'a> {
     /// since only the `glyf` table stores a bounding box. In case of CFF and variable fonts
     /// we have to actually outline a glyph to find it's bounding box.
     ///
+    /// When a glyph is defined by a raster or a vector image,
+    /// that can be obtained via `glyph_image()`,
+    /// the bounding box must be calculated manually and this method will return `None`.
+    ///
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Option<Rect> {
@@ -1221,6 +1292,44 @@ impl<'a> Font<'a> {
         }
 
         self.outline_glyph(glyph_id, &mut DummyOutline)
+    }
+
+    /// Returns a reference to a glyph image.
+    ///
+    /// A font can define a glyph using a raster or a vector image instead of a simple outline.
+    /// Which is primarily used for emojis. This method should be used to access those images.
+    ///
+    /// `pixels_per_em` allows selecting a preferred image size. While the chosen size will
+    /// be closer to an upper one. So when font has 64px and 96px images and `pixels_per_em`
+    /// is set to 72, 96px image will be returned.
+    /// To get the largest image simply use `std::u16::MAX`.
+    /// This property has no effect in case of SVG.
+    ///
+    /// Note that this method will return an encoded image. It should be decoded
+    /// (in case of PNG, JPEG, etc.), rendered (in case of SVG) or even decompressed
+    /// (in case of SVGZ) by the caller. We don't validate or preprocess it in any way.
+    ///
+    /// Also, a font can contain both: images and outlines. So when this method returns `None`
+    /// you should also try `outline_glyph()` afterwards.
+    ///
+    /// There are multiple ways an image can be stored in a TrueType font
+    /// and we support `sbix`, `CBLC`+`CBDT` and `SVG`.
+    #[inline]
+    pub fn glyph_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<GlyphImage> {
+        if let Some(sbix_data) = self.sbix {
+            return sbix::parse(sbix_data, self.number_of_glyphs, glyph_id, pixels_per_em, 0);
+        }
+
+        if let (Some(cblc_data), Some(cbdt_data)) = (self.cblc, self.cbdt) {
+            let location = cblc::find_location(cblc_data, glyph_id, pixels_per_em)?;
+            return cbdt::parse(cbdt_data, location);
+        }
+
+        if let Some(svg_data) = self.svg_ {
+            return svg::parse(svg_data, glyph_id);
+        }
+
+        None
     }
 
     /// Returns an iterator over variation axes.

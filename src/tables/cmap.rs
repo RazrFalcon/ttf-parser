@@ -2,7 +2,7 @@
 
 use core::convert::TryFrom;
 
-use crate::parser::{Stream, Offset, LazyArray16, NumConv};
+use crate::parser::{Stream, Offset, LazyArray16, NumFrom};
 use crate::{GlyphId, PlatformId};
 use crate::raw::cmap as raw;
 

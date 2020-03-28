@@ -21,6 +21,8 @@
 typedef enum {
     TTFP_TABLE_NAME_AXIS_VARIATIONS = 0,
     TTFP_TABLE_NAME_CHARACTER_TO_GLYPH_INDEX_MAPPING,
+    TTFP_TABLE_NAME_COLOR_BITMAP_DATA,
+    TTFP_TABLE_NAME_COLOR_BITMAP_LOCATION,
     TTFP_TABLE_NAME_COMPACT_FONT_FORMAT,
     TTFP_TABLE_NAME_COMPACT_FONT_FORMAT2,
     TTFP_TABLE_NAME_FONT_VARIATIONS,
@@ -37,6 +39,8 @@ typedef enum {
     TTFP_TABLE_NAME_METRICS_VARIATIONS,
     TTFP_TABLE_NAME_NAMING,
     TTFP_TABLE_NAME_POST_SCRIPT,
+    TTFP_TABLE_NAME_SCALABLE_VECTOR_GRAPHICS,
+    TTFP_TABLE_NAME_STANDARD_BITMAP_GRAPHICS,
     TTFP_TABLE_NAME_VERTICAL_HEADER,
     TTFP_TABLE_NAME_VERTICAL_METRICS,
     TTFP_TABLE_NAME_VERTICAL_METRICS_VARIATIONS,
@@ -54,6 +58,16 @@ typedef enum {
     TTFP_GLYPH_CLASS_MARK,
     TTFP_GLYPH_CLASS_COMPONENT,
 } ttfp_glyph_class;
+
+/**
+ * @brief A glyph image format.
+ */
+typedef enum {
+    TTFP_IMAGE_FORMAT_PNG = 0,
+    TTFP_IMAGE_FORMAT_JPEG,
+    TTFP_IMAGE_FORMAT_TIFF,
+    TTFP_IMAGE_FORMAT_SVG,
+} ttfp_image_format;
 
 /**
  * @brief An opaque pointer to the font structure.
@@ -115,7 +129,24 @@ typedef struct {
 } ttfp_rect;
 
 /**
- * @brief A 4-byte tag.
+ * @brief A glyph image.
+ *
+ * An image offset and size isn't defined in all tables, so `x`, `y`, `width` and `height`
+ * can be set to 0.
+ */
+typedef struct {
+    int16_t x;
+    int16_t y;
+    uint16_t width;
+    uint16_t height;
+    ttfp_image_format format;
+    /**< A raw image data as is. It's up to the caller to decode PNG, JPEG, etc. */
+    const char *data;
+    uint32_t len;
+} ttfp_glyph_image;
+
+/**
+ * A 4-byte tag.
  */
 typedef uint32_t ttfp_tag;
 
@@ -515,6 +546,33 @@ bool ttfp_outline_glyph(const ttfp_font *font,
  * This function is affected by variation axes.
  */
 bool ttfp_get_glyph_bbox(const ttfp_font *font, uint16_t glyph_id, ttfp_rect *bbox);
+
+/**
+ * @brief Returns a reference to a glyph image.
+ *
+ * A font can define a glyph using a raster or a vector image instead of a simple outline.
+ * Which is primarily used for emojis. This method should be used to access those images.
+ *
+ * `pixels_per_em` allows selecting a preferred image size. While the chosen size will
+ * be closer to an upper one. So when font has 64px and 96px images and `pixels_per_em`
+ * is set to 72, 96px image will be returned.
+ * To get the largest image simply use `SHRT_MAX`.
+ * This property has no effect in case of SVG.
+ *
+ * Note that this method will return an encoded image. It should be decoded
+ * (in case of PNG, JPEG, etc.), rendered (in case of SVG) or even decompressed
+ * (in case of SVGZ) by the caller. We don't validate or preprocess it in any way.
+ *
+ * Also, a font can contain both: images and outlines. So when this method returns `None`
+ * you should also try `ttfp_outline_glyph()` afterwards.
+ *
+ * There are multiple ways an image can be stored in a TrueType font
+ * and we support `sbix`, `CBLC`+`CBDT` and `SVG`.
+ */
+bool ttfp_get_glyph_image(const ttfp_font *font,
+                          uint16_t glyph_id,
+                          uint16_t pixels_per_em,
+                          ttfp_glyph_image *glyph_image);
 
 /**
  * @brief Returns the amount of variation axes.

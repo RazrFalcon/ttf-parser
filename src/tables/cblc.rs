@@ -23,6 +23,7 @@ pub struct Location {
     pub format: BitmapFormat,
     pub offset: usize,
     pub metrics: Metrics,
+    pub ppem: u16,
 }
 
 pub fn find_location(
@@ -96,6 +97,7 @@ pub fn find_location(
         format: image_format,
         offset: image_offset,
         metrics,
+        ppem: size_table.ppem,
     })
 }
 
@@ -104,6 +106,7 @@ pub fn find_location(
 struct BitmapSizeTable {
     subtable_array_offset: Offset32,
     number_of_subtables: u32,
+    ppem: u16,
     // Many fields are omitted.
 }
 
@@ -148,6 +151,7 @@ fn select_bitmap_size_table(
     Some(BitmapSizeTable {
         subtable_array_offset,
         number_of_subtables,
+        ppem: max_ppem,
     })
 }
 

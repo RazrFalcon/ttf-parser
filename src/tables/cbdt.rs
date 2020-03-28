@@ -19,11 +19,12 @@ pub fn parse(
             let data_len: u32 = s.read()?;
             let data = s.read_bytes(usize::num_from(data_len))?;
             Some(GlyphImage {
-                format: ImageFormat::PNG,
                 x: Some(i16::from(bearing_x)),
                 y: Some(i16::from(bearing_y)),
                 width: Some(u16::from(width)),
                 height: Some(u16::from(height)),
+                pixels_per_em: location.ppem,
+                format: ImageFormat::PNG,
                 data,
             })
         }
@@ -39,11 +40,12 @@ pub fn parse(
             let data_len: u32 = s.read()?;
             let data = s.read_bytes(usize::num_from(data_len))?;
             Some(GlyphImage {
-                format: ImageFormat::PNG,
                 x: Some(i16::from(hor_bearing_x)),
                 y: Some(i16::from(hor_bearing_y)),
                 width: Some(u16::from(width)),
                 height: Some(u16::from(height)),
+                pixels_per_em: location.ppem,
+                format: ImageFormat::PNG,
                 data,
             })
         }
@@ -51,11 +53,12 @@ pub fn parse(
             let data_len: u32 = s.read()?;
             let data = s.read_bytes(usize::num_from(data_len))?;
             Some(GlyphImage {
-                format: ImageFormat::PNG,
                 x: Some(i16::from(location.metrics.x)),
                 y: Some(i16::from(location.metrics.y)),
                 width: Some(u16::from(location.metrics.width)),
                 height: Some(u16::from(location.metrics.height)),
+                pixels_per_em: location.ppem,
+                format: ImageFormat::PNG,
                 data,
             })
         }

@@ -23,11 +23,12 @@ pub fn parse(
     let svg_data = s.read_bytes(usize::num_from(record.svg_doc_length()))?;
 
     Some(GlyphImage {
-        format: ImageFormat::SVG,
         x: None,
         y: None,
         width: None,
         height: None,
+        pixels_per_em: 0,
+        format: ImageFormat::SVG,
         data: svg_data,
     })
 }

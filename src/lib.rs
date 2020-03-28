@@ -440,6 +440,9 @@ pub struct GlyphImage<'a> {
     /// It doesn't guarantee that this value is the same as set in the `data`.
     pub height: Option<u16>,
 
+    /// A pixels per em of the selected strike.
+    pub pixels_per_em: u16,
+
     /// An image format.
     pub format: ImageFormat,
 

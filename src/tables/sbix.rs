@@ -36,8 +36,8 @@ pub fn parse(
 
     // Select a best matching strike based on `pixels_per_em`.
     let mut idx = 0;
+    let mut max_ppem = 0;
     {
-        let mut max_ppem = 0;
         for (i, offset) in strikes.into_iter().enumerate() {
             let mut s = Stream::new_at(data, offset.to_usize())?;
             let ppem: u16 = s.read()?;
@@ -69,8 +69,8 @@ pub fn parse(
     let data_len = end.checked_sub(start)?.checked_sub(8)?; // 8 is a Glyph data header size.
 
     let mut s = Stream::new_at(data, offset.to_usize() + start)?;
-    let x_offset: u16 = s.read()?;
-    let y_offset: u16 = s.read()?;
+    let x_offset: i16 = s.read()?;
+    let y_offset: i16 = s.read()?;
     let image_type: Tag = s.read()?;
     let image_data = s.read_bytes(data_len)?;
 
@@ -95,11 +95,12 @@ pub fn parse(
     };
 
     Some(GlyphImage {
-        format,
         x: i16::try_from(x_offset).ok(),
         y: i16::try_from(y_offset).ok(),
         width: None,
         height: None,
+        pixels_per_em: max_ppem,
+        format,
         data: image_data,
     })
 }

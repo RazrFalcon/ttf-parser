@@ -20,7 +20,8 @@ pub fn parse(
             let data = s.read_bytes(usize::num_from(data_len))?;
             Some(GlyphImage {
                 x: Some(i16::from(bearing_x)),
-                y: Some(i16::from(bearing_y)),
+                // `y` in CDBD is a bottom bound, not top one.
+                y: Some(i16::from(bearing_y) - i16::from(height)),
                 width: Some(u16::from(width)),
                 height: Some(u16::from(height)),
                 pixels_per_em: location.ppem,
@@ -41,7 +42,8 @@ pub fn parse(
             let data = s.read_bytes(usize::num_from(data_len))?;
             Some(GlyphImage {
                 x: Some(i16::from(hor_bearing_x)),
-                y: Some(i16::from(hor_bearing_y)),
+                // `y` in CDBD is a bottom bound, not top one.
+                y: Some(i16::from(hor_bearing_y) - i16::from(height)),
                 width: Some(u16::from(width)),
                 height: Some(u16::from(height)),
                 pixels_per_em: location.ppem,
@@ -54,7 +56,8 @@ pub fn parse(
             let data = s.read_bytes(usize::num_from(data_len))?;
             Some(GlyphImage {
                 x: Some(i16::from(location.metrics.x)),
-                y: Some(i16::from(location.metrics.y)),
+                // `y` in CDBD is a bottom bound, not top one.
+                y: Some(i16::from(location.metrics.y) - i16::from(location.metrics.height)),
                 width: Some(u16::from(location.metrics.width)),
                 height: Some(u16::from(location.metrics.height)),
                 pixels_per_em: location.ppem,

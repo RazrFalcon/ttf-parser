@@ -82,15 +82,32 @@ pub enum ttfp_image_format {
 /// can be set to 0.
 #[repr(C)]
 pub struct ttfp_glyph_image {
+    /// Horizontal offset.
     pub x: i16,
+
+    /// Vertical offset.
     pub y: i16,
+
+    /// Image width.
+    ///
+    /// It doesn't guarantee that this value is the same as set in the `data`.
     pub width: u16,
+
+    /// Image height.
+    ///
+    /// It doesn't guarantee that this value is the same as set in the `data`.
     pub height: u16,
 
+    /// A pixels per em of the selected strike.
+    pub pixels_per_em: u16,
+
+    /// An image format.
     pub format: ttfp_image_format,
 
     /// A raw image data as is. It's up to the caller to decode PNG, JPEG, etc.
     pub data: *const c_char,
+
+    /// A raw image data size.
     pub len: u32,
 }
 
@@ -727,6 +744,7 @@ pub extern "C" fn ttfp_get_glyph_image(
                     y: image.y.unwrap_or(0),
                     width: image.width.unwrap_or(0),
                     height: image.height.unwrap_or(0),
+                    pixels_per_em: image.pixels_per_em,
                     format: match image.format {
                         ttf_parser::ImageFormat::PNG => ttfp_image_format::PNG,
                         ttf_parser::ImageFormat::JPEG => ttfp_image_format::JPEG,

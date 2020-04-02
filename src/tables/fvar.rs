@@ -16,7 +16,7 @@ pub struct VariationAxis {
     pub min_value: f32,
     pub def_value: f32,
     pub max_value: f32,
-    /// Axis name in `name` table.
+    /// An axis name in the `name` table.
     pub name_id: u16,
     pub hidden: bool,
 }

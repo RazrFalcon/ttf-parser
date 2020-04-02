@@ -135,13 +135,41 @@ typedef struct {
  * can be set to 0.
  */
 typedef struct {
+    /**
+     * Horizontal offset.
+     */
     int16_t x;
+    /**
+     * Vertical offset.
+     */
     int16_t y;
+    /**
+     * Image width.
+     *
+     * It doesn't guarantee that this value is the same as set in the `data`.
+     */
     uint16_t width;
+    /**
+     * Image height.
+     *
+     * It doesn't guarantee that this value is the same as set in the `data`.
+     */
     uint16_t height;
+    /**
+     * A pixels per em of the selected strike.
+     */
+    uint16_t pixels_per_em;
+    /**
+     * An image format.
+     */
     ttfp_image_format format;
-    /**< A raw image data as is. It's up to the caller to decode PNG, JPEG, etc. */
+    /**
+     * A raw image data as is. It's up to the caller to decode PNG, JPEG, etc.
+     */
     const char *data;
+    /**
+     * A raw image data size.
+     */
     uint32_t len;
 } ttfp_glyph_image;
 
@@ -164,6 +192,7 @@ typedef struct {
     float min_value;
     float def_value;
     float max_value;
+    /**< An axis name in the `name` table. */
     uint16_t name_id;
     bool hidden;
 } ttfp_variation_axis;

@@ -13,7 +13,7 @@ use crate::glyf::{self, Transform};
 /// that represent horizontal and vertical advance widths and side bearings,
 /// and the variation data within the `gvar` table includes data for these phantom points.'
 ///
-/// We don't actually use them for now, but they are required during deltas parsing.
+/// We don't actually use them, but they are required during deltas parsing.
 const PHANTOM_POINTS_LEN: usize = 4;
 
 #[derive(Clone, Copy)]

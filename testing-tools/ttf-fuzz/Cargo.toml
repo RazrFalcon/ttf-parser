@@ -9,7 +9,7 @@ edition = "2018"
 members = ["."]
 
 [dependencies]
-afl = "0.4"
+afl = "0.7"
 ttf-parser = { path = "../.." }
 
 [[bin]]
@@ -17,9 +17,13 @@ name = "fuzz-outline"
 path = "src/fuzz-outline.rs"
 
 [[bin]]
-name = "fuzz-cmap"
-path = "src/fuzz-cmap.rs"
+name = "fuzz-glyph-index"
+path = "src/fuzz-glyph-index.rs"
 
 [[bin]]
 name = "fuzz-name"
 path = "src/fuzz-name.rs"
+
+[[bin]]
+name = "fuzz-variable-outline"
+path = "src/fuzz-variable-outline.rs"

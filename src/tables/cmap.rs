@@ -195,7 +195,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
     let sub_header = sub_headers.get(i)?;
 
     let first_code = sub_header.first_code();
-    let range_end = first_code + sub_header.entry_count();
+    let range_end = first_code.checked_add(sub_header.entry_count())?;
     if low_byte < first_code || low_byte > range_end {
         return None;
     }

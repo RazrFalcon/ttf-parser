@@ -231,7 +231,7 @@ fn parse_variation_data<'a>(
     data: &'a [u8],
     tuples: &mut VariationTuples<'a>,
 ) -> Option<()> {
-    const SHARED_POINT_NUMBERS: u16 = 0x8000;
+    const SHARED_POINT_NUMBERS_FLAG: u16 = 0x8000;
     const COUNT_MASK: u16 = 0x0FFF;
 
     let mut main_stream = Stream::new(data);
@@ -240,7 +240,7 @@ fn parse_variation_data<'a>(
 
     // 'The high 4 bits are flags, and the low 12 bits
     // are the number of tuple variation tables for this glyph.'
-    let has_shared_point_numbers = tuple_variation_count & SHARED_POINT_NUMBERS != 0;
+    let has_shared_point_numbers = tuple_variation_count & SHARED_POINT_NUMBERS_FLAG != 0;
     let tuple_variation_count = tuple_variation_count & COUNT_MASK;
 
     // 'The number of tuple variation tables can be any number between 1 and 4095.'
@@ -483,17 +483,17 @@ fn parse_tuple_variation_header(
     shared_tuple_records: &LazyArray16<F2DOT14>,
     s: &mut Stream,
 ) -> Option<TupleVariationHeaderData> {
-    const EMBEDDED_PEAK_TUPLE: u16 = 0x8000;
-    const INTERMEDIATE_REGION: u16 = 0x4000;
-    const PRIVATE_POINT_NUMBERS: u16 = 0x2000;
+    const EMBEDDED_PEAK_TUPLE_FLAG: u16 = 0x8000;
+    const INTERMEDIATE_REGION_FLAG: u16 = 0x4000;
+    const PRIVATE_POINT_NUMBERS_FLAG: u16 = 0x2000;
     const TUPLE_INDEX_MASK: u16 = 0x0FFF;
 
     let serialized_data_size: u16 = s.read()?;
     let tuple_index: u16 = s.read()?;
 
-    let has_embedded_peak_tuple = tuple_index & EMBEDDED_PEAK_TUPLE != 0;
-    let has_intermediate_region = tuple_index & INTERMEDIATE_REGION != 0;
-    let has_private_point_numbers = tuple_index & PRIVATE_POINT_NUMBERS != 0;
+    let has_embedded_peak_tuple = tuple_index & EMBEDDED_PEAK_TUPLE_FLAG != 0;
+    let has_intermediate_region = tuple_index & INTERMEDIATE_REGION_FLAG != 0;
+    let has_private_point_numbers = tuple_index & PRIVATE_POINT_NUMBERS_FLAG != 0;
     let tuple_index = tuple_index & TUPLE_INDEX_MASK;
 
     let axis_count = coordinates.len() as u16;
@@ -570,11 +570,11 @@ mod packed_points {
     struct Control(u8);
 
     impl Control {
-        const POINTS_ARE_WORDS: u8 = 0x80;
+        const POINTS_ARE_WORDS_FLAG: u8 = 0x80;
         const POINT_RUN_COUNT_MASK: u8 = 0x7F;
 
         #[inline]
-        fn is_points_are_words(&self) -> bool { self.0 & Self::POINTS_ARE_WORDS != 0 }
+        fn is_points_are_words(&self) -> bool { self.0 & Self::POINTS_ARE_WORDS_FLAG != 0 }
 
         // 'Mask for the low 7 bits to provide the number of point values in the run, minus one.'
         // So we have to add 1.
@@ -609,6 +609,8 @@ mod packed_points {
     }
 
     impl<'a> PackedPointsIter<'a> {
+        // The first Option::None indicates a parsing error.
+        // The second Option::None indicates "no points".
         pub fn new<'b>(s: &'b mut Stream<'a>) -> Option<Option<Self>> {
             let left = s.left();
 
@@ -616,7 +618,7 @@ mod packed_points {
             // depending on the first bit.
             let b1: u8 = s.read()?;
             let mut count = u16::from(b1);
-            if b1 & Control::POINTS_ARE_WORDS != 0 {
+            if b1 & Control::POINTS_ARE_WORDS_FLAG != 0 {
                 let b2: u8 = s.read()?;
                 count = (u16::from(b1 & Control::POINT_RUN_COUNT_MASK) << 8) | u16::from(b2);
             }
@@ -757,6 +759,10 @@ mod packed_points {
                 }
             }
 
+            // Iterator will be returning `Some(true)` after "finished".
+            // This is because this iterator will be zipped with the `glyf::GlyphPointsIter`
+            // and the number of glyph points can be larger than the amount of set points.
+            // Anyway, this is a non-issue in a well-formed font.
             Some(true)
         }
     }
@@ -765,6 +771,20 @@ mod packed_points {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        struct NewControl {
+            deltas_are_words: bool,
+            run_count: u8,
+        }
+
+        fn gen_control(control: NewControl) -> u8 {
+            assert!(control.run_count > 0, "run count cannot be zero");
+
+            let mut n = 0;
+            if control.deltas_are_words { n |= 0x80; }
+            n |= (control.run_count - 1) & 0x7F;
+            n
+        }
 
         #[test]
         fn empty() {
@@ -778,7 +798,171 @@ mod packed_points {
             assert!(PackedPointsIter::new(&mut s).unwrap().is_none());
         }
 
-        // TODO: more tests
+        #[test]
+        fn single_point() {
+            let data = vec![
+                1, // total count
+                gen_control(NewControl { deltas_are_words: false, run_count: 1 }),
+                1
+            ];
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn set_0_and_2() {
+            let data = vec![
+                2, // total count
+                gen_control(NewControl { deltas_are_words: false, run_count: 2 }),
+                0, 2
+            ];
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn set_1_and_2() {
+            let data = vec![
+                2, // total count
+                gen_control(NewControl { deltas_are_words: false, run_count: 2 }),
+                1, 1
+            ];
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn set_1_and_3() {
+            let data = vec![
+                2, // total count
+                gen_control(NewControl { deltas_are_words: false, run_count: 2 }),
+                1, 2
+            ];
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn set_2_5_7() {
+            let data = vec![
+                3, // total count
+                gen_control(NewControl { deltas_are_words: false, run_count: 3 }),
+                2, 3, 2
+            ];
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn more_than_127_points() {
+            let mut data = vec![];
+            // total count
+            data.push(Control::POINTS_ARE_WORDS_FLAG);
+            data.push(150);
+
+            data.push(gen_control(NewControl { deltas_are_words: false, run_count: 100 }));
+            for _ in 0..100 {
+                data.push(2);
+            }
+            data.push(gen_control(NewControl { deltas_are_words: false, run_count: 50 }));
+            for _ in 0..50 {
+                data.push(2);
+            }
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), false);
+            for _ in 0..150 {
+                assert_eq!(iter.next().unwrap(), false);
+                assert_eq!(iter.next().unwrap(), true);
+            }
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn long_points() {
+            let data = vec![
+                2, // total count
+                gen_control(NewControl { deltas_are_words: true, run_count: 2 }),
+                0, 2, 0, 3
+            ];
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn multiple_runs() {
+            let data = vec![
+                5, // total count
+                gen_control(NewControl { deltas_are_words: true, run_count: 2 }),
+                0, 2, 0, 3,
+                gen_control(NewControl { deltas_are_words: false, run_count: 3 }),
+                2, 3, 2
+            ];
+
+            let points_iter = PackedPointsIter::new(&mut Stream::new(&data)).unwrap().unwrap();
+            let mut iter = SetPointsIter::new(points_iter);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), false);
+            assert_eq!(iter.next().unwrap(), true);
+            assert_eq!(iter.next().unwrap(), true); // Endlessly true.
+        }
+
+        #[test]
+        fn runs_overflow() {
+            // TrueType allows up to 32767 points.
+            let data = vec![0xFF; 0xFFFF * 2];
+            assert!(PackedPointsIter::new(&mut Stream::new(&data)).is_none());
+        }
     }
 }
 
@@ -792,15 +976,15 @@ mod packed_deltas {
     struct Control(u8);
 
     impl Control {
-        const DELTAS_ARE_ZERO: u8 = 0x80;
-        const DELTAS_ARE_WORDS: u8 = 0x40;
+        const DELTAS_ARE_ZERO_FLAG: u8 = 0x80;
+        const DELTAS_ARE_WORDS_FLAG: u8 = 0x40;
         const DELTA_RUN_COUNT_MASK: u8 = 0x3F;
 
         #[inline]
-        fn is_deltas_are_zero(&self) -> bool { self.0 & Self::DELTAS_ARE_ZERO != 0 }
+        fn is_deltas_are_zero(&self) -> bool { self.0 & Self::DELTAS_ARE_ZERO_FLAG != 0 }
 
         #[inline]
-        fn is_deltas_are_words(&self) -> bool { self.0 & Self::DELTAS_ARE_WORDS != 0 }
+        fn is_deltas_are_words(&self) -> bool { self.0 & Self::DELTAS_ARE_WORDS_FLAG != 0 }
 
         // 'Mask for the low 6 bits to provide the number of delta values in the run, minus one.'
         // So we have to add 1.
@@ -894,25 +1078,26 @@ mod packed_deltas {
     }
 
     impl<'a> PackedDeltasIter<'a> {
-        pub fn new(scalar: f32, total_count: u16, data: &'a [u8]) -> Self {
+        /// `count` indicates a number of delta pairs.
+        pub fn new(scalar: f32, count: u16, data: &'a [u8]) -> Self {
             debug_assert!(core::mem::size_of::<PackedDeltasIter>() <= 32);
 
             let mut iter = PackedDeltasIter {
                 data,
-                total_count,
+                total_count: count,
                 scalar,
                 ..PackedDeltasIter::default()
             };
 
             // 'The packed deltas are arranged with all of the deltas for X coordinates first,
             // followed by the deltas for Y coordinates.'
-            // So we have to skip Y deltas which are actually X deltas.
+            // So we have to skip X deltas in the Y deltas iterator.
             //
             // Note that Y deltas doesn't necessarily start with a Control byte
             // and can actually start in the middle of the X run.
-            // So we cannot simply split the input data in half
+            // So we can't simply split the input data in half
             // and process those chunks separately.
-            for _ in 0..total_count {
+            for _ in 0..count {
                 iter.y_run.next(data, scalar);
             }
 
@@ -932,7 +1117,279 @@ mod packed_deltas {
         }
     }
 
-    // TODO: test is_deltas_are_zero on the last control
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        struct NewControl {
+            deltas_are_zero: bool,
+            deltas_are_words: bool,
+            run_count: u8,
+        }
+
+        fn gen_control(control: NewControl) -> u8 {
+            assert!(control.run_count > 0, "run count cannot be zero");
+
+            let mut n = 0;
+            if control.deltas_are_zero  { n |= 0x80; }
+            if control.deltas_are_words { n |= 0x40; }
+            n |= (control.run_count - 1) & 0x3F;
+            n
+        }
+
+        #[test]
+        fn empty() {
+            let mut iter = PackedDeltasIter::new(1.0, 1, &[]);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn single_delta() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 2 }),
+                2, 3
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert_eq!(iter.next().unwrap(), (2.0, 3.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn two_deltas() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 4 }),
+                2, 3, 4, 5,
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 2, &data);
+            // Remember that X deltas are defined first.
+            assert_eq!(iter.next().unwrap(), (2.0, 4.0));
+            assert_eq!(iter.next().unwrap(), (3.0, 5.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn single_long_delta() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: true, run_count: 2 }),
+                0, 2, 0, 3
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert_eq!(iter.next().unwrap(), (2.0, 3.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn zeros() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: true, deltas_are_words: false, run_count: 4 }),
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 2, &data);
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn zero_words() {
+            // When `deltas_are_zero` is set, `deltas_are_words` should be ignored.
+
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: true, deltas_are_words: true, run_count: 4 }),
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 2, &data);
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn zero_runs() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: true, deltas_are_words: false, run_count: 2 }),
+                gen_control(NewControl { deltas_are_zero: true, deltas_are_words: false, run_count: 4 }),
+                gen_control(NewControl { deltas_are_zero: true, deltas_are_words: false, run_count: 6 }),
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 6, &data);
+            // First run.
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            // Second run.
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            // Third run.
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn delta_after_zeros() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: true, deltas_are_words: false, run_count: 2 }),
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 2 }),
+                2, 3
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 2, &data);
+            assert_eq!(iter.next().unwrap(), (0.0, 2.0));
+            assert_eq!(iter.next().unwrap(), (0.0, 3.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn unexpected_end_of_data_1() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 2 }),
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn unexpected_end_of_data_2() {
+            // Only X is set.
+
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 2 }),
+                1
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn unexpected_end_of_data_3() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: true, run_count: 2 }),
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn unexpected_end_of_data_4() {
+            // X data is too short.
+
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: true, run_count: 2 }),
+                1
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn unexpected_end_of_data_6() {
+            // Only X is set.
+
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: true, run_count: 2 }),
+                0, 1
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn unexpected_end_of_data_7() {
+            // Y data is too short.
+
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: true, run_count: 2 }),
+                0, 1, 0
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn single_run() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 1 }),
+                2, 3
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 1, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn too_many_pairs() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 2 }),
+                2, 3
+            ];
+
+            // We have only one pair, not 10.
+            let mut iter = PackedDeltasIter::new(1.0, 10, &data);
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn invalid_number_of_pairs() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 2 }),
+                2, 3, 4, 5, 6, 7,
+            ];
+
+            // We have 3 pairs, not 4.
+            // We don't actually check this, since it will be very expensive.
+            // And it should not happen in a well-formed font anyway.
+            // So as long as it doesn't panic - we are fine.
+            let mut iter = PackedDeltasIter::new(1.0, 4, &data);
+            assert_eq!(iter.next().unwrap(), (2.0, 7.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn mixed_runs() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 3 }),
+                2, 3, 4,
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: true, run_count: 2 }),
+                0, 5, 0, 6,
+                gen_control(NewControl { deltas_are_zero: true, deltas_are_words: false, run_count: 1 }),
+            ];
+
+            let mut iter = PackedDeltasIter::new(1.0, 3, &data);
+            assert_eq!(iter.next().unwrap(), (2.0, 5.0));
+            assert_eq!(iter.next().unwrap(), (3.0, 6.0));
+            assert_eq!(iter.next().unwrap(), (4.0, 0.0));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn non_default_scalar() {
+            let data = vec![
+                gen_control(NewControl { deltas_are_zero: false, deltas_are_words: false, run_count: 2 }),
+                2, 3
+            ];
+
+            let mut iter = PackedDeltasIter::new(0.5, 1, &data);
+            assert_eq!(iter.next().unwrap(), (1.0, 1.5));
+            assert!(iter.next().is_none());
+        }
+
+        #[test]
+        fn runs_overflow() {
+            let data = vec![0xFF; 0xFFFF];
+            let mut iter = PackedDeltasIter::new(1.0, 0xFFFF, &data);
+            // As long as it doesn't panic - we are fine.
+            assert_eq!(iter.next().unwrap(), (0.0, 0.0));
+        }
+    }
 }
 
 use packed_deltas::PackedDeltasIter;

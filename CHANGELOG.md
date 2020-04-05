@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `sbix`, `CBLC`, `CBDT` and `SVG` tables support.
 - `Font::glyph_image`.
 
+### Fixed
+- (`gvar`) Integer overflow.
+
 ## [0.5.0] - 2020-03-19
 ### Added
 - Variable fonts support.

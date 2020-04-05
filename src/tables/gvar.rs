@@ -1564,7 +1564,8 @@ fn infer_delta(
         //
         // 'Target point delta is derived from the adjacent point deltas
         // using linear interpolation.'
-        let d = f32::from(target_point - prev_point) / f32::from(next_point - prev_point);
+        let d =   f32::from(try_opt_or!(target_point.checked_sub(prev_point), 0.0))
+                / f32::from(try_opt_or!(next_point.checked_sub(prev_point), 0.0));
         (1.0 - d) * prev_delta + d * next_delta
     }
 }

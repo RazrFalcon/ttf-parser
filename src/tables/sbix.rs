@@ -14,7 +14,6 @@ pub fn parse(
     depth: u8,
 ) -> Option<GlyphImage> {
     if depth == 10 {
-        warn!("Recursion detected in the 'sbix' table.");
         return None;
     }
 
@@ -89,7 +88,6 @@ pub fn parse(
             return parse(data, number_of_glyphs, glyph_id, pixels_per_em, depth + 1);
         }
         _ => {
-            warn!("'{}' is an unsupported 'sbix' image format.", image_type);
             return None;
         }
     };

@@ -539,7 +539,6 @@ fn outline_impl(
     builder: &mut Builder,
 ) -> Option<Rect> {
     if depth >= MAX_COMPONENTS {
-        warn!("Recursion detected in the 'glyf' table.");
         return None;
     }
 

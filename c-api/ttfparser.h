@@ -202,17 +202,6 @@ extern "C" {
 #endif // __cplusplus
 
 /**
- * @brief Initializes the library log.
- *
- * Use it if you want to see any warnings.
- *
- * Will do nothing when library is built without the `logging` feature.
- *
- * All warnings will be printed to the `stderr`.
- */
-void ttfp_init_log(void);
-
-/**
  * @brief Returns the number of fonts stored in a TrueType font collection.
  *
  * @param data The font data.

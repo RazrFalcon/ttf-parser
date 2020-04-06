@@ -12,11 +12,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ttf-parser = { path = "../", default-features = false }
-log = { version = "0.4.8", optional = true }
-
-[features]
-default = ["logging"]
-logging = ["ttf-parser/logging", "log"]
 
 [profile.release]
 lto = "fat"

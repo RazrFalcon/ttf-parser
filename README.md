@@ -16,7 +16,7 @@ Can be used as Rust and as C library.
 - A [C API](./c-api).
 - Zero heap allocations.
 - Zero unsafe.
-- Zero required dependencies. Logging is enabled by default.
+- Zero dependencies.
 - `no_std` compatible.
 - Fast. Set the *Performance* section.
 - Stateless. No mutable methods.
@@ -161,8 +161,6 @@ It doesn't mean that it will crash or panic on malformed fonts, only that the
 error handling will boil down to `Option::None`. So you will not get a detailed cause of an error.
 By doing so we can simplify an API quite a lot since otherwise, we will have to use
 `Result<Option<T>, Error>`.
-
-Some methods may print warnings, when the `logging` feature is enabled.
 
 ### License
 

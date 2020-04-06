@@ -119,25 +119,6 @@ fn font_from_mut_ptr(font: *const ttfp_font) -> &'static mut ttf_parser::Font<'s
     unsafe { &mut *(font as *mut ttf_parser::Font) }
 }
 
-/// @brief Initializes the library log.
-///
-/// Use it if you want to see any warnings.
-///
-/// Will do nothing when library is built without the `logging` feature.
-///
-/// All warnings will be printed to the `stderr`.
-#[cfg(feature = "logging")]
-#[no_mangle]
-pub extern "C" fn ttfp_init_log() {
-    if let Ok(()) = log::set_logger(&logging::LOGGER) {
-        log::set_max_level(log::LevelFilter::Warn);
-    }
-}
-
-#[cfg(not(feature = "logging"))]
-#[no_mangle]
-pub extern "C" fn ttfp_init_log() {}
-
 /// @brief Returns the number of fonts stored in a TrueType font collection.
 ///
 /// @param data The font data.
@@ -814,34 +795,6 @@ pub extern "C" fn ttfp_get_variation_axis_by_tag(
 #[no_mangle]
 pub extern "C" fn ttfp_set_variation(font: *mut ttfp_font, axis: Tag, value: f32) -> bool {
     font_from_mut_ptr(font).set_variation(axis, value).is_some()
-}
-
-#[cfg(feature = "logging")]
-mod logging {
-    pub static LOGGER: SimpleLogger = SimpleLogger;
-
-    pub struct SimpleLogger;
-
-    impl log::Log for SimpleLogger {
-        fn enabled(&self, metadata: &log::Metadata) -> bool {
-            metadata.level() <= log::LevelFilter::Warn
-        }
-
-        fn log(&self, record: &log::Record) {
-            if self.enabled(record.metadata()) {
-                let target = if record.target().len() > 0 {
-                    record.target()
-                } else {
-                    record.module_path().unwrap_or_default()
-                };
-
-                // ttf-parser will emit only warnings.
-                eprintln!("Warning: [{}] {}", target, record.args());
-            }
-        }
-
-        fn flush(&self) {}
-    }
 }
 
 #[cfg(test)]

@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TTFP_ENABLE_LOGGING
 #include "ttfparser.h"
 
 void move_to_cb(float x, float y, void *data)
@@ -53,7 +52,6 @@ int main() {
 
     // Test functions.
     // We mainly interested in linking errors.
-    ttfp_init_log();
     assert(ttfp_fonts_in_collection(font_data, fsize) == -1);
 
     ttfp_font *font = ttfp_create_font(font_data, fsize, 0);

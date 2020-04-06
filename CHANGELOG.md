@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `sbix`, `CBLC`, `CBDT` and `SVG` tables support.
 - `Font::glyph_image`.
 
+### Removed
+- Logging support.
+
 ### Fixed
 - (`gvar`) Integer overflow.
 - (`cmap`) Integer overflow during subtable format 2 parsing.

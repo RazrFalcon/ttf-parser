@@ -151,15 +151,7 @@ pub(crate) fn outline(
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
     let data = metadata.char_strings.get(glyph_id.0)?;
-    match parse_char_string(data, metadata, coordinates, builder) {
-        Ok(bbox) => Some(bbox),
-        Err(CFFError::ZeroBBox) => None,
-        #[allow(unused_variables)]
-        Err(e) => {
-            warn!("Glyph {} parsing failed cause {}.", glyph_id.0, e);
-            None
-        }
-    }
+    parse_char_string(data, metadata, coordinates, builder).ok()
 }
 
 #[derive(Clone, Copy, Default)]

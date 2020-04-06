@@ -87,59 +87,6 @@ pub enum CFFError {
     BlendRegionsLimitReached,
 }
 
-#[cfg(feature = "logging")]
-impl core::fmt::Display for CFFError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match *self {
-            CFFError::ReadOutOfBounds => {
-                write!(f, "read out of bounds")
-            }
-            CFFError::ZeroBBox => {
-                write!(f, "zero bbox")
-            }
-            CFFError::InvalidOperator => {
-                write!(f, "an invalid operator occurred")
-            }
-            CFFError::UnsupportedOperator => {
-                write!(f, "an unsupported operator occurred")
-            }
-            CFFError::MissingEndChar => {
-                write!(f, "the 'endchar' operator is missing")
-            }
-            CFFError::DataAfterEndChar => {
-                write!(f, "unused data left after 'endchar' operator")
-            }
-            CFFError::NestingLimitReached => {
-                write!(f, "subroutines nesting limit reached")
-            }
-            CFFError::ArgumentsStackLimitReached => {
-                write!(f, "arguments stack limit reached")
-            }
-            CFFError::InvalidArgumentsStackLength => {
-                write!(f, "an invalid amount of items are in an arguments stack")
-            }
-            CFFError::BboxOverflow => {
-                write!(f, "outline's bounding box is too large")
-            }
-            CFFError::MissingMoveTo => {
-                write!(f, "missing moveto operator")
-            }
-            CFFError::InvalidSubroutineIndex => {
-                write!(f, "an invalid subroutine index")
-            }
-            CFFError::InvalidItemVariationDataIndex => {
-                write!(f, "no ItemVariationData with required index")
-            }
-            CFFError::InvalidNumberOfBlendOperands => {
-                write!(f, "an invalid number of blend operands")
-            }
-            CFFError::BlendRegionsLimitReached => {
-                write!(f, "only up to 64 blend regions are supported")
-            }
-        }
-    }
-}
-
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Metadata<'a> {
@@ -218,15 +165,7 @@ pub fn outline(
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
     let data = metadata.char_strings.get(glyph_id.0)?;
-    match parse_char_string(data, metadata, builder) {
-        Ok(bbox) => Some(bbox),
-        Err(CFFError::ZeroBBox) => None,
-        #[allow(unused_variables)]
-        Err(e) => {
-            warn!("Glyph {} parsing failed cause {}.", glyph_id.0, e);
-            None
-        }
-    }
+    parse_char_string(data, metadata, builder).ok()
 }
 
 fn parse_top_dict(s: &mut Stream) -> Option<(usize, Option<Range<usize>>)> {
@@ -1578,6 +1517,58 @@ mod tests {
 
         fn close(&mut self) {
             write!(&mut self.0, "Z ").unwrap();
+        }
+    }
+
+    impl core::fmt::Display for CFFError {
+        fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+            match *self {
+                CFFError::ReadOutOfBounds => {
+                    write!(f, "read out of bounds")
+                }
+                CFFError::ZeroBBox => {
+                    write!(f, "zero bbox")
+                }
+                CFFError::InvalidOperator => {
+                    write!(f, "an invalid operator occurred")
+                }
+                CFFError::UnsupportedOperator => {
+                    write!(f, "an unsupported operator occurred")
+                }
+                CFFError::MissingEndChar => {
+                    write!(f, "the 'endchar' operator is missing")
+                }
+                CFFError::DataAfterEndChar => {
+                    write!(f, "unused data left after 'endchar' operator")
+                }
+                CFFError::NestingLimitReached => {
+                    write!(f, "subroutines nesting limit reached")
+                }
+                CFFError::ArgumentsStackLimitReached => {
+                    write!(f, "arguments stack limit reached")
+                }
+                CFFError::InvalidArgumentsStackLength => {
+                    write!(f, "an invalid amount of items are in an arguments stack")
+                }
+                CFFError::BboxOverflow => {
+                    write!(f, "outline's bounding box is too large")
+                }
+                CFFError::MissingMoveTo => {
+                    write!(f, "missing moveto operator")
+                }
+                CFFError::InvalidSubroutineIndex => {
+                    write!(f, "an invalid subroutine index")
+                }
+                CFFError::InvalidItemVariationDataIndex => {
+                    write!(f, "no ItemVariationData with required index")
+                }
+                CFFError::InvalidNumberOfBlendOperands => {
+                    write!(f, "an invalid number of blend operands")
+                }
+                CFFError::BlendRegionsLimitReached => {
+                    write!(f, "only up to 64 blend regions are supported")
+                }
+            }
         }
     }
 

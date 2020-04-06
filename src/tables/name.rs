@@ -272,7 +272,6 @@ pub(crate) fn parse(data: &[u8]) -> Option<Names> {
         let names_data = s.read_bytes(raw::NameRecord::SIZE * usize::from(count))?;
         Some(Names::new(names_data, s.tail(), count))
     } else {
-        warn!("{} is an unsupported name table format.", format);
         None
     }
 }

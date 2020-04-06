@@ -20,9 +20,6 @@ struct Args {
 }
 
 fn main() {
-    std::env::set_var("RUST_LOG", "warn");
-    env_logger::init();
-
     let args = match parse_args() {
         Ok(v) => v,
         Err(e) => {

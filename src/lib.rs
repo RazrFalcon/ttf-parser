@@ -7,7 +7,7 @@ A high-level, safe, zero-allocation TrueType font parser.
   Basically, no direct access to font tables.
 - Zero heap allocations.
 - Zero unsafe.
-- Zero required dependencies. Logging is enabled by default.
+- Zero dependencies.
 - `no_std` compatible.
 - Fast.
 - Stateless. All parsing methods are immutable methods.
@@ -30,8 +30,6 @@ It doesn't mean that it will crash or panic on malformed fonts, only that the
 error handling will boil down to `Option::None`. So you will not get a detailed cause of an error.
 By doing so we can simplify an API quite a lot since otherwise, we will have to use
 `Result<Option<T>, Error>`.
-
-Some methods may print warnings, when the `logging` feature is enabled.
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.5.0")]
@@ -59,18 +57,6 @@ macro_rules! try_opt_or {
             None => return $ret,
         }
     };
-}
-
-#[cfg(feature = "logging")]
-macro_rules! warn {
-    ($($arg:tt)+) => (
-        log::log!(log::Level::Warn, $($arg)+);
-    )
-}
-
-#[cfg(not(feature = "logging"))]
-macro_rules! warn {
-    ($($arg:tt)+) => () // do nothing
 }
 
 mod ggg;
@@ -1363,7 +1349,6 @@ impl<'a> Font<'a> {
 
             self.coordinates.data[idx] = a.normalized_value(value);
         } else {
-            warn!("Font doesn't have a '{}' axis.", axis);
             return None;
         }
 

@@ -140,7 +140,6 @@ fn outline_var_impl<'a>(
     builder: &mut glyf::Builder,
 ) -> Option<()> {
     if depth >= glyf::MAX_COMPONENTS {
-        warn!("Recursion detected in the 'glyf' table.");
         return None;
     }
 

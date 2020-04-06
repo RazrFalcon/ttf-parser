@@ -2,7 +2,7 @@
 
 use crate::{LineMetrics, GlyphId};
 use crate::parser::{Stream, LazyArray16};
-use crate::raw;
+use crate::raw::post as raw;
 
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
@@ -270,13 +270,17 @@ const MACINTOSH_NAMES: &[&str] = &[
 
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
-    table: raw::post::Table<'a>,
+    underline: LineMetrics,
     name_indexes: LazyArray16<'a, u16>,
     names: &'a [u8],
 }
 
 impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
+        if data.len() < raw::TABLE_SIZE {
+            return None;
+        }
+
         let version: u32 = Stream::new(data).read()?;
         if !(version == 0x00010000 || version == 0x00020000 ||
             version == 0x00025000 || version == 0x00030000 ||
@@ -285,19 +289,24 @@ impl<'a> Table<'a> {
             return None;
         }
 
+        let underline = LineMetrics {
+            position: Stream::read_at(data, raw::UNDERLINE_POSITION_OFFSET)?,
+            thickness: Stream::read_at(data, raw::UNDERLINE_THICKNESS_OFFSET)?,
+        };
+
         let mut name_indexes = LazyArray16::default();
         let mut names: &[u8] = &[];
 
         // Only version 2.0 of the table has data at the end.
         if version == 0x00020000 {
-            let mut s = Stream::new_at(data, raw::post::Table::SIZE)?;
+            let mut s = Stream::new_at(data, raw::TABLE_SIZE)?;
             let count: u16 = s.read()?;
             name_indexes = s.read_array16(count)?;
             names = s.tail();
         }
 
         Some(Table {
-            table: raw::post::Table::new(data.get(0..raw::post::Table::SIZE)?),
+            underline,
             name_indexes,
             names,
         })
@@ -305,10 +314,7 @@ impl<'a> Table<'a> {
 
     #[inline]
     pub fn underline_metrics(&self) -> LineMetrics {
-        LineMetrics {
-            position: self.table.underline_position(),
-            thickness: self.table.underline_thickness(),
-        }
+        self.underline
     }
 
     #[inline]

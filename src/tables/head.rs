@@ -1,0 +1,39 @@
+// https://docs.microsoft.com/en-us/typography/opentype/spec/head
+
+use crate::parser::Stream;
+use crate::raw::head as raw;
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(crate) enum IndexToLocationFormat {
+    Short,
+    Long,
+}
+
+#[inline]
+pub fn parse(data: &[u8]) -> Option<&[u8]> {
+    if data.len() == raw::TABLE_SIZE {
+        Some(data)
+    } else {
+        None
+    }
+}
+
+#[inline]
+pub fn units_per_em(data: &[u8]) -> Option<u16> {
+    let num: u16 = Stream::read_at(data, raw::UNITS_PER_EM_OFFSET)?;
+    if num >= 16 && num <= 16384 {
+        Some(num)
+    } else {
+        None
+    }
+}
+
+#[inline]
+pub(crate) fn index_to_loc_format(data: &[u8]) -> Option<IndexToLocationFormat> {
+    let format: i16 = Stream::read_at(data, raw::INDEX_TO_LOC_FORMAT_OFFSET)?;
+    match format {
+        0 => Some(IndexToLocationFormat::Short),
+        1 => Some(IndexToLocationFormat::Long),
+        _ => None,
+    }
+}

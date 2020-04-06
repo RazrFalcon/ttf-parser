@@ -142,16 +142,6 @@ impl SelectionFlags {
 pub(crate) struct Table<'a> {
     version: u8,
     data: &'a [u8],
-    pub table: raw::Table<'a>,
-}
-
-impl<'a> core::ops::Deref for Table<'a> {
-    type Target = raw::Table<'a>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.table
-    }
 }
 
 impl<'a> Table<'a> {
@@ -176,18 +166,17 @@ impl<'a> Table<'a> {
         Some(Table {
             version: version as u8,
             data,
-            table: raw::Table::new(&data[0..78]),
         })
     }
 
     #[inline]
     pub fn weight(&self) -> Weight {
-        Weight::from(self.us_weight_class())
+        Weight::from(Stream::read_at(self.data, raw::US_WEIGHT_CLASS_OFFSET).unwrap_or(0))
     }
 
     #[inline]
     pub fn width(&self) -> Width {
-        match self.us_width_class() {
+        match Stream::read_at(self.data, raw::US_WIDTH_CLASS_OFFSET).unwrap_or(0) {
             1 => Width::UltraCondensed,
             2 => Width::ExtraCondensed,
             3 => Width::Condensed,
@@ -247,28 +236,50 @@ impl<'a> Table<'a> {
     #[inline]
     pub fn strikeout_metrics(&self) -> LineMetrics {
         LineMetrics {
-            thickness: self.y_strikeout_size(),
-            position: self.y_strikeout_position(),
+            thickness: Stream::read_at(self.data, raw::Y_STRIKEOUT_SIZE_OFFSET).unwrap_or(0),
+            position: Stream::read_at(self.data, raw::Y_STRIKEOUT_POSITION_OFFSET).unwrap_or(0),
         }
     }
 
     #[inline]
     pub fn subscript_metrics(&self) -> ScriptMetrics {
+        let mut s = Stream::new_at(self.data, raw::Y_SUBSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
         ScriptMetrics {
-            x_size: self.y_subscript_x_size(),
-            y_size: self.y_subscript_y_size(),
-            x_offset: self.y_subscript_x_offset(),
-            y_offset: self.y_subscript_y_offset(),
+            x_size: s.read().unwrap_or(0),
+            y_size: s.read().unwrap_or(0),
+            x_offset: s.read().unwrap_or(0),
+            y_offset: s.read().unwrap_or(0),
         }
     }
 
     #[inline]
     pub fn superscript_metrics(&self) -> ScriptMetrics {
+        let mut s = Stream::new_at(self.data, raw::Y_SUPERSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
         ScriptMetrics {
-            x_size: self.y_superscript_x_size(),
-            y_size: self.y_superscript_y_size(),
-            x_offset: self.y_superscript_x_offset(),
-            y_offset: self.y_superscript_y_offset(),
+            x_size: s.read().unwrap_or(0),
+            y_size: s.read().unwrap_or(0),
+            x_offset: s.read().unwrap_or(0),
+            y_offset: s.read().unwrap_or(0),
         }
+    }
+
+    #[inline]
+    pub fn typo_ascender(&self) -> i16 {
+        Stream::read_at(self.data, raw::S_TYPO_ASCENDER_OFFSET).unwrap_or(0)
+    }
+
+    #[inline]
+    pub fn typo_descender(&self) -> i16 {
+        Stream::read_at(self.data, raw::S_TYPO_DESCENDER_OFFSET).unwrap_or(0)
+    }
+
+    #[inline]
+    pub fn typo_line_gap(&self) -> i16 {
+        Stream::read_at(self.data, raw::S_TYPO_LINE_GAP_OFFSET).unwrap_or(0)
+    }
+
+    #[inline]
+    fn fs_selection(&self) -> u16 {
+        Stream::read_at(self.data, raw::FS_SELECTION_OFFSET).unwrap_or(0)
     }
 }

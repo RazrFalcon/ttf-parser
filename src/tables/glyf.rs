@@ -557,13 +557,13 @@ fn outline_impl(
 
         // u16 casting is safe, since we already checked that the value is positive.
         let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
-        for point in parse_simple_outline(s.tail(), number_of_contours)? {
+        for point in parse_simple_outline(s.tail()?, number_of_contours)? {
             builder.push_point(f32::from(point.x), f32::from(point.y),
                                point.on_curve_point, point.last_point);
         }
     } else if number_of_contours < 0 {
         // Composite glyph.
-        for comp in CompositeGlyphIter::new(s.tail()) {
+        for comp in CompositeGlyphIter::new(s.tail()?) {
             if let Some(range) = loca_table.glyph_range(comp.glyph_id) {
                 if let Some(glyph_data) = glyf_table.get(range) {
                     let transform = Transform::combine(builder.transform, comp.transform);
@@ -600,9 +600,9 @@ pub fn parse_simple_outline(
     let instructions_len: u16 = s.read()?;
     s.advance(usize::from(instructions_len));
 
-    let flags_offset = glyph_data.len() - s.left();
+    let flags_offset = s.offset();
     let (x_coords_len, y_coords_len) = resolve_coords_len(&mut s, points_total)?;
-    let x_coords_offset = glyph_data.len() - s.left();
+    let x_coords_offset = s.offset();
     let y_coords_offset = x_coords_offset + usize::num_from(x_coords_len);
     let y_coords_end = y_coords_offset + usize::num_from(y_coords_len);
 

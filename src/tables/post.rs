@@ -302,7 +302,7 @@ impl<'a> Table<'a> {
             let mut s = Stream::new_at(data, raw::TABLE_SIZE)?;
             let count: u16 = s.read()?;
             name_indexes = s.read_array16(count)?;
-            names = s.tail();
+            names = s.tail()?;
         }
 
         Some(Table {

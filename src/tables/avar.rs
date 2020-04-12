@@ -27,7 +27,7 @@ impl<'a> Table<'a> {
         let axis_count: u16 = s.read()?;
         let axis_count = NonZeroU16::new(axis_count)?;
 
-        let data = s.tail();
+        let data = s.tail()?;
 
         // Sanitize records.
         for _ in 0..axis_count.get() {

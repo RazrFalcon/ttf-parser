@@ -30,7 +30,7 @@ impl<'a> Default for ItemVariationStore<'a> {
 impl<'a> ItemVariationStore<'a> {
     #[inline]
     pub fn parse(mut s: Stream) -> Option<ItemVariationStore> {
-        let data = s.tail();
+        let data = s.tail()?;
 
         let mut regions_s = s.clone();
         let format: u16 = s.read()?;

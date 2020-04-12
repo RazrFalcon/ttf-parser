@@ -476,70 +476,77 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
 #[derive(Clone, Copy, Default)]
 pub struct Stream<'a> {
     data: &'a [u8],
+    offset: usize,
 }
 
 impl<'a> Stream<'a> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
-        Stream { data }
+        Stream { data, offset: 0 }
     }
 
     #[inline]
     pub fn new_at(data: &'a [u8], offset: usize) -> Option<Self> {
-        data.get(offset..).map(Stream::new)
+        if offset <= data.len() {
+            Some(Stream { data, offset })
+        } else {
+            None
+        }
     }
 
     #[inline]
     pub fn at_end(&self) -> bool {
-        self.data.is_empty()
+        self.offset >= self.data.len()
     }
 
     #[inline]
     pub fn jump_to_end(&mut self) {
-        self.data = &[];
+        self.offset = self.data.len();
     }
 
     #[inline]
-    pub fn left(&self) -> usize {
-        self.data.len()
+    pub fn offset(&self) -> usize {
+        self.offset
     }
 
     #[inline]
-    pub fn tail(&self) -> &'a [u8] {
-        self.data
+    pub fn tail(&self) -> Option<&'a [u8]> {
+        self.data.get(self.offset..)
     }
 
     #[inline]
     pub fn skip<T: FromData>(&mut self) {
-        self.advance(T::SIZE)
+        self.advance(T::SIZE);
     }
 
     #[inline]
     pub fn advance(&mut self, len: usize) {
-        self.data = self.data.get(len..self.data.len()).unwrap_or_default();
+        self.offset += len;
     }
 
     #[inline]
     pub fn advance_checked(&mut self, len: usize) -> Option<()> {
-        self.data = self.data.get(len..self.data.len())?;
-        Some(())
+        if self.offset + len <= self.data.len() {
+            self.advance(len);
+            Some(())
+        } else {
+            None
+        }
     }
 
     #[inline]
     pub fn read<T: FromData>(&mut self) -> Option<T> {
-        let v = self.data.get(0..T::SIZE).and_then(T::parse);
-        self.advance(T::SIZE);
-        v
+        self.read_bytes(T::SIZE).and_then(T::parse)
     }
 
     #[inline]
     pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> Option<T> {
-        Stream::new_at(data, offset).and_then(|mut s| s.read())
+        data.get(offset..offset + T::SIZE).and_then(T::parse)
     }
 
     #[inline]
     pub fn read_bytes(&mut self, len: usize) -> Option<&'a [u8]> {
-        let v = self.data.get(0..len)?;
+        let v = self.data.get(self.offset..self.offset + len)?;
         self.advance(len);
         Some(v)
     }

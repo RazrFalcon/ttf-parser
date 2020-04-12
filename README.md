@@ -18,8 +18,8 @@ Can be used as Rust and as C library.
 - Zero unsafe.
 - Zero dependencies.
 - `no_std` compatible.
-- Fast. Set the *Performance* section.
-- Stateless. No mutable methods.
+- Fast. See the *Performance* section.
+- Stateless. No mutable parsing methods.
 - Simple and maintainable code (no magic numbers).
 
 ### Safety

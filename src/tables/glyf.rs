@@ -432,7 +432,7 @@ impl<'a> CoordsIter<'a> {
         // See https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#simple-glyph-description
         // for details about Simple Glyph Flags processing.
 
-        // We've already checked the coords data, so it's safe fallback to 0.
+        // We've already checked the coords data, so it's safe to fallback to 0.
 
         let mut n = 0;
         if is_short {
@@ -441,7 +441,7 @@ impl<'a> CoordsIter<'a> {
                 n = -n;
             }
         } else if !is_same_or_short {
-            n = self.stream.read().unwrap_or(0);
+            n = self.stream.read::<i16>().unwrap_or(0);
         }
 
         self.prev = self.prev.wrapping_add(n);

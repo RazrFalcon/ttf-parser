@@ -576,113 +576,88 @@ impl<'a> Font<'a> {
         s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
         let tables = s.read_array16::<raw::TableRecord>(num_tables)?;
 
-        let mut cbdt = None;
-        let mut cblc = None;
-        let mut cff_ = None;
-        let mut cff2 = None;
-        let mut gdef = None;
-        let mut hvar = None;
-        let mut gvar = None;
-        let mut mvar = None;
-        let mut os_2 = None;
-        let mut vorg = None;
-        let mut vvar = None;
-        let mut avar = None;
-        let mut cmap = None;
-        let mut fvar = None;
-        let mut glyf = None;
-        let mut head = None;
-        let mut hhea = None;
+        let mut font = Font {
+            avar: None,
+            cbdt: None,
+            cblc: None,
+            cff_: None,
+            cff2: None,
+            cmap: None,
+            fvar: None,
+            gdef: None,
+            glyf: None,
+            gvar: None,
+            head: &[],
+            hhea: &[],
+            hmtx: None,
+            hvar: None,
+            kern: None,
+            loca: None,
+            mvar: None,
+            name: None,
+            os_2: None,
+            post: None,
+            vhea: None,
+            vmtx: None,
+            sbix: None,
+            svg_: None,
+            vorg: None,
+            vvar: None,
+            number_of_glyphs: NonZeroU16::new(1).unwrap(), // dummy
+            coordinates: VarCoords::default(),
+        };
+
+        let mut number_of_glyphs = None;
         let mut hmtx = None;
-        let mut kern = None;
-        let mut loca = None;
-        let mut maxp = None;
-        let mut name = None;
-        let mut post = None;
-        let mut sbix = None;
-        let mut svg_ = None;
-        let mut vhea = None;
         let mut vmtx = None;
+        let mut loca = None;
+
         for table in tables {
             let offset = table.offset().to_usize();
             let length = usize::num_from(table.length());
             let range = offset..(offset + length);
 
-            // It's way faster to compare `[u8; 4]` with `&[u8]`
-            // rather than `&[u8]` with `&[u8]`.
             match &table.table_tag().to_bytes() {
-                b"CBDT" => cbdt = data.get(range),
-                b"CBLC" => cblc = data.get(range),
-                b"CFF " => cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
-                b"CFF2" => cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
-                b"GDEF" => gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
-                b"HVAR" => hvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
-                b"MVAR" => mvar = data.get(range).and_then(|data| mvar::Table::parse(data)),
-                b"OS/2" => os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
-                b"SVG " => svg_ = data.get(range),
-                b"VORG" => vorg = data.get(range).and_then(|data| vorg::Table::parse(data)),
-                b"VVAR" => vvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
-                b"avar" => avar = data.get(range).and_then(|data| avar::Table::parse(data)),
-                b"cmap" => cmap = data.get(range).and_then(|data| cmap::Table::parse(data)),
-                b"fvar" => fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
-                b"glyf" => glyf = data.get(range),
-                b"gvar" => gvar = data.get(range).and_then(|data| gvar::Table::parse(data)),
-                b"head" => head = data.get(range).and_then(|data| head::parse(data)),
-                b"hhea" => hhea = data.get(range).and_then(|data| hhea::parse(data)),
+                b"CBDT" => font.cbdt = data.get(range),
+                b"CBLC" => font.cblc = data.get(range),
+                b"CFF " => font.cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
+                b"CFF2" => font.cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
+                b"GDEF" => font.gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
+                b"HVAR" => font.hvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
+                b"MVAR" => font.mvar = data.get(range).and_then(|data| mvar::Table::parse(data)),
+                b"OS/2" => font.os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
+                b"SVG " => font.svg_ = data.get(range),
+                b"VORG" => font.vorg = data.get(range).and_then(|data| vorg::Table::parse(data)),
+                b"VVAR" => font.vvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
+                b"avar" => font.avar = data.get(range).and_then(|data| avar::Table::parse(data)),
+                b"cmap" => font.cmap = data.get(range).and_then(|data| cmap::Table::parse(data)),
+                b"fvar" => font.fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
+                b"glyf" => font.glyf = data.get(range),
+                b"gvar" => font.gvar = data.get(range).and_then(|data| gvar::Table::parse(data)),
+                b"head" => font.head = data.get(range).and_then(|data| head::parse(data))?,
+                b"hhea" => font.hhea = data.get(range).and_then(|data| hhea::parse(data))?,
                 b"hmtx" => hmtx = data.get(range),
-                b"kern" => kern = data.get(range),
+                b"kern" => font.kern = data.get(range),
                 b"loca" => loca = data.get(range),
-                b"maxp" => maxp = data.get(range).and_then(|data| maxp::parse(data)),
-                b"name" => name = data.get(range).and_then(|data| name::parse(data)),
-                b"post" => post = data.get(range).and_then(|data| post::Table::parse(data)),
-                b"sbix" => sbix = data.get(range),
-                b"vhea" => vhea = data.get(range).and_then(|data| vhea::parse(data)),
+                b"maxp" => number_of_glyphs = data.get(range).and_then(|data| maxp::parse(data)),
+                b"name" => font.name = data.get(range).and_then(|data| name::parse(data)),
+                b"post" => font.post = data.get(range).and_then(|data| post::Table::parse(data)),
+                b"sbix" => font.sbix = data.get(range),
+                b"vhea" => font.vhea = data.get(range).and_then(|data| vhea::parse(data)),
                 b"vmtx" => vmtx = data.get(range),
                 _ => {}
             }
         }
 
-        // Check for mandatory tables.
-        let head = head?;
-        let hhea = hhea?;
-        let maxp = maxp?;
-        let number_of_glyphs = maxp.number_of_glyphs;
-
-        let mut coordinates = VarCoords::default();
-        if let Some(ref fvar) = fvar {
-            coordinates.len = fvar.axes().count().min(MAX_VAR_COORDS as usize) as u8;
+        if font.head.is_empty() || font.hhea.is_empty() || number_of_glyphs.is_none() {
+            return None;
         }
 
-        let mut font = Font {
-            avar,
-            cbdt,
-            cblc,
-            cff_,
-            cff2,
-            cmap,
-            fvar,
-            gdef,
-            glyf,
-            gvar,
-            head,
-            hhea,
-            hmtx: None,
-            hvar,
-            kern,
-            loca: None,
-            mvar,
-            name,
-            os_2,
-            post,
-            vhea,
-            vmtx: None,
-            sbix,
-            svg_,
-            vorg,
-            vvar,
-            number_of_glyphs,
-            coordinates,
-        };
+        font.number_of_glyphs = number_of_glyphs?;
+
+        if let Some(ref fvar) = font.fvar {
+            font.coordinates.len = fvar.axes().count().min(MAX_VAR_COORDS as usize) as u8;
+        }
 
         if let Some(data) = hmtx {
             if let Some(number_of_h_metrics) = hhea::number_of_h_metrics(font.hhea) {

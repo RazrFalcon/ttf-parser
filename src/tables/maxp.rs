@@ -4,12 +4,8 @@ use core::num::NonZeroU16;
 
 use crate::parser::Stream;
 
-pub struct Table {
-    pub number_of_glyphs: NonZeroU16,
-}
-
 // We care only about `numGlyphs`.
-pub fn parse(data: &[u8]) -> Option<Table> {
+pub fn parse(data: &[u8]) -> Option<NonZeroU16> {
     let mut s = Stream::new(data);
     let version: u32 = s.read()?;
     if !(version == 0x00005000 || version == 0x00010000) {
@@ -17,6 +13,5 @@ pub fn parse(data: &[u8]) -> Option<Table> {
     }
 
     let n: u16 = s.read()?;
-    let number_of_glyphs = NonZeroU16::new(n)?;
-    Some(Table { number_of_glyphs })
+    NonZeroU16::new(n)
 }

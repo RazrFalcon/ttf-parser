@@ -41,7 +41,6 @@ struct Outliner
 
 TtfParserFont::TtfParserFont()
 {
-    ttfp_init_log();
 }
 
 TtfParserFont::~TtfParserFont()

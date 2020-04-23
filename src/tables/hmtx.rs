@@ -10,6 +10,7 @@ use crate::raw::hmtx as raw;
 pub struct Table<'a> {
     metrics: LazyArray16<'a, raw::HorizontalMetrics>,
     bearings: Option<LazyArray16<'a, i16>>,
+    number_of_metrics: u16, // Sum of long metrics + bearings.
 }
 
 impl<'a> Table<'a> {
@@ -21,11 +22,15 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
         let metrics = s.read_array16(number_of_hmetrics.get())?;
 
+        let mut number_of_metrics = number_of_hmetrics.get();
+
         // 'If the number_of_hmetrics is less than the total number of glyphs,
         // then that array is followed by an array for the left side bearing values
         // of the remaining glyphs.'
-        let bearings = if number_of_hmetrics < number_of_glyphs {
-            s.read_array16(number_of_glyphs.get() - number_of_hmetrics.get())
+        let bearings_count = number_of_glyphs.get().checked_sub(number_of_hmetrics.get());
+        let bearings = if let Some(count) = bearings_count {
+            number_of_metrics += count;
+            s.read_array16(count)
         } else {
             None
         };
@@ -33,11 +38,16 @@ impl<'a> Table<'a> {
         Some(Table {
             metrics,
             bearings,
+            number_of_metrics,
         })
     }
 
     #[inline]
     pub fn advance(&self, glyph_id: GlyphId) -> Option<u16> {
+        if glyph_id.0 >= self.number_of_metrics {
+            return None;
+        }
+
         if let Some(metrics) = self.metrics.get(glyph_id.0) {
             Some(metrics.advance_width())
         } else {
@@ -126,6 +136,35 @@ mod tests {
         let table = Table::parse(&data, nzu16!(2), nzu16!(1)).unwrap();
         assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
         assert_eq!(table.side_bearing(GlyphId(1)), Some(4));
+        assert_eq!(table.side_bearing(GlyphId(2)), None);
+    }
+
+    #[test]
+    fn glyph_out_of_bounds_0() {
+        let data = writer::convert(&[
+            UInt16(1), // advanceWidth[0]
+            Int16(2), // sideBearing[0]
+        ]);
+
+        let table = Table::parse(&data, nzu16!(1), nzu16!(1)).unwrap();
+        assert_eq!(table.advance(GlyphId(0)), Some(1));
+        assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
+        assert_eq!(table.advance(GlyphId(1)), None);
+        assert_eq!(table.side_bearing(GlyphId(1)), None);
+    }
+
+    #[test]
+    fn glyph_out_of_bounds_1() {
+        let data = writer::convert(&[
+            UInt16(1), // advanceWidth[0]
+            Int16(2), // sideBearing[0]
+            Int16(3), // sideBearing[1]
+        ]);
+
+        let table = Table::parse(&data, nzu16!(1), nzu16!(2)).unwrap();
+        assert_eq!(table.advance(GlyphId(1)), Some(1));
+        assert_eq!(table.side_bearing(GlyphId(1)), Some(3));
+        assert_eq!(table.advance(GlyphId(2)), None);
         assert_eq!(table.side_bearing(GlyphId(2)), None);
     }
 }

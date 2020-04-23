@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - (`gvar`) Integer overflow.
 - (`cmap`) Integer overflow during subtable format 2 parsing.
+- Ignore variation offset in `Font::glyph_*_advance` and `Font::glyph_*_side_bearing`
+  when `HVAR`/`VVAR` tables are missing.
+  Previously returned `None` which is incorrect.
 
 ## [0.5.0] - 2020-03-19
 ### Added

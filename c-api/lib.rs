@@ -616,22 +616,6 @@ pub extern "C" fn ttfp_is_mark_glyph(font: *const ttfp_font, glyph_id: GlyphId) 
     font_from_ptr(font).is_mark_glyph(glyph_id, None)
 }
 
-/// @brief Returns a glyphs pair kerning.
-///
-/// Only a horizontal kerning is supported.
-///
-/// @param glyph_id1 First glyph ID.
-/// @param glyph_id1 Second glyph ID.
-/// @return A kerning offset or 0 otherwise.
-#[no_mangle]
-pub extern "C" fn ttfp_get_glyphs_kerning(
-    font: *const ttfp_font,
-    glyph_id1: GlyphId,
-    glyph_id2: GlyphId,
-) -> i16 {
-    font_from_ptr(font).glyphs_kerning(glyph_id1, glyph_id2).unwrap_or(0)
-}
-
 /// @brief Outlines a glyph and returns its tight bounding box.
 ///
 /// **Warning**: since `ttf-parser` is a pull parser,

@@ -70,7 +70,6 @@ int main() {
     assert(ttfp_get_glyph_ver_advance(font, 0x0041) == 0);
     assert(ttfp_get_glyph_ver_side_bearing(font, 0x0041) == 0);
     assert(ttfp_get_glyph_y_origin(font, a_gid) == 0);
-    assert(ttfp_get_glyphs_kerning(font, 2, 3) == 0);
 
     assert(ttfp_get_name_records_count(font) == 20);
     ttfp_name_record record;

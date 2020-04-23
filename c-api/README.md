@@ -1,4 +1,4 @@
-A complete C bindings to the Rust's `ttf-parser` library.
+A mostly complete C bindings to the Rust's `ttf-parser` library.
 
 ## Build
 
@@ -33,3 +33,7 @@ env LD_LIBRARY_PATH=./target/debug/ ./test
 
 The `ttfparser.h` is generated via [cbindgen](https://github.com/eqrion/cbindgen)
 and then manually edited a bit.
+
+## Missing API
+
+- `Font::kerning_subtables`

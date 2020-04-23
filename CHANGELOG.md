@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - `sbix`, `CBLC`, `CBDT` and `SVG` tables support.
 - `Font::glyph_image`.
+- `Font::kerning_subtables` with subtable formats 0..3 support.
 
 ### Removed
-- Logging support.
+- Logging support. We haven't used it anyway.
+- `Font::glyphs_kerning`. Use `Font::kerning_subtables` instead.
 
 ### Fixed
 - (`gvar`) Integer overflow.

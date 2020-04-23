@@ -524,17 +524,6 @@ uint16_t ttfp_get_glyph_mark_attachment_class(const ttfp_font *font, uint16_t gl
 bool ttfp_is_mark_glyph(const ttfp_font *font, uint16_t glyph_id);
 
 /**
- * @brief Returns a glyphs pair kerning.
- *
- * Only a horizontal kerning is supported.
- *
- * @param glyph_id1 First glyph ID.
- * @param glyph_id1 Second glyph ID.
- * @return A kerning offset or 0 otherwise.
- */
-int16_t ttfp_get_glyphs_kerning(const ttfp_font *font, uint16_t glyph_id1, uint16_t glyph_id2);
-
-/**
  * @brief Outlines a glyph and returns its tight bounding box.
  *
  * **Warning**: since `ttf-parser` is a pull parser,

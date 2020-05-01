@@ -136,26 +136,39 @@ pub extern "C" fn ttfp_fonts_in_collection(data: *const c_char, len: usize) -> i
 
 /// @brief Creates a new font parser.
 ///
-/// This is the only heap allocation in the library.
+/// Since #ttfp_font is an opaque pointer, a caller should allocate it manually
+/// using #ttfp_font_size_of.
+/// Deallocation is also handled by a caller.
+/// #ttfp_font doesn't use heap internally, so we can simply `free()` it without
+/// a dedicated `ttfp_font_deinit` function.
 ///
-/// @param data The font data. Must outlive the #ttfp_font.
-/// @param len The size of the font data.
+/// @param data A font binary data. Must outlive the #ttfp_font.
+/// @param len Size of the font data.
 /// @param index The font index in a collection (typically *.ttc). 0 should be used for basic fonts.
-/// @return Font handle or NULL on error.
+/// @param font A pointer to a #ttfp_font object.
+/// @return `true` on success.
 #[no_mangle]
-pub extern "C" fn ttfp_create_font(data: *const c_char, len: usize, index: u32) -> *mut ttfp_font {
+pub extern "C" fn ttfp_font_init(data: *const c_char, len: usize, index: u32, font: *mut c_void) -> bool {
     // This method invokes a lot of parsing, so let's catch any panics just in case.
     std::panic::catch_unwind(|| {
         let data = unsafe { std::slice::from_raw_parts(data as *const _, len) };
-        let font = ttf_parser::Font::from_data(data, index).unwrap();
-        Box::into_raw(Box::new(font)) as *mut _
-    }).unwrap_or(std::ptr::null_mut())
+        let font_rs = ttf_parser::Font::from_data(data, index).unwrap();
+        unsafe {
+            std::ptr::copy(
+                &font_rs as *const ttf_parser::Font as _,
+                font,
+                ttfp_font_size_of(),
+            );
+        }
+
+        true
+    }).unwrap_or(false)
 }
 
-/// @brief Destroys the #ttfp_font.
+/// @brief Returns the size of `ttfp_font`.
 #[no_mangle]
-pub extern "C" fn ttfp_destroy_font(font: *mut ttfp_font) {
-    unsafe { Box::from_raw(font) };
+pub extern "C" fn ttfp_font_size_of() -> usize {
+    std::mem::size_of::<ttf_parser::Font>()
 }
 
 /// @brief Checks that font has a specified table.

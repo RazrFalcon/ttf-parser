@@ -46,7 +46,7 @@ int main() {
     long fsize = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    char *font_data = malloc(fsize + 1);
+    char *font_data = (char*)malloc(fsize + 1);
     fread(font_data, 1, fsize, file);
     fclose(file);
 
@@ -54,8 +54,8 @@ int main() {
     // We mainly interested in linking errors.
     assert(ttfp_fonts_in_collection(font_data, fsize) == -1);
 
-    ttfp_font *font = ttfp_create_font(font_data, fsize, 0);
-    assert(font);
+    ttfp_font *font = (ttfp_font*)alloca(ttfp_font_size_of());
+    assert(ttfp_font_init(font_data, fsize, 0, font));
 
     assert(ttfp_has_table(font, TTFP_TABLE_NAME_HEADER));
     assert(!ttfp_has_table(font, TTFP_TABLE_NAME_VERTICAL_ORIGIN));
@@ -148,7 +148,7 @@ int main() {
     assert(ttfp_get_glyph_name(font, a_gid, glyph_name));
     assert(strcmp(glyph_name, "A") == 0);
 
-    ttfp_destroy_font(font);
+    free(font_data);
 
     return 0;
 }

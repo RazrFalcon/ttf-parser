@@ -3,6 +3,8 @@
 #include <QCoreApplication>
 #include <QPainterPath>
 
+#include <memory>
+
 #include <ttfparser.h>
 
 #include "glyph.h"
@@ -13,7 +15,6 @@ class TtfParserFont
 
 public:
     TtfParserFont();
-    ~TtfParserFont();
 
     void open(const QString &path, const quint32 index = 0);
     bool isOpen() const;
@@ -25,6 +26,9 @@ public:
     void setVariations(const QVector<Variation> &variations);
 
 private:
+    struct FreeCPtr
+    { void operator()(void* x) { free(x); } };
+
     QByteArray m_fontData;
-    ttfp_font *m_font = nullptr;
+    std::unique_ptr<ttfp_font, FreeCPtr> m_font;
 };

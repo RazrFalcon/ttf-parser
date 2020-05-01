@@ -79,7 +79,7 @@ void MainWindow::loadFont(const QString &path)
         m_ftFont.open(path);
 #endif
 
-#ifdef WITH_FREETYPE
+#ifdef WITH_HARFBUZZ
         m_hbFont.open(path);
 #endif
 

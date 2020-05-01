@@ -43,27 +43,20 @@ TtfParserFont::TtfParserFont()
 {
 }
 
-TtfParserFont::~TtfParserFont()
-{
-    if (m_font) {
-        ttfp_destroy_font(m_font);
-    }
-}
-
 void TtfParserFont::open(const QString &path, const quint32 index)
 {
     if (isOpen()) {
-        ttfp_destroy_font(m_font);
-        m_font = nullptr;
+        m_font.reset();
     }
 
     QFile file(path);
     file.open(QFile::ReadOnly);
     m_fontData = file.readAll();
 
-    m_font = ttfp_create_font(m_fontData.constData(), m_fontData.size(), index);
+    m_font.reset((ttfp_font*)malloc(ttfp_font_size_of()));
+    const auto res = ttfp_font_init(m_fontData.constData(), m_fontData.size(), index, m_font.get());
 
-    if (!m_font) {
+    if (!res) {
         throw tr("Failed to open a font.");
     }
 }
@@ -80,9 +73,9 @@ FontInfo TtfParserFont::fontInfo() const
     }
 
     return FontInfo {
-        ttfp_get_ascender(m_font),
-        ttfp_get_height(m_font),
-        ttfp_get_number_of_glyphs(m_font),
+        ttfp_get_ascender(m_font.get()),
+        ttfp_get_height(m_font.get()),
+        ttfp_get_number_of_glyphs(m_font.get()),
     };
 }
 
@@ -103,7 +96,7 @@ Glyph TtfParserFont::outline(const quint16 gid) const
     ttfp_rect rawBbox;
 
     const bool ok = ttfp_outline_glyph(
-        m_font,
+        m_font.get(),
         builder,
         &outliner,
         gid,
@@ -144,9 +137,9 @@ QVector<VariationInfo> TtfParserFont::loadVariations()
 
     QVector<VariationInfo> variations;
 
-    for (uint16_t i = 0; i < ttfp_get_variation_axes_count(m_font); ++i) {
+    for (uint16_t i = 0; i < ttfp_get_variation_axes_count(m_font.get()); ++i) {
         ttfp_variation_axis axis;
-        ttfp_get_variation_axis(m_font, i, &axis);
+        ttfp_get_variation_axis(m_font.get(), i, &axis);
 
         variations.append(VariationInfo {
             Tag(axis.tag).toString(),
@@ -167,6 +160,6 @@ void TtfParserFont::setVariations(const QVector<Variation> &variations)
     }
 
     for (const auto &variation : variations) {
-        ttfp_set_variation(m_font, variation.tag.value, variation.value);
+        ttfp_set_variation(m_font.get(), variation.tag.value, variation.value);
     }
 }

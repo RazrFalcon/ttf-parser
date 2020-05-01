@@ -11,7 +11,7 @@ cargo test
 
 cd c-api
 cargo build
-gcc test.c -o test -L./target/debug/ -lttfparser -Werror
+gcc test.c -o test -L./target/debug/ -lttfparser -Werror -fsanitize=address
 env LD_LIBRARY_PATH=./target/debug/ ./test
 cd ..
 

@@ -10,9 +10,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::glyph_image`.
 - `Font::kerning_subtables` with subtable formats 0..3 support.
 
+### Changed
+- (c-api) The library doesn't allocate `ttfp_font` anymore. All allocations should be
+  handled by the caller from now.
+
 ### Removed
-- Logging support. We haven't used it anyway.
 - `Font::glyphs_kerning`. Use `Font::kerning_subtables` instead.
+- (c-api) `ttfp_create_font` and `ttfp_destroy_font`.
+  Use `ttfp_font_size_of` + `ttfp_font_init` instead.
+  ```c
+  ttfp_font *font = (ttfp_font*)alloca(ttfp_font_size_of());
+  ttfp_font_init(font_data, font_data_size, 0, font);
+  ```
+- Logging support. We haven't used it anyway.
 
 ### Fixed
 - (`gvar`) Integer overflow.

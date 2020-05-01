@@ -214,19 +214,24 @@ int32_t ttfp_fonts_in_collection(const char *data, uintptr_t len);
 /**
  * @brief Creates a new font parser.
  *
- * This is the only heap allocation in the library.
+ * Since #ttfp_font is an opaque pointer, a caller should allocate it manually
+ * using #ttfp_font_size_of.
+ * Deallocation is also handled by a caller.
+ * #ttfp_font doesn't use heap internally, so we can simply `free()` it without
+ * a dedicated `ttfp_font_deinit` function.
  *
- * @param data The font data. Must outlive the #ttfp_font.
- * @param len The size of the font data.
+ * @param data A font binary data. Must outlive the #ttfp_font.
+ * @param len Size of the font data.
  * @param index The font index in a collection (typically *.ttc). 0 should be used for basic fonts.
- * @return Font handle or NULL on error.
+ * @param font A pointer to a #ttfp_font object.
+ * @return `true` on success.
  */
-ttfp_font *ttfp_create_font(const char *data, uintptr_t len, uint32_t index);
+bool ttfp_font_init(const char *data, uintptr_t len, uint32_t index, void *font);
 
 /**
- * @brief Destroys the #ttfp_font.
+ * @brief Returns the size of `ttfp_font`.
  */
-void ttfp_destroy_font(ttfp_font *font);
+uintptr_t ttfp_font_size_of(void);
 
 /**
  * @brief Checks that font has a specified table.

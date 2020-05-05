@@ -17,7 +17,7 @@ Can be used as Rust and as C library.
 - Zero heap allocations.
 - Zero unsafe.
 - Zero dependencies.
-- `no_std` compatible.
+- `no_std`/WASM compatible.
 - Fast. See the *Performance* section.
 - Stateless. No mutable parsing methods.
 - Simple and maintainable code (no magic numbers).

@@ -4,7 +4,7 @@
 
 use core::num::NonZeroU16;
 
-use crate::parser::{Stream, F2DOT14, LazyArray16, NumFrom, f32_bound};
+use crate::parser::{Stream, F2DOT14, LazyArray16, NumFrom};
 use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox};
 
 pub(crate) struct Builder<'a> {
@@ -255,9 +255,7 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
             ts.a = self.stream.read::<F2DOT14>()?.to_f32();
             ts.d = self.stream.read::<F2DOT14>()?.to_f32();
         } else if flags.we_have_a_scale() {
-            // 'If the bit WE_HAVE_A_SCALE is set, the scale value is read in 2.14 format.
-            // The value can be between -2 to almost +2.'
-            ts.a = f32_bound(-2.0, self.stream.read::<F2DOT14>()?.to_f32(), 2.0);
+            ts.a = self.stream.read::<F2DOT14>()?.to_f32();
             ts.d = ts.a;
         }
 

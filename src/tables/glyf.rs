@@ -1,7 +1,5 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf
 
-// This module is a heavily modified version of https://github.com/raphlinus/font-rs
-
 use core::num::NonZeroU16;
 
 use crate::parser::{Stream, F2DOT14, LazyArray16, NumFrom};

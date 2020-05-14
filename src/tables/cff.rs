@@ -1332,12 +1332,11 @@ pub fn is_dict_one_byte_op(b: u8) -> bool {
 pub fn parse_number(b0: u8, s: &mut Stream) -> Option<i32> {
     match b0 {
         28 => {
-            let n = i32::from(s.read::<u16>()?);
+            let n = i32::from(s.read::<i16>()?);
             Some(n)
         }
         29 => {
-            // TODO: how exactly it should be handled?
-            let n = s.read::<u32>().and_then(|n| i32::try_from(n).ok())?;
+            let n = s.read::<i32>()?;
             Some(n)
         }
         30 => {
@@ -2493,4 +2492,14 @@ mod tests {
     // TODO: FLEX
     // TODO: HFLEX1
     // TODO: FLEX1
+
+    #[test]
+    fn parse_dict_number() {
+        assert_eq!(parse_number(0xFA, &mut Stream::new(&[0x7C])).unwrap(), 1000);
+        assert_eq!(parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(), -1000);
+        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(), 10000);
+        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(), -10000);
+        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(), 100000);
+        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(), -100000);
+    }
 }

@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - (`gvar`) Integer overflow.
 - (`cmap`) Integer overflow during subtable format 2 parsing.
+- (`CFF`, `CFF2`) DICT number parsing.
 - `Font::glyph_*_advance` will return `None` when glyph ID 
   is larger than the number of metrics in the table.
 - Ignore variation offset in `Font::glyph_*_advance` and `Font::glyph_*_side_bearing`

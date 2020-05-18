@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - (`gvar`) Integer overflow.
 - (`cmap`) Integer overflow during subtable format 2 parsing.
 - (`CFF`, `CFF2`) DICT number parsing.
-- `Font::glyph_*_advance` will return `None` when glyph ID 
+- `Font::glyph_*_advance` will return `None` when glyph ID
   is larger than the number of metrics in the table.
 - Ignore variation offset in `Font::glyph_*_advance` and `Font::glyph_*_side_bearing`
   when `HVAR`/`VVAR` tables are missing.
@@ -118,7 +118,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.2.2...v0.3.0

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - `sbix`, `CBLC`, `CBDT` and `SVG` tables support.
-- `Font::glyph_image`.
+- `Font::glyph_raster_image` and `Font::glyph_svg_image`.
 - `Font::kerning_subtables` with subtable formats 0..3 support.
 
 ### Changed

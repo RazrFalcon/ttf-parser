@@ -393,48 +393,42 @@ impl OutlineBuilder for DummyOutline {
 }
 
 
-/// A glyph image format.
+/// A glyph raster image format.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ImageFormat {
+pub enum RasterImageFormat {
     PNG,
-    JPEG,
-    TIFF,
-    SVG,
 }
 
 
-/// A glyph image.
+/// A glyph's raster image.
 ///
-/// Note that different tables provide different glyph metrics,
-/// that's why `x`, `y`, `width` and `height` are optional.
-///
-/// Also note, that glyph metrics are in pixels and not in font units.
+/// Note, that glyph metrics are in pixels and not in font units.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct GlyphImage<'a> {
+pub struct RasterGlyphImage<'a> {
     /// Horizontal offset.
-    pub x: Option<i16>,
+    pub x: i16,
 
     /// Vertical offset.
-    pub y: Option<i16>,
+    pub y: i16,
 
     /// Image width.
     ///
     /// It doesn't guarantee that this value is the same as set in the `data`.
-    pub width: Option<u16>,
+    pub width: u16,
 
     /// Image height.
     ///
     /// It doesn't guarantee that this value is the same as set in the `data`.
-    pub height: Option<u16>,
+    pub height: u16,
 
     /// A pixels per em of the selected strike.
     pub pixels_per_em: u16,
 
     /// An image format.
-    pub format: ImageFormat,
+    pub format: RasterImageFormat,
 
-    /// A raw image data as is. It's up to the caller to decode PNG, JPEG, etc.
+    /// A raw image data. It's up to the caller to decode it.
     pub data: &'a [u8],
 }
 
@@ -1261,28 +1255,28 @@ impl<'a> Font<'a> {
         self.outline_glyph(glyph_id, &mut DummyOutline)
     }
 
-    /// Returns a reference to a glyph image.
+    /// Returns a reference to a glyph's raster image.
     ///
     /// A font can define a glyph using a raster or a vector image instead of a simple outline.
-    /// Which is primarily used for emojis. This method should be used to access those images.
+    /// Which is primarily used for emojis. This method should be used to access raster images.
     ///
-    /// `pixels_per_em` allows selecting a preferred image size. While the chosen size will
+    /// `pixels_per_em` allows selecting a preferred image size. The chosen size will
     /// be closer to an upper one. So when font has 64px and 96px images and `pixels_per_em`
     /// is set to 72, 96px image will be returned.
     /// To get the largest image simply use `std::u16::MAX`.
-    /// This property has no effect in case of SVG.
     ///
     /// Note that this method will return an encoded image. It should be decoded
-    /// (in case of PNG, JPEG, etc.), rendered (in case of SVG) or even decompressed
-    /// (in case of SVGZ) by the caller. We don't validate or preprocess it in any way.
+    /// by the caller. We don't validate or preprocess it in any way.
+    ///
+    /// Currently, only PNG images are supported.
     ///
     /// Also, a font can contain both: images and outlines. So when this method returns `None`
     /// you should also try `outline_glyph()` afterwards.
     ///
     /// There are multiple ways an image can be stored in a TrueType font
-    /// and we support `sbix`, `CBLC`+`CBDT` and `SVG`.
+    /// and this method supports only `sbix`, `CBLC`+`CBDT`.
     #[inline]
-    pub fn glyph_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<GlyphImage> {
+    pub fn glyph_raster_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<RasterGlyphImage> {
         if let Some(sbix_data) = self.sbix {
             return sbix::parse(sbix_data, self.number_of_glyphs, glyph_id, pixels_per_em, 0);
         }
@@ -1292,11 +1286,23 @@ impl<'a> Font<'a> {
             return cbdt::parse(cbdt_data, location);
         }
 
-        if let Some(svg_data) = self.svg_ {
-            return svg::parse(svg_data, glyph_id);
-        }
-
         None
+    }
+
+    /// Returns a reference to a glyph's SVG image.
+    ///
+    /// A font can define a glyph using a raster or a vector image instead of a simple outline.
+    /// Which is primarily used for emojis. This method should be used to access SVG images.
+    ///
+    /// Note that this method will return just an SVG data. It should be rendered
+    /// or even decompressed (in case of SVGZ) by the caller.
+    /// We don't validate or preprocess it in any way.
+    ///
+    /// Also, a font can contain both: images and outlines. So when this method returns `None`
+    /// you should also try `outline_glyph()` afterwards.
+    #[inline]
+    pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
+        self.svg_.and_then(|svg_data| svg::parse(svg_data, glyph_id))
     }
 
     /// Returns an iterator over variation axes.

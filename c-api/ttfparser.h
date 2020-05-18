@@ -63,11 +63,8 @@ typedef enum {
  * @brief A glyph image format.
  */
 typedef enum {
-    TTFP_IMAGE_FORMAT_PNG = 0,
-    TTFP_IMAGE_FORMAT_JPEG,
-    TTFP_IMAGE_FORMAT_TIFF,
-    TTFP_IMAGE_FORMAT_SVG,
-} ttfp_image_format;
+    TTFP_RASTER_IMAGE_FORMAT_PNG = 0,
+} ttfp_raster_image_format;
 
 /**
  * @brief An opaque pointer to the font structure.
@@ -162,7 +159,7 @@ typedef struct {
     /**
      * An image format.
      */
-    ttfp_image_format format;
+    ttfp_raster_image_format format;
     /**
      * A raw image data as is. It's up to the caller to decode PNG, JPEG, etc.
      */
@@ -171,7 +168,7 @@ typedef struct {
      * A raw image data size.
      */
     uint32_t len;
-} ttfp_glyph_image;
+} ttfp_glyph_raster_image;
 
 /**
  * A 4-byte tag.
@@ -560,31 +557,49 @@ bool ttfp_outline_glyph(const ttfp_font *font,
 bool ttfp_get_glyph_bbox(const ttfp_font *font, uint16_t glyph_id, ttfp_rect *bbox);
 
 /**
- * @brief Returns a reference to a glyph image.
+ * @brief Returns a reference to a glyph's raster image.
  *
  * A font can define a glyph using a raster or a vector image instead of a simple outline.
- * Which is primarily used for emojis. This method should be used to access those images.
+ * Which is primarily used for emojis. This method should be used to access raster images.
  *
- * `pixels_per_em` allows selecting a preferred image size. While the chosen size will
+ * `pixels_per_em` allows selecting a preferred image size. The chosen size will
  * be closer to an upper one. So when font has 64px and 96px images and `pixels_per_em`
  * is set to 72, 96px image will be returned.
  * To get the largest image simply use `SHRT_MAX`.
- * This property has no effect in case of SVG.
  *
  * Note that this method will return an encoded image. It should be decoded
- * (in case of PNG, JPEG, etc.), rendered (in case of SVG) or even decompressed
- * (in case of SVGZ) by the caller. We don't validate or preprocess it in any way.
+ * by the caller. We don't validate or preprocess it in any way.
  *
- * Also, a font can contain both: images and outlines. So when this method returns `None`
+ * Currently, only PNG images are supported.
+ *
+ * Also, a font can contain both: images and outlines. So when this method returns `false`
  * you should also try `ttfp_outline_glyph()` afterwards.
  *
  * There are multiple ways an image can be stored in a TrueType font
- * and we support `sbix`, `CBLC`+`CBDT` and `SVG`.
+ * and this method supports only `sbix`, `CBLC`+`CBDT`.
  */
-bool ttfp_get_glyph_image(const ttfp_font *font,
-                          uint16_t glyph_id,
-                          uint16_t pixels_per_em,
-                          ttfp_glyph_image *glyph_image);
+bool ttfp_get_glyph_raster_image(const ttfp_font *font,
+                                 uint16_t glyph_id,
+                                 uint16_t pixels_per_em,
+                                 ttfp_glyph_raster_image *glyph_image);
+
+/**
+ * @brief Returns a reference to a glyph's SVG image.
+ *
+ * A font can define a glyph using a raster or a vector image instead of a simple outline.
+ * Which is primarily used for emojis. This method should be used to access SVG images.
+ *
+ * Note that this method will return just an SVG data. It should be rendered
+ * or even decompressed (in case of SVGZ) by the caller.
+ * We don't validate or preprocess it in any way.
+ *
+ * Also, a font can contain both: images and outlines. So when this method returns `false`
+ * you should also try `ttfp_outline_glyph()` afterwards.
+ */
+bool ttfp_get_glyph_svg_image(const ttfp_font *font,
+                              uint16_t glyph_id,
+                              const char **svg,
+                              uint32_t *len);
 
 /**
  * @brief Returns the amount of variation axes.

@@ -122,34 +122,31 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         svg.write_text_fmt(format_args!("{}", &id));
         svg.end_element();
 
-        if let Some(img) = font.glyph_image(ttf::GlyphId(id), std::u16::MAX) {
-            // TODO: figure out proper image positioning
+        if let Some(img) = font.glyph_raster_image(ttf::GlyphId(id), std::u16::MAX) {
             svg.start_element("image");
-            svg.write_attribute("x", &(x + 2.0 + img.x.unwrap_or(0) as f64));
-            if font.has_table(ttf::TableName::StandardBitmapGraphics) {
-                svg.write_attribute("y", &y);
-            } else if font.has_table(ttf::TableName::ScalableVectorGraphics) {
-                svg.write_attribute("y", &(y + cell_size));
-                svg.write_attribute("width", &cell_size);
-                svg.write_attribute("height", &cell_size);
-            } else {
-                svg.write_attribute("y", &y);
-                svg.write_attribute("width", &img.width.unwrap_or(0));
-                svg.write_attribute("height", &img.height.unwrap_or(0));
-            }
-
+            svg.write_attribute("x", &(x + 2.0 + img.x as f64));
+            svg.write_attribute("y", &(y - img.y as f64));
+            svg.write_attribute("width", &img.width);
+            svg.write_attribute("height", &img.height);
             svg.write_attribute_raw("xlink:href", |buf| {
-                buf.extend_from_slice(b"data:image/");
-                buf.extend_from_slice(match img.format {
-                    ttf::ImageFormat::PNG => b"png",
-                    ttf::ImageFormat::JPEG => b"jpg",
-                    ttf::ImageFormat::TIFF => b"tiff",
-                    ttf::ImageFormat::SVG => b"svg+xml",
-                });
-                buf.extend_from_slice(b";base64, ");
+                buf.extend_from_slice(b"data:image/png;base64, ");
 
                 let mut enc = base64::write::EncoderWriter::new(buf, base64::STANDARD);
                 enc.write_all(img.data).unwrap();
+                enc.finish().unwrap();
+            });
+            svg.end_element();
+        } else if let Some(img) = font.glyph_svg_image(ttf::GlyphId(id)) {
+            svg.start_element("image");
+            svg.write_attribute("x", &(x + 2.0));
+            svg.write_attribute("y", &(y + cell_size));
+            svg.write_attribute("width", &cell_size);
+            svg.write_attribute("height", &cell_size);
+            svg.write_attribute_raw("xlink:href", |buf| {
+                buf.extend_from_slice(b"data:image/svg+xml;base64, ");
+
+                let mut enc = base64::write::EncoderWriter::new(buf, base64::STANDARD);
+                enc.write_all(img).unwrap();
                 enc.finish().unwrap();
             });
             svg.end_element();

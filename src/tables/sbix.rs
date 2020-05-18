@@ -3,7 +3,7 @@
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
-use crate::{GlyphId, GlyphImage, ImageFormat, Tag};
+use crate::{GlyphId, RasterGlyphImage, RasterImageFormat, Tag};
 use crate::parser::{Stream, FromData, Offset, Offset32};
 
 pub fn parse(
@@ -12,7 +12,7 @@ pub fn parse(
     glyph_id: GlyphId,
     pixels_per_em: u16,
     depth: u8,
-) -> Option<GlyphImage> {
+) -> Option<RasterGlyphImage> {
     if depth == 10 {
         return None;
     }
@@ -68,8 +68,8 @@ pub fn parse(
     let data_len = end.checked_sub(start)?.checked_sub(8)?; // 8 is a Glyph data header size.
 
     let mut s = Stream::new_at(data, offset.to_usize() + start)?;
-    let x_offset: i16 = s.read()?;
-    let y_offset: i16 = s.read()?;
+    let x: i16 = s.read()?;
+    let y: i16 = s.read()?;
     let image_type: Tag = s.read()?;
     let image_data = s.read_bytes(data_len)?;
 
@@ -77,9 +77,7 @@ pub fn parse(
     // 'Support for the 'pdf ' and 'mask' data types and sbixDrawOutlines flag
     // are planned for future releases of iOS and OS X.'
     let format = match &image_type.to_bytes() {
-        b"png " => ImageFormat::PNG,
-        b"jpg " => ImageFormat::JPEG,
-        b"tiff" => ImageFormat::TIFF,
+        b"png " => RasterImageFormat::PNG,
         b"dupe" => {
             // 'The special graphicType of 'dupe' indicates that
             // the data field contains a glyph ID. The bitmap data for
@@ -88,17 +86,36 @@ pub fn parse(
             return parse(data, number_of_glyphs, glyph_id, pixels_per_em, depth + 1);
         }
         _ => {
+            // TODO: support JPEG and TIFF
             return None;
         }
     };
 
-    Some(GlyphImage {
-        x: i16::try_from(x_offset).ok(),
-        y: i16::try_from(y_offset).ok(),
-        width: None,
-        height: None,
+    let (width, height) = png_size(image_data)?;
+
+    Some(RasterGlyphImage {
+        x,
+        y,
+        width,
+        height,
         pixels_per_em: max_ppem,
         format,
         data: image_data,
     })
+}
+
+// The `sbix` table doesn't store the image size, so we have to parse it manually.
+// Which is quite simple in case of PNG, but way more complex for JPEG.
+// Therefore we are omitting it for now.
+fn png_size(data: &[u8]) -> Option<(u16, u16)> {
+    // PNG stores its size as u32 BE at a fixed offset.
+    let mut s = Stream::new_at(data, 16)?;
+    let width: u32 = s.read()?;
+    let height: u32 = s.read()?;
+
+    // PNG size larger than u16::MAX is an error.
+    Some((
+        u16::try_from(width).ok()?,
+        u16::try_from(height).ok()?,
+    ))
 }

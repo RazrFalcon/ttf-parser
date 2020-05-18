@@ -116,10 +116,10 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 
 | Table/Library | ttf-parser     | FreeType   | stb_truetype   |
 | ------------- | -------------: | ---------: | -------------: |
-| `glyf`        |   `0.786 ms`   | `1.194 ms` | **`0.695 ms`** |
-| `gvar`        | **`3.119 ms`** | `3.594 ms` |              - |
-| `CFF`         | **`1.237 ms`** | `5.806 ms` |   `2.862 ms`   |
-| `CFF2`        | **`1.893 ms`** | `6.782 ms` |              - |
+| `glyf`        |   `0.827 ms`   | `1.194 ms` | **`0.695 ms`** |
+| `gvar`        | **`3.252 ms`** | `3.594 ms` |              - |
+| `CFF`         | **`1.209 ms`** | `5.946 ms` |   `2.862 ms`   |
+| `CFF2`        | **`1.921 ms`** | `7.001 ms` |              - |
 
 **Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
 

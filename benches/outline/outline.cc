@@ -199,8 +199,9 @@ public:
                                 std::istreambuf_iterator<char>());
         m_fontData = std::move(data);
 
-        m_font = ttfp_create_font(m_fontData.data(), m_fontData.size(), index);
-        if (!m_font) {
+        m_font = (ttfp_font*)malloc(ttfp_font_size_of());
+        if (!ttfp_font_init(m_fontData.data(), m_fontData.size(), index, m_font)) {
+            free(m_font);
             throw "failed to parse a font";
         }
     }
@@ -208,7 +209,7 @@ public:
     ~Font()
     {
         if (m_font) {
-            ttfp_destroy_font(m_font);
+            free(m_font);
         }
     }
 

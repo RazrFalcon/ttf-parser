@@ -8,7 +8,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Zero heap allocations.
 - Zero unsafe.
 - Zero dependencies.
-- `no_std` compatible.
+- `no_std`/WASM compatible.
 - Fast.
 - Stateless. All parsing methods are immutable methods.
 - Simple and maintainable code (no magic numbers).
@@ -32,7 +32,7 @@ By doing so we can simplify an API quite a lot since otherwise, we will have to 
 `Result<Option<T>, Error>`.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.5.0")]
+#![doc(html_root_url = "https://docs.rs/ttf-parser/0.6.0")]
 
 #![no_std]
 #![forbid(unsafe_code)]

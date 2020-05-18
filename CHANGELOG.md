@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.6.0] - 2020-05-18
 ### Added
 - `sbix`, `CBLC`, `CBDT` and `SVG` tables support.
 - `Font::glyph_raster_image` and `Font::glyph_svg_image`.

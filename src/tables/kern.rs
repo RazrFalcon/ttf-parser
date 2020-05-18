@@ -9,7 +9,7 @@ variants.
 
 Since there is no single correct way to process a kerning data,
 we have to provide an access to kerning subtables, so a caller can implement
-a kerning algorithm themselves.
+a kerning algorithm manually.
 But we still try to keep the API as high-level as possible.
 */
 

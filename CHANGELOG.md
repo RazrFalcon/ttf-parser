@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- (`kern`) Support fonts that ignore the subtable size limit.
 
 ## [0.6.0] - 2020-05-18
 ### Added

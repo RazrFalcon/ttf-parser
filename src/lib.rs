@@ -32,7 +32,7 @@ By doing so we can simplify an API quite a lot since otherwise, we will have to 
 `Result<Option<T>, Error>`.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.6.0")]
+#![doc(html_root_url = "https://docs.rs/ttf-parser/0.6.1")]
 
 #![no_std]
 #![forbid(unsafe_code)]

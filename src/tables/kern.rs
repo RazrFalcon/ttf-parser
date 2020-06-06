@@ -33,6 +33,8 @@ impl OTCoverage {
 }
 
 impl FromData for OTCoverage {
+    const SIZE: usize = 1;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.get(0).copied().map(OTCoverage)
@@ -61,6 +63,8 @@ impl AATCoverage {
 }
 
 impl FromData for AATCoverage {
+    const SIZE: usize = 1;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.get(0).copied().map(AATCoverage)
@@ -458,6 +462,8 @@ pub mod state_machine {
     }
 
     impl FromData for Entry {
+        const SIZE: usize = 4;
+
         #[inline]
         fn parse(data: &[u8]) -> Option<Self> {
             let mut s = Stream::new(data);

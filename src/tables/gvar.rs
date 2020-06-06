@@ -581,6 +581,8 @@ mod packed_points {
     }
 
     impl FromData for Control {
+        const SIZE: usize = 1;
+
         #[inline]
         fn parse(data: &[u8]) -> Option<Self> { data.get(0).copied().map(Control) }
     }

@@ -84,6 +84,8 @@ pub use tables::kern;
 pub struct GlyphId(pub u16);
 
 impl FromData for GlyphId {
+    const SIZE: usize = 2;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         u16::parse(data).map(GlyphId)
@@ -264,6 +266,8 @@ impl core::fmt::Display for Tag {
 }
 
 impl FromData for Tag {
+    const SIZE: usize = 4;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         u32::parse(data).map(Tag)
@@ -477,6 +481,8 @@ struct TableRecord {
 }
 
 impl FromData for TableRecord {
+    const SIZE: usize = 16;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);

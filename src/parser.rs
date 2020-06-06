@@ -5,20 +5,18 @@ use core::convert::{TryFrom, TryInto};
 ///
 /// This is a low-level, internal trait that should not be used directly.
 pub trait FromData: Sized {
-    /// Stores an object size in raw data.
+    /// Object's raw data size.
     ///
-    /// `mem::size_of` by default.
-    ///
-    /// Override when size of `Self` != size of a raw data.
-    /// For example, when you are parsing `u16`, but storing it as `u8`.
-    /// In this case `size_of::<Self>()` == 1, but `FromData::SIZE` == 2.
-    const SIZE: usize = core::mem::size_of::<Self>();
+    /// Not always the same as `mem::size_of`.
+    const SIZE: usize;
 
     /// Parses an object from a raw data.
     fn parse(data: &[u8]) -> Option<Self>;
 }
 
 impl FromData for u8 {
+    const SIZE: usize = 1;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.get(0).copied()
@@ -26,6 +24,8 @@ impl FromData for u8 {
 }
 
 impl FromData for i8 {
+    const SIZE: usize = 1;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.get(0).copied().map(|n| n as i8)
@@ -33,6 +33,8 @@ impl FromData for i8 {
 }
 
 impl FromData for u16 {
+    const SIZE: usize = 2;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.try_into().ok().map(u16::from_be_bytes)
@@ -40,6 +42,8 @@ impl FromData for u16 {
 }
 
 impl FromData for i16 {
+    const SIZE: usize = 2;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.try_into().ok().map(i16::from_be_bytes)
@@ -47,6 +51,8 @@ impl FromData for i16 {
 }
 
 impl FromData for u32 {
+    const SIZE: usize = 4;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.try_into().ok().map(u32::from_be_bytes)
@@ -54,6 +60,8 @@ impl FromData for u32 {
 }
 
 impl FromData for i32 {
+    const SIZE: usize = 4;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.try_into().ok().map(i32::from_be_bytes)
@@ -89,6 +97,8 @@ impl F2DOT14 {
 }
 
 impl FromData for F2DOT14 {
+    const SIZE: usize = 2;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         i16::parse(data).map(F2DOT14)
@@ -582,6 +592,8 @@ impl Offset for Offset16 {
 }
 
 impl FromData for Offset16 {
+    const SIZE: usize = 2;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         u16::parse(data).map(Offset16)
@@ -610,6 +622,8 @@ impl Offset for Offset32 {
 }
 
 impl FromData for Offset32 {
+    const SIZE: usize = 4;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         u32::parse(data).map(Offset32)

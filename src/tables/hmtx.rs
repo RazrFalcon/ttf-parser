@@ -13,6 +13,8 @@ struct HorizontalMetrics {
 }
 
 impl FromData for HorizontalMetrics {
+    const SIZE: usize = 4;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);

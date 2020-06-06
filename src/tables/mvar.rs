@@ -13,6 +13,8 @@ struct ValueRecord {
 }
 
 impl FromData for ValueRecord {
+    const SIZE: usize = 8;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);

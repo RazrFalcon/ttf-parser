@@ -114,6 +114,8 @@ struct AxisValueMapRecord {
 }
 
 impl FromData for AxisValueMapRecord {
+    const SIZE: usize = 4;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);

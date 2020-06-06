@@ -14,6 +14,8 @@ struct EncodingRecord {
 }
 
 impl FromData for EncodingRecord {
+    const SIZE: usize = 8;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
@@ -258,6 +260,8 @@ struct SubHeaderRecord {
 }
 
 impl FromData for SubHeaderRecord {
+    const SIZE: usize = 8;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);

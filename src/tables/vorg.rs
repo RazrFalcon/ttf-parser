@@ -11,6 +11,8 @@ struct VertOriginYMetrics {
 }
 
 impl FromData for VertOriginYMetrics {
+    const SIZE: usize = 4;
+
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);

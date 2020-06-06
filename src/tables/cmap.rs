@@ -317,7 +317,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
 
     // SubHeaderRecord::id_range_offset points to SubHeaderRecord::first_code
     // in the glyphIndexArray. So we have to advance to our code point.
-    let index_offset = usize::from(low_byte.checked_sub(first_code)?) * core::mem::size_of::<u16>();
+    let index_offset = usize::from(low_byte.checked_sub(first_code)?) * u16::SIZE;
 
     // 'The value of the idRangeOffset is the number of bytes
     // past the actual location of the idRangeOffset'.
@@ -326,7 +326,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
         // Advance to required subheader.
         + SubHeaderRecord::SIZE * usize::from(i + 1)
         // Move back to idRangeOffset start.
-        - core::mem::size_of::<u16>()
+        - u16::SIZE
         // Use defined offset.
         + usize::from(sub_header.id_range_offset)
         // Advance to required index in the glyphIndexArray.

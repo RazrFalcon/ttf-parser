@@ -3,12 +3,30 @@
 use core::num::NonZeroU16;
 
 use crate::GlyphId;
-use crate::parser::{Stream, LazyArray16};
-use crate::raw::hmtx as raw;
+use crate::parser::{Stream, FromData, LazyArray16};
+
+
+#[derive(Clone, Copy)]
+struct HorizontalMetrics {
+    advance_width: u16,
+    lsb: i16,
+}
+
+impl FromData for HorizontalMetrics {
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(HorizontalMetrics {
+            advance_width: s.read()?,
+            lsb: s.read()?,
+        })
+    }
+}
+
 
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
-    metrics: LazyArray16<'a, raw::HorizontalMetrics>,
+    metrics: LazyArray16<'a, HorizontalMetrics>,
     bearings: Option<LazyArray16<'a, i16>>,
     number_of_metrics: u16, // Sum of long metrics + bearings.
 }
@@ -49,19 +67,19 @@ impl<'a> Table<'a> {
         }
 
         if let Some(metrics) = self.metrics.get(glyph_id.0) {
-            Some(metrics.advance_width())
+            Some(metrics.advance_width)
         } else {
             // 'As an optimization, the number of records can be less than the number of glyphs,
             // in which case the advance width value of the last record applies
             // to all remaining glyph IDs.'
-            self.metrics.last().map(|m| m.advance_width())
+            self.metrics.last().map(|m| m.advance_width)
         }
     }
 
     #[inline]
     pub fn side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
         if let Some(metrics) = self.metrics.get(glyph_id.0) {
-            Some(metrics.lsb())
+            Some(metrics.lsb)
         } else if let Some(bearings) = self.bearings {
             // 'If the number_of_hmetrics is less than the total number of glyphs,
             // then that array is followed by an array for the left side bearing values

@@ -2,7 +2,19 @@
 
 use crate::LineMetrics;
 use crate::parser::Stream;
-use crate::raw::os_2 as raw;
+
+
+const US_WEIGHT_CLASS_OFFSET: usize = 4;
+const US_WIDTH_CLASS_OFFSET: usize = 6;
+const Y_SUBSCRIPT_X_SIZE_OFFSET: usize = 10;
+const Y_SUPERSCRIPT_X_SIZE_OFFSET: usize = 18;
+const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
+const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
+const FS_SELECTION_OFFSET: usize = 62;
+const S_TYPO_ASCENDER_OFFSET: usize = 68;
+const S_TYPO_DESCENDER_OFFSET: usize = 70;
+const S_TYPO_LINE_GAP_OFFSET: usize = 72;
+const SX_HEIGHT_OFFSET: usize = 86;
 
 
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
@@ -171,12 +183,12 @@ impl<'a> Table<'a> {
 
     #[inline]
     pub fn weight(&self) -> Weight {
-        Weight::from(Stream::read_at(self.data, raw::US_WEIGHT_CLASS_OFFSET).unwrap_or(0))
+        Weight::from(Stream::read_at(self.data, US_WEIGHT_CLASS_OFFSET).unwrap_or(0))
     }
 
     #[inline]
     pub fn width(&self) -> Width {
-        match Stream::read_at(self.data, raw::US_WIDTH_CLASS_OFFSET).unwrap_or(0) {
+        match Stream::read_at(self.data, US_WIDTH_CLASS_OFFSET).unwrap_or(0) {
             1 => Width::UltraCondensed,
             2 => Width::ExtraCondensed,
             3 => Width::Condensed,
@@ -229,21 +241,21 @@ impl<'a> Table<'a> {
             None
         } else {
             // We cannot use SafeStream here, because x height is an optional data.
-            Stream::read_at(self.data, raw::SX_HEIGHT_OFFSET)
+            Stream::read_at(self.data, SX_HEIGHT_OFFSET)
         }
     }
 
     #[inline]
     pub fn strikeout_metrics(&self) -> LineMetrics {
         LineMetrics {
-            thickness: Stream::read_at(self.data, raw::Y_STRIKEOUT_SIZE_OFFSET).unwrap_or(0),
-            position: Stream::read_at(self.data, raw::Y_STRIKEOUT_POSITION_OFFSET).unwrap_or(0),
+            thickness: Stream::read_at(self.data, Y_STRIKEOUT_SIZE_OFFSET).unwrap_or(0),
+            position: Stream::read_at(self.data, Y_STRIKEOUT_POSITION_OFFSET).unwrap_or(0),
         }
     }
 
     #[inline]
     pub fn subscript_metrics(&self) -> ScriptMetrics {
-        let mut s = Stream::new_at(self.data, raw::Y_SUBSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
+        let mut s = Stream::new_at(self.data, Y_SUBSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
         ScriptMetrics {
             x_size: s.read().unwrap_or(0),
             y_size: s.read().unwrap_or(0),
@@ -254,7 +266,7 @@ impl<'a> Table<'a> {
 
     #[inline]
     pub fn superscript_metrics(&self) -> ScriptMetrics {
-        let mut s = Stream::new_at(self.data, raw::Y_SUPERSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
+        let mut s = Stream::new_at(self.data, Y_SUPERSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
         ScriptMetrics {
             x_size: s.read().unwrap_or(0),
             y_size: s.read().unwrap_or(0),
@@ -265,21 +277,21 @@ impl<'a> Table<'a> {
 
     #[inline]
     pub fn typo_ascender(&self) -> i16 {
-        Stream::read_at(self.data, raw::S_TYPO_ASCENDER_OFFSET).unwrap_or(0)
+        Stream::read_at(self.data, S_TYPO_ASCENDER_OFFSET).unwrap_or(0)
     }
 
     #[inline]
     pub fn typo_descender(&self) -> i16 {
-        Stream::read_at(self.data, raw::S_TYPO_DESCENDER_OFFSET).unwrap_or(0)
+        Stream::read_at(self.data, S_TYPO_DESCENDER_OFFSET).unwrap_or(0)
     }
 
     #[inline]
     pub fn typo_line_gap(&self) -> i16 {
-        Stream::read_at(self.data, raw::S_TYPO_LINE_GAP_OFFSET).unwrap_or(0)
+        Stream::read_at(self.data, S_TYPO_LINE_GAP_OFFSET).unwrap_or(0)
     }
 
     #[inline]
     fn fs_selection(&self) -> u16 {
-        Stream::read_at(self.data, raw::FS_SELECTION_OFFSET).unwrap_or(0)
+        Stream::read_at(self.data, FS_SELECTION_OFFSET).unwrap_or(0)
     }
 }

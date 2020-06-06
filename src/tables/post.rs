@@ -2,8 +2,11 @@
 
 use crate::{LineMetrics, GlyphId};
 use crate::parser::{Stream, LazyArray16};
-use crate::raw::post as raw;
 
+
+const TABLE_SIZE: usize = 32;
+const UNDERLINE_POSITION_OFFSET: usize = 8;
+const UNDERLINE_THICKNESS_OFFSET: usize = 10;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
 const MACINTOSH_NAMES: &[&str] = &[
@@ -277,21 +280,21 @@ pub struct Table<'a> {
 
 impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
-        if data.len() < raw::TABLE_SIZE {
+        if data.len() < TABLE_SIZE {
             return None;
         }
 
         let version: u32 = Stream::new(data).read()?;
         if !(version == 0x00010000 || version == 0x00020000 ||
-            version == 0x00025000 || version == 0x00030000 ||
-            version == 0x00040000)
+             version == 0x00025000 || version == 0x00030000 ||
+             version == 0x00040000)
         {
             return None;
         }
 
         let underline = LineMetrics {
-            position: Stream::read_at(data, raw::UNDERLINE_POSITION_OFFSET)?,
-            thickness: Stream::read_at(data, raw::UNDERLINE_THICKNESS_OFFSET)?,
+            position: Stream::read_at(data, UNDERLINE_POSITION_OFFSET)?,
+            thickness: Stream::read_at(data, UNDERLINE_THICKNESS_OFFSET)?,
         };
 
         let mut name_indexes = LazyArray16::default();
@@ -299,7 +302,7 @@ impl<'a> Table<'a> {
 
         // Only version 2.0 of the table has data at the end.
         if version == 0x00020000 {
-            let mut s = Stream::new_at(data, raw::TABLE_SIZE)?;
+            let mut s = Stream::new_at(data, TABLE_SIZE)?;
             let count: u16 = s.read()?;
             name_indexes = s.read_array16(count)?;
             names = s.tail()?;

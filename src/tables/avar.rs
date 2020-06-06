@@ -4,8 +4,8 @@ use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
 use crate::NormalizedCoord;
-use crate::parser::{Stream, LazyArray16};
-use crate::raw::avar as raw;
+use crate::parser::{Stream, FromData, LazyArray16};
+
 
 #[derive(Clone, Copy)]
 pub(crate) struct Table<'a> {
@@ -32,7 +32,7 @@ impl<'a> Table<'a> {
         // Sanitize records.
         for _ in 0..axis_count.get() {
             let count: u16 = s.read()?;
-            s.advance_checked(raw::AxisValueMapRecord::SIZE * usize::from(count))?;
+            s.advance_checked(AxisValueMapRecord::SIZE * usize::from(count))?;
         }
 
         Some(Table {
@@ -49,7 +49,7 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(self.data);
         for coord in coordinates {
             let count: u16 = s.read()?;
-            let map = s.read_array16::<raw::AxisValueMapRecord>(count)?;
+            let map = s.read_array16::<AxisValueMapRecord>(count)?;
             *coord = NormalizedCoord::from(map_value(&map, coord.0)?);
         }
 
@@ -57,23 +57,23 @@ impl<'a> Table<'a> {
     }
 }
 
-fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> Option<i16> {
+fn map_value(map: &LazyArray16<AxisValueMapRecord>, value: i16) -> Option<i16> {
     // This code is based on harfbuzz implementation.
 
     if map.len() == 0 {
         return Some(value);
     } else if map.len() == 1 {
         let record = map.get(0)?;
-        return Some(value - record.from_coordinate() + record.to_coordinate());
+        return Some(value - record.from_coordinate + record.to_coordinate);
     }
 
     let record_0 = map.get(0)?;
-    if value <= record_0.from_coordinate() {
-        return Some(value - record_0.from_coordinate() + record_0.to_coordinate());
+    if value <= record_0.from_coordinate {
+        return Some(value - record_0.from_coordinate + record_0.to_coordinate);
     }
 
     let mut i = 1;
-    while i < map.len() && value > map.get(i)?.from_coordinate() {
+    while i < map.len() && value > map.get(i)?.from_coordinate {
         i += 1;
     }
 
@@ -82,15 +82,15 @@ fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> Option<i
     }
 
     let record_curr = map.get(i)?;
-    let curr_from = record_curr.from_coordinate();
-    let curr_to = record_curr.to_coordinate();
+    let curr_from = record_curr.from_coordinate;
+    let curr_to = record_curr.to_coordinate;
     if value >= curr_from {
         return Some(value - curr_from + curr_to);
     }
 
     let record_prev = map.get(i - 1)?;
-    let prev_from = record_prev.from_coordinate();
-    let prev_to = record_prev.to_coordinate();
+    let prev_from = record_prev.from_coordinate;
+    let prev_to = record_prev.to_coordinate;
     if prev_from == curr_from {
         return Some(prev_to);
     }
@@ -104,4 +104,22 @@ fn map_value(map: &LazyArray16<raw::AxisValueMapRecord>, value: i16) -> Option<i
     let k = (curr_to - prev_to) * (i32::from(value) - prev_from) + denom / 2;
     let value = prev_to + k / denom;
     i16::try_from(value).ok()
+}
+
+
+#[derive(Clone, Copy)]
+struct AxisValueMapRecord {
+    from_coordinate: i16,
+    to_coordinate: i16,
+}
+
+impl FromData for AxisValueMapRecord {
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(AxisValueMapRecord {
+            from_coordinate: s.read()?,
+            to_coordinate: s.read()?,
+        })
+    }
 }

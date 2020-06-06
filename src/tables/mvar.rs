@@ -1,14 +1,34 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
 
 use crate::{Tag, NormalizedCoord};
-use crate::parser::{Stream, Offset, Offset16, LazyArray16};
+use crate::parser::{Stream, FromData, Offset, Offset16, LazyArray16};
 use crate::var_store::ItemVariationStore;
-use crate::raw::mvar as raw;
+
+
+#[derive(Clone, Copy)]
+struct ValueRecord {
+    value_tag: Tag,
+    delta_set_outer_index: u16,
+    delta_set_inner_index: u16,
+}
+
+impl FromData for ValueRecord {
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(ValueRecord {
+            value_tag: s.read()?,
+            delta_set_outer_index: s.read()?,
+            delta_set_inner_index: s.read()?,
+        })
+    }
+}
+
 
 #[derive(Clone, Copy)]
 pub(crate) struct Table<'a> {
     variation_store: ItemVariationStore<'a>,
-    records: LazyArray16<'a, raw::ValueRecord>,
+    records: LazyArray16<'a, ValueRecord>,
 }
 
 impl<'a> Table<'a> {
@@ -23,7 +43,7 @@ impl<'a> Table<'a> {
         s.skip::<u16>(); // reserved
         let value_record_size: u16 = s.read()?;
 
-        if usize::from(value_record_size) != raw::ValueRecord::SIZE {
+        if usize::from(value_record_size) != ValueRecord::SIZE {
             return None;
         }
 
@@ -33,7 +53,7 @@ impl<'a> Table<'a> {
         }
 
         let var_store_offset = s.read::<Option<Offset16>>()??.to_usize();
-        let records = s.read_array16::<raw::ValueRecord>(count)?;
+        let records = s.read_array16::<ValueRecord>(count)?;
         let variation_store = ItemVariationStore::parse(Stream::new_at(data, var_store_offset)?)?;
 
         Some(Table {
@@ -43,10 +63,10 @@ impl<'a> Table<'a> {
     }
 
     pub fn metrics_offset(&self, tag: Tag, coordinates: &[NormalizedCoord]) -> Option<f32> {
-        let (_, record) = self.records.binary_search_by(|r| r.value_tag().cmp(&tag))?;
+        let (_, record) = self.records.binary_search_by(|r| r.value_tag.cmp(&tag))?;
         self.variation_store.parse_delta(
-            record.delta_set_outer_index(),
-            record.delta_set_inner_index(),
+            record.delta_set_outer_index,
+            record.delta_set_inner_index,
             coordinates
         )
     }

@@ -3,8 +3,8 @@
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store
 
 use crate::NormalizedCoord;
-use crate::parser::{Stream, LazyArray16, NumFrom};
-use crate::raw::var_store as raw;
+use crate::parser::{Stream, FromData, LazyArray16, NumFrom};
+
 
 #[derive(Clone, Copy)]
 pub(crate) struct ItemVariationStore<'a> {
@@ -110,7 +110,7 @@ impl<'a> ItemVariationStore<'a> {
 #[derive(Clone, Copy)]
 pub struct VariationRegionList<'a> {
     axis_count: u16,
-    regions: LazyArray16<'a, raw::RegionAxisCoordinatesRecord>,
+    regions: LazyArray16<'a, RegionAxisCoordinatesRecord>,
 }
 
 impl<'a> VariationRegionList<'a> {
@@ -139,12 +139,20 @@ impl<'a> VariationRegionList<'a> {
     }
 }
 
-impl raw::RegionAxisCoordinatesRecord {
+
+#[derive(Clone, Copy)]
+struct RegionAxisCoordinatesRecord {
+    start_coord: i16,
+    peak_coord: i16,
+    end_coord: i16,
+}
+
+impl RegionAxisCoordinatesRecord {
     #[inline]
     pub fn evaluate_axis(&self, coord: i16) -> f32 {
-        let start = self.start_coord();
-        let peak = self.peak_coord();
-        let end = self.end_coord();
+        let start = self.start_coord;
+        let peak = self.peak_coord;
+        let end = self.end_coord;
 
         if start > peak || peak > end {
             return 1.0;
@@ -167,5 +175,19 @@ impl raw::RegionAxisCoordinatesRecord {
         } else {
             f32::from(end - coord) / f32::from(end - peak)
         }
+    }
+}
+
+impl FromData for RegionAxisCoordinatesRecord {
+    const SIZE: usize = 6;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(RegionAxisCoordinatesRecord {
+            start_coord: s.read()?,
+            peak_coord: s.read()?,
+            end_coord: s.read()?,
+        })
     }
 }

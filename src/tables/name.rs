@@ -8,8 +8,7 @@ use std::string::String;
 #[cfg(feature = "std")]
 use crate::parser::LazyArray16;
 
-use crate::parser::Stream;
-use crate::raw::name as raw;
+use crate::parser::{Stream, FromData};
 
 
 /// A list of [name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids)'s.
@@ -84,42 +83,70 @@ fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
 }
 
 
+#[derive(Clone, Copy)]
+struct NameRecord {
+    platform_id: u16,
+    encoding_id: u16,
+    language_id: u16,
+    name_id: u16,
+    length: u16,
+    offset: u16,
+}
+
+impl FromData for NameRecord {
+    const SIZE: usize = 12;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(NameRecord {
+            platform_id: s.read()?,
+            encoding_id: s.read()?,
+            language_id: s.read()?,
+            name_id: s.read()?,
+            length: s.read()?,
+            offset: s.read()?,
+        })
+    }
+}
+
+
 /// A [Name Record](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records).
 #[derive(Clone, Copy)]
 pub struct Name<'a> {
-    data: raw::NameRecord,
+    data: NameRecord,
     strings: &'a [u8],
 }
 
 impl<'a> Name<'a> {
     /// Parses the platform ID.
     pub fn platform_id(&self) -> Option<PlatformId> {
-        PlatformId::from_u16(self.data.platform_id())
+        PlatformId::from_u16(self.data.platform_id)
     }
 
     /// Parses the platform-specific encoding ID.
     pub fn encoding_id(&self) -> u16 {
-        self.data.encoding_id()
+        self.data.encoding_id
     }
 
     /// Parses the language ID.
     pub fn language_id(&self) -> u16 {
-        self.data.language_id()
+        self.data.language_id
     }
 
     /// Parses the [Name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids).
     ///
     /// A predefined list of ID's can be found in the [`name_id`](name_id/index.html) module.
     pub fn name_id(&self) -> u16 {
-        self.data.name_id()
+        self.data.name_id
     }
 
     /// Parses the Name's data as bytes.
     ///
     /// Can be empty.
     pub fn name(&self) -> &'a [u8] {
-        let start = usize::from(self.data.offset());
-        let end = start + usize::from(self.data.length());
+        let start = usize::from(self.data.offset);
+        let end = start + usize::from(self.data.length);
         self.strings.get(start..end).unwrap_or(&[])
     }
 
@@ -239,12 +266,8 @@ impl<'a> Iterator for Names<'a> {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let start = raw::NameRecord::SIZE * n;
-        let end = start + raw::NameRecord::SIZE;
-        let data = self.names.get(start..end)?;
-
         Some(Name {
-            data: raw::NameRecord::new(data)?,
+            data: Stream::read_at(self.names, NameRecord::SIZE * n)?,
             strings: self.storage,
         })
     }
@@ -262,14 +285,14 @@ pub(crate) fn parse(data: &[u8]) -> Option<Names> {
     s.skip::<u16>(); // offset
 
     if format == 0 {
-        let names_data = s.read_bytes(raw::NameRecord::SIZE * usize::from(count))?;
+        let names_data = s.read_bytes(NameRecord::SIZE * usize::from(count))?;
         Some(Names::new(names_data, s.tail()?, count))
     } else if format == 1 {
         let lang_tag_count: u16 = s.read()?;
         let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
 
         s.advance(usize::from(lang_tag_len)); // langTagRecords
-        let names_data = s.read_bytes(raw::NameRecord::SIZE * usize::from(count))?;
+        let names_data = s.read_bytes(NameRecord::SIZE * usize::from(count))?;
         Some(Names::new(names_data, s.tail()?, count))
     } else {
         None

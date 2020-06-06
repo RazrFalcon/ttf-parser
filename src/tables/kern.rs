@@ -15,7 +15,6 @@ But we still try to keep the API as high-level as possible.
 
 use crate::GlyphId;
 use crate::parser::{Stream, FromData, NumFrom, Offset16, Offset};
-use crate::raw::kern::*;
 
 
 #[derive(Clone, Copy, Debug)]
@@ -65,6 +64,28 @@ impl FromData for AATCoverage {
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         data.get(0).copied().map(AATCoverage)
+    }
+}
+
+
+#[derive(Clone, Copy)]
+struct KerningRecord {
+    // In the kern table spec, a kerning pair is stored as two u16,
+    // but we are using one u32, so we can binary search it directly.
+    pair: u32,
+    value: i16,
+}
+
+impl FromData for KerningRecord {
+    const SIZE: usize = 6;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(KerningRecord {
+            pair: s.read()?,
+            value: s.read()?,
+        })
     }
 }
 
@@ -275,7 +296,7 @@ fn parse_format0(data: &[u8], left: GlyphId, right: GlyphId) -> Option<i16> {
     let pairs = s.read_array16::<KerningRecord>(number_of_pairs)?;
 
     let needle = u32::from(left.0) << 16 | u32::from(right.0);
-    pairs.binary_search_by(|v| v.pair().cmp(&needle)).map(|(_, v)| v.value())
+    pairs.binary_search_by(|v| v.pair.cmp(&needle)).map(|(_, v)| v.value)
 }
 
 /// A *Format 2 Kerning Table (Simple n x m Array of Kerning Values)* implementation

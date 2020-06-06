@@ -4,6 +4,34 @@ use crate::GlyphId;
 use crate::parser::*;
 
 
+#[derive(Clone, Copy)]
+struct RangeRecord {
+    start_glyph_id: GlyphId,
+    end_glyph_id: GlyphId,
+    value: u16,
+}
+
+impl RangeRecord {
+    fn range(&self) -> core::ops::RangeInclusive<GlyphId> {
+        self.start_glyph_id..=self.end_glyph_id
+    }
+}
+
+impl FromData for RangeRecord {
+    const SIZE: usize = 6;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(RangeRecord {
+            start_glyph_id: s.read()?,
+            end_glyph_id: s.read()?,
+            value: s.read()?,
+        })
+    }
+}
+
+
 /// A [Coverage Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-table).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CoverageTable<'a> {
@@ -26,7 +54,7 @@ impl<'a> CoverageTable<'a> {
             }
             2 => {
                 let count = try_opt_or!(s.read::<u16>(), false);
-                let records = try_opt_or!(s.read_array16::<crate::raw::gdef::RangeRecord>(count), false);
+                let records = try_opt_or!(s.read_array16::<RangeRecord>(count), false);
                 records.into_iter().any(|r| r.range().contains(&glyph_id))
             }
             _ => false,
@@ -81,9 +109,9 @@ impl<'a> ClassDefinitionTable<'a> {
             }
             2 => {
                 let count: u16 = s.read()?;
-                let records = s.read_array16::<crate::raw::gdef::ClassRangeRecord>(count)?;
+                let records = s.read_array16::<RangeRecord>(count)?;
                 records.into_iter().find(|r| r.range().contains(&glyph_id))
-                    .map(|record| Class(record.class()))
+                    .map(|record| Class(record.value))
             }
             _ => None,
         }

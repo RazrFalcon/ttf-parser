@@ -49,7 +49,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Font::set_variation`
 - `Font::is_variable`
 - `Tag` type.
-- Initial GSUB/GPOS support.
 
 ### Fixed
 - Multiple issues due to arithmetic overflow.

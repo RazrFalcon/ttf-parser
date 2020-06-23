@@ -69,7 +69,6 @@ impl PlatformId {
 }
 
 
-#[cfg(feature = "std")]
 #[inline]
 fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
@@ -162,6 +161,7 @@ impl<'a> Name<'a> {
     ///
     /// Supports:
     /// - Unicode Platform ID
+    /// - Windows Platform ID + Symbol
     /// - Windows Platform ID + Unicode BMP
     #[cfg(feature = "std")]
     #[inline(never)]
@@ -173,9 +173,9 @@ impl<'a> Name<'a> {
         }
     }
 
-    #[cfg(feature = "std")]
+    /// Checks that the current Name data has a Unicode encoding.
     #[inline]
-    pub(crate) fn is_unicode(&self) -> bool {
+    pub fn is_unicode(&self) -> bool {
         is_unicode_encoding(self.platform_id().unwrap(), self.encoding_id())
     }
 

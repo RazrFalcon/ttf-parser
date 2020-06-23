@@ -73,11 +73,16 @@ impl PlatformId {
 #[inline]
 fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
+    const WINDOWS_SYMBOL_ENCODING_ID: u16 = 0;
     const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
 
     match platform_id {
         PlatformId::Unicode => true,
-        PlatformId::Windows if encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+        PlatformId::Windows => match encoding_id {
+            WINDOWS_SYMBOL_ENCODING_ID |
+            WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+            _ => false,
+        }
         _ => false,
     }
 }

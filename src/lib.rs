@@ -1276,8 +1276,10 @@ impl<'a> Font<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Option<Rect> {
-        if let Some(glyf_table) = self.glyf {
-            return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
+        if !self.is_variable() {
+            if let Some(glyf_table) = self.glyf {
+                return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
+            }
         }
 
         self.outline_glyph(glyph_id, &mut DummyOutline)

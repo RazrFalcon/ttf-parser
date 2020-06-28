@@ -7,9 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - `Name::is_unicode`
+- `Font::family_name` will load names with Windows Symbol encoding now.
 
 ### Fixed
-- `Font::family_name` will load names with Windows Symbol encoding now.
+- `Font::glyph_bounding_box` will apply variation in case of `gvar` fonts.
 
 ## [0.6.1] - 2020-05-19
 ### Fixed

@@ -1,10 +1,10 @@
 [package]
 name = "ttf-parser"
-version = "0.6.1"
+version = "0.6.2"
 authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
 keywords = ["ttf", "truetype", "opentype"]
 categories = ["parser-implementations"]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 description = "A high-level, safe, zero-allocation TrueType font parser."
 repository = "https://github.com/RazrFalcon/ttf-parser"
 documentation = "https://docs.rs/ttf-parser/"

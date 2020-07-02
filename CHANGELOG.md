@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.6.1] - 2020-07-02
 ### Added
 - `Name::is_unicode`
 - `Font::family_name` will load names with Windows Symbol encoding now.
@@ -127,7 +129,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.4.0...v0.5.0

@@ -4,13 +4,11 @@ use core::num::NonZeroU16;
 
 use crate::parser::Stream;
 
-
 const TABLE_SIZE: usize = 36;
 const ASCENDER_OFFSET: usize = 4;
 const DESCENDER_OFFSET: usize = 6;
 const LINE_GAP_OFFSET: usize = 8;
 const NUMBER_OF_H_METRICS_OFFSET: usize = 34;
-
 
 #[inline]
 pub fn parse(data: &[u8]) -> Option<&[u8]> {

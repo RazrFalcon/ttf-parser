@@ -2,9 +2,8 @@
 
 use core::convert::TryFrom;
 
+use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset32, Stream, U24};
 use crate::{GlyphId, PlatformId};
-use crate::parser::{Stream, FromData, Offset, Offset32, U24, LazyArray16, NumFrom};
-
 
 #[derive(Clone, Copy)]
 struct EncodingRecord {
@@ -27,7 +26,6 @@ impl FromData for EncodingRecord {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
     data: &'a [u8],
@@ -41,10 +39,7 @@ impl<'a> Table<'a> {
         let count: u16 = s.read()?;
         let records = s.read_array16(count)?;
 
-        Some(Table {
-            data,
-            records,
-        })
+        Some(Table { data, records })
     }
 }
 
@@ -68,25 +63,19 @@ pub fn glyph_index(table: &Table, c: char) -> Option<GlyphId> {
 
         let c = u32::from(c);
         let glyph = match format {
-            Format::ByteEncodingTable => {
-                parse_byte_encoding_table(s, c)
-            }
+            Format::ByteEncodingTable => parse_byte_encoding_table(s, c),
             Format::HighByteMappingThroughTable => {
                 parse_high_byte_mapping_through_table(subtable_data, c)
             }
             Format::SegmentMappingToDeltaValues => {
                 parse_segment_mapping_to_delta_values(subtable_data, c)
             }
-            Format::TrimmedTableMapping => {
-                parse_trimmed_table_mapping(s, c)
-            }
+            Format::TrimmedTableMapping => parse_trimmed_table_mapping(s, c),
             Format::MixedCoverage => {
                 // Unsupported.
                 continue;
             }
-            Format::TrimmedArray => {
-                parse_trimmed_array(s, c)
-            }
+            Format::TrimmedArray => parse_trimmed_array(s, c),
             Format::SegmentedCoverage | Format::ManyToOneRangeMappings => {
                 parse_segmented_coverage(s, c, format)
             }
@@ -123,7 +112,6 @@ pub fn glyph_variation_index(table: &Table, c: char, variation: char) -> Option<
     None
 }
 
-
 #[derive(Clone, Copy)]
 struct VariationSelectorRecord {
     var_selector: u32,
@@ -145,7 +133,6 @@ impl FromData for VariationSelectorRecord {
     }
 }
 
-
 #[derive(Clone, Copy)]
 struct UVSMappingRecord {
     unicode_value: u32,
@@ -164,7 +151,6 @@ impl FromData for UVSMappingRecord {
         })
     }
 }
-
 
 #[derive(Clone, Copy)]
 struct UnicodeRangeRecord {
@@ -191,7 +177,6 @@ impl FromData for UnicodeRangeRecord {
         })
     }
 }
-
 
 fn parse_unicode_variation_sequences(
     table: &Table,
@@ -321,8 +306,7 @@ fn parse_high_byte_mapping_through_table(data: &[u8], code_point: u32) -> Option
 
     // 'The value of the idRangeOffset is the number of bytes
     // past the actual location of the idRangeOffset'.
-    let offset =
-          sub_headers_offset
+    let offset = sub_headers_offset
         // Advance to required subheader.
         + SubHeaderRecord::SIZE * usize::from(i + 1)
         // Move back to idRangeOffset start.
@@ -463,7 +447,10 @@ fn parse_segmented_coverage(mut s: Stream, code_point: u32, format: Format) -> O
         let start_char_code = group.start_char_code;
         if code_point >= start_char_code && code_point <= group.end_char_code {
             let id = if format == Format::SegmentedCoverage {
-                group.start_glyph_id.checked_add(code_point)?.checked_sub(start_char_code)?
+                group
+                    .start_glyph_id
+                    .checked_add(code_point)?
+                    .checked_sub(start_char_code)?
             } else {
                 group.start_glyph_id
             };
@@ -474,7 +461,6 @@ fn parse_segmented_coverage(mut s: Stream, code_point: u32, format: Format) -> O
 
     None
 }
-
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Format {
@@ -491,11 +477,11 @@ enum Format {
 
 fn parse_format(v: u16) -> Option<Format> {
     match v {
-         0 => Some(Format::ByteEncodingTable),
-         2 => Some(Format::HighByteMappingThroughTable),
-         4 => Some(Format::SegmentMappingToDeltaValues),
-         6 => Some(Format::TrimmedTableMapping),
-         8 => Some(Format::MixedCoverage),
+        0 => Some(Format::ByteEncodingTable),
+        2 => Some(Format::HighByteMappingThroughTable),
+        4 => Some(Format::SegmentMappingToDeltaValues),
+        6 => Some(Format::TrimmedTableMapping),
+        8 => Some(Format::MixedCoverage),
         10 => Some(Format::TrimmedArray),
         12 => Some(Format::SegmentedCoverage),
         13 => Some(Format::ManyToOneRangeMappings),
@@ -517,8 +503,8 @@ fn is_unicode_encoding(format: Format, platform_id: PlatformId, encoding_id: u16
             // "Fonts that support Unicode supplementary-plane characters (U+10000 to U+10FFFF)
             // on the Windows platform must have a format 12 subtable for platform ID 3,
             // encoding ID 10."
-               encoding_id == WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID
-            && format == Format::SegmentedCoverage
+            encoding_id == WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID
+                && format == Format::SegmentedCoverage
         }
         _ => false,
     }

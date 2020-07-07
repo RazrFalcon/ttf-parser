@@ -1,8 +1,8 @@
 pub mod avar;
 pub mod cbdt;
 pub mod cblc;
-pub mod cff2;
 pub mod cff;
+pub mod cff2;
 pub mod cmap;
 pub mod fvar;
 pub mod gdef;

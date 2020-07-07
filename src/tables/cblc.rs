@@ -1,7 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cblc
 
+use crate::parser::{FromData, NumFrom, Offset, Offset16, Offset32, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, Offset, Offset16, Offset32, NumFrom};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum BitmapFormat {
@@ -26,11 +26,7 @@ pub struct Location {
     pub ppem: u16,
 }
 
-pub fn find_location(
-    data: &[u8],
-    glyph_id: GlyphId,
-    pixels_per_em: u16,
-) -> Option<Location> {
+pub fn find_location(data: &[u8], glyph_id: GlyphId, pixels_per_em: u16) -> Option<Location> {
     let mut s = Stream::new(data);
 
     // The CBLC table version is a bit tricky, so we are ignoring it for now.
@@ -101,7 +97,6 @@ pub fn find_location(
     })
 }
 
-
 #[derive(Clone, Copy)]
 struct BitmapSizeTable {
     subtable_array_offset: Offset32,
@@ -135,7 +130,9 @@ fn select_bitmap_size_table(
         }
 
         // Select a best matching subtable based on `pixels_per_em`.
-        if (pixels_per_em <= ppem && ppem < max_ppem) || (pixels_per_em > max_ppem && ppem > max_ppem) {
+        if (pixels_per_em <= ppem && ppem < max_ppem)
+            || (pixels_per_em > max_ppem && ppem > max_ppem)
+        {
             idx = Some(usize::num_from(i));
             max_ppem = ppem;
         }
@@ -154,7 +151,6 @@ fn select_bitmap_size_table(
         ppem: max_ppem,
     })
 }
-
 
 #[derive(Clone, Copy)]
 struct IndexSubtableInfo {
@@ -178,13 +174,12 @@ fn select_index_subtable(
             return Some(IndexSubtableInfo {
                 start_glyph_id,
                 offset,
-            })
+            });
         }
     }
 
     None
 }
-
 
 #[derive(Clone, Copy)]
 pub struct GlyphIdOffsetPair {

@@ -1,13 +1,10 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cbdt
 
-use crate::{RasterGlyphImage, RasterImageFormat};
-use crate::parser::{Stream, NumFrom};
 use super::cblc::{BitmapFormat, Location};
+use crate::parser::{NumFrom, Stream};
+use crate::{RasterGlyphImage, RasterImageFormat};
 
-pub fn parse(
-    data: &[u8],
-    location: Location,
-) -> Option<RasterGlyphImage> {
+pub fn parse(data: &[u8], location: Location) -> Option<RasterGlyphImage> {
     let mut s = Stream::new_at(data, location.offset)?;
     match location.format {
         BitmapFormat::Format17 => {

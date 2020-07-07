@@ -1,8 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/svg
 
+use crate::parser::{FromData, NumFrom, Offset, Offset32, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, Offset, Offset32, NumFrom};
-
 
 #[derive(Clone, Copy)]
 struct SvgDocumentRecord {
@@ -27,11 +26,7 @@ impl FromData for SvgDocumentRecord {
     }
 }
 
-
-pub fn parse(
-    data: &[u8],
-    glyph_id: GlyphId,
-) -> Option<&[u8]> {
+pub fn parse(data: &[u8], glyph_id: GlyphId) -> Option<&[u8]> {
     let mut s = Stream::new(data);
     s.skip::<u16>(); // version
     let doc_list_offset = s.read::<Option<Offset32>>()??;
@@ -39,7 +34,8 @@ pub fn parse(
     let mut s = Stream::new_at(data, doc_list_offset.to_usize())?;
     let count: u16 = s.read()?;
     let records = s.read_array16::<SvgDocumentRecord>(count)?;
-    let record = records.into_iter()
+    let record = records
+        .into_iter()
         .find(|rec| (rec.start_glyph_id..=rec.end_glyph_id).contains(&glyph_id))?;
 
     let svg_offset = record.svg_doc_offset?;

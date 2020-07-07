@@ -3,9 +3,8 @@
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
+use crate::parser::{FromData, LazyArray16, Stream};
 use crate::NormalizedCoord;
-use crate::parser::{Stream, FromData, LazyArray16};
-
 
 #[derive(Clone, Copy)]
 pub(crate) struct Table<'a> {
@@ -23,7 +22,7 @@ impl<'a> Table<'a> {
         }
 
         s.skip::<u16>(); // reserved
-        // TODO: check that `axisCount` is the same as in `fvar`?
+                         // TODO: check that `axisCount` is the same as in `fvar`?
         let axis_count: u16 = s.read()?;
         let axis_count = NonZeroU16::new(axis_count)?;
 
@@ -35,10 +34,7 @@ impl<'a> Table<'a> {
             s.advance_checked(AxisValueMapRecord::SIZE * usize::from(count))?;
         }
 
-        Some(Table {
-            axis_count,
-            data,
-        })
+        Some(Table { axis_count, data })
     }
 
     pub fn map_coordinates(&self, coordinates: &mut [NormalizedCoord]) -> Option<()> {
@@ -105,7 +101,6 @@ fn map_value(map: &LazyArray16<AxisValueMapRecord>, value: i16) -> Option<i16> {
     let value = prev_to + k / denom;
     i16::try_from(value).ok()
 }
-
 
 #[derive(Clone, Copy)]
 struct AxisValueMapRecord {

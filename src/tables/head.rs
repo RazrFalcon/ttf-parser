@@ -2,11 +2,9 @@
 
 use crate::parser::Stream;
 
-
 const TABLE_SIZE: usize = 54;
 const UNITS_PER_EM_OFFSET: usize = 18;
 const INDEX_TO_LOC_FORMAT_OFFSET: usize = 50;
-
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum IndexToLocationFormat {

@@ -2,9 +2,9 @@
 
 use core::convert::TryFrom;
 
-use crate::{GlyphId, NormalizedCoord};
-use crate::parser::{Stream, Offset, Offset32};
+use crate::parser::{Offset, Offset32, Stream};
 use crate::var_store::ItemVariationStore;
+use crate::{GlyphId, NormalizedCoord};
 
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
@@ -35,7 +35,6 @@ impl<'a> Table<'a> {
         })
     }
 }
-
 
 pub struct DeltaSetIndexMap<'a> {
     data: &'a [u8],
@@ -78,7 +77,7 @@ impl<'a> DeltaSetIndexMap<'a> {
         let inner_index = n & ((1 << inner_index_bit_count) - 1);
         Some((
             u16::try_from(outer_index).ok()?,
-            u16::try_from(inner_index).ok()?
+            u16::try_from(inner_index).ok()?,
         ))
     }
 }
@@ -99,7 +98,9 @@ pub(crate) fn glyph_advance_offset(
         (0, glyph_id.0)
     };
 
-    table.variation_store.parse_delta(outer_idx, inner_idx, coordinates)
+    table
+        .variation_store
+        .parse_delta(outer_idx, inner_idx, coordinates)
 }
 
 #[inline]
@@ -110,5 +111,7 @@ pub(crate) fn glyph_side_bearing_offset(
 ) -> Option<f32> {
     let set_data = table.data.get(table.lsb_mapping_offset?.to_usize()..)?;
     let (outer_idx, inner_idx) = DeltaSetIndexMap::new(set_data).map(glyph_id)?;
-    table.variation_store.parse_delta(outer_idx, inner_idx, coordinates)
+    table
+        .variation_store
+        .parse_delta(outer_idx, inner_idx, coordinates)
 }

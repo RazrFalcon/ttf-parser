@@ -14,7 +14,7 @@ fn main() {
         None => {
             eprint!("Error: failed to open a font.");
             std::process::exit(1);
-        },
+        }
     };
 
     println!("Family name: {:?}", font.family_name());
@@ -40,8 +40,10 @@ fn main() {
     if font.is_variable() {
         println!("Variation axes:");
         for axis in font.variation_axes() {
-            println!("  {} {}..{}, default {}",
-                     axis.tag, axis.min_value, axis.max_value, axis.def_value);
+            println!(
+                "  {} {}..{}, default {}",
+                axis.tag, axis.min_value, axis.max_value, axis.def_value
+            );
         }
     }
 

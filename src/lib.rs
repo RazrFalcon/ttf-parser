@@ -33,7 +33,6 @@ By doing so we can simplify an API quite a lot since otherwise, we will have to 
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.6.2")]
-
 #![no_std]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -67,16 +66,15 @@ mod var_store;
 #[cfg(feature = "std")]
 mod writer;
 
-use tables::*;
-use parser::{Stream, FromData, NumFrom, TryNumFrom, i16_bound, f32_bound};
-use head::IndexToLocationFormat;
 pub use fvar::{VariationAxes, VariationAxis};
 pub use gdef::GlyphClass;
 pub use ggg::*;
+use head::IndexToLocationFormat;
 pub use name::*;
 pub use os2::*;
+use parser::{f32_bound, i16_bound, FromData, NumFrom, Stream, TryNumFrom};
 pub use tables::kern;
-
+use tables::*;
 
 /// A type-safe wrapper for glyph ID.
 #[repr(transparent)]
@@ -91,7 +89,6 @@ impl FromData for GlyphId {
         u16::parse(data).map(GlyphId)
     }
 }
-
 
 /// A variation coordinate in a normalized coordinate system.
 ///
@@ -130,7 +127,6 @@ impl NormalizedCoord {
     }
 }
 
-
 /// A font variation value.
 ///
 /// # Example
@@ -148,7 +144,6 @@ pub struct Variation {
     pub value: f32,
 }
 
-
 /// A 4-byte tag.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -158,8 +153,10 @@ impl Tag {
     /// Creates a `Tag` from bytes.
     #[inline]
     pub const fn from_bytes(bytes: &[u8; 4]) -> Self {
-        Tag(((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16) |
-            ((bytes[2] as u32) << 8) | (bytes[3] as u32))
+        Tag(((bytes[0] as u32) << 24)
+            | ((bytes[1] as u32) << 16)
+            | ((bytes[2] as u32) << 8)
+            | (bytes[3] as u32))
     }
 
     /// Creates a `Tag` from bytes.
@@ -274,8 +271,6 @@ impl FromData for Tag {
     }
 }
 
-
-
 /// A line metrics.
 ///
 /// Used for underline and strikeout.
@@ -288,7 +283,6 @@ pub struct LineMetrics {
     /// Line thickness.
     pub thickness: i16,
 }
-
 
 /// A rectangle.
 #[repr(C)]
@@ -315,7 +309,6 @@ impl Rect {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct BBox {
     x_min: f32,
@@ -337,10 +330,10 @@ impl BBox {
 
     #[inline]
     fn is_default(&self) -> bool {
-        self.x_min == core::f32::MAX &&
-        self.y_min == core::f32::MAX &&
-        self.x_max == core::f32::MIN &&
-        self.y_max == core::f32::MIN
+        self.x_min == core::f32::MAX
+            && self.y_min == core::f32::MAX
+            && self.x_max == core::f32::MIN
+            && self.y_max == core::f32::MIN
     }
 
     #[inline]
@@ -361,7 +354,6 @@ impl BBox {
         })
     }
 }
-
 
 /// A trait for glyph outline construction.
 pub trait OutlineBuilder {
@@ -385,7 +377,6 @@ pub trait OutlineBuilder {
     fn close(&mut self);
 }
 
-
 struct DummyOutline;
 impl OutlineBuilder for DummyOutline {
     fn move_to(&mut self, _: f32, _: f32) {}
@@ -395,14 +386,12 @@ impl OutlineBuilder for DummyOutline {
     fn close(&mut self) {}
 }
 
-
 /// A glyph raster image format.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RasterImageFormat {
     PNG,
 }
-
 
 /// A glyph's raster image.
 ///
@@ -434,7 +423,6 @@ pub struct RasterGlyphImage<'a> {
     /// A raw image data. It's up to the caller to decode it.
     pub data: &'a [u8],
 }
-
 
 /// A table name.
 #[repr(C)]
@@ -470,7 +458,6 @@ pub enum TableName {
     WindowsMetrics,
 }
 
-
 #[derive(Clone, Copy)]
 struct TableRecord {
     table_tag: Tag,
@@ -495,7 +482,6 @@ impl FromData for TableRecord {
     }
 }
 
-
 const MAX_VAR_COORDS: u8 = 32;
 
 #[derive(Clone, Default)]
@@ -516,7 +502,6 @@ impl VarCoords {
         &mut self.data[0..end]
     }
 }
-
 
 /// A font data handle.
 #[derive(Clone)]
@@ -571,7 +556,7 @@ impl<'a> Font<'a> {
                 const OFFSET_32_SIZE: usize = 4;
                 let offset = OFFSET_TABLE_SIZE + OFFSET_32_SIZE * usize::num_from(index);
                 let font_offset: u32 = Stream::read_at(data, offset)?;
-                data.get(usize::num_from(font_offset) .. data.len())?
+                data.get(usize::num_from(font_offset)..data.len())?
             } else {
                 return None;
             }
@@ -709,33 +694,33 @@ impl<'a> Font<'a> {
     #[inline]
     pub fn has_table(&self, name: TableName) -> bool {
         match name {
-            TableName::Header                       => true,
-            TableName::HorizontalHeader             => true,
-            TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => self.avar.is_some(),
+            TableName::Header => true,
+            TableName::HorizontalHeader => true,
+            TableName::MaximumProfile => true,
+            TableName::AxisVariations => self.avar.is_some(),
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
-            TableName::ColorBitmapData              => self.cbdt.is_some(),
-            TableName::ColorBitmapLocation          => self.cblc.is_some(),
-            TableName::CompactFontFormat            => self.cff_.is_some(),
-            TableName::CompactFontFormat2           => self.cff2.is_some(),
-            TableName::FontVariations               => self.fvar.is_some(),
-            TableName::GlyphData                    => self.glyf.is_some(),
-            TableName::GlyphDefinition              => self.gdef.is_some(),
-            TableName::GlyphVariations              => self.gvar.is_some(),
-            TableName::HorizontalMetrics            => self.hmtx.is_some(),
-            TableName::HorizontalMetricsVariations  => self.hvar.is_some(),
-            TableName::IndexToLocation              => self.loca.is_some(),
-            TableName::Kerning                      => self.kern.is_some(),
-            TableName::MetricsVariations            => self.mvar.is_some(),
-            TableName::Naming                       => self.name.is_some(),
-            TableName::PostScript                   => self.post.is_some(),
-            TableName::ScalableVectorGraphics       => self.svg_.is_some(),
-            TableName::StandardBitmapGraphics       => self.sbix.is_some(),
-            TableName::VerticalHeader               => self.vhea.is_some(),
-            TableName::VerticalMetrics              => self.vmtx.is_some(),
-            TableName::VerticalMetricsVariations    => self.vvar.is_some(),
-            TableName::VerticalOrigin               => self.vorg.is_some(),
-            TableName::WindowsMetrics               => self.os_2.is_some(),
+            TableName::ColorBitmapData => self.cbdt.is_some(),
+            TableName::ColorBitmapLocation => self.cblc.is_some(),
+            TableName::CompactFontFormat => self.cff_.is_some(),
+            TableName::CompactFontFormat2 => self.cff2.is_some(),
+            TableName::FontVariations => self.fvar.is_some(),
+            TableName::GlyphData => self.glyf.is_some(),
+            TableName::GlyphDefinition => self.gdef.is_some(),
+            TableName::GlyphVariations => self.gvar.is_some(),
+            TableName::HorizontalMetrics => self.hmtx.is_some(),
+            TableName::HorizontalMetricsVariations => self.hvar.is_some(),
+            TableName::IndexToLocation => self.loca.is_some(),
+            TableName::Kerning => self.kern.is_some(),
+            TableName::MetricsVariations => self.mvar.is_some(),
+            TableName::Naming => self.name.is_some(),
+            TableName::PostScript => self.post.is_some(),
+            TableName::ScalableVectorGraphics => self.svg_.is_some(),
+            TableName::StandardBitmapGraphics => self.sbix.is_some(),
+            TableName::VerticalHeader => self.vhea.is_some(),
+            TableName::VerticalMetrics => self.vmtx.is_some(),
+            TableName::VerticalMetricsVariations => self.vvar.is_some(),
+            TableName::VerticalOrigin => self.vorg.is_some(),
+            TableName::WindowsMetrics => self.os_2.is_some(),
         }
     }
 
@@ -905,7 +890,8 @@ impl<'a> Font<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_ascender(&self) -> Option<i16> {
-        self.vhea.map(vhea::ascender)
+        self.vhea
+            .map(vhea::ascender)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vasc"), v))
     }
 
@@ -914,7 +900,8 @@ impl<'a> Font<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_descender(&self) -> Option<i16> {
-        self.vhea.map(vhea::descender)
+        self.vhea
+            .map(vhea::descender)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vdsc"), v))
     }
 
@@ -931,7 +918,8 @@ impl<'a> Font<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_line_gap(&self) -> Option<i16> {
-        self.vhea.map(vhea::line_gap)
+        self.vhea
+            .map(vhea::line_gap)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vlgp"), v))
     }
 
@@ -950,7 +938,8 @@ impl<'a> Font<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
-        self.os_2.and_then(|os_2| os_2.x_height())
+        self.os_2
+            .and_then(|os_2| os_2.x_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"xhgt"), v))
     }
 
@@ -1097,7 +1086,8 @@ impl<'a> Font<'a> {
             // Ignore variation offset when `hvar` is not set.
             if let Some(hvar_data) = self.hvar {
                 // We can't use `round()` in `no_std`, so this is the next best thing.
-                bearing += hvar::glyph_side_bearing_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+                bearing +=
+                    hvar::glyph_side_bearing_offset(hvar_data, glyph_id, self.coords())? + 0.5;
             }
         }
 
@@ -1115,7 +1105,8 @@ impl<'a> Font<'a> {
             // Ignore variation offset when `vvar` is not set.
             if let Some(vvar_data) = self.vvar {
                 // We can't use `round()` in `no_std`, so this is the next best thing.
-                bearing += hvar::glyph_side_bearing_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+                bearing +=
+                    hvar::glyph_side_bearing_offset(vvar_data, glyph_id, self.coords())? + 0.5;
             }
         }
 
@@ -1245,7 +1236,14 @@ impl<'a> Font<'a> {
         builder: &mut dyn OutlineBuilder,
     ) -> Option<Rect> {
         if let Some(ref gvar_table) = self.gvar {
-            return gvar::outline(self.loca?, self.glyf?, gvar_table, self.coords(), glyph_id, builder);
+            return gvar::outline(
+                self.loca?,
+                self.glyf?,
+                gvar_table,
+                self.coords(),
+                glyph_id,
+                builder,
+            );
         }
 
         if let Some(glyf_table) = self.glyf {
@@ -1306,7 +1304,11 @@ impl<'a> Font<'a> {
     /// There are multiple ways an image can be stored in a TrueType font
     /// and this method supports only `sbix`, `CBLC`+`CBDT`.
     #[inline]
-    pub fn glyph_raster_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<RasterGlyphImage> {
+    pub fn glyph_raster_image(
+        &self,
+        glyph_id: GlyphId,
+        pixels_per_em: u16,
+    ) -> Option<RasterGlyphImage> {
         if let Some(sbix_data) = self.sbix {
             return sbix::parse(sbix_data, self.number_of_glyphs, glyph_id, pixels_per_em, 0);
         }
@@ -1332,7 +1334,8 @@ impl<'a> Font<'a> {
     /// you should also try `outline_glyph()` afterwards.
     #[inline]
     pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
-        self.svg_.and_then(|svg_data| svg::parse(svg_data, glyph_id))
+        self.svg_
+            .and_then(|svg_data| svg::parse(svg_data, glyph_id))
     }
 
     /// Returns an iterator over variation axes.
@@ -1355,7 +1358,10 @@ impl<'a> Font<'a> {
             return None;
         }
 
-        let v = self.variation_axes().enumerate().find(|(_, a)| a.tag == axis);
+        let v = self
+            .variation_axes()
+            .enumerate()
+            .find(|(_, a)| a.tag == axis);
         if let Some((idx, a)) = v {
             if idx >= usize::from(MAX_VAR_COORDS) {
                 return None;
@@ -1377,7 +1383,9 @@ impl<'a> Font<'a> {
 
     #[inline]
     fn metrics_var_offset(&self, tag: Tag) -> f32 {
-        self.mvar.and_then(|table| table.metrics_offset(tag, self.coords())).unwrap_or(0.0)
+        self.mvar
+            .and_then(|table| table.metrics_offset(tag, self.coords()))
+            .unwrap_or(0.0)
     }
 
     #[inline]
@@ -1423,7 +1431,6 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     s.read()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1468,9 +1475,9 @@ mod tests {
         let data = writer::convert(&[
             TrueTypeMagic,
             UInt16(std::u16::MAX), // numTables
-            UInt16(0), // searchRange
-            UInt16(0), // entrySelector
-            UInt16(0), // rangeShift
+            UInt16(0),             // searchRange
+            UInt16(0),             // entrySelector
+            UInt16(0),             // rangeShift
         ]);
 
         assert!(Font::from_data(&data, 0).is_none());
@@ -1519,8 +1526,8 @@ mod tests {
     fn font_collection_num_fonts_overflow() {
         let data = writer::convert(&[
             FontCollectionMagic,
-            UInt16(1), // majorVersion
-            UInt16(0), // minorVersion
+            UInt16(1),             // majorVersion
+            UInt16(0),             // minorVersion
             UInt32(std::u32::MAX), // numFonts
         ]);
 
@@ -1545,8 +1552,8 @@ mod tests {
     fn font_index_overflow_2() {
         let data = writer::convert(&[
             FontCollectionMagic,
-            UInt16(1), // majorVersion
-            UInt16(0), // minorVersion
+            UInt16(1),             // majorVersion
+            UInt16(0),             // minorVersion
             UInt32(std::u32::MAX), // numFonts
         ]);
 

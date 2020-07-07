@@ -1,8 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
-use crate::{LineMetrics, GlyphId};
-use crate::parser::{Stream, LazyArray16};
-
+use crate::parser::{LazyArray16, Stream};
+use crate::{GlyphId, LineMetrics};
 
 const TABLE_SIZE: usize = 32;
 const UNDERLINE_POSITION_OFFSET: usize = 8;
@@ -270,7 +269,6 @@ const MACINTOSH_NAMES: &[&str] = &[
     "dcroat",
 ];
 
-
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
     underline: LineMetrics,
@@ -285,9 +283,11 @@ impl<'a> Table<'a> {
         }
 
         let version: u32 = Stream::new(data).read()?;
-        if !(version == 0x00010000 || version == 0x00020000 ||
-             version == 0x00025000 || version == 0x00030000 ||
-             version == 0x00040000)
+        if !(version == 0x00010000
+            || version == 0x00020000
+            || version == 0x00025000
+            || version == 0x00030000
+            || version == 0x00040000)
         {
             return None;
         }

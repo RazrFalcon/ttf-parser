@@ -2,9 +2,8 @@
 
 use core::num::NonZeroU16;
 
+use crate::parser::{FromData, LazyArray16, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
-
 
 #[derive(Clone, Copy)]
 struct HorizontalMetrics {
@@ -24,7 +23,6 @@ impl FromData for HorizontalMetrics {
         })
     }
 }
-
 
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
@@ -108,14 +106,16 @@ mod tests {
     use writer::TtfType::*;
 
     macro_rules! nzu16 {
-        ($n:expr) => { NonZeroU16::new($n).unwrap() };
+        ($n:expr) => {
+            NonZeroU16::new($n).unwrap()
+        };
     }
 
     #[test]
     fn simple_case() {
         let data = writer::convert(&[
             UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
+            Int16(2),  // sideBearing[0]
         ]);
 
         let table = Table::parse(&data, nzu16!(1), nzu16!(1)).unwrap();
@@ -132,8 +132,8 @@ mod tests {
     fn smaller_than_glyphs_count() {
         let data = writer::convert(&[
             UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
-            Int16(3), // sideBearing[1]
+            Int16(2),  // sideBearing[0]
+            Int16(3),  // sideBearing[1]
         ]);
 
         let table = Table::parse(&data, nzu16!(1), nzu16!(2)).unwrap();
@@ -147,10 +147,10 @@ mod tests {
     fn less_metrics_than_glyphs() {
         let data = writer::convert(&[
             UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
+            Int16(2),  // sideBearing[0]
             UInt16(3), // advanceWidth[1]
-            Int16(4), // sideBearing[1]
-            Int16(5), // sideBearing[2]
+            Int16(4),  // sideBearing[1]
+            Int16(5),  // sideBearing[2]
         ]);
 
         let table = Table::parse(&data, nzu16!(2), nzu16!(1)).unwrap();
@@ -163,7 +163,7 @@ mod tests {
     fn glyph_out_of_bounds_0() {
         let data = writer::convert(&[
             UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
+            Int16(2),  // sideBearing[0]
         ]);
 
         let table = Table::parse(&data, nzu16!(1), nzu16!(1)).unwrap();
@@ -177,8 +177,8 @@ mod tests {
     fn glyph_out_of_bounds_1() {
         let data = writer::convert(&[
             UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
-            Int16(3), // sideBearing[1]
+            Int16(2),  // sideBearing[0]
+            Int16(3),  // sideBearing[1]
         ]);
 
         let table = Table::parse(&data, nzu16!(1), nzu16!(2)).unwrap();

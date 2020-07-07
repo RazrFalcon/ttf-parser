@@ -1,8 +1,7 @@
 //! Common types for GDEF, GPOS and GSUB tables.
 
-use crate::GlyphId;
 use crate::parser::*;
-
+use crate::GlyphId;
 
 #[derive(Clone, Copy)]
 struct RangeRecord {
@@ -31,7 +30,6 @@ impl FromData for RangeRecord {
     }
 }
 
-
 /// A [Coverage Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-table).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CoverageTable<'a> {
@@ -50,7 +48,10 @@ impl<'a> CoverageTable<'a> {
         match format {
             1 => {
                 let count = try_opt_or!(s.read::<u16>(), false);
-                s.read_array16::<GlyphId>(count).unwrap().binary_search(&glyph_id).is_some()
+                s.read_array16::<GlyphId>(count)
+                    .unwrap()
+                    .binary_search(&glyph_id)
+                    .is_some()
             }
             2 => {
                 let count = try_opt_or!(s.read::<u16>(), false);
@@ -61,7 +62,6 @@ impl<'a> CoverageTable<'a> {
         }
     }
 }
-
 
 /// A value of [Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table).
 #[repr(C)]
@@ -76,7 +76,6 @@ impl FromData for Class {
         u16::parse(data).map(Class)
     }
 }
-
 
 /// A [Class Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table).
 #[derive(Clone, Copy)]
@@ -113,7 +112,9 @@ impl<'a> ClassDefinitionTable<'a> {
             2 => {
                 let count: u16 = s.read()?;
                 let records = s.read_array16::<RangeRecord>(count)?;
-                records.into_iter().find(|r| r.range().contains(&glyph_id))
+                records
+                    .into_iter()
+                    .find(|r| r.range().contains(&glyph_id))
                     .map(|record| Class(record.value))
             }
             _ => None,

@@ -90,7 +90,8 @@ fn glyph_hor_side_bearing(bencher: &mut bencher::Bencher) {
     })
 }
 
-bencher::benchmark_group!(perf,
+bencher::benchmark_group!(
+    perf,
     units_per_em,
     width,
     ascender,

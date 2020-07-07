@@ -2,9 +2,10 @@
 
 use core::num::NonZeroU16;
 
-use crate::{Tag, NormalizedCoord};
-use crate::parser::{Stream, FromData, Fixed, Offset16, Offset, LazyArray16, LazyArrayIter16, f32_bound};
-
+use crate::parser::{
+    f32_bound, Fixed, FromData, LazyArray16, LazyArrayIter16, Offset, Offset16, Stream,
+};
+use crate::{NormalizedCoord, Tag};
 
 /// A [variation axis](https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord).
 #[allow(missing_docs)]
@@ -39,7 +40,6 @@ impl VariationAxis {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub(crate) struct Table<'a> {
     axes: LazyArray16<'a, VariationAxisRecord>,
@@ -69,12 +69,13 @@ impl<'a> Table<'a> {
     }
 
     pub fn axes(&self) -> VariationAxes<'a> {
-        VariationAxes { iter: self.axes.into_iter() }
+        VariationAxes {
+            iter: self.axes.into_iter(),
+        }
     }
 
     // TODO: add axis_by_tag
 }
-
 
 /// An iterator over variation axes.
 #[allow(missing_debug_implementations)]
@@ -109,7 +110,6 @@ impl<'a> Iterator for VariationAxes<'a> {
         self.iter.count()
     }
 }
-
 
 #[derive(Clone, Copy)]
 struct VariationAxisRecord {

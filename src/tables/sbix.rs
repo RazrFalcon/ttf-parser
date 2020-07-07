@@ -3,8 +3,8 @@
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
+use crate::parser::{FromData, Offset, Offset32, Stream};
 use crate::{GlyphId, RasterGlyphImage, RasterImageFormat, Tag};
-use crate::parser::{Stream, FromData, Offset, Offset32};
 
 pub fn parse(
     data: &[u8],
@@ -42,8 +42,8 @@ pub fn parse(
             let ppem: u16 = s.read()?;
             s.skip::<u16>(); // ppi
 
-            if (pixels_per_em <= ppem && ppem < max_ppem) ||
-                (pixels_per_em > max_ppem && ppem > max_ppem)
+            if (pixels_per_em <= ppem && ppem < max_ppem)
+                || (pixels_per_em > max_ppem && ppem > max_ppem)
             {
                 idx = i as u32;
                 max_ppem = ppem;
@@ -58,7 +58,9 @@ pub fn parse(
 
     let glyph_offsets = s.read_array32::<Offset32>(total_glyphs)?;
     let start = glyph_offsets.get(u32::from(glyph_id.0))?.to_usize();
-    let end = glyph_offsets.get(u32::from(glyph_id.0.checked_add(1)?))?.to_usize();
+    let end = glyph_offsets
+        .get(u32::from(glyph_id.0.checked_add(1)?))?
+        .to_usize();
 
     if start == end {
         // No bitmap data for that glyph.
@@ -114,8 +116,5 @@ fn png_size(data: &[u8]) -> Option<(u16, u16)> {
     let height: u32 = s.read()?;
 
     // PNG size larger than u16::MAX is an error.
-    Some((
-        u16::try_from(width).ok()?,
-        u16::try_from(height).ok()?,
-    ))
+    Some((u16::try_from(width).ok()?, u16::try_from(height).ok()?))
 }

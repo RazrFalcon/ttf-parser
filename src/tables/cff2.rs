@@ -4,14 +4,13 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoord};
-use crate::parser::{Stream, Fixed, NumFrom, TryNumFrom};
-use crate::var_store::*;
 use crate::cff::{
-    Builder, DataIndex, IsEven, Operator, ArgumentsStack, CFFError,
-    calc_subroutine_bias, f32_abs, parse_number, skip_number, parse_index_impl,
-    is_dict_one_byte_op, conv_subroutine_index
+    calc_subroutine_bias, conv_subroutine_index, f32_abs, is_dict_one_byte_op, parse_index_impl,
+    parse_number, skip_number, ArgumentsStack, Builder, CFFError, DataIndex, IsEven, Operator,
 };
+use crate::parser::{Fixed, NumFrom, Stream, TryNumFrom};
+use crate::var_store::*;
+use crate::{BBox, GlyphId, NormalizedCoord, OutlineBuilder, Rect};
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cff2#7-top-dict-data
 // 'Operators in DICT may be preceded by up to a maximum of 513 operands.'
@@ -25,42 +24,42 @@ const TWO_BYTE_OPERATOR_MARK: u8 = 12;
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cff2charstr#4-charstring-operators
 mod operator {
-    pub const HORIZONTAL_STEM: u8           = 1;
-    pub const VERTICAL_STEM: u8             = 3;
-    pub const VERTICAL_MOVE_TO: u8          = 4;
-    pub const LINE_TO: u8                   = 5;
-    pub const HORIZONTAL_LINE_TO: u8        = 6;
-    pub const VERTICAL_LINE_TO: u8          = 7;
-    pub const CURVE_TO: u8                  = 8;
-    pub const CALL_LOCAL_SUBROUTINE: u8     = 10;
-    pub const VS_INDEX: u8                  = 15;
-    pub const BLEND: u8                     = 16;
+    pub const HORIZONTAL_STEM: u8 = 1;
+    pub const VERTICAL_STEM: u8 = 3;
+    pub const VERTICAL_MOVE_TO: u8 = 4;
+    pub const LINE_TO: u8 = 5;
+    pub const HORIZONTAL_LINE_TO: u8 = 6;
+    pub const VERTICAL_LINE_TO: u8 = 7;
+    pub const CURVE_TO: u8 = 8;
+    pub const CALL_LOCAL_SUBROUTINE: u8 = 10;
+    pub const VS_INDEX: u8 = 15;
+    pub const BLEND: u8 = 16;
     pub const HORIZONTAL_STEM_HINT_MASK: u8 = 18;
-    pub const HINT_MASK: u8                 = 19;
-    pub const COUNTER_MASK: u8              = 20;
-    pub const MOVE_TO: u8                   = 21;
-    pub const HORIZONTAL_MOVE_TO: u8        = 22;
-    pub const VERTICAL_STEM_HINT_MASK: u8   = 23;
-    pub const CURVE_LINE: u8                = 24;
-    pub const LINE_CURVE: u8                = 25;
-    pub const VV_CURVE_TO: u8               = 26;
-    pub const HH_CURVE_TO: u8               = 27;
-    pub const SHORT_INT: u8                 = 28;
-    pub const CALL_GLOBAL_SUBROUTINE: u8    = 29;
-    pub const VH_CURVE_TO: u8               = 30;
-    pub const HV_CURVE_TO: u8               = 31;
-    pub const HFLEX: u8                     = 34;
-    pub const FLEX: u8                      = 35;
-    pub const HFLEX1: u8                    = 36;
-    pub const FLEX1: u8                     = 37;
-    pub const FIXED_16_16: u8               = 255;
+    pub const HINT_MASK: u8 = 19;
+    pub const COUNTER_MASK: u8 = 20;
+    pub const MOVE_TO: u8 = 21;
+    pub const HORIZONTAL_MOVE_TO: u8 = 22;
+    pub const VERTICAL_STEM_HINT_MASK: u8 = 23;
+    pub const CURVE_LINE: u8 = 24;
+    pub const LINE_CURVE: u8 = 25;
+    pub const VV_CURVE_TO: u8 = 26;
+    pub const HH_CURVE_TO: u8 = 27;
+    pub const SHORT_INT: u8 = 28;
+    pub const CALL_GLOBAL_SUBROUTINE: u8 = 29;
+    pub const VH_CURVE_TO: u8 = 30;
+    pub const HV_CURVE_TO: u8 = 31;
+    pub const HFLEX: u8 = 34;
+    pub const FLEX: u8 = 35;
+    pub const HFLEX1: u8 = 36;
+    pub const FLEX1: u8 = 37;
+    pub const FIXED_16_16: u8 = 255;
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cff2#table-9-top-dict-operator-entries
 mod top_dict_operator {
-    pub const CHAR_STRINGS_OFFSET: u16      = 17;
-    pub const VARIATION_STORE_OFFSET: u16   = 24;
-    pub const FONT_DICT_INDEX_OFFSET: u16   = 1236;
+    pub const CHAR_STRINGS_OFFSET: u16 = 17;
+    pub const VARIATION_STORE_OFFSET: u16 = 24;
+    pub const FONT_DICT_INDEX_OFFSET: u16 = 1236;
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cff2#table-10-font-dict-operator-entries
@@ -72,7 +71,6 @@ mod font_dict_operator {
 mod private_dict_operator {
     pub const LOCAL_SUBROUTINES_OFFSET: u16 = 19;
 }
-
 
 #[derive(Clone, Copy, Default)]
 pub struct Metadata<'a> {
@@ -142,7 +140,6 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
 
     Some(metadata)
 }
-
 
 pub(crate) fn outline(
     metadata: &Metadata,
@@ -303,12 +300,19 @@ impl CharStringParserContext<'_> {
     fn update_scalars(&mut self, index: u16) -> Result<(), CFFError> {
         self.scalars.clear();
 
-        let indices = self.metadata.item_variation_store.region_indices(index)
+        let indices = self
+            .metadata
+            .item_variation_store
+            .region_indices(index)
             .ok_or(CFFError::InvalidItemVariationDataIndex)?;
         for index in indices {
-            let scalar = self.metadata.item_variation_store.regions
+            let scalar = self
+                .metadata
+                .item_variation_store
+                .regions
                 .evaluate_region(index, self.coordinates);
-            self.scalars.push(scalar)
+            self.scalars
+                .push(scalar)
                 .ok_or(CFFError::BlendRegionsLimitReached)?;
         }
 
@@ -380,10 +384,10 @@ fn _parse_char_string(
                 // Reserved.
                 return Err(CFFError::InvalidOperator);
             }
-            operator::HORIZONTAL_STEM |
-            operator::VERTICAL_STEM |
-            operator::HORIZONTAL_STEM_HINT_MASK |
-            operator::VERTICAL_STEM_HINT_MASK => {
+            operator::HORIZONTAL_STEM
+            | operator::VERTICAL_STEM
+            | operator::HORIZONTAL_STEM_HINT_MASK
+            | operator::VERTICAL_STEM_HINT_MASK => {
                 // y dy {dya dyb}* hstem
                 // x dx {dxa dxb}* vstem
                 // y dy {dya dyb}* hstemhm
@@ -530,7 +534,10 @@ fn _parse_char_string(
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len());
                 let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
-                let char_string = ctx.metadata.local_subrs.get(index)
+                let char_string = ctx
+                    .metadata
+                    .local_subrs
+                    .get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
@@ -688,8 +695,8 @@ fn _parse_char_string(
 
                 ctx.had_blend = true;
 
-                let n = u16::try_num_from(stack.pop())
-                    .ok_or(CFFError::InvalidNumberOfBlendOperands)?;
+                let n =
+                    u16::try_num_from(stack.pop()).ok_or(CFFError::InvalidNumberOfBlendOperands)?;
                 let k = ctx.scalars.len();
 
                 let len = usize::from(n) * (usize::from(k) + 1);
@@ -902,7 +909,10 @@ fn _parse_char_string(
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.global_subrs.len());
                 let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
-                let char_string = ctx.metadata.global_subrs.get(index)
+                let char_string = ctx
+                    .metadata
+                    .global_subrs
+                    .get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
@@ -1032,7 +1042,6 @@ fn parse_index<'a>(s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
     }
 }
 
-
 struct DictionaryParser<'a> {
     data: &'a [u8],
     // The current offset.
@@ -1120,19 +1129,18 @@ impl<'a> DictionaryParser<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cff::parse_index_impl;
     use crate::writer;
     use writer::TtfType::*;
-    use crate::cff::parse_index_impl;
 
     #[test]
     fn index_data_offsets_len_overflow() {
         let data = writer::convert(&[
             UInt8(4), // offset size
-            // other data doesn't matter
+                      // other data doesn't matter
         ]);
 
         assert!(parse_index_impl(std::u32::MAX / 2, &mut Stream::new(&data)).is_none());

@@ -1,20 +1,18 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 
-use crate::GlyphId;
-use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16};
 use crate::ggg::{Class, ClassDefinitionTable, CoverageTable};
-
+use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream};
+use crate::GlyphId;
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
 pub enum GlyphClass {
-    Base      = 1,
-    Ligature  = 2,
-    Mark      = 3,
+    Base = 1,
+    Ligature = 2,
+    Mark = 3,
     Component = 4,
 }
-
 
 #[derive(Clone, Copy, Default)]
 pub struct Table<'a> {
@@ -105,11 +103,7 @@ impl<'a> Table<'a> {
 }
 
 #[inline(never)]
-fn is_mark_glyph_impl(
-    table: &Table,
-    glyph_id: GlyphId,
-    set_index: Option<u16>,
-) -> Option<()> {
+fn is_mark_glyph_impl(table: &Table, glyph_id: GlyphId, set_index: Option<u16>) -> Option<()> {
     let (data, offsets) = table.mark_glyph_coverage_offsets?;
 
     if let Some(set_index) = set_index {

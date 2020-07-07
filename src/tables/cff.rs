@@ -6,8 +6,8 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::{GlyphId, OutlineBuilder, Rect, BBox};
-use crate::parser::{Stream, U24, Fixed, FromData, NumFrom, TryNumFrom};
+use crate::parser::{Fixed, FromData, NumFrom, Stream, TryNumFrom, U24};
+use crate::{BBox, GlyphId, OutlineBuilder, Rect};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: u8 = 48;
@@ -22,41 +22,41 @@ const TWO_BYTE_OPERATOR_MARK: u8 = 12;
 
 /// Enumerates some operators defined in the Adobe Technical Note #5177.
 mod operator {
-    pub const HORIZONTAL_STEM: u8           = 1;
-    pub const VERTICAL_STEM: u8             = 3;
-    pub const VERTICAL_MOVE_TO: u8          = 4;
-    pub const LINE_TO: u8                   = 5;
-    pub const HORIZONTAL_LINE_TO: u8        = 6;
-    pub const VERTICAL_LINE_TO: u8          = 7;
-    pub const CURVE_TO: u8                  = 8;
-    pub const CALL_LOCAL_SUBROUTINE: u8     = 10;
-    pub const RETURN: u8                    = 11;
-    pub const ENDCHAR: u8                   = 14;
+    pub const HORIZONTAL_STEM: u8 = 1;
+    pub const VERTICAL_STEM: u8 = 3;
+    pub const VERTICAL_MOVE_TO: u8 = 4;
+    pub const LINE_TO: u8 = 5;
+    pub const HORIZONTAL_LINE_TO: u8 = 6;
+    pub const VERTICAL_LINE_TO: u8 = 7;
+    pub const CURVE_TO: u8 = 8;
+    pub const CALL_LOCAL_SUBROUTINE: u8 = 10;
+    pub const RETURN: u8 = 11;
+    pub const ENDCHAR: u8 = 14;
     pub const HORIZONTAL_STEM_HINT_MASK: u8 = 18;
-    pub const HINT_MASK: u8                 = 19;
-    pub const COUNTER_MASK: u8              = 20;
-    pub const MOVE_TO: u8                   = 21;
-    pub const HORIZONTAL_MOVE_TO: u8        = 22;
-    pub const VERTICAL_STEM_HINT_MASK: u8   = 23;
-    pub const CURVE_LINE: u8                = 24;
-    pub const LINE_CURVE: u8                = 25;
-    pub const VV_CURVE_TO: u8               = 26;
-    pub const HH_CURVE_TO: u8               = 27;
-    pub const SHORT_INT: u8                 = 28;
-    pub const CALL_GLOBAL_SUBROUTINE: u8    = 29;
-    pub const VH_CURVE_TO: u8               = 30;
-    pub const HV_CURVE_TO: u8               = 31;
-    pub const HFLEX: u8                     = 34;
-    pub const FLEX: u8                      = 35;
-    pub const HFLEX1: u8                    = 36;
-    pub const FLEX1: u8                     = 37;
-    pub const FIXED_16_16: u8               = 255;
+    pub const HINT_MASK: u8 = 19;
+    pub const COUNTER_MASK: u8 = 20;
+    pub const MOVE_TO: u8 = 21;
+    pub const HORIZONTAL_MOVE_TO: u8 = 22;
+    pub const VERTICAL_STEM_HINT_MASK: u8 = 23;
+    pub const CURVE_LINE: u8 = 24;
+    pub const LINE_CURVE: u8 = 25;
+    pub const VV_CURVE_TO: u8 = 26;
+    pub const HH_CURVE_TO: u8 = 27;
+    pub const SHORT_INT: u8 = 28;
+    pub const CALL_GLOBAL_SUBROUTINE: u8 = 29;
+    pub const VH_CURVE_TO: u8 = 30;
+    pub const HV_CURVE_TO: u8 = 31;
+    pub const HFLEX: u8 = 34;
+    pub const FLEX: u8 = 35;
+    pub const HFLEX1: u8 = 36;
+    pub const FLEX1: u8 = 37;
+    pub const FIXED_16_16: u8 = 255;
 }
 
 /// Enumerates some operators defined in the Adobe Technical Note #5176,
 /// Table 9 Top DICT Operator Entries
 mod top_dict_operator {
-    pub const CHAR_STRINGS_OFFSET: u16          = 17;
+    pub const CHAR_STRINGS_OFFSET: u16 = 17;
     pub const PRIVATE_DICT_SIZE_AND_OFFSET: u16 = 18;
 }
 
@@ -65,7 +65,6 @@ mod top_dict_operator {
 mod private_dict_operator {
     pub const LOCAL_SUBROUTINES_OFFSET: u16 = 19;
 }
-
 
 /// A list of errors that can occur during a CFF table parsing.
 #[derive(Clone, Copy, Debug)]
@@ -86,7 +85,6 @@ pub enum CFFError {
     InvalidNumberOfBlendOperands,
     BlendRegionsLimitReached,
 }
-
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Metadata<'a> {
@@ -157,7 +155,6 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
 
     Some(metadata)
 }
-
 
 pub fn outline(
     metadata: &Metadata,
@@ -278,7 +275,6 @@ fn parse_char_string(
     bbox.to_rect().ok_or(CFFError::BboxOverflow)
 }
 
-
 pub(crate) struct Builder<'a> {
     pub builder: &'a mut dyn OutlineBuilder,
     pub bbox: BBox,
@@ -328,10 +324,10 @@ fn _parse_char_string(
                 // Reserved.
                 return Err(CFFError::InvalidOperator);
             }
-            operator::HORIZONTAL_STEM |
-            operator::VERTICAL_STEM |
-            operator::HORIZONTAL_STEM_HINT_MASK |
-            operator::VERTICAL_STEM_HINT_MASK => {
+            operator::HORIZONTAL_STEM
+            | operator::VERTICAL_STEM
+            | operator::HORIZONTAL_STEM_HINT_MASK
+            | operator::VERTICAL_STEM_HINT_MASK => {
                 // y dy {dya dyb}* hstem
                 // x dx {dxa dxb}* vstem
                 // y dy {dya dyb}* hstemhm
@@ -490,7 +486,10 @@ fn _parse_char_string(
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len());
                 let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
-                let char_string = ctx.metadata.local_subrs.get(index)
+                let char_string = ctx
+                    .metadata
+                    .local_subrs
+                    .get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
@@ -864,7 +863,10 @@ fn _parse_char_string(
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.global_subrs.len());
                 let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
-                let char_string = ctx.metadata.global_subrs.get(index)
+                let char_string = ctx
+                    .metadata
+                    .global_subrs
+                    .get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
                 let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
                 x = pos.0;
@@ -1037,9 +1039,7 @@ pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<DataIndex<
             let data = s.read_bytes(usize::num_from(last_offset))?;
             Some(DataIndex { data, offsets })
         }
-        None => {
-            Some(DataIndex::default())
-        }
+        None => Some(DataIndex::default()),
     }
 }
 
@@ -1060,7 +1060,6 @@ fn skip_index(s: &mut Stream) -> Option<()> {
 
     Some(())
 }
-
 
 #[derive(Clone, Copy, Debug)]
 pub struct VarOffsets<'a> {
@@ -1115,7 +1114,6 @@ impl<'a> VarOffsets<'a> {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub struct DataIndex<'a> {
     pub data: &'a [u8],
@@ -1127,7 +1125,10 @@ impl<'a> Default for DataIndex<'a> {
     fn default() -> Self {
         DataIndex {
             data: b"",
-            offsets: VarOffsets { data: b"", offset_size: OffsetSize::Size1 },
+            offsets: VarOffsets {
+                data: b"",
+                offset_size: OffsetSize::Size1,
+            },
         }
     }
 }
@@ -1192,7 +1193,6 @@ impl<'a> Iterator for DataIndexIter<'a> {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub enum OffsetSize {
     Size1 = 1,
@@ -1202,8 +1202,14 @@ pub enum OffsetSize {
 }
 
 impl OffsetSize {
-    #[inline] fn to_u32(self) -> u32 { self as u32 }
-    #[inline] fn to_usize(self) -> usize { self as usize }
+    #[inline]
+    fn to_u32(self) -> u32 {
+        self as u32
+    }
+    #[inline]
+    fn to_usize(self) -> usize {
+        self as usize
+    }
 }
 
 #[inline]
@@ -1217,15 +1223,15 @@ fn try_parse_offset_size(s: &mut Stream) -> Option<OffsetSize> {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub struct Operator(pub u16);
 
 impl Operator {
     #[inline]
-    pub fn get(self) -> u16 { self.0 }
+    pub fn get(self) -> u16 {
+        self.0
+    }
 }
-
 
 struct DictionaryParser<'a> {
     data: &'a [u8],
@@ -1321,10 +1327,10 @@ impl<'a> DictionaryParser<'a> {
 pub fn is_dict_one_byte_op(b: u8) -> bool {
     match b {
         0..=27 => true,
-        28..=30 => false, // numbers
-        31 => true, // Reserved
+        28..=30 => false,  // numbers
+        31 => true,        // Reserved
         32..=254 => false, // numbers
-        255 => true, // Reserved
+        255 => true,       // Reserved
     }
 }
 
@@ -1394,7 +1400,6 @@ pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
     Some(())
 }
 
-
 pub struct ArgumentsStack<'a> {
     pub data: &'a mut [f32],
     pub len: usize,
@@ -1458,7 +1463,6 @@ impl core::fmt::Debug for ArgumentsStack<'_> {
     }
 }
 
-
 pub trait IsEven {
     fn is_even(&self) -> bool;
     fn is_odd(&self) -> bool;
@@ -1466,10 +1470,14 @@ pub trait IsEven {
 
 impl IsEven for usize {
     #[inline]
-    fn is_even(&self) -> bool { (*self) & 1 == 0 }
+    fn is_even(&self) -> bool {
+        (*self) & 1 == 0
+    }
 
     #[inline]
-    fn is_odd(&self) -> bool { !self.is_even() }
+    fn is_odd(&self) -> bool {
+        !self.is_even()
+    }
 }
 
 #[cfg(feature = "std")]
@@ -1481,17 +1489,20 @@ pub fn f32_abs(n: f32) -> f32 {
 #[cfg(not(feature = "std"))]
 #[inline]
 pub fn f32_abs(n: f32) -> f32 {
-    if n.is_sign_negative() { -n } else { n }
+    if n.is_sign_negative() {
+        -n
+    } else {
+        n
+    }
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::vec::Vec;
-    use std::string::{String, ToString};
-    use std::fmt::Write;
     use crate::writer;
+    use std::fmt::Write;
+    use std::string::{String, ToString};
+    use std::vec::Vec;
     use writer::TtfType::*;
 
     struct Builder(String);
@@ -1520,42 +1531,22 @@ mod tests {
     impl core::fmt::Display for CFFError {
         fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
             match *self {
-                CFFError::ReadOutOfBounds => {
-                    write!(f, "read out of bounds")
-                }
-                CFFError::ZeroBBox => {
-                    write!(f, "zero bbox")
-                }
-                CFFError::InvalidOperator => {
-                    write!(f, "an invalid operator occurred")
-                }
-                CFFError::UnsupportedOperator => {
-                    write!(f, "an unsupported operator occurred")
-                }
-                CFFError::MissingEndChar => {
-                    write!(f, "the 'endchar' operator is missing")
-                }
+                CFFError::ReadOutOfBounds => write!(f, "read out of bounds"),
+                CFFError::ZeroBBox => write!(f, "zero bbox"),
+                CFFError::InvalidOperator => write!(f, "an invalid operator occurred"),
+                CFFError::UnsupportedOperator => write!(f, "an unsupported operator occurred"),
+                CFFError::MissingEndChar => write!(f, "the 'endchar' operator is missing"),
                 CFFError::DataAfterEndChar => {
                     write!(f, "unused data left after 'endchar' operator")
                 }
-                CFFError::NestingLimitReached => {
-                    write!(f, "subroutines nesting limit reached")
-                }
-                CFFError::ArgumentsStackLimitReached => {
-                    write!(f, "arguments stack limit reached")
-                }
+                CFFError::NestingLimitReached => write!(f, "subroutines nesting limit reached"),
+                CFFError::ArgumentsStackLimitReached => write!(f, "arguments stack limit reached"),
                 CFFError::InvalidArgumentsStackLength => {
                     write!(f, "an invalid amount of items are in an arguments stack")
                 }
-                CFFError::BboxOverflow => {
-                    write!(f, "outline's bounding box is too large")
-                }
-                CFFError::MissingMoveTo => {
-                    write!(f, "missing moveto operator")
-                }
-                CFFError::InvalidSubroutineIndex => {
-                    write!(f, "an invalid subroutine index")
-                }
+                CFFError::BboxOverflow => write!(f, "outline's bounding box is too large"),
+                CFFError::MissingMoveTo => write!(f, "missing moveto operator"),
+                CFFError::InvalidSubroutineIndex => write!(f, "an invalid subroutine index"),
                 CFFError::InvalidItemVariationDataIndex => {
                     write!(f, "no ItemVariationData with required index")
                 }
@@ -1627,7 +1618,7 @@ mod tests {
 
         let top_dict_idx2 = if local_subrs.is_empty() { 3 } else { 6 };
         w.write(UInt8(top_dict_idx2)); // index[1]
-        // Item 0
+                                       // Item 0
         let mut charstr_offset = w.offset() + 2;
         charstr_offset += EMPTY_INDEX_SIZE; // String INDEX
 
@@ -1648,7 +1639,9 @@ mod tests {
         if !local_subrs_data.is_empty() {
             // Item 1
             w.write(CFFInt(2)); // length
-            w.write(CFFInt((charstr_offset + INDEX_HEADER_SIZE + chars_data.len()) as i32)); // offset
+            w.write(CFFInt(
+                (charstr_offset + INDEX_HEADER_SIZE + chars_data.len()) as i32,
+            )); // offset
             w.write(UInt8(top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET as u8));
         }
 
@@ -1695,9 +1688,9 @@ mod tests {
     fn unsupported_version() {
         let data = writer::convert(&[
             UInt8(10), // major version, only 1 is supported
-            UInt8(0), // minor version
-            UInt8(4), // header size
-            UInt8(0), // absolute offset
+            UInt8(0),  // minor version
+            UInt8(4),  // header size
+            UInt8(0),  // absolute offset
         ]);
 
         assert!(parse_metadata(&data).is_none());
@@ -1711,37 +1704,31 @@ mod tests {
             UInt8(0), // minor version
             UInt8(8), // header size
             UInt8(0), // absolute offset
-
             // no-op, should be skipped
             UInt8(0),
             UInt8(0),
             UInt8(0),
             UInt8(0),
-
             // Name INDEX
             UInt16(0), // count
-
             // Top DICT
             // INDEX
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(3), // index[1]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
+            UInt8(3),  // index[1]
             // Data
             CFFInt(21),
             UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
-
             // String INDEX
             UInt16(0), // count
-
             // Global Subroutines INDEX
             UInt16(0), // count
-
             // CharString INDEX
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(4), // index[1]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
+            UInt8(4),  // index[1]
             // Data
             CFFInt(10),
             UInt8(operator::HORIZONTAL_MOVE_TO),
@@ -1754,11 +1741,24 @@ mod tests {
         let rect = parse_char_string(char_str, &metadata, &mut builder).unwrap();
 
         assert_eq!(builder.0, "M 10 0 Z ");
-        assert_eq!(rect, Rect { x_min: 10, y_min: 0, x_max: 10, y_max: 0 });
+        assert_eq!(
+            rect,
+            Rect {
+                x_min: 10,
+                y_min: 0,
+                x_max: 10,
+                y_max: 0
+            }
+        );
     }
 
     fn rect(x_min: i16, y_min: i16, x_max: i16, y_max: i16) -> Rect {
-        Rect { x_min, y_min, x_max, y_max }
+        Rect {
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+        }
     }
 
     macro_rules! test_cs_with_subrs {
@@ -1798,160 +1798,310 @@ mod tests {
         };
     }
 
-    test_cs!(move_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 Z ",
+    test_cs!(
+        move_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 Z ",
         rect(10, 20, 10, 20)
     );
 
-    test_cs!(move_to_with_width, &[
-        CFFInt(5), CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 Z ",
+    test_cs!(
+        move_to_with_width,
+        &[
+            CFFInt(5),
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 Z ",
         rect(10, 20, 10, 20)
     );
 
-    test_cs!(hmove_to, &[
-        CFFInt(10), UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 0 Z ",
+    test_cs!(
+        hmove_to,
+        &[
+            CFFInt(10),
+            UInt8(operator::HORIZONTAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 0 Z ",
         rect(10, 0, 10, 0)
     );
 
-    test_cs!(hmove_to_with_width, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 20 0 Z ",
+    test_cs!(
+        hmove_to_with_width,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::HORIZONTAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 20 0 Z ",
         rect(20, 0, 20, 0)
     );
 
-    test_cs!(vmove_to, &[
-        CFFInt(10), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 0 10 Z ",
+    test_cs!(
+        vmove_to,
+        &[
+            CFFInt(10),
+            UInt8(operator::VERTICAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 0 10 Z ",
         rect(0, 10, 0, 10)
     );
 
-    test_cs!(vmove_to_with_width, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 0 20 Z ",
+    test_cs!(
+        vmove_to_with_width,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::VERTICAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 0 20 Z ",
         rect(0, 20, 0, 20)
     );
 
-    test_cs!(line_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 60 Z ",
+    test_cs!(
+        line_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            UInt8(operator::LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 40 60 Z ",
         rect(10, 20, 40, 60)
     );
 
-    test_cs!(line_to_with_multiple_pairs, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 60 L 90 120 Z ",
+    test_cs!(
+        line_to_with_multiple_pairs,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            UInt8(operator::LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 40 60 L 90 120 Z ",
         rect(10, 20, 90, 120)
     );
 
-    test_cs!(hline_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 20 Z ",
+    test_cs!(
+        hline_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            UInt8(operator::HORIZONTAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 40 20 Z ",
         rect(10, 20, 40, 20)
     );
 
-    test_cs!(hline_to_with_two_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 20 L 40 60 Z ",
+    test_cs!(
+        hline_to_with_two_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            UInt8(operator::HORIZONTAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 40 20 L 40 60 Z ",
         rect(10, 20, 40, 60)
     );
 
-    test_cs!(hline_to_with_three_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 20 L 40 60 L 90 60 Z ",
+    test_cs!(
+        hline_to_with_three_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            UInt8(operator::HORIZONTAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 40 20 L 40 60 L 90 60 Z ",
         rect(10, 20, 90, 60)
     );
 
-    test_cs!(vline_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 10 50 Z ",
+    test_cs!(
+        vline_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            UInt8(operator::VERTICAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 10 50 Z ",
         rect(10, 20, 10, 50)
     );
 
-    test_cs!(vline_to_with_two_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 10 50 L 50 50 Z ",
+    test_cs!(
+        vline_to_with_two_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            UInt8(operator::VERTICAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 10 50 L 50 50 Z ",
         rect(10, 20, 50, 50)
     );
 
-    test_cs!(vline_to_with_three_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 10 50 L 50 50 L 50 100 Z ",
+    test_cs!(
+        vline_to_with_three_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            UInt8(operator::VERTICAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 L 10 50 L 50 50 L 50 100 Z ",
         rect(10, 20, 50, 100)
     );
 
-    test_cs!(curve_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80),
-        UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 60 90 120 160 200 Z ",
+    test_cs!(
+        curve_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            CFFInt(70),
+            CFFInt(80),
+            UInt8(operator::CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 C 40 60 90 120 160 200 Z ",
         rect(10, 20, 160, 200)
     );
 
-    test_cs!(curve_to_with_two_sets_of_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80),
-        CFFInt(90), CFFInt(100), CFFInt(110), CFFInt(120), CFFInt(130), CFFInt(140),
-        UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 60 90 120 160 200 C 250 300 360 420 490 560 Z ",
+    test_cs!(
+        curve_to_with_two_sets_of_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            CFFInt(70),
+            CFFInt(80),
+            CFFInt(90),
+            CFFInt(100),
+            CFFInt(110),
+            CFFInt(120),
+            CFFInt(130),
+            CFFInt(140),
+            UInt8(operator::CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 C 40 60 90 120 160 200 C 250 300 360 420 490 560 Z ",
         rect(10, 20, 490, 560)
     );
 
-    test_cs!(hh_curve_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 20 80 70 140 70 Z ",
+    test_cs!(
+        hh_curve_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            UInt8(operator::HH_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 C 40 20 80 70 140 70 Z ",
         rect(10, 20, 140, 70)
     );
 
-    test_cs!(hh_curve_to_with_y, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 50 50 100 110 170 110 Z ",
+    test_cs!(
+        hh_curve_to_with_y,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            CFFInt(70),
+            UInt8(operator::HH_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 C 50 50 100 110 170 110 Z ",
         rect(10, 20, 170, 110)
     );
 
-    test_cs!(vv_curve_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 10 50 50 100 50 160 Z ",
+    test_cs!(
+        vv_curve_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            UInt8(operator::VV_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 C 10 50 50 100 50 160 Z ",
         rect(10, 20, 50, 160)
     );
 
-    test_cs!(vv_curve_to_with_x, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 60 90 120 90 190 Z ",
+    test_cs!(
+        vv_curve_to_with_x,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            CFFInt(70),
+            UInt8(operator::VV_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "M 10 20 C 40 60 90 120 90 190 Z ",
         rect(10, 20, 90, 190)
     );
 
@@ -1964,7 +2114,8 @@ mod tests {
         assert!(parse_char_string(char_str, &metadata, &mut builder).is_err());
     }
 
-    test_cs_with_subrs!(local_subr,
+    test_cs_with_subrs!(
+        local_subr,
         &[],
         &[&[
             CFFInt(30),
@@ -1983,7 +2134,8 @@ mod tests {
         rect(10, 0, 40, 40)
     );
 
-    test_cs_with_subrs!(endchar_in_subr,
+    test_cs_with_subrs!(
+        endchar_in_subr,
         &[],
         &[&[
             CFFInt(30),
@@ -2001,7 +2153,8 @@ mod tests {
         rect(10, 0, 40, 40)
     );
 
-    test_cs_with_subrs!(global_subr,
+    test_cs_with_subrs!(
+        global_subr,
         &[&[
             CFFInt(30),
             CFFInt(40),
@@ -2020,147 +2173,384 @@ mod tests {
         rect(10, 0, 40, 40)
     );
 
-    test_cs_err!(reserved_operator, &[
-        CFFInt(10), UInt8(2),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid operator occurred");
+    test_cs_err!(
+        reserved_operator,
+        &[CFFInt(10), UInt8(2), UInt8(operator::ENDCHAR),],
+        "an invalid operator occurred"
+    );
 
-    test_cs_err!(line_to_without_move_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "missing moveto operator");
+    test_cs_err!(
+        line_to_without_move_to,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "missing moveto operator"
+    );
 
     // Width must be set only once.
-    test_cs_err!(two_vmove_to_with_width, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-        CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        two_vmove_to_with_width,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::VERTICAL_MOVE_TO),
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::VERTICAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(move_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(10), CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        move_to_with_too_many_coords,
+        &[
+            CFFInt(10),
+            CFFInt(10),
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(move_to_with_not_enought_coords, &[
-        CFFInt(10), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        move_to_with_not_enought_coords,
+        &[
+            CFFInt(10),
+            UInt8(operator::MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(hmove_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        hmove_to_with_too_many_coords,
+        &[
+            CFFInt(10),
+            CFFInt(10),
+            CFFInt(10),
+            UInt8(operator::HORIZONTAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(hmove_to_with_not_enought_coords, &[
-        UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        hmove_to_with_not_enought_coords,
+        &[
+            UInt8(operator::HORIZONTAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(vmove_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        vmove_to_with_too_many_coords,
+        &[
+            CFFInt(10),
+            CFFInt(10),
+            CFFInt(10),
+            UInt8(operator::VERTICAL_MOVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(vmove_to_with_not_enought_coords, &[
-        UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        vmove_to_with_not_enought_coords,
+        &[UInt8(operator::VERTICAL_MOVE_TO), UInt8(operator::ENDCHAR),],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(line_to_with_single_coord, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        line_to_with_single_coord,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            UInt8(operator::LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(line_to_with_odd_number_of_coord, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        line_to_with_odd_number_of_coord,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            UInt8(operator::LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(hline_to_without_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        hline_to_without_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            UInt8(operator::HORIZONTAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(vline_to_without_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        vline_to_without_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            UInt8(operator::VERTICAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(curve_to_with_invalid_num_of_coords_1, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        curve_to_with_invalid_num_of_coords_1,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            UInt8(operator::CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(curve_to_with_invalid_num_of_coords_2, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80), CFFInt(90),
-        UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        curve_to_with_invalid_num_of_coords_2,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(60),
+            CFFInt(70),
+            CFFInt(80),
+            CFFInt(90),
+            UInt8(operator::CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(hh_curve_to_with_not_enought_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        hh_curve_to_with_not_enought_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            UInt8(operator::HH_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(hh_curve_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
-        UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        hh_curve_to_with_too_many_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            UInt8(operator::HH_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(vv_curve_to_with_not_enought_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        vv_curve_to_with_not_enought_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            UInt8(operator::VV_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(vv_curve_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
-        UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    test_cs_err!(
+        vv_curve_to_with_too_many_coords,
+        &[
+            CFFInt(10),
+            CFFInt(20),
+            UInt8(operator::MOVE_TO),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            CFFInt(30),
+            CFFInt(40),
+            CFFInt(50),
+            UInt8(operator::VV_CURVE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "an invalid amount of items are in an arguments stack"
+    );
 
-    test_cs_err!(multiple_endchar, &[
-        UInt8(operator::ENDCHAR),
-        UInt8(operator::ENDCHAR),
-    ], "unused data left after 'endchar' operator");
+    test_cs_err!(
+        multiple_endchar,
+        &[UInt8(operator::ENDCHAR), UInt8(operator::ENDCHAR),],
+        "unused data left after 'endchar' operator"
+    );
 
-    test_cs_err!(operands_overflow, &[
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-    ], "arguments stack limit reached");
+    test_cs_err!(
+        operands_overflow,
+        &[
+            CFFInt(0),
+            CFFInt(1),
+            CFFInt(2),
+            CFFInt(3),
+            CFFInt(4),
+            CFFInt(5),
+            CFFInt(6),
+            CFFInt(7),
+            CFFInt(8),
+            CFFInt(9),
+            CFFInt(0),
+            CFFInt(1),
+            CFFInt(2),
+            CFFInt(3),
+            CFFInt(4),
+            CFFInt(5),
+            CFFInt(6),
+            CFFInt(7),
+            CFFInt(8),
+            CFFInt(9),
+            CFFInt(0),
+            CFFInt(1),
+            CFFInt(2),
+            CFFInt(3),
+            CFFInt(4),
+            CFFInt(5),
+            CFFInt(6),
+            CFFInt(7),
+            CFFInt(8),
+            CFFInt(9),
+            CFFInt(0),
+            CFFInt(1),
+            CFFInt(2),
+            CFFInt(3),
+            CFFInt(4),
+            CFFInt(5),
+            CFFInt(6),
+            CFFInt(7),
+            CFFInt(8),
+            CFFInt(9),
+            CFFInt(0),
+            CFFInt(1),
+            CFFInt(2),
+            CFFInt(3),
+            CFFInt(4),
+            CFFInt(5),
+            CFFInt(6),
+            CFFInt(7),
+            CFFInt(8),
+            CFFInt(9),
+        ],
+        "arguments stack limit reached"
+    );
 
-    test_cs_err!(operands_overflow_with_4_byte_ints, &[
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-    ], "arguments stack limit reached");
+    test_cs_err!(
+        operands_overflow_with_4_byte_ints,
+        &[
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+            CFFInt(30000),
+        ],
+        "arguments stack limit reached"
+    );
 
-    test_cs_err!(bbox_overflow, &[
-        CFFInt(32767), UInt8(operator::HORIZONTAL_MOVE_TO),
-        CFFInt(32767), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "outline's bounding box is too large");
+    test_cs_err!(
+        bbox_overflow,
+        &[
+            CFFInt(32767),
+            UInt8(operator::HORIZONTAL_MOVE_TO),
+            CFFInt(32767),
+            UInt8(operator::HORIZONTAL_LINE_TO),
+            UInt8(operator::ENDCHAR),
+        ],
+        "outline's bounding box is too large"
+    );
 
     #[test]
     fn endchar_in_subr_with_extra_data_1() {
@@ -2180,15 +2570,17 @@ mod tests {
                 CFFInt(30),
                 CFFInt(40),
                 UInt8(operator::LINE_TO),
-            ]
+            ],
         );
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "unused data left after 'endchar' operator");
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "unused data left after 'endchar' operator"
+        );
     }
 
     #[test]
@@ -2209,15 +2601,17 @@ mod tests {
                 UInt8(operator::HORIZONTAL_MOVE_TO),
                 CFFInt(0 - 107), // subr index - subr bias
                 UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]
+            ],
         );
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "unused data left after 'endchar' operator");
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "unused data left after 'endchar' operator"
+        );
     }
 
     #[test]
@@ -2238,15 +2632,17 @@ mod tests {
                 UInt8(operator::HORIZONTAL_MOVE_TO),
                 CFFInt(0 - 107), // subr index - subr bias
                 UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]
+            ],
         );
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "unused data left after 'endchar' operator");
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "unused data left after 'endchar' operator"
+        );
     }
 
     #[test]
@@ -2262,15 +2658,17 @@ mod tests {
                 UInt8(operator::HORIZONTAL_MOVE_TO),
                 CFFInt(0 - 107), // subr index - subr bias
                 UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]
+            ],
         );
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "subroutines nesting limit reached");
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "subroutines nesting limit reached"
+        );
     }
 
     #[test]
@@ -2286,15 +2684,17 @@ mod tests {
                 UInt8(operator::HORIZONTAL_MOVE_TO),
                 CFFInt(0 - 107), // subr index - subr bias
                 UInt8(operator::CALL_GLOBAL_SUBROUTINE),
-            ]
+            ],
         );
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "subroutines nesting limit reached");
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "subroutines nesting limit reached"
+        );
     }
 
     #[test]
@@ -2313,15 +2713,17 @@ mod tests {
                 UInt8(operator::HORIZONTAL_MOVE_TO),
                 CFFInt(0 - 107), // subr index - subr bias
                 UInt8(operator::CALL_GLOBAL_SUBROUTINE),
-            ]
+            ],
         );
 
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "subroutines nesting limit reached");
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "subroutines nesting limit reached"
+        );
     }
 
     #[test]
@@ -2332,16 +2734,14 @@ mod tests {
             UInt8(0), // minor version
             UInt8(4), // header size
             UInt8(0), // absolute offset
-
             // Name INDEX
             UInt16(0), // count
-
             // Top DICT
             // INDEX
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(3), // index[1]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
+            UInt8(3),  // index[1]
             // Data
             CFFInt(0), // zero offset!
             UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
@@ -2358,16 +2758,14 @@ mod tests {
             UInt8(0), // minor version
             UInt8(4), // header size
             UInt8(0), // absolute offset
-
             // Name INDEX
             UInt16(0), // count
-
             // Top DICT
             // INDEX
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(3), // index[1]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
+            UInt8(3),  // index[1]
             // Data
             CFFInt(2), // invalid offset!
             UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
@@ -2380,8 +2778,8 @@ mod tests {
     fn index_data_count_overflow() {
         let data = writer::convert(&[
             UInt16(std::u16::MAX), // count
-            UInt8(1), // offset size
-            // other data doesn't matter
+            UInt8(1),              // offset size
+                                   // other data doesn't matter
         ]);
 
         assert!(parse_index(&mut Stream::new(&data)).is_some());
@@ -2391,8 +2789,8 @@ mod tests {
     fn index_data_invalid_offset_size_0() {
         let data = writer::convert(&[
             UInt16(1), // count
-            UInt8(0), // offset size
-            // other data doesn't matter
+            UInt8(0),  // offset size
+                       // other data doesn't matter
         ]);
 
         assert!(parse_index(&mut Stream::new(&data)).is_none());
@@ -2402,8 +2800,8 @@ mod tests {
     fn index_data_invalid_offset_size_5() {
         let data = writer::convert(&[
             UInt16(1), // count
-            UInt8(5), // offset size
-            // other data doesn't matter
+            UInt8(5),  // offset size
+                       // other data doesn't matter
         ]);
 
         assert!(parse_index(&mut Stream::new(&data)).is_none());
@@ -2413,8 +2811,8 @@ mod tests {
     fn private_dict_size_overflow() {
         let data = writer::convert(&[
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
             UInt8(14), // index[1]
             // Item 0
             CFFInt(5),
@@ -2425,16 +2823,18 @@ mod tests {
             UInt8(top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET as u8),
         ]);
 
-        assert_eq!(parse_top_dict(&mut Stream::new(&data)).unwrap(),
-                   (5, Some(2147483647..4294967294)));
+        assert_eq!(
+            parse_top_dict(&mut Stream::new(&data)).unwrap(),
+            (5, Some(2147483647..4294967294))
+        );
     }
 
     #[test]
     fn private_dict_negative_char_strings_offset() {
         let data = writer::convert(&[
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
             UInt8(14), // index[1]
             // Item 0
             CFFInt(-1),
@@ -2448,8 +2848,8 @@ mod tests {
     fn private_dict_no_char_strings_offset_operand() {
         let data = writer::convert(&[
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
             UInt8(14), // index[1]
             // Item 0
             // <-- No number here.
@@ -2463,8 +2863,8 @@ mod tests {
     fn negative_private_dict_offset_and_size() {
         let data = writer::convert(&[
             UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
+            UInt8(1),  // offset size
+            UInt8(1),  // index[0]
             UInt8(14), // index[1]
             // Item 0
             CFFInt(-1),
@@ -2496,10 +2896,25 @@ mod tests {
     #[test]
     fn parse_dict_number() {
         assert_eq!(parse_number(0xFA, &mut Stream::new(&[0x7C])).unwrap(), 1000);
-        assert_eq!(parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(), -1000);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(), 10000);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(), -10000);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(), 100000);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(), -100000);
+        assert_eq!(
+            parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(),
+            -1000
+        );
+        assert_eq!(
+            parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(),
+            10000
+        );
+        assert_eq!(
+            parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(),
+            -10000
+        );
+        assert_eq!(
+            parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(),
+            100000
+        );
+        assert_eq!(
+            parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(),
+            -100000
+        );
     }
 }

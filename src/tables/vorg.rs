@@ -1,8 +1,7 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vorg
 
+use crate::parser::{FromData, LazyArray16, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
-
 
 #[derive(Clone, Copy)]
 struct VertOriginYMetrics {
@@ -23,7 +22,6 @@ impl FromData for VertOriginYMetrics {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
     default_y: i16,
@@ -43,14 +41,12 @@ impl<'a> Table<'a> {
         let count: u16 = s.read()?;
         let origins = s.read_array16(count)?;
 
-        Some(Table {
-            default_y,
-            origins,
-        })
+        Some(Table { default_y, origins })
     }
 
     pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> i16 {
-        self.origins.binary_search_by(|m| m.glyph_index.cmp(&glyph_id))
+        self.origins
+            .binary_search_by(|m| m.glyph_index.cmp(&glyph_id))
             .map(|(_, m)| m.vert_origin_y)
             .unwrap_or(self.default_y)
     }

@@ -13,9 +13,8 @@ a kerning algorithm manually.
 But we still try to keep the API as high-level as possible.
 */
 
+use crate::parser::{FromData, NumFrom, Offset, Offset16, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, NumFrom, Offset16, Offset};
-
 
 #[derive(Clone, Copy, Debug)]
 struct OTCoverage(u8);
@@ -40,7 +39,6 @@ impl FromData for OTCoverage {
         data.get(0).copied().map(OTCoverage)
     }
 }
-
 
 #[derive(Clone, Copy, Debug)]
 struct AATCoverage(u8);
@@ -71,7 +69,6 @@ impl FromData for AATCoverage {
     }
 }
 
-
 #[derive(Clone, Copy)]
 struct KerningRecord {
     // In the kern table spec, a kerning pair is stored as two u16,
@@ -92,7 +89,6 @@ impl FromData for KerningRecord {
         })
     }
 }
-
 
 /// A kerning subtable.
 #[derive(Clone, Copy, Default)]
@@ -170,7 +166,6 @@ impl core::fmt::Debug for Subtable<'_> {
             .finish()
     }
 }
-
 
 /// An iterator over kerning subtables.
 #[allow(missing_debug_implementations)]
@@ -280,7 +275,7 @@ pub(crate) fn parse(data: &[u8]) -> Option<Subtables> {
         })
     } else {
         s.skip::<u16>(); // Skip the second part of u32 version.
-        // Note that AAT stores the number of tables as u32 and not as u16.
+                         // Note that AAT stores the number of tables as u32 and not as u16.
         let number_of_tables: u32 = s.read()?;
         Some(Subtables {
             is_aat: true,
@@ -300,7 +295,9 @@ fn parse_format0(data: &[u8], left: GlyphId, right: GlyphId) -> Option<i16> {
     let pairs = s.read_array16::<KerningRecord>(number_of_pairs)?;
 
     let needle = u32::from(left.0) << 16 | u32::from(right.0);
-    pairs.binary_search_by(|v| v.pair.cmp(&needle)).map(|(_, v)| v.value)
+    pairs
+        .binary_search_by(|v| v.pair.cmp(&needle))
+        .map(|(_, v)| v.value)
 }
 
 /// A *Format 2 Kerning Table (Simple n x m Array of Kerning Values)* implementation
@@ -367,7 +364,8 @@ fn parse_format3(data: &[u8], left: GlyphId, right: GlyphId) -> Option<i16> {
         return None;
     }
 
-    let index = u16::from(left_class) * u16::from(right_hand_classes_count) + u16::from(right_class);
+    let index =
+        u16::from(left_class) * u16::from(right_hand_classes_count) + u16::from(right_class);
     let index = indices.get(index)?;
     kerning_values.get(u16::from(index))
 }
@@ -390,7 +388,6 @@ pub mod state_machine {
         pub const PUNCTUATION: u8 = 6;
     }
 
-
     /// A type-safe wrapper for a state machine state.
     #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct State(u16);
@@ -406,7 +403,6 @@ pub mod state_machine {
         pub const IN_WORD: State = State(2);
     }
 
-
     /// A type-safe wrapper for a kerning value offset.
     #[derive(Clone, Copy, Debug)]
     pub struct ValueOffset(u16);
@@ -420,7 +416,6 @@ pub mod state_machine {
             ValueOffset(self.0.wrapping_add(u16::SIZE as u16))
         }
     }
-
 
     /// A state machine entry.
     #[derive(Clone, Copy, Debug)]
@@ -473,7 +468,6 @@ pub mod state_machine {
             })
         }
     }
-
 
     /// A state machine.
     pub struct Machine<'a> {
@@ -542,7 +536,7 @@ pub mod state_machine {
             }
 
             let entry_idx = self.state_array.get(
-                usize::from(state.0) * usize::from(self.number_of_classes) + usize::from(class)
+                usize::from(state.0) * usize::from(self.number_of_classes) + usize::from(class),
             )?;
 
             Stream::read_at(self.entry_table, usize::from(*entry_idx) * Entry::SIZE)
@@ -558,7 +552,7 @@ pub mod state_machine {
         #[inline]
         pub fn new_state(&self, state: State) -> State {
             let n = (i32::from(state.0) - i32::from(self.state_array_offset))
-                        / i32::from(self.number_of_classes);
+                / i32::from(self.number_of_classes);
 
             use core::convert::TryFrom;
             State(u16::try_from(n).unwrap_or(0))

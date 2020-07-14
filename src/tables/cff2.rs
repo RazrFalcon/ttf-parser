@@ -150,7 +150,7 @@ pub(crate) fn outline(
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
-    let data = metadata.char_strings.get(glyph_id.0)?;
+    let data = metadata.char_strings.get(u32::from(glyph_id.0))?;
     parse_char_string(data, metadata, coordinates, builder).ok()
 }
 

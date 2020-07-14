@@ -164,7 +164,7 @@ pub fn outline(
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
-    let data = metadata.char_strings.get(glyph_id.0)?;
+    let data = metadata.char_strings.get(u32::from(glyph_id.0))?;
     parse_char_string(data, metadata, builder).ok()
 }
 
@@ -995,15 +995,22 @@ fn _parse_char_string(
 }
 
 #[inline]
-pub fn conv_subroutine_index(index: f32, bias: u16) -> Result<u16, CFFError> {
-    let mut index = i32::try_num_from(index).ok_or(CFFError::InvalidSubroutineIndex)?;
-    index += i32::from(bias);
-    u16::try_from(index).map_err(|_| CFFError::InvalidSubroutineIndex)
+pub fn conv_subroutine_index(index: f32, bias: u16) -> Result<u32, CFFError> {
+    conv_subroutine_index_impl(index, bias).ok_or(CFFError::InvalidSubroutineIndex)
+}
+
+#[inline]
+fn conv_subroutine_index_impl(index: f32, bias: u16) -> Option<u32> {
+    let index = i32::try_num_from(index)?;
+    let bias = i32::from(bias);
+
+    let index = index.checked_add(bias)?;
+    u32::try_from(index).ok()
 }
 
 // Adobe Technical Note #5176, Chapter 16 "Local / Global Subrs INDEXes"
 #[inline]
-pub fn calc_subroutine_bias(len: u16) -> u16 {
+pub fn calc_subroutine_bias(len: u32) -> u16 {
     if len < 1240 {
         107
     } else if len < 33900 {
@@ -1015,7 +1022,7 @@ pub fn calc_subroutine_bias(len: u16) -> u16 {
 
 fn parse_index<'a>(s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
     let count: u16 = s.read()?;
-    if count != 0 && count != core::u16::MAX {
+    if count != 0 {
         parse_index_impl(u32::from(count), s)
     } else {
         Some(DataIndex::default())
@@ -1045,7 +1052,7 @@ pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<DataIndex<
 
 fn skip_index(s: &mut Stream) -> Option<()> {
     let count: u16 = s.read()?;
-    if count != 0 && count != core::u16::MAX {
+    if count != 0 {
         let offset_size: OffsetSize = try_parse_offset_size(s)?;
         let offsets_len = (u32::from(count) + 1).checked_mul(offset_size.to_u32())?;
         let offsets = VarOffsets {
@@ -1069,12 +1076,12 @@ pub struct VarOffsets<'a> {
 }
 
 impl<'a> VarOffsets<'a> {
-    pub fn get(&self, index: u16) -> Option<u32> {
-        if index >= self.len() {
+    pub fn get(&self, index: u32) -> Option<u32> {
+        if u32::from(index) >= self.len() {
             return None;
         }
 
-        let start = usize::from(index) * self.offset_size.to_usize();
+        let start = usize::num_from(index) * self.offset_size.to_usize();
         let end = start + self.offset_size.to_usize();
         let data = self.data.get(start..end)?;
         let n: u32 = match self.offset_size {
@@ -1104,9 +1111,8 @@ impl<'a> VarOffsets<'a> {
     }
 
     #[inline]
-    pub fn len(&self) -> u16 {
-        // TODO: check that len actually u16
-        self.data.len() as u16 / self.offset_size as u16
+    pub fn len(&self) -> u32 {
+        self.data.len() as u32 / self.offset_size as u32
     }
 
     #[inline]
@@ -1140,14 +1146,14 @@ impl<'a> IntoIterator for DataIndex<'a> {
     fn into_iter(self) -> Self::IntoIter {
         DataIndexIter {
             data: self,
-            offset: 0,
+            offset_index: 0,
         }
     }
 }
 
 impl<'a> DataIndex<'a> {
     #[inline]
-    pub fn len(&self) -> u16 {
+    pub fn len(&self) -> u32 {
         if !self.offsets.is_empty() {
             // Last offset points to the byte after the `Object data`.
             // We should skip it.
@@ -1157,11 +1163,11 @@ impl<'a> DataIndex<'a> {
         }
     }
 
-    pub fn get(&self, index: u16) -> Option<&'a [u8]> {
+    pub fn get(&self, index: u32) -> Option<&'a [u8]> {
         // Check for overflow first.
-        if index == core::u16::MAX {
+        if index == core::u32::MAX {
             None
-        } else if index + 1 < self.offsets.len() {
+        } else if u32::from(index + 1) < self.offsets.len() {
             let start = usize::try_from(self.offsets.get(index)?).ok()?;
             let end = usize::try_from(self.offsets.get(index + 1)?).ok()?;
             let data = self.data.get(start..end)?;
@@ -1174,7 +1180,7 @@ impl<'a> DataIndex<'a> {
 
 pub struct DataIndexIter<'a> {
     data: DataIndex<'a>,
-    offset: u16,
+    offset_index: u32,
 }
 
 impl<'a> Iterator for DataIndexIter<'a> {
@@ -1182,12 +1188,12 @@ impl<'a> Iterator for DataIndexIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.offset == self.data.len() {
+        if self.offset_index == self.data.len() {
             return None;
         }
 
-        let index = self.offset;
-        self.offset += 1;
+        let index = self.offset_index;
+        self.offset_index += 1;
         self.data.get(index)
     }
 }

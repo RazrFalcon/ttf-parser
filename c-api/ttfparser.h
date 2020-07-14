@@ -557,6 +557,11 @@ bool ttfp_outline_glyph(const ttfp_font *font,
 bool ttfp_get_glyph_bbox(const ttfp_font *font, uint16_t glyph_id, ttfp_rect *bbox);
 
 /**
+ * @brief Returns a bounding box that large enough to enclose any glyph from the font.
+ */
+ttfp_rect ttfp_get_global_bounding_box(const ttfp_font *font);
+
+/**
  * @brief Returns a reference to a glyph's raster image.
  *
  * A font can define a glyph using a raster or a vector image instead of a simple outline.

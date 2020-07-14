@@ -684,6 +684,14 @@ pub extern "C" fn ttfp_get_glyph_bbox(
     }).unwrap_or(false)
 }
 
+/// @brief Returns a bounding box that large enough to enclose any glyph from the font.
+#[no_mangle]
+pub extern "C" fn ttfp_get_global_bounding_box(
+    font: *const ttfp_font,
+) -> ttf_parser::Rect {
+    font_from_ptr(font).global_bounding_box()
+}
+
 /// @brief Returns a reference to a glyph's raster image.
 ///
 /// A font can define a glyph using a raster or a vector image instead of a simple outline.

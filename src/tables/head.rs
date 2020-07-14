@@ -1,10 +1,12 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/head
 
+use crate::Rect;
 use crate::parser::Stream;
 
 
 const TABLE_SIZE: usize = 54;
 const UNITS_PER_EM_OFFSET: usize = 18;
+const BBOX_OFFSET: usize = 36;
 const INDEX_TO_LOC_FORMAT_OFFSET: usize = 50;
 
 
@@ -31,6 +33,17 @@ pub fn units_per_em(data: &[u8]) -> Option<u16> {
     } else {
         None
     }
+}
+
+#[inline]
+pub fn global_bbox(data: &[u8]) -> Option<Rect> {
+    let mut s = Stream::new_at(data, BBOX_OFFSET)?;
+    Some(Rect {
+        x_min: s.read()?,
+        y_min: s.read()?,
+        x_max: s.read()?,
+        y_max: s.read()?,
+    })
 }
 
 #[inline]

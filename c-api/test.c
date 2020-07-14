@@ -94,6 +94,12 @@ int main() {
     assert(ttfp_get_x_height(font) == 486);
     assert(ttfp_get_number_of_glyphs(font) == 1974);
 
+    ttfp_rect g_bbox = ttfp_get_global_bounding_box(font);
+    assert(g_bbox.x_min == -454);
+    assert(g_bbox.y_min == -293);
+    assert(g_bbox.x_max == 2159);
+    assert(g_bbox.y_max == 968);
+
     ttfp_line_metrics line_metrics;
     assert(ttfp_get_underline_metrics(font, &line_metrics));
     assert(line_metrics.position == -50);

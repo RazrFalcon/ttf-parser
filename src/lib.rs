@@ -1285,6 +1285,13 @@ impl<'a> Font<'a> {
         self.outline_glyph(glyph_id, &mut DummyOutline)
     }
 
+    /// Returns a bounding box that large enough to enclose any glyph from the font.
+    #[inline]
+    pub fn global_bounding_box(&self) -> Rect {
+        // unwrap is safe, because this method cannot fail.
+        head::global_bbox(self.head).unwrap()
+    }
+
     /// Returns a reference to a glyph's raster image.
     ///
     /// A font can define a glyph using a raster or a vector image instead of a simple outline.

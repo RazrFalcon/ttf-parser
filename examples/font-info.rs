@@ -23,6 +23,7 @@ fn main() {
     println!("Ascender: {}", font.ascender());
     println!("Descender: {}", font.descender());
     println!("Line gap: {}", font.line_gap());
+    println!("Global bbox: {:?}", font.global_bounding_box());
     println!("Number of glyphs: {}", font.number_of_glyphs());
     println!("Underline: {:?}", font.underline_metrics());
     println!("X height: {:?}", font.x_height());

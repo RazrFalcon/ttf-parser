@@ -99,8 +99,8 @@ Notes:
 
 1. `stb_truetype` outline parsing method is reentrant.
 2. Very primitive.
-3. Matching points are not supported.
-4. `type2` only. `seac` is not supported.
+3. `type2` only. CID fonts are not supported. `seac` is not supported.
+4. Matching points are not supported.
 5. Depends on build flags.
 
 ### Performance

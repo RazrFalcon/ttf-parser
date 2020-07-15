@@ -56,7 +56,7 @@ There are roughly three types of TrueType tables:
 | `bloc` table      |                        | ✓                   |                                |
 | `CBDT` table      | ✓                      | ✓                   |                                |
 | `CBLC` table      | ✓                      | ✓                   |                                |
-| `CFF `&nbsp;table | ~<sup>3,4</sup>        | ✓                   | ~<sup>3</sup>                  |
+| `CFF `&nbsp;table | ~<sup>3</sup>          | ✓                   | ~<sup>3</sup>                  |
 | `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
 | `EBDT` table      |                        | ✓                   |                                |
@@ -64,7 +64,7 @@ There are roughly three types of TrueType tables:
 | `fvar` table      | ✓                      | ✓                   |                                |
 | `gasp` table      |                        | ✓                   |                                |
 | `GDEF` table      | ~                      |                     |                                |
-| `glyf` table      | ~<sup>5</sup>          | ✓                   | ~<sup>5</sup>                  |
+| `glyf` table      | ~<sup>4</sup>          | ✓                   | ~<sup>4</sup>                  |
 | `GPOS` table      |                        |                     | ~ (only 2)                     |
 | `GSUB` table      |                        |                     |                                |
 | `gvar` table      | ✓                      | ✓                   |                                |
@@ -85,7 +85,7 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Dynamic lib size  | ~300KiB                | ~760KiB<sup>6</sup> | ? (header-only)                |
+| Dynamic lib size  | ~300KiB                | ~760KiB<sup>5</sup> | ? (header-only)                |
 | Tested version    | 0.6.0                  | 2.9.1               | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
@@ -100,9 +100,8 @@ Notes:
 1. `stb_truetype` outline parsing method is reentrant.
 2. Very primitive.
 3. `type2` only. `seac` is not supported.
-4. CID fonts are not supported.
-5. Matching points are not supported.
-6. Depends on build flags.
+4. Matching points are not supported.
+5. Depends on build flags.
 
 ### Performance
 

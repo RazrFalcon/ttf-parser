@@ -164,30 +164,14 @@ struct TopDictData {
 fn parse_top_dict(data: &[u8]) -> Option<TopDictData> {
     let mut dict_data = TopDictData::default();
 
-    // TODO: simplify
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == top_dict_operator::CHAR_STRINGS_OFFSET {
-            dict_parser.parse_operands()?;
-            let operands = dict_parser.operands();
-
-            if operands.len() == 1 {
-                dict_data.char_strings_offset = usize::try_from(operands[0]).ok()?;
-            }
+            dict_data.char_strings_offset = dict_parser.parse_offset()?;
         } else if operator.get() == top_dict_operator::FONT_DICT_INDEX_OFFSET {
-            dict_parser.parse_operands()?;
-            let operands = dict_parser.operands();
-
-            if operands.len() == 1 {
-                dict_data.font_dict_index_offset = usize::try_from(operands[0]).ok();
-            }
+            dict_data.font_dict_index_offset = dict_parser.parse_offset();
         } else if operator.get() == top_dict_operator::VARIATION_STORE_OFFSET {
-            dict_parser.parse_operands()?;
-            let operands = dict_parser.operands();
-
-            if operands.len() == 1 {
-                dict_data.variation_store_offset = usize::try_from(operands[0]).ok();
-            }
+            dict_data.variation_store_offset = dict_parser.parse_offset();
         }
     }
 
@@ -1117,6 +1101,17 @@ impl<'a> DictionaryParser<'a> {
     #[inline]
     fn operands(&self) -> &[i32] {
         &self.operands[..usize::from(self.operands_len)]
+    }
+
+    #[inline]
+    fn parse_offset(&mut self) -> Option<usize> {
+        self.parse_operands()?;
+        let operands = self.operands();
+        if operands.len() == 1 {
+            usize::try_from(operands[0]).ok()
+        } else {
+            None
+        }
     }
 }
 

@@ -7,7 +7,7 @@ use core::convert::TryFrom;
 use core::ops::Range;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox};
-use crate::parser::{Stream, U24, Fixed, FromData, NumFrom, TryNumFrom};
+use crate::parser::{Stream, LazyArray16, U24, Fixed, FromData, NumFrom, TryNumFrom};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: u8 = 48;
@@ -56,14 +56,26 @@ mod operator {
 /// Enumerates some operators defined in the Adobe Technical Note #5176,
 /// Table 9 Top DICT Operator Entries
 mod top_dict_operator {
+    pub const CHARSET_OFFSET: u16               = 15;
     pub const CHAR_STRINGS_OFFSET: u16          = 17;
     pub const PRIVATE_DICT_SIZE_AND_OFFSET: u16 = 18;
+    pub const ROS: u16                          = 1230;
+    pub const FD_ARRAY: u16                     = 1236;
+    pub const FD_SELECT: u16                    = 1237;
 }
 
 /// Enumerates some operators defined in the Adobe Technical Note #5176,
 /// Table 23 Private DICT Operators
 mod private_dict_operator {
     pub const LOCAL_SUBROUTINES_OFFSET: u16 = 19;
+}
+
+/// Enumerates Charset IDs defined in the Adobe Technical Note #5176, Table 22
+mod charset_id {
+    #![allow(dead_code)]
+    pub const ISO_ADOBE: usize = 0;
+    pub const EXPERT: usize = 1;
+    pub const EXPERT_SUBSET: usize = 2;
 }
 
 
@@ -85,14 +97,36 @@ pub enum CFFError {
     InvalidItemVariationDataIndex,
     InvalidNumberOfBlendOperands,
     BlendRegionsLimitReached,
+    NoLocalSubroutines,
 }
 
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Metadata<'a> {
+    // The whole CFF table.
+    // Used to resolve a local subroutine in a CID font.
+    table_data: &'a [u8],
+
     global_subrs: DataIndex<'a>,
-    local_subrs: DataIndex<'a>,
     char_strings: DataIndex<'a>,
+    kind: FontKind<'a>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum FontKind<'a> {
+    SID(SIDMetadata<'a>),
+    CID(CIDMetadata<'a>),
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct SIDMetadata<'a> {
+    local_subrs: DataIndex<'a>,
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct CIDMetadata<'a> {
+    fd_array: DataIndex<'a>,
+    fd_select: FDSelect<'a>,
 }
 
 pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
@@ -116,27 +150,55 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     // Skip Name INDEX.
     skip_index(&mut s)?;
 
-    let (char_strings_offset, private_dict_range) = parse_top_dict(&mut s)?;
+    let top_dict = parse_top_dict(&mut s)?;
 
     // Must be set, otherwise there are nothing to parse.
-    if char_strings_offset == 0 {
+    if top_dict.char_strings_offset == 0 {
         return None;
     }
-
-    let subroutines_offset = if let Some(range) = private_dict_range.clone() {
-        parse_private_dict(data.get(range)?)
-    } else {
-        None
-    };
 
     // Skip String INDEX.
     skip_index(&mut s)?;
 
     // Parse Global Subroutines INDEX.
-    let mut metadata = Metadata::default();
-    metadata.global_subrs = parse_index(&mut s)?;
+    let global_subrs = parse_index(&mut s)?;
 
-    match (private_dict_range, subroutines_offset) {
+    let char_strings = {
+        let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
+        parse_index(&mut s)?
+    };
+
+    if char_strings.len() == 0 {
+        return None;
+    }
+
+    let kind = if top_dict.has_ros {
+        // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
+        let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
+        parse_cid_metadata(data, top_dict, number_of_glyphs)?
+    } else {
+        parse_sid_metadata(data, top_dict)?
+    };
+
+    Some(Metadata {
+        table_data: data,
+        global_subrs,
+        char_strings,
+        kind,
+    })
+}
+
+fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
+    let subroutines_offset = if let Some(range) = top_dict.private_dict_range.clone() {
+        parse_private_dict(data.get(range)?)
+    } else {
+        None
+    };
+
+    // Parse Global Subroutines INDEX.
+    let mut metadata = SIDMetadata::default();
+
+    match (top_dict.private_dict_range, subroutines_offset) {
         (Some(private_dict_range), Some(subroutines_offset)) => {
             // 'The local subroutines offset is relative to the beginning
             // of the Private DICT data.'
@@ -149,28 +211,49 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
         _ => {}
     }
 
-    // TODO: check that index is not default
-    metadata.char_strings = {
-        let mut s = Stream::new_at(data, char_strings_offset)?;
+    Some(FontKind::SID(metadata))
+}
+
+fn parse_cid_metadata(data: &[u8], top_dict: TopDict, number_of_glyphs: u16) -> Option<FontKind> {
+    let (charset_offset, fd_array_offset, fd_select_offset) =
+        match (top_dict.charset_offset, top_dict.fd_array_offset, top_dict.fd_select_offset) {
+            (Some(a), Some(b), Some(c)) => (a, b, c),
+            _ => return None, // charset, FDArray and FDSelect must be set.
+        };
+
+    if charset_offset <= charset_id::EXPERT_SUBSET {
+        // 'There are no predefined charsets for CID fonts.'
+        // Adobe Technical Note #5176, chapter 18 CID-keyed Fonts
+        return None;
+    }
+
+    let mut metadata = CIDMetadata::default();
+
+    metadata.fd_array = {
+        let mut s = Stream::new_at(data, fd_array_offset)?;
         parse_index(&mut s)?
     };
 
-    Some(metadata)
+    metadata.fd_select = {
+        let mut s = Stream::new_at(data, fd_select_offset)?;
+        parse_fd_select(number_of_glyphs, &mut s)?
+    };
+
+    Some(FontKind::CID(metadata))
 }
 
-
-pub fn outline(
-    metadata: &Metadata,
-    glyph_id: GlyphId,
-    builder: &mut dyn OutlineBuilder,
-) -> Option<Rect> {
-    let data = metadata.char_strings.get(u32::from(glyph_id.0))?;
-    parse_char_string(data, metadata, builder).ok()
+#[derive(Default)]
+struct TopDict {
+    charset_offset: Option<usize>,
+    char_strings_offset: usize,
+    private_dict_range: Option<Range<usize>>,
+    has_ros: bool,
+    fd_array_offset: Option<usize>,
+    fd_select_offset: Option<usize>,
 }
 
-fn parse_top_dict(s: &mut Stream) -> Option<(usize, Option<Range<usize>>)> {
-    let mut char_strings_offset = 0;
-    let mut private_dict_range = None;
+fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
+    let mut top_dict = TopDict::default();
 
     let index = parse_index(s)?;
 
@@ -180,53 +263,85 @@ fn parse_top_dict(s: &mut Stream) -> Option<(usize, Option<Range<usize>>)> {
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
         match operator.get() {
+            top_dict_operator::CHARSET_OFFSET => {
+                top_dict.charset_offset = dict_parser.parse_offset();
+            }
             top_dict_operator::CHAR_STRINGS_OFFSET => {
-                dict_parser.parse_operands()?;
-                let operands = dict_parser.operands();
-
-                if operands.len() == 1 {
-                    char_strings_offset = usize::try_from(operands[0]).ok()?;
-                }
+                top_dict.char_strings_offset = dict_parser.parse_offset()?;
             }
             top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET => {
-                dict_parser.parse_operands()?;
-                let operands = dict_parser.operands();
-
-                if operands.len() == 2 {
-                    let len = usize::try_from(operands[0]).ok()?;
-                    let start = usize::try_from(operands[1]).ok()?;
-                    let end = start.checked_add(len)?;
-                    private_dict_range = Some(start..end);
-                }
+                top_dict.private_dict_range = dict_parser.parse_range();
+            }
+            top_dict_operator::ROS => {
+                top_dict.has_ros = true;
+            }
+            top_dict_operator::FD_ARRAY => {
+                top_dict.fd_array_offset = dict_parser.parse_offset();
+            }
+            top_dict_operator::FD_SELECT => {
+                top_dict.fd_select_offset = dict_parser.parse_offset();
             }
             _ => {}
         }
-
-        if char_strings_offset != 0 && private_dict_range.is_some() {
-            break;
-        }
     }
 
-    Some((char_strings_offset, private_dict_range))
+    Some(top_dict)
 }
 
 fn parse_private_dict(data: &[u8]) -> Option<usize> {
-    let mut subroutines_offset = None;
     let mut dict_parser = DictionaryParser::new(data);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
-            dict_parser.parse_operands()?;
-            let operands = dict_parser.operands();
-
-            if operands.len() == 1 {
-                subroutines_offset = usize::try_from(operands[0]).ok();
-            }
-
-            break;
+            return dict_parser.parse_offset();
         }
     }
 
-    subroutines_offset
+    None
+}
+
+fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
+    let mut dict_parser = DictionaryParser::new(data);
+    while let Some(operator) = dict_parser.parse_next() {
+        if operator.get() == top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
+            return dict_parser.parse_range();
+        }
+    }
+
+    None
+}
+
+/// In CID fonts, to get local subroutines we have to:
+///   1. Find Font DICT index via FDSelect by GID.
+///   2. Get Font DICT data from FDArray using this index.
+///   3. Get a Private DICT offset from a Font DICT.
+///   4. Get a local subroutine offset from Private DICT.
+///   5. Parse a local subroutine at offset.
+fn parse_cid_local_subrs<'a>(
+    data: &'a [u8],
+    glyph_id: GlyphId,
+    cid: &CIDMetadata,
+) -> Option<DataIndex<'a>> {
+    let font_dict_index = cid.fd_select.font_dict_index(glyph_id)?;
+    let font_dict_data = cid.fd_array.get(u32::from(font_dict_index))?;
+    let private_dict_range = parse_font_dict(font_dict_data)?;
+    let private_dict_data = data.get(private_dict_range.clone())?;
+    let subroutines_offset = parse_private_dict(private_dict_data)?;
+
+    // 'The local subroutines offset is relative to the beginning
+    // of the Private DICT data.'
+    let start = private_dict_range.start.checked_add(subroutines_offset)?;
+    let subrs_data = data.get(start..)?;
+    let mut s = Stream::new(subrs_data);
+    parse_index(&mut s)
+}
+
+pub fn outline(
+    metadata: &Metadata,
+    glyph_id: GlyphId,
+    builder: &mut dyn OutlineBuilder,
+) -> Option<Rect> {
+    let data = metadata.char_strings.get(u32::from(glyph_id.0))?;
+    parse_char_string(data, metadata, glyph_id, builder).ok()
 }
 
 struct CharStringParserContext<'a> {
@@ -236,13 +351,21 @@ struct CharStringParserContext<'a> {
     width_parsed: bool,
     stems_len: u32,
     has_endchar: bool,
+    glyph_id: GlyphId, // Required to parse local subroutine in CID fonts.
+    local_subrs: Option<DataIndex<'a>>,
 }
 
 fn parse_char_string(
     data: &[u8],
     metadata: &Metadata,
+    glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Result<Rect, CFFError> {
+    let local_subrs = match metadata.kind {
+        FontKind::SID(ref sid) => Some(sid.local_subrs),
+        FontKind::CID(_) => None, // Will be resolved on request.
+    };
+
     let mut ctx = CharStringParserContext {
         metadata,
         is_first_move_to: true,
@@ -250,6 +373,8 @@ fn parse_char_string(
         width_parsed: false,
         stems_len: 0,
         has_endchar: false,
+        glyph_id,
+        local_subrs,
     };
 
     let mut inner_builder = Builder {
@@ -488,13 +613,27 @@ fn _parse_char_string(
                     return Err(CFFError::NestingLimitReached);
                 }
 
-                let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len());
-                let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
-                let char_string = ctx.metadata.local_subrs.get(index)
-                    .ok_or(CFFError::InvalidSubroutineIndex)?;
-                let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
-                x = pos.0;
-                y = pos.1;
+                // Parse and remember the local subroutine for the current glyph.
+                // Since it's a pretty complex task, we're doing it only when
+                // a local subroutine is actually requested by the glyphs charstring.
+                if ctx.local_subrs.is_none() {
+                    if let FontKind::CID(ref cid) = ctx.metadata.kind {
+                        ctx.local_subrs = parse_cid_local_subrs(
+                            ctx.metadata.table_data, ctx.glyph_id, cid
+                        );
+                    }
+                }
+
+                if let Some(local_subrs) = ctx.local_subrs {
+                    let subroutine_bias = calc_subroutine_bias(local_subrs.len());
+                    let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
+                    let char_string = local_subrs.get(index).ok_or(CFFError::InvalidSubroutineIndex)?;
+                    let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
+                    x = pos.0;
+                    y = pos.1;
+                } else {
+                    return Err(CFFError::NoLocalSubroutines);
+                }
 
                 if ctx.has_endchar {
                     if !s.at_end() {
@@ -1320,6 +1459,31 @@ impl<'a> DictionaryParser<'a> {
     fn operands(&self) -> &[i32] {
         &self.operands[..usize::from(self.operands_len)]
     }
+
+    #[inline]
+    fn parse_offset(&mut self) -> Option<usize> {
+        self.parse_operands()?;
+        let operands = self.operands();
+        if operands.len() == 1 {
+            usize::try_from(operands[0]).ok()
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn parse_range(&mut self) -> Option<Range<usize>> {
+        self.parse_operands()?;
+        let operands = self.operands();
+        if operands.len() == 2 {
+            let len = usize::try_from(operands[0]).ok()?;
+            let start = usize::try_from(operands[1]).ok()?;
+            let end = start.checked_add(len)?;
+            Some(start..end)
+        } else {
+            None
+        }
+    }
 }
 
 // One-byte CFF DICT Operators according to the
@@ -1398,6 +1562,64 @@ pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
     }
 
     Some(())
+}
+
+
+#[derive(Clone, Copy, Debug)]
+enum FDSelect<'a> {
+    Format0(LazyArray16<'a, u8>),
+    Format3(&'a [u8]), // It's easier to parse it inplace.
+}
+
+impl Default for FDSelect<'_> {
+    fn default() -> Self {
+        FDSelect::Format0(LazyArray16::default())
+    }
+}
+
+impl FDSelect<'_> {
+    fn font_dict_index(&self, glyph_id: GlyphId) -> Option<u8> {
+        match self {
+            FDSelect::Format0(ref array) => array.get(glyph_id.0),
+            FDSelect::Format3(ref data) => {
+                let mut s = Stream::new(data);
+                let number_of_ranges: u16 = s.read()?;
+                if number_of_ranges == 0 {
+                    return None;
+                }
+
+                // 'A sentinel GID follows the last range element and serves
+                // to delimit the last range in the array.'
+                // So we can simply increase the number of ranges by one.
+                let number_of_ranges = number_of_ranges.checked_add(1)?;
+
+                // Range is: GlyphId + u8
+                let mut prev_first_glyph: GlyphId = s.read()?;
+                let mut prev_index: u8 = s.read()?;
+                for _ in 1..number_of_ranges {
+                    let curr_first_glyph: GlyphId = s.read()?;
+                    if (prev_first_glyph..curr_first_glyph).contains(&glyph_id) {
+                        return Some(prev_index);
+                    } else {
+                        prev_index = s.read()?;
+                    }
+
+                    prev_first_glyph = curr_first_glyph;
+                }
+
+                None
+            }
+        }
+    }
+}
+
+fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSelect<'a>> {
+    let format: u8 = s.read()?;
+    match format {
+        0 => Some(FDSelect::Format0(s.read_array16(number_of_glyphs)?)),
+        3 => Some(FDSelect::Format3(s.tail()?)),
+        _ => None,
+    }
 }
 
 
@@ -1570,6 +1792,9 @@ mod tests {
                 }
                 CFFError::BlendRegionsLimitReached => {
                     write!(f, "only up to 64 blend regions are supported")
+                }
+                CFFError::NoLocalSubroutines => {
+                    write!(f, "no local subroutines")
                 }
             }
         }
@@ -1757,7 +1982,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        let rect = parse_char_string(char_str, &metadata, &mut builder).unwrap();
+        let rect = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder).unwrap();
 
         assert_eq!(builder.0, "M 10 0 Z ");
         assert_eq!(rect, Rect { x_min: 10, y_min: 0, x_max: 10, y_max: 0 });
@@ -1775,7 +2000,7 @@ mod tests {
                 let metadata = parse_metadata(&data).unwrap();
                 let mut builder = Builder(String::new());
                 let char_str = metadata.char_strings.get(0).unwrap();
-                let rect = parse_char_string(char_str, &metadata, &mut builder).unwrap();
+                let rect = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder).unwrap();
 
                 assert_eq!(builder.0, $path);
                 assert_eq!(rect, $rect_res);
@@ -1797,7 +2022,7 @@ mod tests {
                 let metadata = parse_metadata(&data).unwrap();
                 let mut builder = Builder(String::new());
                 let char_str = metadata.char_strings.get(0).unwrap();
-                let res = parse_char_string(char_str, &metadata, &mut builder);
+                let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
 
                 assert_eq!(res.unwrap_err().to_string(), $err);
             }
@@ -1967,7 +2192,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        assert!(parse_char_string(char_str, &metadata, &mut builder).is_err());
+        assert!(parse_char_string(char_str, &metadata, GlyphId(0), &mut builder).is_err());
     }
 
     test_cs_with_subrs!(local_subr,
@@ -2192,7 +2417,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, &mut builder);
+        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
                    "unused data left after 'endchar' operator");
     }
@@ -2221,7 +2446,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, &mut builder);
+        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
                    "unused data left after 'endchar' operator");
     }
@@ -2250,7 +2475,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, &mut builder);
+        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
                    "unused data left after 'endchar' operator");
     }
@@ -2274,7 +2499,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, &mut builder);
+        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
                    "subroutines nesting limit reached");
     }
@@ -2298,7 +2523,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, &mut builder);
+        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
                    "subroutines nesting limit reached");
     }
@@ -2325,7 +2550,7 @@ mod tests {
         let metadata = parse_metadata(&data).unwrap();
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, &mut builder);
+        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
         assert_eq!(res.unwrap_err().to_string(),
                    "subroutines nesting limit reached");
     }
@@ -2431,8 +2656,9 @@ mod tests {
             UInt8(top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET as u8),
         ]);
 
-        assert_eq!(parse_top_dict(&mut Stream::new(&data)).unwrap(),
-                   (5, Some(2147483647..4294967294)));
+        let top_dict = parse_top_dict(&mut Stream::new(&data)).unwrap();
+        assert_eq!(top_dict.char_strings_offset, 5);
+        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
     }
 
     #[test]

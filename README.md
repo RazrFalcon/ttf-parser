@@ -47,16 +47,16 @@ There are roughly three types of TrueType tables:
 | Feature/Library   | ttf-parser             | FreeType            | stb_truetype                   |
 | ----------------- | :--------------------: | :-----------------: | :----------------------------: |
 | Memory safe       | ✓                      |                     |                                |
-| Thread safe       | ✓                      |                     | ~<sup>1</sup>                  |
+| Thread safe       | ✓                      |                     | ~ (mostly reentrant)           |
 | Zero allocation   | ✓                      |                     |                                |
 | Variable fonts    | ✓                      | ✓                   |                                |
-| Rendering         |                        | ✓                   | ~<sup>2</sup>                  |
+| Rendering         |                        | ✓                   | ~ (very primitive)             |
 | `avar` table      | ✓                      | ✓                   |                                |
 | `bdat` table      |                        | ✓                   |                                |
 | `bloc` table      |                        | ✓                   |                                |
 | `CBDT` table      | ✓                      | ✓                   |                                |
 | `CBLC` table      | ✓                      | ✓                   |                                |
-| `CFF `&nbsp;table | ~<sup>3</sup>          | ✓                   | ~<sup>3</sup>                  |
+| `CFF `&nbsp;table | ✓                      | ✓                   | ~ (no `seac` support)          |
 | `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
 | `EBDT` table      |                        | ✓                   |                                |
@@ -64,7 +64,7 @@ There are roughly three types of TrueType tables:
 | `fvar` table      | ✓                      | ✓                   |                                |
 | `gasp` table      |                        | ✓                   |                                |
 | `GDEF` table      | ~                      |                     |                                |
-| `glyf` table      | ~<sup>4</sup>          | ✓                   | ~<sup>4</sup>                  |
+| `glyf` table      | ~<sup>1</sup>          | ✓                   | ~<sup>1</sup>                  |
 | `GPOS` table      |                        |                     | ~ (only 2)                     |
 | `GSUB` table      |                        |                     |                                |
 | `gvar` table      | ✓                      | ✓                   |                                |
@@ -85,7 +85,7 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Dynamic lib size  | ~300KiB                | ~760KiB<sup>5</sup> | ? (header-only)                |
+| Dynamic lib size  | <300KiB<sup>2</sup>    | ~760KiB<sup>3</sup> | ? (header-only)                |
 | Tested version    | 0.6.0                  | 2.9.1               | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
@@ -97,11 +97,11 @@ Legend:
 
 Notes:
 
-1. `stb_truetype` outline parsing method is reentrant.
-2. Very primitive.
-3. `type2` only. `seac` is not supported.
-4. Matching points are not supported.
-5. Depends on build flags.
+1. Matching points are not supported.
+2. When using from Rust, the library binary overhead depends on used methods 
+   and can vary from 10KiB up to 100KiB.<br/>
+   When using from C, we have to include the Rust's std too, which blows up the size.
+3. Depends on build flags.
 
 ### Performance
 

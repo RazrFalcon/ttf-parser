@@ -5,9 +5,9 @@ use std::os::raw::{c_void, c_char};
 
 use ttf_parser::{GlyphId, Tag};
 
-/// @brief An opaque pointer to the font structure.
+/// @brief An opaque pointer to the font face structure.
 #[repr(C)]
-pub struct ttfp_font {
+pub struct ttfp_face {
     _unused: [u8; 0],
 }
 
@@ -108,12 +108,12 @@ pub struct ttfp_glyph_raster_image {
     pub len: u32,
 }
 
-fn font_from_ptr(font: *const ttfp_font) -> &'static ttf_parser::Font<'static> {
-    unsafe { &*(font as *const ttf_parser::Font) }
+fn face_from_ptr(face: *const ttfp_face) -> &'static ttf_parser::Face<'static> {
+    unsafe { &*(face as *const ttf_parser::Face) }
 }
 
-fn font_from_mut_ptr(font: *const ttfp_font) -> &'static mut ttf_parser::Font<'static> {
-    unsafe { &mut *(font as *mut ttf_parser::Font) }
+fn face_from_mut_ptr(face: *const ttfp_face) -> &'static mut ttf_parser::Face<'static> {
+    unsafe { &mut *(face as *mut ttf_parser::Face) }
 }
 
 /// @brief Returns the number of fonts stored in a TrueType font collection.
@@ -131,30 +131,30 @@ pub extern "C" fn ttfp_fonts_in_collection(data: *const c_char, len: usize) -> i
     }
 }
 
-/// @brief Creates a new font parser.
+/// @brief Creates a new font face parser.
 ///
-/// Since #ttfp_font is an opaque pointer, a caller should allocate it manually
-/// using #ttfp_font_size_of.
+/// Since #ttfp_face is an opaque pointer, a caller should allocate it manually
+/// using #ttfp_face_size_of.
 /// Deallocation is also handled by a caller.
-/// #ttfp_font doesn't use heap internally, so we can simply `free()` it without
-/// a dedicated `ttfp_font_deinit` function.
+/// #ttfp_face doesn't use heap internally, so we can simply `free()` it without
+/// a dedicated `ttfp_face_deinit` function.
 ///
-/// @param data A font binary data. Must outlive the #ttfp_font.
+/// @param data A font binary data. Must outlive the #ttfp_face.
 /// @param len Size of the font data.
-/// @param index The font index in a collection (typically *.ttc). 0 should be used for basic fonts.
-/// @param font A pointer to a #ttfp_font object.
+/// @param index The font face index in a collection (typically *.ttc). 0 should be used for basic fonts.
+/// @param face A pointer to a #ttfp_face object.
 /// @return `true` on success.
 #[no_mangle]
-pub extern "C" fn ttfp_font_init(data: *const c_char, len: usize, index: u32, font: *mut c_void) -> bool {
+pub extern "C" fn ttfp_face_init(data: *const c_char, len: usize, index: u32, face: *mut c_void) -> bool {
     // This method invokes a lot of parsing, so let's catch any panics just in case.
     std::panic::catch_unwind(|| {
         let data = unsafe { std::slice::from_raw_parts(data as *const _, len) };
-        let font_rs = ttf_parser::Font::from_data(data, index).unwrap();
+        let face_rs = ttf_parser::Face::from_slice(data, index).unwrap();
         unsafe {
             std::ptr::copy(
-                &font_rs as *const ttf_parser::Font as _,
-                font,
-                ttfp_font_size_of(),
+                &face_rs as *const ttf_parser::Face as _,
+                face,
+                ttfp_face_size_of(),
             );
         }
 
@@ -162,24 +162,24 @@ pub extern "C" fn ttfp_font_init(data: *const c_char, len: usize, index: u32, fo
     }).unwrap_or(false)
 }
 
-/// @brief Returns the size of `ttfp_font`.
+/// @brief Returns the size of `ttfp_face`.
 #[no_mangle]
-pub extern "C" fn ttfp_font_size_of() -> usize {
-    std::mem::size_of::<ttf_parser::Font>()
+pub extern "C" fn ttfp_face_size_of() -> usize {
+    std::mem::size_of::<ttf_parser::Face>()
 }
 
-/// @brief Checks that font has a specified table.
+/// @brief Checks that face has a specified table.
 ///
 /// @return `true` only for tables that were successfully parsed.
 #[no_mangle]
-pub extern "C" fn ttfp_has_table(font: *const ttfp_font, name: ttf_parser::TableName) -> bool {
-    font_from_ptr(font).has_table(name)
+pub extern "C" fn ttfp_has_table(face: *const ttfp_face, name: ttf_parser::TableName) -> bool {
+    face_from_ptr(face).has_table(name)
 }
 
-/// @brief Returns the number of name records in the font.
+/// @brief Returns the number of name records in the face.
 #[no_mangle]
-pub extern "C" fn ttfp_get_name_records_count(font: *const ttfp_font) -> u16 {
-    font_from_ptr(font).names().count() as u16
+pub extern "C" fn ttfp_get_name_records_count(face: *const ttfp_face) -> u16 {
+    face_from_ptr(face).names().count() as u16
 }
 
 /// @brief Returns a name record.
@@ -188,11 +188,11 @@ pub extern "C" fn ttfp_get_name_records_count(font: *const ttfp_font) -> u16 {
 /// @return `false` when `index` is out of range or `platform_id` is invalid.
 #[no_mangle]
 pub extern "C" fn ttfp_get_name_record(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     index: u16,
     record: *mut ttfp_name_record,
 ) -> bool {
-    match font_from_ptr(font).names().nth(index as usize) {
+    match face_from_ptr(face).names().nth(index as usize) {
         Some(rec) => {
             unsafe {
                 (*record).platform_id = match rec.platform_id() {
@@ -227,12 +227,12 @@ pub extern "C" fn ttfp_get_name_record(
 ///         `ttfp_name_record.name_size`.
 #[no_mangle]
 pub extern "C" fn ttfp_get_name_record_string(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     index: u16,
     name: *mut c_char,
     len: usize,
 ) -> bool {
-    match font_from_ptr(font).names().nth(index as usize) {
+    match face_from_ptr(face).names().nth(index as usize) {
         Some(r) => {
             let r_name = r.name();
             if r_name.len() != len {
@@ -251,164 +251,164 @@ pub extern "C" fn ttfp_get_name_record_string(
     }
 }
 
-/// @brief Checks that font is marked as *Regular*.
+/// @brief Checks that face is marked as *Regular*.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_is_regular(font: *const ttfp_font) -> bool {
-    font_from_ptr(font).is_regular()
+pub extern "C" fn ttfp_is_regular(face: *const ttfp_face) -> bool {
+    face_from_ptr(face).is_regular()
 }
 
-/// @brief Checks that font is marked as *Italic*.
+/// @brief Checks that face is marked as *Italic*.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_is_italic(font: *const ttfp_font) -> bool {
-    font_from_ptr(font).is_italic()
+pub extern "C" fn ttfp_is_italic(face: *const ttfp_face) -> bool {
+    face_from_ptr(face).is_italic()
 }
 
-/// @brief Checks that font is marked as *Bold*.
+/// @brief Checks that face is marked as *Bold*.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_is_bold(font: *const ttfp_font) -> bool {
-    font_from_ptr(font).is_bold()
+pub extern "C" fn ttfp_is_bold(face: *const ttfp_face) -> bool {
+    face_from_ptr(face).is_bold()
 }
 
-/// @brief Checks that font is marked as *Oblique*.
+/// @brief Checks that face is marked as *Oblique*.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_is_oblique(font: *const ttfp_font) -> bool {
-    font_from_ptr(font).is_oblique()
+pub extern "C" fn ttfp_is_oblique(face: *const ttfp_face) -> bool {
+    face_from_ptr(face).is_oblique()
 }
 
-/// @brief Checks that font is variable.
+/// @brief Checks that face is variable.
 ///
 /// Simply checks the presence of a `fvar` table.
 #[no_mangle]
-pub extern "C" fn ttfp_is_variable(font: *const ttfp_font) -> bool {
-    font_from_ptr(font).is_variable()
+pub extern "C" fn ttfp_is_variable(face: *const ttfp_face) -> bool {
+    face_from_ptr(face).is_variable()
 }
 
-/// @brief Returns font's weight.
+/// @brief Returns face's weight.
 ///
-/// @return Font's weight or `400` when OS/2 table is not present.
+/// @return Face's weight or `400` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_get_weight(font: *const ttfp_font) -> u16 {
-    font_from_ptr(font).weight().to_number()
+pub extern "C" fn ttfp_get_weight(face: *const ttfp_face) -> u16 {
+    face_from_ptr(face).weight().to_number()
 }
 
-/// @brief Returns font's width.
+/// @brief Returns face's width.
 ///
-/// @return Font's width in a 1..9 range or `5` when OS/2 table is not present
+/// @return Face's width in a 1..9 range or `5` when OS/2 table is not present
 ///         or when value is invalid.
 #[no_mangle]
-pub extern "C" fn ttfp_get_width(font: *const ttfp_font) -> u16 {
-    font_from_ptr(font).width().to_number()
+pub extern "C" fn ttfp_get_width(face: *const ttfp_face) -> u16 {
+    face_from_ptr(face).width().to_number()
 }
 
-/// @brief Returns a horizontal font ascender.
+/// @brief Returns a horizontal face ascender.
 ///
 /// This function is affected by variation axes.
 #[no_mangle]
-pub extern "C" fn ttfp_get_ascender(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).ascender()
+pub extern "C" fn ttfp_get_ascender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).ascender()
 }
 
-/// @brief Returns a horizontal font descender.
+/// @brief Returns a horizontal face descender.
 ///
 /// This function is affected by variation axes.
 #[no_mangle]
-pub extern "C" fn ttfp_get_descender(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).descender()
+pub extern "C" fn ttfp_get_descender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).descender()
 }
 
-/// @brief Returns a horizontal font height.
+/// @brief Returns a horizontal face height.
 ///
 /// This function is affected by variation axes.
 #[no_mangle]
-pub extern "C" fn ttfp_get_height(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).height()
+pub extern "C" fn ttfp_get_height(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).height()
 }
 
-/// @brief Returns a horizontal font line gap.
+/// @brief Returns a horizontal face line gap.
 ///
 /// This function is affected by variation axes.
 #[no_mangle]
-pub extern "C" fn ttfp_get_line_gap(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).line_gap()
+pub extern "C" fn ttfp_get_line_gap(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).line_gap()
 }
 
-/// @brief Returns a vertical font ascender.
-///
-/// This function is affected by variation axes.
-///
-/// @return `0` when `vhea` table is not present.
-#[no_mangle]
-pub extern "C" fn ttfp_get_vertical_ascender(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).vertical_ascender().unwrap_or(0)
-}
-
-/// @brief Returns a vertical font descender.
+/// @brief Returns a vertical face ascender.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return `0` when `vhea` table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_get_vertical_descender(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).vertical_descender().unwrap_or(0)
+pub extern "C" fn ttfp_get_vertical_ascender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).vertical_ascender().unwrap_or(0)
 }
 
-/// @brief Returns a vertical font height.
+/// @brief Returns a vertical face descender.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return `0` when `vhea` table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_get_vertical_height(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).vertical_height().unwrap_or(0)
+pub extern "C" fn ttfp_get_vertical_descender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).vertical_descender().unwrap_or(0)
 }
 
-/// @brief Returns a vertical font line gap.
+/// @brief Returns a vertical face height.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return `0` when `vhea` table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_get_vertical_line_gap(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).vertical_line_gap().unwrap_or(0)
+pub extern "C" fn ttfp_get_vertical_height(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).vertical_height().unwrap_or(0)
 }
 
-/// @brief Returns font's units per EM.
+/// @brief Returns a vertical face line gap.
+///
+/// This function is affected by variation axes.
+///
+/// @return `0` when `vhea` table is not present.
+#[no_mangle]
+pub extern "C" fn ttfp_get_vertical_line_gap(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).vertical_line_gap().unwrap_or(0)
+}
+
+/// @brief Returns face's units per EM.
 ///
 /// @return Units in a 16..16384 range or `0` otherwise.
 #[no_mangle]
-pub extern "C" fn ttfp_get_units_per_em(font: *const ttfp_font) -> u16 {
-    font_from_ptr(font).units_per_em().unwrap_or(0)
+pub extern "C" fn ttfp_get_units_per_em(face: *const ttfp_face) -> u16 {
+    face_from_ptr(face).units_per_em().unwrap_or(0)
 }
 
-/// @brief Returns font's x height.
+/// @brief Returns face's x height.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return x height or 0 when OS/2 table is not present or when its version is < 2.
 #[no_mangle]
-pub extern "C" fn ttfp_get_x_height(font: *const ttfp_font) -> i16 {
-    font_from_ptr(font).x_height().unwrap_or(0)
+pub extern "C" fn ttfp_get_x_height(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).x_height().unwrap_or(0)
 }
 
-/// @brief Returns font's underline metrics.
+/// @brief Returns face's underline metrics.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return `false` when `post` table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_underline_metrics(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     metrics: *mut ttf_parser::LineMetrics,
 ) -> bool {
-    match font_from_ptr(font).underline_metrics() {
+    match face_from_ptr(face).underline_metrics() {
         Some(m) => {
             unsafe { *metrics = m; }
             true
@@ -417,17 +417,17 @@ pub extern "C" fn ttfp_get_underline_metrics(
     }
 }
 
-/// @brief Returns font's strikeout metrics.
+/// @brief Returns face's strikeout metrics.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_strikeout_metrics(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     metrics: *mut ttf_parser::LineMetrics,
 ) -> bool {
-    match font_from_ptr(font).strikeout_metrics() {
+    match face_from_ptr(face).strikeout_metrics() {
         Some(m) => {
             unsafe { *metrics = m; }
             true
@@ -443,10 +443,10 @@ pub extern "C" fn ttfp_get_strikeout_metrics(
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_subscript_metrics(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     metrics: *mut ttf_parser::ScriptMetrics,
 ) -> bool {
-    match font_from_ptr(font).subscript_metrics() {
+    match face_from_ptr(face).subscript_metrics() {
         Some(m) => {
             unsafe { *metrics = m; }
             true
@@ -455,17 +455,17 @@ pub extern "C" fn ttfp_get_subscript_metrics(
     }
 }
 
-/// @brief Returns font's superscript metrics.
+/// @brief Returns face's superscript metrics.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return `false` when OS/2 table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_superscript_metrics(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     metrics: *mut ttf_parser::ScriptMetrics,
 ) -> bool {
-    match font_from_ptr(font).superscript_metrics() {
+    match face_from_ptr(face).superscript_metrics() {
         Some(m) => {
             unsafe { *metrics = m; }
             true
@@ -474,12 +474,12 @@ pub extern "C" fn ttfp_get_superscript_metrics(
     }
 }
 
-/// @brief Returns a total number of glyphs in the font.
+/// @brief Returns a total number of glyphs in the face.
 ///
 /// @return The number of glyphs which is never zero.
 #[no_mangle]
-pub extern "C" fn ttfp_get_number_of_glyphs(font: *const ttfp_font) -> u16 {
-    font_from_ptr(font).number_of_glyphs()
+pub extern "C" fn ttfp_get_number_of_glyphs(face: *const ttfp_face) -> u16 {
+    face_from_ptr(face).number_of_glyphs()
 }
 
 /// @brief Resolves a Glyph ID for a code point.
@@ -489,12 +489,12 @@ pub extern "C" fn ttfp_get_number_of_glyphs(font: *const ttfp_font) -> u16 {
 /// @param codepoint A valid Unicode codepoint. Otherwise 0 will be returned.
 /// @return Returns 0 when glyph is not present or parsing is failed.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_index(font: *const ttfp_font, codepoint: u32) -> u16 {
+pub extern "C" fn ttfp_get_glyph_index(face: *const ttfp_face, codepoint: u32) -> u16 {
     // This method invokes a lot of parsing, so let's catch any panics just in case.
     std::panic::catch_unwind(|| {
         let get = || {
             let c = char::try_from(codepoint).ok()?;
-            font_from_ptr(font).glyph_index(c).map(|gid| gid.0)
+            face_from_ptr(face).glyph_index(c).map(|gid| gid.0)
         };
 
         get().unwrap_or(0)
@@ -508,7 +508,7 @@ pub extern "C" fn ttfp_get_glyph_index(font: *const ttfp_font, codepoint: u32) -
 /// @return Returns 0 when glyph is not present or parsing is failed.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_var_index(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     codepoint: u32,
     variation: u32,
 ) -> u16 {
@@ -517,7 +517,7 @@ pub extern "C" fn ttfp_get_glyph_var_index(
         let get = || {
             let c = char::try_from(codepoint).ok()?;
             let v = char::try_from(variation).ok()?;
-            font_from_ptr(font).glyph_variation_index(c, v).map(|gid| gid.0)
+            face_from_ptr(face).glyph_variation_index(c, v).map(|gid| gid.0)
         };
 
         get().unwrap_or(0)
@@ -528,8 +528,8 @@ pub extern "C" fn ttfp_get_glyph_var_index(
 ///
 /// @return Glyph's advance or 0 when not set.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_hor_advance(font: *const ttfp_font, glyph_id: GlyphId) -> u16 {
-    font_from_ptr(font).glyph_hor_advance(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_hor_advance(face: *const ttfp_face, glyph_id: GlyphId) -> u16 {
+    face_from_ptr(face).glyph_hor_advance(glyph_id).unwrap_or(0)
 }
 
 /// @brief Returns glyph's vertical advance.
@@ -538,16 +538,16 @@ pub extern "C" fn ttfp_get_glyph_hor_advance(font: *const ttfp_font, glyph_id: G
 ///
 /// @return Glyph's advance or 0 when not set.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_ver_advance(font: *const ttfp_font, glyph_id: GlyphId) -> u16 {
-    font_from_ptr(font).glyph_ver_advance(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_ver_advance(face: *const ttfp_face, glyph_id: GlyphId) -> u16 {
+    face_from_ptr(face).glyph_ver_advance(glyph_id).unwrap_or(0)
 }
 
 /// @brief Returns glyph's horizontal side bearing.
 ///
 /// @return Glyph's side bearing or 0 when not set.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_hor_side_bearing(font: *const ttfp_font, glyph_id: GlyphId) -> i16 {
-    font_from_ptr(font).glyph_hor_side_bearing(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_hor_side_bearing(face: *const ttfp_face, glyph_id: GlyphId) -> i16 {
+    face_from_ptr(face).glyph_hor_side_bearing(glyph_id).unwrap_or(0)
 }
 
 /// @brief Returns glyph's vertical side bearing.
@@ -556,16 +556,16 @@ pub extern "C" fn ttfp_get_glyph_hor_side_bearing(font: *const ttfp_font, glyph_
 ///
 /// @return Glyph's side bearing or 0 when not set.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_ver_side_bearing(font: *const ttfp_font, glyph_id: GlyphId) -> i16 {
-    font_from_ptr(font).glyph_ver_side_bearing(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_ver_side_bearing(face: *const ttfp_face, glyph_id: GlyphId) -> i16 {
+    face_from_ptr(face).glyph_ver_side_bearing(glyph_id).unwrap_or(0)
 }
 
 /// @brief Returns glyph's vertical origin.
 ///
 /// @return Glyph's vertical origin or 0 when not set.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_y_origin(font: *const ttfp_font, glyph_id: GlyphId) -> i16 {
-    font_from_ptr(font).glyph_y_origin(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_y_origin(face: *const ttfp_face, glyph_id: GlyphId) -> i16 {
+    face_from_ptr(face).glyph_y_origin(glyph_id).unwrap_or(0)
 }
 
 /// @brief Returns glyph's name.
@@ -578,11 +578,11 @@ pub extern "C" fn ttfp_get_glyph_y_origin(font: *const ttfp_font, glyph_id: Glyp
 /// @return `true` on success.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_name(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     glyph_id: GlyphId,
     name: *mut c_char,
 ) -> bool {
-    match font_from_ptr(font).glyph_name(glyph_id) {
+    match face_from_ptr(face).glyph_name(glyph_id) {
         Some(n) => {
             // TODO: memcpy?
             let name = unsafe { std::slice::from_raw_parts_mut(name as *mut _, 256) };
@@ -602,8 +602,8 @@ pub extern "C" fn ttfp_get_glyph_name(
 ///
 /// @return A glyph class or TTFP_GLYPH_CLASS_UNKNOWN otherwise.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_class(font: *const ttfp_font, glyph_id: GlyphId) -> ttfp_glyph_class {
-    match font_from_ptr(font).glyph_class(glyph_id) {
+pub extern "C" fn ttfp_get_glyph_class(face: *const ttfp_face, glyph_id: GlyphId) -> ttfp_glyph_class {
+    match face_from_ptr(face).glyph_class(glyph_id) {
         None => ttfp_glyph_class::Unknown,
         Some(ttf_parser::GlyphClass::Base) => ttfp_glyph_class::Base,
         Some(ttf_parser::GlyphClass::Ligature) => ttfp_glyph_class::Ligature,
@@ -616,14 +616,14 @@ pub extern "C" fn ttfp_get_glyph_class(font: *const ttfp_font, glyph_id: GlyphId
 ///
 /// @return All glyphs not assigned to a class fall into Class 0.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_mark_attachment_class(font: *const ttfp_font, glyph_id: GlyphId) -> u16 {
-    font_from_ptr(font).glyph_mark_attachment_class(glyph_id).0
+pub extern "C" fn ttfp_get_glyph_mark_attachment_class(face: *const ttfp_face, glyph_id: GlyphId) -> u16 {
+    face_from_ptr(face).glyph_mark_attachment_class(glyph_id).0
 }
 
 /// @brief Checks that glyph is a mark according to Mark Glyph Sets Table.
 #[no_mangle]
-pub extern "C" fn ttfp_is_mark_glyph(font: *const ttfp_font, glyph_id: GlyphId) -> bool {
-    font_from_ptr(font).is_mark_glyph(glyph_id, None)
+pub extern "C" fn ttfp_is_mark_glyph(face: *const ttfp_face, glyph_id: GlyphId) -> bool {
+    face_from_ptr(face).is_mark_glyph(glyph_id, None)
 }
 
 /// @brief Outlines a glyph and returns its tight bounding box.
@@ -640,7 +640,7 @@ pub extern "C" fn ttfp_is_mark_glyph(font: *const ttfp_font, glyph_id: GlyphId) 
 /// @return `false` when glyph has no outline or on error.
 #[no_mangle]
 pub extern "C" fn ttfp_outline_glyph(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     builder: ttfp_outline_builder,
     user_data: *mut c_void,
     glyph_id: GlyphId,
@@ -649,7 +649,7 @@ pub extern "C" fn ttfp_outline_glyph(
     // This method invokes a lot of parsing, so let's catch any panics just in case.
     std::panic::catch_unwind(|| {
         let mut b = Builder(builder, user_data);
-        match font_from_ptr(font).outline_glyph(glyph_id, &mut b) {
+        match face_from_ptr(face).outline_glyph(glyph_id, &mut b) {
             Some(bb) => {
                 unsafe { *bbox = bb }
                 true
@@ -661,20 +661,20 @@ pub extern "C" fn ttfp_outline_glyph(
 
 /// @brief Returns a tight glyph bounding box.
 ///
-/// Unless the current font has a `glyf` table, this is just a shorthand for `outline_glyph()`
+/// Unless the current face has a `glyf` table, this is just a shorthand for `outline_glyph()`
 /// since only the `glyf` table stores a bounding box. In case of CFF and variable fonts
 /// we have to actually outline a glyph to find it's bounding box.
 ///
 /// This function is affected by variation axes.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_bbox(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     glyph_id: GlyphId,
     bbox: *mut ttf_parser::Rect,
 ) -> bool {
     // This method invokes a lot of parsing, so let's catch any panics just in case.
     std::panic::catch_unwind(|| {
-        match font_from_ptr(font).glyph_bounding_box(glyph_id) {
+        match face_from_ptr(face).glyph_bounding_box(glyph_id) {
             Some(bb) => {
                 unsafe { *bbox = bb }
                 true
@@ -684,12 +684,12 @@ pub extern "C" fn ttfp_get_glyph_bbox(
     }).unwrap_or(false)
 }
 
-/// @brief Returns a bounding box that large enough to enclose any glyph from the font.
+/// @brief Returns a bounding box that large enough to enclose any glyph from the face.
 #[no_mangle]
 pub extern "C" fn ttfp_get_global_bounding_box(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
 ) -> ttf_parser::Rect {
-    font_from_ptr(font).global_bounding_box()
+    face_from_ptr(face).global_bounding_box()
 }
 
 /// @brief Returns a reference to a glyph's raster image.
@@ -714,12 +714,12 @@ pub extern "C" fn ttfp_get_global_bounding_box(
 /// and this method supports only `sbix`, `CBLC`+`CBDT`.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_raster_image(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     glyph_id: GlyphId,
     pixels_per_em: u16,
     glyph_image: *mut ttfp_glyph_raster_image,
 ) -> bool {
-    match font_from_ptr(font).glyph_raster_image(glyph_id, pixels_per_em) {
+    match face_from_ptr(face).glyph_raster_image(glyph_id, pixels_per_em) {
         Some(image) => {
             unsafe {
                 *glyph_image = ttfp_glyph_raster_image {
@@ -755,12 +755,12 @@ pub extern "C" fn ttfp_get_glyph_raster_image(
 /// you should also try `ttfp_outline_glyph()` afterwards.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_svg_image(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     glyph_id: GlyphId,
     svg: *mut *const c_char,
     len: *mut u32,
 ) -> bool {
-    match font_from_ptr(font).glyph_svg_image(glyph_id) {
+    match face_from_ptr(face).glyph_svg_image(glyph_id) {
         Some(image) => {
             unsafe {
                 *svg = image.as_ptr() as *const c_char;
@@ -775,18 +775,18 @@ pub extern "C" fn ttfp_get_glyph_svg_image(
 
 /// @brief Returns the amount of variation axes.
 #[no_mangle]
-pub extern "C" fn ttfp_get_variation_axes_count(font: *const ttfp_font) -> u16 {
-    font_from_ptr(font).variation_axes().count() as u16
+pub extern "C" fn ttfp_get_variation_axes_count(face: *const ttfp_face) -> u16 {
+    face_from_ptr(face).variation_axes().count() as u16
 }
 
 /// @brief Returns a variation axis by index.
 #[no_mangle]
 pub extern "C" fn ttfp_get_variation_axis(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     index: u16,
     axis: *mut ttf_parser::VariationAxis,
 ) -> bool {
-    match font_from_ptr(font).variation_axes().nth(index as usize) {
+    match face_from_ptr(face).variation_axes().nth(index as usize) {
         Some(a) => {
             unsafe { *axis = a };
             true
@@ -798,11 +798,11 @@ pub extern "C" fn ttfp_get_variation_axis(
 /// @brief Returns a variation axis by tag.
 #[no_mangle]
 pub extern "C" fn ttfp_get_variation_axis_by_tag(
-    font: *const ttfp_font,
+    face: *const ttfp_face,
     tag: ttf_parser::Tag,
     axis: *mut ttf_parser::VariationAxis,
 ) -> bool {
-    match font_from_ptr(font).variation_axes().find(|axis| axis.tag == tag) {
+    match face_from_ptr(face).variation_axes().find(|axis| axis.tag == tag) {
         Some(a) => {
             unsafe { *axis = a };
             true
@@ -815,16 +815,16 @@ pub extern "C" fn ttfp_get_variation_axis_by_tag(
 ///
 /// This is the only mutable function in the library.
 /// We can simplify the API a lot by storing the variable coordinates
-/// in the font object itself.
+/// in the face object itself.
 ///
 /// This function is reentrant.
 ///
 /// Since coordinates are stored on the stack, we allow only 32 of them.
 ///
-/// @return `false` when font is not variable or doesn't have such axis.
+/// @return `false` when face is not variable or doesn't have such axis.
 #[no_mangle]
-pub extern "C" fn ttfp_set_variation(font: *mut ttfp_font, axis: Tag, value: f32) -> bool {
-    font_from_mut_ptr(font).set_variation(axis, value).is_some()
+pub extern "C" fn ttfp_set_variation(face: *mut ttfp_face, axis: Tag, value: f32) -> bool {
+    face_from_mut_ptr(face).set_variation(axis, value).is_some()
 }
 
 #[cfg(test)]

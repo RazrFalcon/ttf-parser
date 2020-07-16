@@ -10,7 +10,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - (CFF) `seac` support.
 - `Font::global_bounding_box`
 
-## [0.6.1] - 2020-07-02
+### Changed
+- Rename `Font` to `Face`, because this is what it actually is.
+- Rename `Font::from_data` to `Font::from_slice` to match serde and other libraries.
+- Rename `Name::name_utf8` to `Name::to_string`.
+
+### Removed
+- `Font::family_name` and `Font::post_script_name`. They were a bit confusing.
+  Prefer:
+  ```
+  face.names().find(|name| name.name_id() == name_id::FULL_NAME).and_then(|name| name.to_string())
+  ```
+
+## [0.6.2] - 2020-07-02
 ### Added
 - `Name::is_unicode`
 - `Font::family_name` will load names with Windows Symbol encoding now.

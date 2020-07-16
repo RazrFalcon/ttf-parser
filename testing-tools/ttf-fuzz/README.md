@@ -18,7 +18,7 @@ Before running, we have to collect some test data.
 Using raw fonts is too wasteful, so we are using the `strip-tables.py` script
 to remove unneeded tables.
 
-Here is an example to test `cmap`/`Font::glyph_index`:
+Here is an example to test `cmap`/`Face::glyph_index`:
 
 ```
 strip-tables.py glyph-index in /usr/share/fonts

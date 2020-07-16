@@ -9,7 +9,7 @@ fn main() {
 
     let now = std::time::Instant::now();
 
-    let font = match ttf_parser::Font::from_data(&font_data, 0) {
+    let face = match ttf_parser::Face::from_slice(&font_data, 0) {
         Some(f) => f,
         None => {
             eprint!("Error: failed to open a font.");
@@ -17,30 +17,38 @@ fn main() {
         },
     };
 
-    println!("Family name: {:?}", font.family_name());
-    println!("PostScript name: {:?}", font.post_script_name());
-    println!("Units per EM: {:?}", font.units_per_em());
-    println!("Ascender: {}", font.ascender());
-    println!("Descender: {}", font.descender());
-    println!("Line gap: {}", font.line_gap());
-    println!("Global bbox: {:?}", font.global_bounding_box());
-    println!("Number of glyphs: {}", font.number_of_glyphs());
-    println!("Underline: {:?}", font.underline_metrics());
-    println!("X height: {:?}", font.x_height());
-    println!("Weight: {:?}", font.weight());
-    println!("Width: {:?}", font.width());
-    println!("Regular: {}", font.is_regular());
-    println!("Italic: {}", font.is_italic());
-    println!("Bold: {}", font.is_bold());
-    println!("Oblique: {}", font.is_oblique());
-    println!("Strikeout: {:?}", font.strikeout_metrics());
-    println!("Subscript: {:?}", font.subscript_metrics());
-    println!("Superscript: {:?}", font.superscript_metrics());
-    println!("Variable: {:?}", font.is_variable());
+    let family_name = face.names()
+        .find(|name| name.name_id() == ttf_parser::name_id::FULL_NAME)
+        .and_then(|name| name.to_string());
 
-    if font.is_variable() {
+    let post_script_name = face.names()
+        .find(|name| name.name_id() == ttf_parser::name_id::POST_SCRIPT_NAME)
+        .and_then(|name| name.to_string());
+
+    println!("Family name: {:?}", family_name);
+    println!("PostScript name: {:?}", post_script_name);
+    println!("Units per EM: {:?}", face.units_per_em());
+    println!("Ascender: {}", face.ascender());
+    println!("Descender: {}", face.descender());
+    println!("Line gap: {}", face.line_gap());
+    println!("Global bbox: {:?}", face.global_bounding_box());
+    println!("Number of glyphs: {}", face.number_of_glyphs());
+    println!("Underline: {:?}", face.underline_metrics());
+    println!("X height: {:?}", face.x_height());
+    println!("Weight: {:?}", face.weight());
+    println!("Width: {:?}", face.width());
+    println!("Regular: {}", face.is_regular());
+    println!("Italic: {}", face.is_italic());
+    println!("Bold: {}", face.is_bold());
+    println!("Oblique: {}", face.is_oblique());
+    println!("Strikeout: {:?}", face.strikeout_metrics());
+    println!("Subscript: {:?}", face.subscript_metrics());
+    println!("Superscript: {:?}", face.superscript_metrics());
+    println!("Variable: {:?}", face.is_variable());
+
+    if face.is_variable() {
         println!("Variation axes:");
-        for axis in font.variation_axes() {
+        for axis in face.variation_axes() {
             println!("  {} {}..{}, default {}",
                      axis.tag, axis.min_value, axis.max_value, axis.def_value);
         }

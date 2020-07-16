@@ -30,5 +30,5 @@ private:
     { void operator()(void* x) { free(x); } };
 
     QByteArray m_fontData;
-    std::unique_ptr<ttfp_font, FreeCPtr> m_font;
+    std::unique_ptr<ttfp_face, FreeCPtr> m_face;
 };

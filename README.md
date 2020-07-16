@@ -28,7 +28,7 @@ Can be used as Rust and as C library.
 - The library forbids the unsafe code.
 - No heap allocations, so crash due to OOM is not possible.
 - All recursive methods have a depth limit.
-- Technically, should use less than 64KiB of stack in worst case scenario.
+- Technically, should use less than 64KiB of stack in the worst case scenario.
 - Most of arithmetic operations are checked.
 - Most of numeric casts are checked.
 

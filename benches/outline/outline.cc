@@ -199,28 +199,28 @@ public:
                                 std::istreambuf_iterator<char>());
         m_fontData = std::move(data);
 
-        m_font = (ttfp_font*)malloc(ttfp_font_size_of());
-        if (!ttfp_font_init(m_fontData.data(), m_fontData.size(), index, m_font)) {
-            free(m_font);
+        m_face = (ttfp_face*)malloc(ttfp_face_size_of());
+        if (!ttfp_face_init(m_fontData.data(), m_fontData.size(), index, m_face)) {
+            free(m_face);
             throw "failed to parse a font";
         }
     }
 
     ~Font()
     {
-        if (m_font) {
-            free(m_font);
+        if (m_face) {
+            free(m_face);
         }
     }
 
     uint16_t numberOfGlyphs() const
     {
-        return ttfp_get_number_of_glyphs(m_font);
+        return ttfp_get_number_of_glyphs(m_face);
     }
 
     void setVariations()
     {
-        if (!ttfp_set_variation(m_font, TTFP_TAG('w', 'g', 'h', 't'), 500)) {
+        if (!ttfp_set_variation(m_face, TTFP_TAG('w', 'g', 'h', 't'), 500)) {
             throw "failed to set veriations";
         }
     }
@@ -237,14 +237,14 @@ public:
         builder.close_path = outliner.closePathFn;
 
         ttfp_rect bbox;
-        ttfp_outline_glyph(m_font, builder, &outliner, gid, &bbox);
+        ttfp_outline_glyph(m_face, builder, &outliner, gid, &bbox);
 
         return outliner.counter;
     }
 
 private:
     std::vector<char> m_fontData;
-    ttfp_font *m_font = nullptr;
+    ttfp_face *m_face = nullptr;
 };
 }
 

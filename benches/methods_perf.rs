@@ -3,102 +3,105 @@ use ttf_parser as ttf;
 fn from_data_ttf(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     bencher.iter(|| {
-        bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
+        bencher::black_box(ttf::Face::from_slice(&font_data, 0).unwrap());
     })
 }
 
 fn from_data_otf_cff(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.otf").unwrap();
     bencher.iter(|| {
-        bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
+        bencher::black_box(ttf::Face::from_slice(&font_data, 0).unwrap());
     })
 }
 
 fn from_data_otf_cff2(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansVariable-Roman.otf").unwrap();
     bencher.iter(|| {
-        bencher::black_box(ttf::Font::from_data(&font_data, 0).unwrap());
+        bencher::black_box(ttf::Face::from_slice(&font_data, 0).unwrap());
     })
 }
 
 fn outline_glyph_8_from_glyf(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        font.outline_glyph(ttf::GlyphId(8), &mut Builder(0))
+        face.outline_glyph(ttf::GlyphId(8), &mut Builder(0))
     })
 }
 
 fn outline_glyph_276_from_glyf(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     let mut b = Builder(0);
     bencher.iter(|| {
-        font.outline_glyph(ttf::GlyphId(276), &mut b)
+        face.outline_glyph(ttf::GlyphId(276), &mut b)
     })
 }
 
 fn outline_glyph_8_from_cff(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.otf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        font.outline_glyph(ttf::GlyphId(8), &mut Builder(0))
+        face.outline_glyph(ttf::GlyphId(8), &mut Builder(0))
     })
 }
 
 fn outline_glyph_276_from_cff(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.otf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        font.outline_glyph(ttf::GlyphId(276), &mut Builder(0))
+        face.outline_glyph(ttf::GlyphId(276), &mut Builder(0))
     })
 }
 
 fn outline_glyph_8_from_cff2(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansVariable-Roman.otf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        font.outline_glyph(ttf::GlyphId(8), &mut Builder(0))
+        face.outline_glyph(ttf::GlyphId(8), &mut Builder(0))
     })
 }
 
 fn outline_glyph_276_from_cff2(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansVariable-Roman.otf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        font.outline_glyph(ttf::GlyphId(276), &mut Builder(0))
+        face.outline_glyph(ttf::GlyphId(276), &mut Builder(0))
     })
 }
 
 fn family_name(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        bencher::black_box(font.family_name());
+        bencher::black_box(
+            face.names().find(|name| name.name_id() == ttf::name_id::FULL_NAME)
+                .and_then(|name| name.to_string())
+        );
     })
 }
 
 fn glyph_name_8(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        bencher::black_box(font.glyph_name(ttf::GlyphId(8)).unwrap());
+        bencher::black_box(face.glyph_name(ttf::GlyphId(8)).unwrap());
     })
 }
 
 fn glyph_name_276(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        bencher::black_box(font.glyph_name(ttf::GlyphId(276)).unwrap());
+        bencher::black_box(face.glyph_name(ttf::GlyphId(276)).unwrap());
     })
 }
 
 fn glyph_index_u41(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
-    let font = ttf::Font::from_data(&font_data, 0).unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
-        bencher::black_box(font.glyph_index('A').unwrap());
+        bencher::black_box(face.glyph_index('A').unwrap());
     })
 }
 

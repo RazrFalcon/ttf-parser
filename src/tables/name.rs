@@ -123,29 +123,29 @@ pub struct Name<'a> {
 }
 
 impl<'a> Name<'a> {
-    /// Parses the platform ID.
+    /// Returns the platform ID.
     pub fn platform_id(&self) -> Option<PlatformId> {
         PlatformId::from_u16(self.data.platform_id)
     }
 
-    /// Parses the platform-specific encoding ID.
+    /// Returns the platform-specific encoding ID.
     pub fn encoding_id(&self) -> u16 {
         self.data.encoding_id
     }
 
-    /// Parses the language ID.
+    /// Returns the language ID.
     pub fn language_id(&self) -> u16 {
         self.data.language_id
     }
 
-    /// Parses the [Name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids).
+    /// Returns the [Name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids).
     ///
     /// A predefined list of ID's can be found in the [`name_id`](name_id/index.html) module.
     pub fn name_id(&self) -> u16 {
         self.data.name_id
     }
 
-    /// Parses the Name's data as bytes.
+    /// Returns the Name's data as bytes.
     ///
     /// Can be empty.
     pub fn name(&self) -> &'a [u8] {
@@ -154,7 +154,7 @@ impl<'a> Name<'a> {
         self.strings.get(start..end).unwrap_or(&[])
     }
 
-    /// Parses the Name's data as a UTF-8 string.
+    /// Returns the Name's data as a UTF-8 string.
     ///
     /// Only Unicode names are supported. And since they are stored as UTF-16BE,
     /// we can't return `&str` and have to allocate a `String`.
@@ -165,7 +165,7 @@ impl<'a> Name<'a> {
     /// - Windows Platform ID + Unicode BMP
     #[cfg(feature = "std")]
     #[inline(never)]
-    pub fn name_utf8(&self) -> Option<String> {
+    pub fn to_string(&self) -> Option<String> {
         if self.is_unicode() {
             self.name_from_utf16_be()
         } else {
@@ -181,7 +181,7 @@ impl<'a> Name<'a> {
 
     #[cfg(feature = "std")]
     #[inline(never)]
-    pub(crate) fn name_from_utf16_be(&self) -> Option<String> {
+    fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
         for c in LazyArray16::<u16>::new(self.name()) {
             name.push(c);
@@ -196,7 +196,7 @@ impl<'a> core::fmt::Debug for Name<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         // TODO: https://github.com/rust-lang/rust/issues/50264
 
-        let name = self.name_utf8();
+        let name = self.to_string();
         f.debug_struct("Name")
             .field("name", &name.as_ref().map(core::ops::Deref::deref)
                                 .unwrap_or("unsupported encoding"))

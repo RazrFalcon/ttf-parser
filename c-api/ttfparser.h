@@ -67,9 +67,9 @@ typedef enum {
 } ttfp_raster_image_format;
 
 /**
- * @brief An opaque pointer to the font structure.
+ * @brief An opaque pointer to the font face structure.
  */
-typedef struct ttfp_font ttfp_font;
+typedef struct ttfp_face ttfp_face;
 
 /**
  * @brief A name record.
@@ -209,38 +209,38 @@ extern "C" {
 int32_t ttfp_fonts_in_collection(const char *data, uintptr_t len);
 
 /**
- * @brief Creates a new font parser.
+ * @brief Creates a new font face parser.
  *
- * Since #ttfp_font is an opaque pointer, a caller should allocate it manually
- * using #ttfp_font_size_of.
+ * Since #ttfp_face is an opaque pointer, a caller should allocate it manually
+ * using #ttfp_face_size_of.
  * Deallocation is also handled by a caller.
- * #ttfp_font doesn't use heap internally, so we can simply `free()` it without
- * a dedicated `ttfp_font_deinit` function.
+ * #ttfp_face doesn't use heap internally, so we can simply `free()` it without
+ * a dedicated `ttfp_face_deinit` function.
  *
- * @param data A font binary data. Must outlive the #ttfp_font.
+ * @param data A font binary data. Must outlive the #ttfp_face.
  * @param len Size of the font data.
- * @param index The font index in a collection (typically *.ttc). 0 should be used for basic fonts.
- * @param font A pointer to a #ttfp_font object.
+ * @param index The font face index in a collection (typically *.ttc). 0 should be used for basic fonts.
+ * @param face A pointer to a #ttfp_face object.
  * @return `true` on success.
  */
-bool ttfp_font_init(const char *data, uintptr_t len, uint32_t index, void *font);
+bool ttfp_face_init(const char *data, uintptr_t len, uint32_t index, void *face);
 
 /**
- * @brief Returns the size of `ttfp_font`.
+ * @brief Returns the size of `ttfp_face`.
  */
-uintptr_t ttfp_font_size_of(void);
+uintptr_t ttfp_face_size_of(void);
 
 /**
- * @brief Checks that font has a specified table.
+ * @brief Checks that face has a specified table.
  *
  * @return `true` only for tables that were successfully parsed.
  */
-bool ttfp_has_table(const ttfp_font *font, ttfp_table_name name);
+bool ttfp_has_table(const ttfp_face *face, ttfp_table_name name);
 
 /**
- * @brief Returns the number of name records in the font.
+ * @brief Returns the number of name records in the face.
  */
-uint16_t ttfp_get_name_records_count(const ttfp_font *font);
+uint16_t ttfp_get_name_records_count(const ttfp_face *face);
 
 /**
  * @brief Returns a name record.
@@ -248,7 +248,7 @@ uint16_t ttfp_get_name_records_count(const ttfp_font *font);
  * @param Record's index. The total amount can be obtained via #ttfp_get_name_records_count.
  * @return `false` when `index` is out of range or `platform_id` is invalid.
  */
-bool ttfp_get_name_record(const ttfp_font *font, uint16_t index, ttfp_name_record *record);
+bool ttfp_get_name_record(const ttfp_face *face, uint16_t index, ttfp_name_record *record);
 
 /**
  * @brief Returns a name record's string.
@@ -261,155 +261,155 @@ bool ttfp_get_name_record(const ttfp_font *font, uint16_t index, ttfp_name_recor
  * @return `false` when `index` is out of range or string buffer is not equal
  *         `ttfp_name_record.name_size`.
  */
-bool ttfp_get_name_record_string(const ttfp_font *font, uint16_t index, char *name, uintptr_t len);
+bool ttfp_get_name_record_string(const ttfp_face *face, uint16_t index, char *name, uintptr_t len);
 
 /**
- * @brief Checks that font is marked as *Regular*.
+ * @brief Checks that face is marked as *Regular*.
  *
  * @return `false` when OS/2 table is not present.
  */
-bool ttfp_is_regular(const ttfp_font *font);
+bool ttfp_is_regular(const ttfp_face *face);
 
 /**
- * @brief Checks that font is marked as *Italic*.
+ * @brief Checks that face is marked as *Italic*.
  *
  * @return `false` when OS/2 table is not present.
  */
-bool ttfp_is_italic(const ttfp_font *font);
+bool ttfp_is_italic(const ttfp_face *face);
 
 /**
- * @brief Checks that font is marked as *Bold*.
+ * @brief Checks that face is marked as *Bold*.
  *
  * @return `false` when OS/2 table is not present.
  */
-bool ttfp_is_bold(const ttfp_font *font);
+bool ttfp_is_bold(const ttfp_face *face);
 
 /**
- * @brief Checks that font is marked as *Oblique*.
+ * @brief Checks that face is marked as *Oblique*.
  *
  * @return `false` when OS/2 table is not present.
  */
-bool ttfp_is_oblique(const ttfp_font *font);
+bool ttfp_is_oblique(const ttfp_face *face);
 
 /**
- * @brief Checks that font is variable.
+ * @brief Checks that face is variable.
  *
  * Simply checks the presence of a `fvar` table.
  */
-bool ttfp_is_variable(const ttfp_font *font);
+bool ttfp_is_variable(const ttfp_face *face);
 
 /**
- * @brief Returns font's weight.
+ * @brief Returns face's weight.
  *
- * @return Font's weight or `400` when OS/2 table is not present.
+ * @return Face's weight or `400` when OS/2 table is not present.
  */
-uint16_t ttfp_get_weight(const ttfp_font *font);
+uint16_t ttfp_get_weight(const ttfp_face *face);
 
 /**
- * @brief Returns font's width.
+ * @brief Returns face's width.
  *
- * @return Font's width in a 1..9 range or `5` when OS/2 table is not present
+ * @return Face's width in a 1..9 range or `5` when OS/2 table is not present
  *         or when value is invalid.
  */
-uint16_t ttfp_get_width(const ttfp_font *font);
+uint16_t ttfp_get_width(const ttfp_face *face);
 
 /**
- * @brief Returns a horizontal font ascender.
+ * @brief Returns a horizontal face ascender.
  *
  * This function is affected by variation axes.
  */
-int16_t ttfp_get_ascender(const ttfp_font *font);
+int16_t ttfp_get_ascender(const ttfp_face *face);
 
 /**
- * @brief Returns a horizontal font descender.
+ * @brief Returns a horizontal face descender.
  *
  * This function is affected by variation axes.
  */
-int16_t ttfp_get_descender(const ttfp_font *font);
+int16_t ttfp_get_descender(const ttfp_face *face);
 
 /**
- * @brief Returns a horizontal font height.
+ * @brief Returns a horizontal face height.
  *
  * This function is affected by variation axes.
  */
-int16_t ttfp_get_height(const ttfp_font *font);
+int16_t ttfp_get_height(const ttfp_face *face);
 
 /**
- * @brief Returns a horizontal font line gap.
+ * @brief Returns a horizontal face line gap.
  *
  * This function is affected by variation axes.
  */
-int16_t ttfp_get_line_gap(const ttfp_font *font);
+int16_t ttfp_get_line_gap(const ttfp_face *face);
 
 /**
- * @brief Returns a vertical font ascender.
- *
- * This function is affected by variation axes.
- *
- * @return `0` when `vhea` table is not present.
- */
-int16_t ttfp_get_vertical_ascender(const ttfp_font *font);
-
-/**
- * @brief Returns a vertical font descender.
+ * @brief Returns a vertical face ascender.
  *
  * This function is affected by variation axes.
  *
  * @return `0` when `vhea` table is not present.
  */
-int16_t ttfp_get_vertical_descender(const ttfp_font *font);
+int16_t ttfp_get_vertical_ascender(const ttfp_face *face);
 
 /**
- * @brief Returns a vertical font height.
+ * @brief Returns a vertical face descender.
  *
  * This function is affected by variation axes.
  *
  * @return `0` when `vhea` table is not present.
  */
-int16_t ttfp_get_vertical_height(const ttfp_font *font);
+int16_t ttfp_get_vertical_descender(const ttfp_face *face);
 
 /**
- * @brief Returns a vertical font line gap.
+ * @brief Returns a vertical face height.
  *
  * This function is affected by variation axes.
  *
  * @return `0` when `vhea` table is not present.
  */
-int16_t ttfp_get_vertical_line_gap(const ttfp_font *font);
+int16_t ttfp_get_vertical_height(const ttfp_face *face);
 
 /**
- * @brief Returns font's units per EM.
+ * @brief Returns a vertical face line gap.
+ *
+ * This function is affected by variation axes.
+ *
+ * @return `0` when `vhea` table is not present.
+ */
+int16_t ttfp_get_vertical_line_gap(const ttfp_face *face);
+
+/**
+ * @brief Returns face's units per EM.
  *
  * @return Units in a 16..16384 range or `0` otherwise.
  */
-uint16_t ttfp_get_units_per_em(const ttfp_font *font);
+uint16_t ttfp_get_units_per_em(const ttfp_face *face);
 
 /**
- * @brief Returns font's x height.
+ * @brief Returns face's x height.
  *
  * This function is affected by variation axes.
  *
  * @return x height or 0 when OS/2 table is not present or when its version is < 2.
  */
-int16_t ttfp_get_x_height(const ttfp_font *font);
+int16_t ttfp_get_x_height(const ttfp_face *face);
 
 /**
- * @brief Returns font's underline metrics.
+ * @brief Returns face's underline metrics.
  *
  * This function is affected by variation axes.
  *
  * @return `false` when `post` table is not present.
  */
-bool ttfp_get_underline_metrics(const ttfp_font *font, ttfp_line_metrics *metrics);
+bool ttfp_get_underline_metrics(const ttfp_face *face, ttfp_line_metrics *metrics);
 
 /**
- * @brief Returns font's strikeout metrics.
+ * @brief Returns face's strikeout metrics.
  *
  * This function is affected by variation axes.
  *
  * @return `false` when OS/2 table is not present.
  */
-bool ttfp_get_strikeout_metrics(const ttfp_font *font, ttfp_line_metrics *metrics);
+bool ttfp_get_strikeout_metrics(const ttfp_face *face, ttfp_line_metrics *metrics);
 
 /**
  * @brief Returns font's subscript metrics.
@@ -418,23 +418,23 @@ bool ttfp_get_strikeout_metrics(const ttfp_font *font, ttfp_line_metrics *metric
  *
  * @return `false` when OS/2 table is not present.
  */
-bool ttfp_get_subscript_metrics(const ttfp_font *font, ttfp_script_metrics *metrics);
+bool ttfp_get_subscript_metrics(const ttfp_face *face, ttfp_script_metrics *metrics);
 
 /**
- * @brief Returns font's superscript metrics.
+ * @brief Returns face's superscript metrics.
  *
  * This function is affected by variation axes.
  *
  * @return `false` when OS/2 table is not present.
  */
-bool ttfp_get_superscript_metrics(const ttfp_font *font, ttfp_script_metrics *metrics);
+bool ttfp_get_superscript_metrics(const ttfp_face *face, ttfp_script_metrics *metrics);
 
 /**
- * @brief Returns a total number of glyphs in the font.
+ * @brief Returns a total number of glyphs in the face.
  *
  * @return The number of glyphs which is never zero.
  */
-uint16_t ttfp_get_number_of_glyphs(const ttfp_font *font);
+uint16_t ttfp_get_number_of_glyphs(const ttfp_face *face);
 
 /**
  * @brief Resolves a Glyph ID for a code point.
@@ -444,7 +444,7 @@ uint16_t ttfp_get_number_of_glyphs(const ttfp_font *font);
  * @param codepoint A valid Unicode codepoint. Otherwise 0 will be returned.
  * @return Returns 0 when glyph is not present or parsing is failed.
  */
-uint16_t ttfp_get_glyph_index(const ttfp_font *font, uint32_t codepoint);
+uint16_t ttfp_get_glyph_index(const ttfp_face *face, uint32_t codepoint);
 
 /**
  * @brief Resolves a variation of a Glyph ID from two code points.
@@ -453,14 +453,14 @@ uint16_t ttfp_get_glyph_index(const ttfp_font *font, uint32_t codepoint);
  * @param variation A valid Unicode codepoint. Otherwise 0 will be returned.
  * @return Returns 0 when glyph is not present or parsing is failed.
  */
-uint16_t ttfp_get_glyph_var_index(const ttfp_font *font, uint32_t codepoint, uint32_t variation);
+uint16_t ttfp_get_glyph_var_index(const ttfp_face *face, uint32_t codepoint, uint32_t variation);
 
 /**
  * @brief Returns glyph's horizontal advance.
  *
  * @return Glyph's advance or 0 when not set.
  */
-uint16_t ttfp_get_glyph_hor_advance(const ttfp_font *font, uint16_t glyph_id);
+uint16_t ttfp_get_glyph_hor_advance(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's vertical advance.
@@ -469,14 +469,14 @@ uint16_t ttfp_get_glyph_hor_advance(const ttfp_font *font, uint16_t glyph_id);
  *
  * @return Glyph's advance or 0 when not set.
  */
-uint16_t ttfp_get_glyph_ver_advance(const ttfp_font *font, uint16_t glyph_id);
+uint16_t ttfp_get_glyph_ver_advance(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's horizontal side bearing.
  *
  * @return Glyph's side bearing or 0 when not set.
  */
-int16_t ttfp_get_glyph_hor_side_bearing(const ttfp_font *font, uint16_t glyph_id);
+int16_t ttfp_get_glyph_hor_side_bearing(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's vertical side bearing.
@@ -485,14 +485,14 @@ int16_t ttfp_get_glyph_hor_side_bearing(const ttfp_font *font, uint16_t glyph_id
  *
  * @return Glyph's side bearing or 0 when not set.
  */
-int16_t ttfp_get_glyph_ver_side_bearing(const ttfp_font *font, uint16_t glyph_id);
+int16_t ttfp_get_glyph_ver_side_bearing(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's vertical origin.
  *
  * @return Glyph's vertical origin or 0 when not set.
  */
-int16_t ttfp_get_glyph_y_origin(const ttfp_font *font, uint16_t glyph_id);
+int16_t ttfp_get_glyph_y_origin(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's name.
@@ -504,26 +504,26 @@ int16_t ttfp_get_glyph_y_origin(const ttfp_font *font, uint16_t glyph_id);
  * @param name A char buffer longer than 256 bytes.
  * @return `true` on success.
  */
-bool ttfp_get_glyph_name(const ttfp_font *font, uint16_t glyph_id, char *name);
+bool ttfp_get_glyph_name(const ttfp_face *face, uint16_t glyph_id, char *name);
 
 /**
  * @brief Returns glyph's class according to Glyph Class Definition Table.
  *
  * @return A glyph class or TTFP_GLYPH_CLASS_UNKNOWN otherwise.
  */
-ttfp_glyph_class ttfp_get_glyph_class(const ttfp_font *font, uint16_t glyph_id);
+ttfp_glyph_class ttfp_get_glyph_class(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's mark attachment class according to Mark Attachment Class Definition Table.
  *
  * @return All glyphs not assigned to a class fall into Class 0.
  */
-uint16_t ttfp_get_glyph_mark_attachment_class(const ttfp_font *font, uint16_t glyph_id);
+uint16_t ttfp_get_glyph_mark_attachment_class(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Checks that glyph is a mark according to Mark Glyph Sets Table.
  */
-bool ttfp_is_mark_glyph(const ttfp_font *font, uint16_t glyph_id);
+bool ttfp_is_mark_glyph(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Outlines a glyph and returns its tight bounding box.
@@ -539,7 +539,7 @@ bool ttfp_is_mark_glyph(const ttfp_font *font, uint16_t glyph_id);
  *
  * @return `false` when glyph has no outline or on error.
  */
-bool ttfp_outline_glyph(const ttfp_font *font,
+bool ttfp_outline_glyph(const ttfp_face *face,
                         ttfp_outline_builder builder,
                         void *user_data,
                         uint16_t glyph_id,
@@ -548,18 +548,18 @@ bool ttfp_outline_glyph(const ttfp_font *font,
 /**
  * @brief Returns a tight glyph bounding box.
  *
- * Unless the current font has a `glyf` table, this is just a shorthand for `outline_glyph()`
+ * Unless the current face has a `glyf` table, this is just a shorthand for `outline_glyph()`
  * since only the `glyf` table stores a bounding box. In case of CFF and variable fonts
  * we have to actually outline a glyph to find it's bounding box.
  *
  * This function is affected by variation axes.
  */
-bool ttfp_get_glyph_bbox(const ttfp_font *font, uint16_t glyph_id, ttfp_rect *bbox);
+bool ttfp_get_glyph_bbox(const ttfp_face *face, uint16_t glyph_id, ttfp_rect *bbox);
 
 /**
- * @brief Returns a bounding box that large enough to enclose any glyph from the font.
+ * @brief Returns a bounding box that large enough to enclose any glyph from the face.
  */
-ttfp_rect ttfp_get_global_bounding_box(const ttfp_font *font);
+ttfp_rect ttfp_get_global_bounding_box(const ttfp_face *face);
 
 /**
  * @brief Returns a reference to a glyph's raster image.
@@ -583,7 +583,7 @@ ttfp_rect ttfp_get_global_bounding_box(const ttfp_font *font);
  * There are multiple ways an image can be stored in a TrueType font
  * and this method supports only `sbix`, `CBLC`+`CBDT`.
  */
-bool ttfp_get_glyph_raster_image(const ttfp_font *font,
+bool ttfp_get_glyph_raster_image(const ttfp_face *face,
                                  uint16_t glyph_id,
                                  uint16_t pixels_per_em,
                                  ttfp_glyph_raster_image *glyph_image);
@@ -601,7 +601,7 @@ bool ttfp_get_glyph_raster_image(const ttfp_font *font,
  * Also, a font can contain both: images and outlines. So when this method returns `false`
  * you should also try `ttfp_outline_glyph()` afterwards.
  */
-bool ttfp_get_glyph_svg_image(const ttfp_font *font,
+bool ttfp_get_glyph_svg_image(const ttfp_face *face,
                               uint16_t glyph_id,
                               const char **svg,
                               uint32_t *len);
@@ -609,32 +609,32 @@ bool ttfp_get_glyph_svg_image(const ttfp_font *font,
 /**
  * @brief Returns the amount of variation axes.
  */
-uint16_t ttfp_get_variation_axes_count(const ttfp_font *font);
+uint16_t ttfp_get_variation_axes_count(const ttfp_face *face);
 
 /**
  * @brief Returns a variation axis by index.
  */
-bool ttfp_get_variation_axis(const ttfp_font *font, uint16_t index, ttfp_variation_axis *axis);
+bool ttfp_get_variation_axis(const ttfp_face *face, uint16_t index, ttfp_variation_axis *axis);
 
 /**
  * @brief Returns a variation axis by tag.
  */
-bool ttfp_get_variation_axis_by_tag(const ttfp_font *font, ttfp_tag tag, ttfp_variation_axis *axis);
+bool ttfp_get_variation_axis_by_tag(const ttfp_face *face, ttfp_tag tag, ttfp_variation_axis *axis);
 
 /**
  * @brief Sets a variation axis coordinate.
  *
  * This is the only mutable function in the library.
  * We can simplify the API a lot by storing the variable coordinates
- * in the font object itself.
+ * in the face object itself.
  *
  * This function is reentrant.
  *
  * Since coordinates are stored on the stack, we allow only 32 of them.
  *
- * @return `false` when font is not variable or doesn't have such axis.
+ * @return `false` when face is not variable or doesn't have such axis.
  */
-bool ttfp_set_variation(ttfp_font *font, ttfp_tag axis, float value);
+bool ttfp_set_variation(ttfp_face *face, ttfp_tag axis, float value);
 
 #ifdef __cplusplus
 } // extern "C"

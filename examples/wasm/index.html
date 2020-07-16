@@ -16,7 +16,7 @@ function update(fontBlob) {
     // it is all ours and we can decide how to use it
     const heapStart = exports.__heap_base.value;
     const fontHandlerAddress = heapStart;
-    const fontHandlerLength = exports.ttfp_font_size_of();
+    const fontHandlerLength = exports.ttfp_face_size_of();
     const fontDataAddress = heapStart + fontHandlerLength;
     const fontDataLength = fontBlob.length;
 
@@ -27,7 +27,7 @@ function update(fontBlob) {
     fontsInCollection.textContent = exports.ttfp_fonts_in_collection(fontDataAddress, fontDataLength);
 
     // Create font handler
-    exports.ttfp_font_init(fontDataAddress, fontDataLength, 0/*font index*/, fontHandlerAddress);
+    exports.ttfp_face_init(fontDataAddress, fontDataLength, 0/*face index*/, fontHandlerAddress);
 
     isVariable.textContent = exports.ttfp_is_variable(fontHandlerAddress);
     fontWeight.textContent = exports.ttfp_get_weight(fontHandlerAddress);

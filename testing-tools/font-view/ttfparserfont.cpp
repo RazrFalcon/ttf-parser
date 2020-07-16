@@ -46,15 +46,15 @@ TtfParserFont::TtfParserFont()
 void TtfParserFont::open(const QString &path, const quint32 index)
 {
     if (isOpen()) {
-        m_font.reset();
+        m_face.reset();
     }
 
     QFile file(path);
     file.open(QFile::ReadOnly);
     m_fontData = file.readAll();
 
-    m_font.reset((ttfp_font*)malloc(ttfp_font_size_of()));
-    const auto res = ttfp_font_init(m_fontData.constData(), m_fontData.size(), index, m_font.get());
+    m_face.reset((ttfp_face*)malloc(ttfp_face_size_of()));
+    const auto res = ttfp_face_init(m_fontData.constData(), m_fontData.size(), index, m_face.get());
 
     if (!res) {
         throw tr("Failed to open a font.");
@@ -63,7 +63,7 @@ void TtfParserFont::open(const QString &path, const quint32 index)
 
 bool TtfParserFont::isOpen() const
 {
-    return m_font != nullptr;
+    return m_face != nullptr;
 }
 
 FontInfo TtfParserFont::fontInfo() const
@@ -73,9 +73,9 @@ FontInfo TtfParserFont::fontInfo() const
     }
 
     return FontInfo {
-        ttfp_get_ascender(m_font.get()),
-        ttfp_get_height(m_font.get()),
-        ttfp_get_number_of_glyphs(m_font.get()),
+        ttfp_get_ascender(m_face.get()),
+        ttfp_get_height(m_face.get()),
+        ttfp_get_number_of_glyphs(m_face.get()),
     };
 }
 
@@ -96,7 +96,7 @@ Glyph TtfParserFont::outline(const quint16 gid) const
     ttfp_rect rawBbox;
 
     const bool ok = ttfp_outline_glyph(
-        m_font.get(),
+        m_face.get(),
         builder,
         &outliner,
         gid,
@@ -137,9 +137,9 @@ QVector<VariationInfo> TtfParserFont::loadVariations()
 
     QVector<VariationInfo> variations;
 
-    for (uint16_t i = 0; i < ttfp_get_variation_axes_count(m_font.get()); ++i) {
+    for (uint16_t i = 0; i < ttfp_get_variation_axes_count(m_face.get()); ++i) {
         ttfp_variation_axis axis;
-        ttfp_get_variation_axis(m_font.get(), i, &axis);
+        ttfp_get_variation_axis(m_face.get(), i, &axis);
 
         variations.append(VariationInfo {
             Tag(axis.tag).toString(),
@@ -160,6 +160,6 @@ void TtfParserFont::setVariations(const QVector<Variation> &variations)
     }
 
     for (const auto &variation : variations) {
-        ttfp_set_variation(m_font.get(), variation.tag.value, variation.value);
+        ttfp_set_variation(m_face.get(), variation.tag.value, variation.value);
     }
 }

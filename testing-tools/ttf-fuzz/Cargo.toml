@@ -21,9 +21,5 @@ name = "fuzz-glyph-index"
 path = "src/fuzz-glyph-index.rs"
 
 [[bin]]
-name = "fuzz-name"
-path = "src/fuzz-name.rs"
-
-[[bin]]
 name = "fuzz-variable-outline"
 path = "src/fuzz-variable-outline.rs"

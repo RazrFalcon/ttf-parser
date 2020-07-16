@@ -3,10 +3,10 @@ extern crate afl;
 
 fn main() {
     afl::fuzz!(|data: &[u8]| {
-        if let Some(mut font) = ttf_parser::Font::from_data(data, 0) {
-            if font.set_variation(ttf_parser::Tag::from_bytes(b"wght"), 500.0).is_some() {
-                for id in 0..font.number_of_glyphs() {
-                    let _ = font.outline_glyph(ttf_parser::GlyphId(id), &mut Builder(0));
+        if let Some(mut face) = ttf_parser::Face::from_slice(data, 0) {
+            if face.set_variation(ttf_parser::Tag::from_bytes(b"wght"), 500.0).is_some() {
+                for id in 0..face.number_of_glyphs() {
+                    let _ = face.outline_glyph(ttf_parser::GlyphId(id), &mut Builder(0));
                 }
             }
         }

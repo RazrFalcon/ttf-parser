@@ -79,22 +79,22 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Exclude IO operations.
     let now = std::time::Instant::now();
 
-    let mut font = ttf::Font::from_data(&font_data, 0).ok_or("failed to open a font")?;
-    if font.is_variable() {
+    let mut face = ttf::Face::from_slice(&font_data, 0).ok_or("failed to open a font")?;
+    if face.is_variable() {
         for variation in args.variations {
-            font.set_variation(variation.axis, variation.value)
+            face.set_variation(variation.axis, variation.value)
                 .ok_or("failed to create variation coordinates")?;
         }
     }
 
-    let units_per_em = font.units_per_em().ok_or("invalid units per em")?;
+    let units_per_em = face.units_per_em().ok_or("invalid units per em")?;
     let scale = FONT_SIZE / units_per_em as f64;
 
-    let cell_size = font.height() as f64 * FONT_SIZE / units_per_em as f64;
-    let rows = (font.number_of_glyphs() as f64 / COLUMNS as f64).ceil() as u32;
+    let cell_size = face.height() as f64 * FONT_SIZE / units_per_em as f64;
+    let rows = (face.number_of_glyphs() as f64 / COLUMNS as f64).ceil() as u32;
 
     let mut svg = xmlwriter::XmlWriter::with_capacity(
-        font.number_of_glyphs() as usize * 512,
+        face.number_of_glyphs() as usize * 512,
         xmlwriter::Options::default(),
     );
     svg.start_element("svg");
@@ -105,12 +105,12 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         format_args!("{} {} {} {}", 0, 0, cell_size * COLUMNS as f64, cell_size * rows as f64),
     );
 
-    draw_grid(font.number_of_glyphs(), cell_size, &mut svg);
+    draw_grid(face.number_of_glyphs(), cell_size, &mut svg);
 
     let mut path_buf = svgtypes::Path::with_capacity(64);
     let mut row = 0;
     let mut column = 0;
-    for id in 0..font.number_of_glyphs() {
+    for id in 0..face.number_of_glyphs() {
         let x = column as f64 * cell_size;
         let y = row as f64 * cell_size;
 
@@ -122,7 +122,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         svg.write_text_fmt(format_args!("{}", &id));
         svg.end_element();
 
-        if let Some(img) = font.glyph_raster_image(ttf::GlyphId(id), std::u16::MAX) {
+        if let Some(img) = face.glyph_raster_image(ttf::GlyphId(id), std::u16::MAX) {
             svg.start_element("image");
             svg.write_attribute("x", &(x + 2.0 + img.x as f64));
             svg.write_attribute("y", &(y - img.y as f64));
@@ -136,7 +136,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 enc.finish().unwrap();
             });
             svg.end_element();
-        } else if let Some(img) = font.glyph_svg_image(ttf::GlyphId(id)) {
+        } else if let Some(img) = face.glyph_svg_image(ttf::GlyphId(id)) {
             svg.start_element("image");
             svg.write_attribute("x", &(x + 2.0));
             svg.write_attribute("y", &(y + cell_size));
@@ -154,7 +154,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             glyph_to_path(
                 x,
                 y,
-                &font,
+                &face,
                 ttf::GlyphId(id),
                 cell_size,
                 scale,
@@ -216,7 +216,7 @@ fn draw_grid(
 fn glyph_to_path(
     x: f64,
     y: f64,
-    font: &ttf::Font,
+    face: &ttf::Face,
     glyph_id: ttf::GlyphId,
     cell_size: f64,
     scale: f64,
@@ -225,14 +225,14 @@ fn glyph_to_path(
 ) {
     path_buf.clear();
     let mut builder = Builder(path_buf);
-    let bbox = match font.outline_glyph(glyph_id, &mut builder) {
+    let bbox = match face.outline_glyph(glyph_id, &mut builder) {
         Some(v) => v,
         None => return,
     };
 
     let bbox_w = (bbox.x_max as f64 - bbox.x_min as f64) * scale;
     let dx = (cell_size - bbox_w) / 2.0;
-    let y = y + cell_size + font.descender() as f64 * scale;
+    let y = y + cell_size + face.descender() as f64 * scale;
 
     let mut ts = svgtypes::Transform::default();
     ts.translate(x + dx, y);

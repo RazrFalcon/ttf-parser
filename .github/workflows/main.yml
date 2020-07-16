@@ -11,18 +11,25 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-18.04
-
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - 1.35.0
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+
     - name: Build without std
       run: cargo build --no-default-features
+
     - name: Build with std
       run: cargo build
+
     - name: Run tests
       run: cargo test
+
     - name: Test C API
       run: |
         cd c-api
@@ -30,6 +37,7 @@ jobs:
         gcc test.c -o test -L./target/debug/ -lttfparser -Werror -fsanitize=address
         env LD_LIBRARY_PATH=./target/debug/ ./test
         cd ..
+
     - name: Build benches
       run: |
         cd benches

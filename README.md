@@ -116,9 +116,9 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 
 | Table/Library | ttf-parser     | FreeType   | stb_truetype   |
 | ------------- | -------------: | ---------: | -------------: |
-| `glyf`        |   `0.827 ms`   | `1.194 ms` | **`0.695 ms`** |
-| `gvar`        | **`3.252 ms`** | `3.594 ms` |              - |
-| `CFF`         | **`1.209 ms`** | `5.946 ms` |   `2.862 ms`   |
+| `glyf`        |   `0.835 ms`   | `1.194 ms` | **`0.695 ms`** |
+| `gvar`        | **`3.158 ms`** | `3.594 ms` |              - |
+| `CFF`         | **`1.251 ms`** | `5.946 ms` |   `2.862 ms`   |
 | `CFF2`        | **`1.921 ms`** | `7.001 ms` |              - |
 
 **Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
@@ -126,21 +126,21 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 And here are some methods benchmarks:
 
 ```text
-test from_data_otf_cff2          ... bench:         775 ns/iter (+/- 75)
-test outline_glyph_276_from_cff2 ... bench:         763 ns/iter (+/- 59)
-test outline_glyph_276_from_cff  ... bench:         754 ns/iter (+/- 69)
-test from_data_otf_cff           ... bench:         618 ns/iter (+/- 8)
-test outline_glyph_276_from_glyf ... bench:         581 ns/iter (+/- 14)
-test outline_glyph_8_from_cff2   ... bench:         451 ns/iter (+/- 27)
-test from_data_ttf               ... bench:         400 ns/iter (+/- 9)
-test family_name                 ... bench:         392 ns/iter (+/- 7)
-test outline_glyph_8_from_cff    ... bench:         285 ns/iter (+/- 10)
-test outline_glyph_8_from_glyf   ... bench:         252 ns/iter (+/- 8)
-test glyph_name_276              ... bench:         220 ns/iter (+/- 2)
+test outline_glyph_276_from_cff  ... bench:         858 ns/iter (+/- 40)
+test outline_glyph_276_from_cff2 ... bench:         793 ns/iter (+/- 30)
+test from_data_otf_cff           ... bench:         746 ns/iter (+/- 10)
+test from_data_otf_cff2          ... bench:         709 ns/iter (+/- 75)
+test outline_glyph_276_from_glyf ... bench:         606 ns/iter (+/- 10)
+test outline_glyph_8_from_cff2   ... bench:         470 ns/iter (+/- 11)
+test from_data_ttf               ... bench:         351 ns/iter (+/- 5)
+test glyph_name_276              ... bench:         299 ns/iter (+/- 4)
+test outline_glyph_8_from_cff    ... bench:         299 ns/iter (+/- 7)
+test outline_glyph_8_from_glyf   ... bench:         266 ns/iter (+/- 4)
+test family_name                 ... bench:         198 ns/iter (+/- 3)
 test glyph_index_u41             ... bench:          13 ns/iter (+/- 0)
 test subscript_metrics           ... bench:           2 ns/iter (+/- 0)
-test glyph_advance               ... bench:           2 ns/iter (+/- 0)
-test glyph_side_bearing          ... bench:           2 ns/iter (+/- 0)
+test glyph_hor_advance           ... bench:           2 ns/iter (+/- 0)
+test glyph_hor_side_bearing      ... bench:           2 ns/iter (+/- 0)
 test glyph_name_8                ... bench:           1 ns/iter (+/- 0)
 test ascender                    ... bench:           1 ns/iter (+/- 0)
 test underline_metrics           ... bench:           1 ns/iter (+/- 0)

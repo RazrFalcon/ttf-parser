@@ -142,6 +142,13 @@ pub trait TryNumFrom<T>: Sized {
     fn try_num_from(_: T) -> Option<Self>;
 }
 
+impl TryNumFrom<f32> for u8 {
+    #[inline]
+    fn try_num_from(v: f32) -> Option<Self> {
+        i32::try_num_from(v).and_then(|v| u8::try_from(v).ok())
+    }
+}
+
 impl TryNumFrom<f32> for i16 {
     #[inline]
     fn try_num_from(v: f32) -> Option<Self> {

@@ -223,8 +223,6 @@ fn glyph_to_path(
     svg: &mut xmlwriter::XmlWriter,
     path_buf: &mut svgtypes::Path,
 ) {
-
-
     path_buf.clear();
     let mut builder = Builder(path_buf);
     let bbox = match font.outline_glyph(glyph_id, &mut builder) {

@@ -72,7 +72,6 @@ mod private_dict_operator {
 
 /// Enumerates Charset IDs defined in the Adobe Technical Note #5176, Table 22
 mod charset_id {
-    #![allow(dead_code)]
     pub const ISO_ADOBE: usize = 0;
     pub const EXPERT: usize = 1;
     pub const EXPERT_SUBSET: usize = 2;
@@ -98,6 +97,21 @@ pub enum CFFError {
     InvalidNumberOfBlendOperands,
     BlendRegionsLimitReached,
     NoLocalSubroutines,
+    InvalidSeacCode,
+}
+
+
+/// A type-safe wrapper for string ID.
+#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+struct StringId(u16);
+
+impl FromData for StringId {
+    const SIZE: usize = 2;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        u16::parse(data).map(StringId)
+    }
 }
 
 
@@ -108,6 +122,7 @@ pub struct Metadata<'a> {
     table_data: &'a [u8],
 
     global_subrs: DataIndex<'a>,
+    charset: Charset<'a>,
     char_strings: DataIndex<'a>,
     kind: FontKind<'a>,
 }
@@ -172,9 +187,18 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
         return None;
     }
 
+    // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
+    let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
+
+    let charset = match top_dict.charset_offset {
+        Some(charset_id::ISO_ADOBE) => Charset::ISOAdobe,
+        Some(charset_id::EXPERT) => Charset::Expert,
+        Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
+        Some(offset) => parse_charset(number_of_glyphs, &mut Stream::new_at(data, offset)?)?,
+        None => Charset::ISOAdobe, // default
+    };
+
     let kind = if top_dict.has_ros {
-        // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
-        let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
         parse_cid_metadata(data, top_dict, number_of_glyphs)?
     } else {
         parse_sid_metadata(data, top_dict)?
@@ -183,6 +207,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     Some(Metadata {
         table_data: data,
         global_subrs,
+        charset,
         char_strings,
         kind,
     })
@@ -351,6 +376,7 @@ struct CharStringParserContext<'a> {
     width_parsed: bool,
     stems_len: u32,
     has_endchar: bool,
+    has_seac: bool,
     glyph_id: GlyphId, // Required to parse local subroutine in CID fonts.
     local_subrs: Option<DataIndex<'a>>,
 }
@@ -373,6 +399,7 @@ fn parse_char_string(
         width_parsed: false,
         stems_len: 0,
         has_endchar: false,
+        has_seac: false,
         glyph_id,
         local_subrs,
     };
@@ -635,7 +662,7 @@ fn _parse_char_string(
                     return Err(CFFError::NoLocalSubroutines);
                 }
 
-                if ctx.has_endchar {
+                if ctx.has_endchar && !ctx.has_seac {
                     if !s.at_end() {
                         return Err(CFFError::DataAfterEndChar);
                     }
@@ -771,8 +798,33 @@ fn _parse_char_string(
                 }
             }
             operator::ENDCHAR => {
-                if !stack.is_empty() && !ctx.width_parsed {
-                    stack.clear();
+                if stack.len() == 4 || (!ctx.width_parsed && stack.len() == 5) {
+                    // Process 'seac'.
+                    let accent_char = seac_code_to_glyph_id(&ctx.metadata.charset, stack.pop())
+                        .ok_or(CFFError::InvalidSeacCode)?;
+                    let base_char = seac_code_to_glyph_id(&ctx.metadata.charset, stack.pop())
+                        .ok_or(CFFError::InvalidSeacCode)?;
+                    let dy = stack.pop();
+                    let dx = stack.pop();
+
+                    if !ctx.width_parsed {
+                        stack.pop();
+                        ctx.width_parsed = true;
+                    }
+
+                    ctx.has_seac = true;
+
+                    let base_char_string = ctx.metadata.char_strings.get(u32::from(base_char.0))
+                        .ok_or(CFFError::InvalidSeacCode)?;
+                    _parse_char_string(ctx, base_char_string, x, y, stack, depth + 1, builder)?;
+                    x = dx;
+                    y = dy;
+
+                    let accent_char_string = ctx.metadata.char_strings.get(u32::from(accent_char.0))
+                        .ok_or(CFFError::InvalidSeacCode)?;
+                    _parse_char_string(ctx, accent_char_string, x, y, stack, depth + 1, builder)?;
+                } else if stack.len() == 1 && !ctx.width_parsed {
+                    stack.pop();
                     ctx.width_parsed = true;
                 }
 
@@ -1009,7 +1061,7 @@ fn _parse_char_string(
                 x = pos.0;
                 y = pos.1;
 
-                if ctx.has_endchar {
+                if ctx.has_endchar && !ctx.has_seac {
                     if !s.at_end() {
                         return Err(CFFError::DataAfterEndChar);
                     }
@@ -1156,6 +1208,22 @@ pub fn calc_subroutine_bias(len: u32) -> u16 {
         1131
     } else {
         32768
+    }
+}
+
+fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
+    let code = u8::try_num_from(n)?;
+
+    let sid = STANDARD_ENCODING[code as usize];
+    let sid = StringId(u16::from(sid));
+
+    match charset {
+        Charset::ISOAdobe => {
+            // Not sure why code should be less than 228/zcaron, but this is what harfbuzz does.
+            if code < 228 { Some(GlyphId(sid.0)) } else { None }
+        }
+        Charset::Expert | Charset::ExpertSubset => None,
+        _ => charset.sid_to_gid(sid),
     }
 }
 
@@ -1566,9 +1634,152 @@ pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
 
 
 #[derive(Clone, Copy, Debug)]
+struct CharsetFormat1Range {
+    first: StringId,
+    left: u8,
+}
+
+impl FromData for CharsetFormat1Range {
+    const SIZE: usize = 3;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(CharsetFormat1Range {
+            first: s.read()?,
+            left: s.read()?,
+        })
+    }
+}
+
+
+#[derive(Clone, Copy, Debug)]
+struct CharsetFormat2Range {
+    first: StringId,
+    left: u16,
+}
+
+impl FromData for CharsetFormat2Range {
+    const SIZE: usize = 4;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(CharsetFormat2Range {
+            first: s.read()?,
+            left: s.read()?,
+        })
+    }
+}
+
+
+#[derive(Clone, Copy, Debug)]
+enum Charset<'a> {
+    ISOAdobe,
+    Expert,
+    ExpertSubset,
+    Format0(LazyArray16<'a, StringId>),
+    Format1(LazyArray16<'a, CharsetFormat1Range>),
+    Format2(LazyArray16<'a, CharsetFormat2Range>),
+}
+
+impl Charset<'_> {
+    fn sid_to_gid(&self, sid: StringId) -> Option<GlyphId> {
+        if sid.0 == 0 {
+            return Some(GlyphId(0));
+        }
+
+        match self {
+            Charset::ISOAdobe | Charset::Expert | Charset::ExpertSubset => None,
+            Charset::Format0(ref array) => {
+                // First glyph is omitted, so we have to add 1.
+                array.into_iter().position(|n| n == sid).map(|n| GlyphId(n as u16 + 1))
+            }
+            Charset::Format1(array) => {
+                let mut glyph_id = GlyphId(1);
+                for range in *array {
+                    let last = u32::from(range.first.0) + u32::from(range.left);
+                    if range.first <= sid && u32::from(sid.0) <= last {
+                        glyph_id.0 += sid.0 - range.first.0;
+                        return Some(glyph_id)
+                    }
+
+                    glyph_id.0 += u16::from(range.left) + 1;
+                }
+
+                None
+            }
+            Charset::Format2(array) => {
+                // The same as format 1, but Range::left is u16.
+                let mut glyph_id = GlyphId(1);
+                for range in *array {
+                    let last = u32::from(range.first.0) + u32::from(range.left);
+                    if sid >= range.first && u32::from(sid.0) <= last {
+                        glyph_id.0 += sid.0 - range.first.0;
+                        return Some(glyph_id)
+                    }
+
+                    glyph_id.0 += range.left + 1;
+                }
+
+                None
+            }
+        }
+    }
+}
+
+fn parse_charset<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<Charset<'a>> {
+    if number_of_glyphs < 2 {
+        return None;
+    }
+
+    // -1 everywhere, since `.notdef` is omitted.
+    let format: u8 = s.read()?;
+    match format {
+        0 => Some(Charset::Format0(s.read_array16(number_of_glyphs - 1)?)),
+        1 => {
+            // The number of ranges is not defined, so we have to
+            // read until no glyphs are left.
+            let mut count = 0;
+            {
+                let mut s = s.clone();
+                let mut total_left = number_of_glyphs - 1;
+                while total_left > 0 {
+                    s.skip::<StringId>(); // first
+                    let left: u8 = s.read()?;
+                    total_left = total_left.checked_sub(u16::from(left) + 1)?;
+                    count += 1;
+                }
+            }
+
+            s.read_array16(count).map(Charset::Format1)
+        }
+        2 => {
+            // The same as format 1, but Range::left is u16.
+            let mut count = 0;
+            {
+                let mut s = s.clone();
+                let mut total_left = number_of_glyphs - 1;
+                while total_left > 0 {
+                    s.skip::<StringId>(); // first
+                    let left: u16 = s.read()?;
+                    let left = left.checked_add(1)?;
+                    total_left = total_left.checked_sub(left)?;
+                    count += 1;
+                }
+            }
+
+            s.read_array16(count).map(Charset::Format2)
+        }
+        _ => None,
+    }
+}
+
+
+#[derive(Clone, Copy, Debug)]
 enum FDSelect<'a> {
     Format0(LazyArray16<'a, u8>),
-    Format3(&'a [u8]), // It's easier to parse it inplace.
+    Format3(&'a [u8]), // It's easier to parse it in-place.
 }
 
 impl Default for FDSelect<'_> {
@@ -1712,6 +1923,26 @@ pub fn f32_abs(n: f32) -> f32 {
     if n.is_sign_negative() { -n } else { n }
 }
 
+/// The Standard Encoding as defined in the Adobe Technical Note #5176 Appendix B.
+const STANDARD_ENCODING: [u8;256] = [
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,
+     17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,
+     33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,
+     49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,
+     65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  80,
+     81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,  96,  97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
+      0, 111, 112, 113, 114,   0, 115, 116, 117, 118, 119, 120, 121, 122,   0, 123,
+      0, 124, 125, 126, 127, 128, 129, 130, 131,   0, 132, 133,   0, 134, 135, 136,
+    137,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0, 138,   0, 139,   0,   0,   0,   0, 140, 141, 142, 143,   0,   0,   0,   0,
+      0, 144,   0,   0,   0, 145,   0,   0, 146, 147, 148, 149,   0,   0,   0,   0,
+];
+
 
 #[cfg(test)]
 mod tests {
@@ -1795,6 +2026,9 @@ mod tests {
                 }
                 CFFError::NoLocalSubroutines => {
                     write!(f, "no local subroutines")
+                }
+                CFFError::InvalidSeacCode => {
+                    write!(f, "invalid seac code")
                 }
             }
         }

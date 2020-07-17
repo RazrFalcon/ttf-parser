@@ -90,6 +90,31 @@ impl FromData for GlyphId {
 }
 
 
+/// A TrueType font magic.
+///
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Magic {
+    TrueType,
+    OpenType,
+    FontCollection,
+}
+
+impl FromData for Magic {
+    const SIZE: usize = 4;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        match u32::parse(data)? {
+            0x00010000 => Some(Magic::TrueType),
+            0x4F54544F => Some(Magic::OpenType),
+            0x74746366 => Some(Magic::FontCollection),
+            _ => None,
+        }
+    }
+}
+
+
 /// A variation coordinate in a normalized coordinate system.
 ///
 /// Basically any number in a -1.0..1.0 range.
@@ -582,14 +607,10 @@ impl<'a> Face<'a> {
             return None;
         }
 
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
-        const SFNT_VERSION_TRUE_TYPE: u32 = 0x00010000;
-        const SFNT_VERSION_OPEN_TYPE: u32 = 0x4F54544F;
-
         let mut s = Stream::new(table_data);
 
-        let sfnt_version: u32 = s.read()?;
-        if sfnt_version != SFNT_VERSION_TRUE_TYPE && sfnt_version != SFNT_VERSION_OPEN_TYPE {
+        let magic: Magic = s.read()?;
+        if magic != Magic::TrueType && magic != Magic::OpenType {
             return None;
         }
 
@@ -1380,7 +1401,7 @@ impl fmt::Debug for Face<'_> {
 #[inline]
 pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     let mut s = Stream::new(data);
-    if &s.read::<Tag>()?.to_bytes() != b"ttcf" {
+    if s.read::<Magic>()? != Magic::FontCollection {
         return None;
     }
 
@@ -1433,32 +1454,6 @@ mod tests {
         let data = writer::convert(&[
             TrueTypeMagic,
             UInt16(std::u16::MAX), // numTables
-            UInt16(0), // searchRange
-            UInt16(0), // entrySelector
-            UInt16(0), // rangeShift
-        ]);
-
-        assert!(Face::from_slice(&data, 0).is_none());
-    }
-
-    #[test]
-    fn open_type_magic() {
-        let data = writer::convert(&[
-            OpenTypeMagic,
-            UInt16(0), // numTables
-            UInt16(0), // searchRange
-            UInt16(0), // entrySelector
-            UInt16(0), // rangeShift
-        ]);
-
-        assert!(Face::from_slice(&data, 0).is_none());
-    }
-
-    #[test]
-    fn unknown_magic() {
-        let data = writer::convert(&[
-            Raw(&[0xFF, 0xFF, 0xFF, 0xFF]),
-            UInt16(0), // numTables
             UInt16(0), // searchRange
             UInt16(0), // entrySelector
             UInt16(0), // rangeShift

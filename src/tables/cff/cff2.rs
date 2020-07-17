@@ -5,10 +5,11 @@ use core::convert::TryFrom;
 use core::ops::Range;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoord};
-use crate::parser::{Stream, Fixed, NumFrom, TryNumFrom};
+use crate::parser::{Stream, NumFrom, TryNumFrom};
 use crate::var_store::*;
-use super::{Builder, IsEven, CFFError, f32_abs, calc_subroutine_bias, conv_subroutine_index};
+use super::{Builder, CFFError, calc_subroutine_bias, conv_subroutine_index};
 use super::argstack::ArgumentsStack;
+use super::charstring::CharStringParser;
 use super::dict::DictionaryParser;
 use super::index::{Index, parse_index};
 
@@ -277,8 +278,6 @@ impl Scalars {
 struct CharStringParserContext<'a> {
     metadata: &'a Metadata<'a>,
     coordinates: &'a [NormalizedCoord],
-    is_first_move_to: bool,
-    has_move_to: bool,
     scalars: Scalars,
     had_vsindex: bool,
     had_blend: bool,
@@ -311,8 +310,6 @@ fn parse_char_string(
     let mut ctx = CharStringParserContext {
         metadata,
         coordinates,
-        is_first_move_to: true,
-        has_move_to: false,
         scalars: Scalars::default(),
         had_vsindex: false,
         had_blend: false,
@@ -327,14 +324,23 @@ fn parse_char_string(
         bbox: BBox::new(),
     };
 
-    let mut stack = ArgumentsStack {
+    let stack = ArgumentsStack {
         data: &mut [0.0; MAX_ARGUMENTS_STACK_LEN], // 2052B
         len: 0,
         max_len: MAX_ARGUMENTS_STACK_LEN,
     };
-    let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, &mut inner_builder)?;
+    let mut parser = CharStringParser {
+        stack,
+        builder: &mut inner_builder,
+        x: 0.0,
+        y: 0.0,
+        has_move_to: false,
+        is_first_move_to: true,
+    };
+    _parse_char_string(&mut ctx, data, 0, &mut parser)?;
+    // let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, &mut inner_builder)?;
 
-    let bbox = inner_builder.bbox;
+    let bbox = parser.builder.bbox;
 
     // Check that bbox was changed.
     if bbox.is_default() {
@@ -344,20 +350,12 @@ fn parse_char_string(
     bbox.to_rect().ok_or(CFFError::BboxOverflow)
 }
 
-// TODO: It would be great to merge this with CFF, but we need const generics first.
-//       And still, we can merge only flex and path operators,
-//       since CFF2 doesn't have advance width as a first (optional) argument.
-//       On the other hand, other small CFF and CFF2 differences may lead
-//       to a more complicated code, so maybe some code duplication would not hurt.
 fn _parse_char_string(
     ctx: &mut CharStringParserContext,
     char_string: &[u8],
-    mut x: f32,
-    mut y: f32,
-    stack: &mut ArgumentsStack,
     depth: u8,
-    builder: &mut Builder,
-) -> Result<(f32, f32), CFFError> {
+    p: &mut CharStringParser,
+) -> Result<(), CFFError> {
     let mut s = Stream::new(char_string);
     while !s.at_end() {
         let op: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
@@ -375,138 +373,28 @@ fn _parse_char_string(
                 // y dy {dya dyb}* hstemhm
                 // x dx {dxa dxb}* vstemhm
 
-                ctx.stems_len += stack.len() as u32 >> 1;
+                ctx.stems_len += p.stack.len() as u32 >> 1;
 
                 // We are ignoring the hint operators.
-                stack.clear();
+                p.stack.clear();
             }
             operator::VERTICAL_MOVE_TO => {
-                // dy1
-
-                if stack.len() != 1 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                if ctx.is_first_move_to {
-                    ctx.is_first_move_to = false;
-                } else {
-                    builder.close();
-                }
-
-                ctx.has_move_to = true;
-
-                y += stack.at(0);
-                builder.move_to(x, y);
-
-                stack.clear();
+                p.parse_vertical_move_to(0)?;
             }
             operator::LINE_TO => {
-                // {dxa dya}+
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.len().is_odd() {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                let mut i = 0;
-                while i < stack.len() {
-                    x += stack.at(i + 0);
-                    y += stack.at(i + 1);
-                    builder.line_to(x, y);
-                    i += 2;
-                }
-
-                stack.clear();
+                p.parse_line_to()?;
             }
             operator::HORIZONTAL_LINE_TO => {
-                // dx1 {dya dxb}*
-                //     {dxa dyb}+
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                let mut i = 0;
-                while i < stack.len() {
-                    x += stack.at(i);
-                    i += 1;
-                    builder.line_to(x, y);
-
-                    if i == stack.len() {
-                        break;
-                    }
-
-                    y += stack.at(i);
-                    i += 1;
-                    builder.line_to(x, y);
-                }
-
-                stack.clear();
+                p.parse_horizontal_line_to()?;
             }
             operator::VERTICAL_LINE_TO => {
-                // dy1 {dxa dyb}*
-                //     {dya dxb}+
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.is_empty() {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                let mut i = 0;
-                while i < stack.len() {
-                    y += stack.at(i);
-                    i += 1;
-                    builder.line_to(x, y);
-
-                    if i == stack.len() {
-                        break;
-                    }
-
-                    x += stack.at(i);
-                    i += 1;
-                    builder.line_to(x, y);
-                }
-
-                stack.clear();
+                p.parse_vertical_line_to()?;
             }
             operator::CURVE_TO => {
-                // {dxa dya dxb dyb dxc dyc}+
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.len() % 6 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                let mut i = 0;
-                while i < stack.len() {
-                    let x1 = x + stack.at(i + 0);
-                    let y1 = y + stack.at(i + 1);
-                    let x2 = x1 + stack.at(i + 2);
-                    let y2 = y1 + stack.at(i + 3);
-                    x = x2 + stack.at(i + 4);
-                    y = y2 + stack.at(i + 5);
-
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                    i += 6;
-                }
-
-                stack.clear();
+                p.parse_curve_to()?;
             }
             operator::CALL_LOCAL_SUBROUTINE => {
-                if stack.is_empty() {
+                if p.stack.is_empty() {
                     return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
@@ -515,135 +403,20 @@ fn _parse_char_string(
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.local_subrs.len());
-                let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
+                let index = conv_subroutine_index(p.stack.pop(), subroutine_bias)?;
                 let char_string = ctx.metadata.local_subrs.get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
-                let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
-                x = pos.0;
-                y = pos.1;
+                _parse_char_string(ctx, char_string, depth + 1, p)?;
             }
             TWO_BYTE_OPERATOR_MARK => {
                 // flex
                 let op2: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
                 match op2 {
-                    operator::HFLEX => {
-                        // dx1 dx2 dy2 dx3 dx4 dx5 dx6
-
-                        if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo);
-                        }
-
-                        if stack.len() != 7 {
-                            return Err(CFFError::InvalidArgumentsStackLength);
-                        }
-
-                        let dx1 = x + stack.at(0);
-                        let dy1 = y;
-                        let dx2 = dx1 + stack.at(1);
-                        let dy2 = dy1 + stack.at(2);
-                        let dx3 = dx2 + stack.at(3);
-                        let dy3 = dy2;
-                        let dx4 = dx3 + stack.at(4);
-                        let dy4 = dy2;
-                        let dx5 = dx4 + stack.at(5);
-                        let dy5 = y;
-                        x = dx5 + stack.at(6);
-                        builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-                        builder.curve_to(dx4, dy4, dx5, dy5, x, y);
-
-                        stack.clear();
-                    }
-                    operator::FLEX => {
-                        // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd
-
-                        if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo);
-                        }
-
-                        if stack.len() != 13 {
-                            return Err(CFFError::InvalidArgumentsStackLength);
-                        }
-
-                        let dx1 = x + stack.at(0);
-                        let dy1 = y + stack.at(1);
-                        let dx2 = dx1 + stack.at(2);
-                        let dy2 = dy1 + stack.at(3);
-                        let dx3 = dx2 + stack.at(4);
-                        let dy3 = dy2 + stack.at(5);
-                        let dx4 = dx3 + stack.at(6);
-                        let dy4 = dy3 + stack.at(7);
-                        let dx5 = dx4 + stack.at(8);
-                        let dy5 = dy4 + stack.at(9);
-                        x = dx5 + stack.at(10);
-                        y = dy5 + stack.at(11);
-                        builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-                        builder.curve_to(dx4, dy4, dx5, dy5, x, y);
-
-                        stack.clear();
-                    }
-                    operator::HFLEX1 => {
-                        // dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6
-
-                        if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo);
-                        }
-
-                        if stack.len() != 9 {
-                            return Err(CFFError::InvalidArgumentsStackLength);
-                        }
-
-                        let dx1 = x + stack.at(0);
-                        let dy1 = y + stack.at(1);
-                        let dx2 = dx1 + stack.at(2);
-                        let dy2 = dy1 + stack.at(3);
-                        let dx3 = dx2 + stack.at(4);
-                        let dy3 = dy2;
-                        let dx4 = dx3 + stack.at(5);
-                        let dy4 = dy2;
-                        let dx5 = dx4 + stack.at(6);
-                        let dy5 = dy4 + stack.at(7);
-                        x = dx5 + stack.at(8);
-                        builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-                        builder.curve_to(dx4, dy4, dx5, dy5, x, y);
-
-                        stack.clear();
-                    }
-                    operator::FLEX1 => {
-                        // dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6
-
-                        if !ctx.has_move_to {
-                            return Err(CFFError::MissingMoveTo);
-                        }
-
-                        if stack.len() != 11 {
-                            return Err(CFFError::InvalidArgumentsStackLength);
-                        }
-
-                        let dx1 = x + stack.at(0);
-                        let dy1 = y + stack.at(1);
-                        let dx2 = dx1 + stack.at(2);
-                        let dy2 = dy1 + stack.at(3);
-                        let dx3 = dx2 + stack.at(4);
-                        let dy3 = dy2 + stack.at(5);
-                        let dx4 = dx3 + stack.at(6);
-                        let dy4 = dy3 + stack.at(7);
-                        let dx5 = dx4 + stack.at(8);
-                        let dy5 = dy4 + stack.at(9);
-
-                        if f32_abs(dx5 - x) > f32_abs(dy5 - y) {
-                            x = dx5 + stack.at(10);
-                        } else {
-                            y = dy5 + stack.at(10);
-                        }
-
-                        builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-                        builder.curve_to(dx4, dy4, dx5, dy5, x, y);
-
-                        stack.clear();
-                    }
-                    _ => {
-                        return Err(CFFError::UnsupportedOperator);
-                    }
+                    operator::HFLEX => p.parse_hflex()?,
+                    operator::FLEX => p.parse_flex()?,
+                    operator::HFLEX1 => p.parse_hflex1()?,
+                    operator::FLEX1 => p.parse_flex1()?,
+                    _ => return Err(CFFError::UnsupportedOperator),
                 }
             }
             operator::VS_INDEX => {
@@ -655,17 +428,17 @@ fn _parse_char_string(
                     return Err(CFFError::InvalidOperator);
                 }
 
-                if stack.len() != 1 {
+                if p.stack.len() != 1 {
                     return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
-                let index = u16::try_num_from(stack.pop())
+                let index = u16::try_num_from(p.stack.pop())
                     .ok_or(CFFError::InvalidItemVariationDataIndex)?;
                 ctx.update_scalars(index)?;
 
                 ctx.had_vsindex = true;
 
-                stack.clear();
+                p.stack.clear();
             }
             operator::BLEND => {
                 // num(0)..num(n-1), delta(0,0)..delta(k-1,0),
@@ -674,211 +447,54 @@ fn _parse_char_string(
 
                 ctx.had_blend = true;
 
-                let n = u16::try_num_from(stack.pop())
+                let n = u16::try_num_from(p.stack.pop())
                     .ok_or(CFFError::InvalidNumberOfBlendOperands)?;
                 let k = ctx.scalars.len();
 
                 let len = usize::from(n) * (usize::from(k) + 1);
-                if stack.len() < len {
+                if p.stack.len() < len {
                     return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
-                let start = stack.len() - len;
+                let start = p.stack.len() - len;
                 for i in (0..n).rev() {
                     for j in 0..k {
-                        let delta = stack.pop();
-                        stack.data[start + usize::from(i)] += delta * ctx.scalars.at(k - j - 1);
+                        let delta = p.stack.pop();
+                        p.stack.data[start + usize::from(i)] += delta * ctx.scalars.at(k - j - 1);
                     }
                 }
             }
             operator::HINT_MASK | operator::COUNTER_MASK => {
-                ctx.stems_len += stack.len() as u32 >> 1;
+                ctx.stems_len += p.stack.len() as u32 >> 1;
                 s.advance(usize::num_from((ctx.stems_len + 7) >> 3));
 
                 // We are ignoring the hint operators.
-                stack.clear();
+                p.stack.clear();
             }
             operator::MOVE_TO => {
-                // dx1 dy1
-
-                if stack.len() != 2 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                if ctx.is_first_move_to {
-                    ctx.is_first_move_to = false;
-                } else {
-                    builder.close();
-                }
-
-                ctx.has_move_to = true;
-
-                x += stack.at(0);
-                y += stack.at(1);
-                builder.move_to(x, y);
-
-                stack.clear();
+                p.parse_move_to(0)?;
             }
             operator::HORIZONTAL_MOVE_TO => {
-                // dx1
-
-                if stack.len() != 1 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                if ctx.is_first_move_to {
-                    ctx.is_first_move_to = false;
-                } else {
-                    builder.close();
-                }
-
-                ctx.has_move_to = true;
-
-                x += stack.at(0);
-                builder.move_to(x, y);
-
-                stack.clear();
+                p.parse_horizontal_move_to(0)?;
             }
             operator::CURVE_LINE => {
-                // {dxa dya dxb dyb dxc dyc}+ dxd dyd
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.len() < 8 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                if (stack.len() - 2) % 6 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                let mut i = 0;
-                while i < stack.len() - 2 {
-                    let x1 = x + stack.at(i + 0);
-                    let y1 = y + stack.at(i + 1);
-                    let x2 = x1 + stack.at(i + 2);
-                    let y2 = y1 + stack.at(i + 3);
-                    x = x2 + stack.at(i + 4);
-                    y = y2 + stack.at(i + 5);
-
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                    i += 6;
-                }
-
-                x += stack.at(i + 0);
-                y += stack.at(i + 1);
-                builder.line_to(x, y);
-
-                stack.clear();
+                p.parse_curve_line()?;
             }
             operator::LINE_CURVE => {
-                // {dxa dya}+ dxb dyb dxc dyc dxd dyd
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.len() < 8 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                if (stack.len() - 6).is_odd() {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                let mut i = 0;
-                while i < stack.len() - 6 {
-                    x += stack.at(i + 0);
-                    y += stack.at(i + 1);
-
-                    builder.line_to(x, y);
-                    i += 2;
-                }
-
-                let x1 = x + stack.at(i + 0);
-                let y1 = y + stack.at(i + 1);
-                let x2 = x1 + stack.at(i + 2);
-                let y2 = y1 + stack.at(i + 3);
-                x = x2 + stack.at(i + 4);
-                y = y2 + stack.at(i + 5);
-                builder.curve_to(x1, y1, x2, y2, x, y);
-
-                stack.clear();
+                p.parse_line_curve()?;
             }
             operator::VV_CURVE_TO => {
-                // dx1? {dya dxb dyb dyc}+
-
-                let mut i = 0;
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                // The odd argument count indicates an X position.
-                if stack.len().is_odd() {
-                    x += stack.at(0);
-                    i += 1;
-                }
-
-                if (stack.len() - i) % 4 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                while i < stack.len() {
-                    let x1 = x;
-                    let y1 = y + stack.at(i + 0);
-                    let x2 = x1 + stack.at(i + 1);
-                    let y2 = y1 + stack.at(i + 2);
-                    x = x2;
-                    y = y2 + stack.at(i + 3);
-
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                    i += 4;
-                }
-
-                stack.clear();
+                p.parse_vv_curve_to()?;
             }
             operator::HH_CURVE_TO => {
-                // dy1? {dxa dxb dyb dxc}+
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                let mut i = 0;
-
-                // The odd argument count indicates an Y position.
-                if stack.len().is_odd() {
-                    y += stack.at(0);
-                    i += 1;
-                }
-
-                if (stack.len() - i) % 4 != 0 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                while i < stack.len() {
-                    let x1 = x + stack.at(i + 0);
-                    let y1 = y;
-                    let x2 = x1 + stack.at(i + 1);
-                    let y2 = y1 + stack.at(i + 2);
-                    x = x2 + stack.at(i + 3);
-                    y = y2;
-
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                    i += 4;
-                }
-
-                stack.clear();
+                p.parse_hh_curve_to()?;
             }
             operator::SHORT_INT => {
                 let n = s.read::<i16>().ok_or(CFFError::ReadOutOfBounds)?;
-                stack.push(f32::from(n))?;
+                p.stack.push(f32::from(n))?;
             }
             operator::CALL_GLOBAL_SUBROUTINE => {
-                if stack.is_empty() {
+                if p.stack.is_empty() {
                     return Err(CFFError::InvalidArgumentsStackLength);
                 }
 
@@ -887,123 +503,31 @@ fn _parse_char_string(
                 }
 
                 let subroutine_bias = calc_subroutine_bias(ctx.metadata.global_subrs.len());
-                let index = conv_subroutine_index(stack.pop(), subroutine_bias)?;
+                let index = conv_subroutine_index(p.stack.pop(), subroutine_bias)?;
                 let char_string = ctx.metadata.global_subrs.get(index)
                     .ok_or(CFFError::InvalidSubroutineIndex)?;
-                let pos = _parse_char_string(ctx, char_string, x, y, stack, depth + 1, builder)?;
-                x = pos.0;
-                y = pos.1;
+                _parse_char_string(ctx, char_string, depth + 1, p)?;
             }
             operator::VH_CURVE_TO => {
-                // dy1 dx2 dy2 dx3 {dxa dxb dyb dyc dyd dxe dye dxf}* dyf?
-                //                 {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.len() < 4 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                stack.reverse();
-                while !stack.is_empty() {
-                    if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength);
-                    }
-
-                    let x1 = x;
-                    let y1 = y + stack.pop();
-                    let x2 = x1 + stack.pop();
-                    let y2 = y1 + stack.pop();
-                    x = x2 + stack.pop();
-                    y = y2 + if stack.len() == 1 { stack.pop() } else { 0.0 };
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                    if stack.is_empty() {
-                        break;
-                    }
-
-                    if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength);
-                    }
-
-                    let x1 = x + stack.pop();
-                    let y1 = y;
-                    let x2 = x1 + stack.pop();
-                    let y2 = y1 + stack.pop();
-                    y = y2 + stack.pop();
-                    x = x2 + if stack.len() == 1 { stack.pop() } else { 0.0 };
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                }
-
-                debug_assert!(stack.is_empty());
+                p.parse_vh_curve_to()?;
             }
             operator::HV_CURVE_TO => {
-                // dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
-                //                 {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf?
-
-                if !ctx.has_move_to {
-                    return Err(CFFError::MissingMoveTo);
-                }
-
-                if stack.len() < 4 {
-                    return Err(CFFError::InvalidArgumentsStackLength);
-                }
-
-                stack.reverse();
-                while !stack.is_empty() {
-                    if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength);
-                    }
-
-                    let x1 = x + stack.pop();
-                    let y1 = y;
-                    let x2 = x1 + stack.pop();
-                    let y2 = y1 + stack.pop();
-                    y = y2 + stack.pop();
-                    x = x2 + if stack.len() == 1 { stack.pop() } else { 0.0 };
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                    if stack.is_empty() {
-                        break;
-                    }
-
-                    if stack.len() < 4 {
-                        return Err(CFFError::InvalidArgumentsStackLength);
-                    }
-
-                    let x1 = x;
-                    let y1 = y + stack.pop();
-                    let x2 = x1 + stack.pop();
-                    let y2 = y1 + stack.pop();
-                    x = x2 + stack.pop();
-                    y = y2 + if stack.len() == 1 { stack.pop() } else { 0.0 };
-                    builder.curve_to(x1, y1, x2, y2, x, y);
-                }
-
-                debug_assert!(stack.is_empty());
+                p.parse_hv_curve_to()?;
             }
             32..=246 => {
-                let n = i16::from(op) - 139;
-                stack.push(f32::from(n))?;
+                p.parse_int1(op)?;
             }
             247..=250 => {
-                let b1: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
-                let n = (i16::from(op) - 247) * 256 + i16::from(b1) + 108;
-                debug_assert!((108..=1131).contains(&n));
-                stack.push(f32::from(n))?;
+                p.parse_int2(op, &mut s)?;
             }
             251..=254 => {
-                let b1: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
-                let n = -(i16::from(op) - 251) * 256 - i16::from(b1) - 108;
-                debug_assert!((-1131..=-108).contains(&n));
-                stack.push(f32::from(n))?;
+                p.parse_int3(op, &mut s)?;
             }
             operator::FIXED_16_16 => {
-                let n = s.read::<Fixed>().ok_or(CFFError::ReadOutOfBounds)?;
-                stack.push(n.0)?;
+                p.parse_fixed(&mut s)?;
             }
         }
     }
 
-    Ok((x, y))
+    Ok(())
 }

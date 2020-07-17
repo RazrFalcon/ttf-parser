@@ -2,6 +2,7 @@ pub mod cff1;
 pub mod cff2;
 mod argstack;
 mod charset;
+mod charstring;
 mod dict;
 mod index;
 
@@ -34,7 +35,7 @@ pub enum CFFError {
 }
 
 
-struct Builder<'a> {
+pub(crate) struct Builder<'a> {
     builder: &'a mut dyn OutlineBuilder,
     bbox: BBox,
 }

@@ -104,8 +104,6 @@ impl<'a> Table<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer;
-    use writer::TtfType::*;
 
     macro_rules! nzu16 {
         ($n:expr) => { NonZeroU16::new($n).unwrap() };
@@ -113,12 +111,12 @@ mod tests {
 
     #[test]
     fn simple_case() {
-        let data = writer::convert(&[
-            UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
-        ]);
+        let data = &[
+            0x00, 0x01, // advance width [0]: 1
+            0x00, 0x02, // side bearing [0]: 2
+        ];
 
-        let table = Table::parse(&data, nzu16!(1), nzu16!(1)).unwrap();
+        let table = Table::parse(data, nzu16!(1), nzu16!(1)).unwrap();
         assert_eq!(table.advance(GlyphId(0)), Some(1));
         assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
     }
@@ -130,13 +128,14 @@ mod tests {
 
     #[test]
     fn smaller_than_glyphs_count() {
-        let data = writer::convert(&[
-            UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
-            Int16(3), // sideBearing[1]
-        ]);
+        let data = &[
+            0x00, 0x01, // advance width [0]: 1
+            0x00, 0x02, // side bearing [0]: 2
 
-        let table = Table::parse(&data, nzu16!(1), nzu16!(2)).unwrap();
+            0x00, 0x03, // side bearing [1]: 3
+        ];
+
+        let table = Table::parse(data, nzu16!(1), nzu16!(2)).unwrap();
         assert_eq!(table.advance(GlyphId(0)), Some(1));
         assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
         assert_eq!(table.advance(GlyphId(1)), Some(1));
@@ -145,15 +144,17 @@ mod tests {
 
     #[test]
     fn less_metrics_than_glyphs() {
-        let data = writer::convert(&[
-            UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
-            UInt16(3), // advanceWidth[1]
-            Int16(4), // sideBearing[1]
-            Int16(5), // sideBearing[2]
-        ]);
+        let data = &[
+            0x00, 0x01, // advance width [0]: 1
+            0x00, 0x02, // side bearing [0]: 2
 
-        let table = Table::parse(&data, nzu16!(2), nzu16!(1)).unwrap();
+            0x00, 0x03, // advance width [1]: 3
+            0x00, 0x04, // side bearing [1]: 4
+
+            0x00, 0x05, // side bearing [2]: 5
+        ];
+
+        let table = Table::parse(data, nzu16!(2), nzu16!(1)).unwrap();
         assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
         assert_eq!(table.side_bearing(GlyphId(1)), Some(4));
         assert_eq!(table.side_bearing(GlyphId(2)), None);
@@ -161,12 +162,12 @@ mod tests {
 
     #[test]
     fn glyph_out_of_bounds_0() {
-        let data = writer::convert(&[
-            UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
-        ]);
+        let data = &[
+            0x00, 0x01, // advance width [0]: 1
+            0x00, 0x02, // side bearing [0]: 2
+        ];
 
-        let table = Table::parse(&data, nzu16!(1), nzu16!(1)).unwrap();
+        let table = Table::parse(data, nzu16!(1), nzu16!(1)).unwrap();
         assert_eq!(table.advance(GlyphId(0)), Some(1));
         assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
         assert_eq!(table.advance(GlyphId(1)), None);
@@ -175,13 +176,14 @@ mod tests {
 
     #[test]
     fn glyph_out_of_bounds_1() {
-        let data = writer::convert(&[
-            UInt16(1), // advanceWidth[0]
-            Int16(2), // sideBearing[0]
-            Int16(3), // sideBearing[1]
-        ]);
+        let data = &[
+            0x00, 0x01, // advance width [0]: 1
+            0x00, 0x02, // side bearing [0]: 2
 
-        let table = Table::parse(&data, nzu16!(1), nzu16!(2)).unwrap();
+            0x00, 0x03, // side bearing [1]: 3
+        ];
+
+        let table = Table::parse(data, nzu16!(1), nzu16!(2)).unwrap();
         assert_eq!(table.advance(GlyphId(1)), Some(1));
         assert_eq!(table.side_bearing(GlyphId(1)), Some(3));
         assert_eq!(table.advance(GlyphId(2)), None);

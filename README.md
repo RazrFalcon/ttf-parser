@@ -118,8 +118,8 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 | ------------- | -------------: | ---------: | -------------: |
 | `glyf`        |   `0.835 ms`   | `1.194 ms` | **`0.695 ms`** |
 | `gvar`        | **`3.158 ms`** | `3.594 ms` |              - |
-| `CFF`         | **`1.251 ms`** | `5.946 ms` |   `2.862 ms`   |
-| `CFF2`        | **`1.921 ms`** | `7.001 ms` |              - |
+| `CFF`         | **`1.114 ms`** | `5.946 ms` |   `2.862 ms`   |
+| `CFF2`        | **`1.763 ms`** | `7.001 ms` |              - |
 
 **Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
 

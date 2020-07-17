@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- (CFF,CFF2) 10% faster parsing.
 
 ## [0.7.0] - 2020-07-16
 ### Added

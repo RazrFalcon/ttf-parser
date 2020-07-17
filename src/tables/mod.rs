@@ -1,8 +1,7 @@
 pub mod avar;
 pub mod cbdt;
 pub mod cblc;
-pub mod cff2;
-pub mod cff;
+mod cff;
 pub mod cmap;
 pub mod fvar;
 pub mod gdef;
@@ -23,3 +22,5 @@ pub mod sbix;
 pub mod svg;
 pub mod vhea;
 pub mod vorg;
+
+pub use cff::{cff1, cff2};

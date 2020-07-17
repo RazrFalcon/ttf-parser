@@ -7,16 +7,19 @@ use core::convert::TryFrom;
 use core::ops::Range;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox};
-use crate::parser::{Stream, LazyArray16, U24, Fixed, FromData, NumFrom, TryNumFrom};
+use crate::parser::{Stream, LazyArray16, Fixed, NumFrom, TryNumFrom};
+use super::{Builder, IsEven, CFFError, StringId, f32_abs, calc_subroutine_bias, conv_subroutine_index};
+use super::argstack::ArgumentsStack;
+use super::charset::{Charset, parse_charset};
+use super::dict::DictionaryParser;
+use super::index::{Index, parse_index, skip_index};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
-const MAX_OPERANDS_LEN: u8 = 48;
+const MAX_OPERANDS_LEN: usize = 48;
 
 // Limits according to the Adobe Technical Note #5177 Appendix B.
 const STACK_LIMIT: u8 = 10;
 const MAX_ARGUMENTS_STACK_LEN: usize = 48;
-
-const END_OF_FLOAT_FLAG: u8 = 0xf;
 
 const TWO_BYTE_OPERATOR_MARK: u8 = 12;
 
@@ -78,52 +81,15 @@ mod charset_id {
 }
 
 
-/// A list of errors that can occur during a CFF table parsing.
-#[derive(Clone, Copy, Debug)]
-pub enum CFFError {
-    ReadOutOfBounds,
-    ZeroBBox,
-    InvalidOperator,
-    UnsupportedOperator,
-    MissingEndChar,
-    DataAfterEndChar,
-    NestingLimitReached,
-    ArgumentsStackLimitReached,
-    InvalidArgumentsStackLength,
-    BboxOverflow,
-    MissingMoveTo,
-    InvalidSubroutineIndex,
-    InvalidItemVariationDataIndex,
-    InvalidNumberOfBlendOperands,
-    BlendRegionsLimitReached,
-    NoLocalSubroutines,
-    InvalidSeacCode,
-}
-
-
-/// A type-safe wrapper for string ID.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-struct StringId(u16);
-
-impl FromData for StringId {
-    const SIZE: usize = 2;
-
-    #[inline]
-    fn parse(data: &[u8]) -> Option<Self> {
-        u16::parse(data).map(StringId)
-    }
-}
-
-
 #[derive(Clone, Copy, Debug)]
 pub struct Metadata<'a> {
     // The whole CFF table.
     // Used to resolve a local subroutine in a CID font.
     table_data: &'a [u8],
 
-    global_subrs: DataIndex<'a>,
+    global_subrs: Index<'a>,
     charset: Charset<'a>,
-    char_strings: DataIndex<'a>,
+    char_strings: Index<'a>,
     kind: FontKind<'a>,
 }
 
@@ -135,12 +101,12 @@ pub enum FontKind<'a> {
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct SIDMetadata<'a> {
-    local_subrs: DataIndex<'a>,
+    local_subrs: Index<'a>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct CIDMetadata<'a> {
-    fd_array: DataIndex<'a>,
+    fd_array: Index<'a>,
     fd_select: FDSelect<'a>,
 }
 
@@ -163,7 +129,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     }
 
     // Skip Name INDEX.
-    skip_index(&mut s)?;
+    skip_index::<u16>(&mut s)?;
 
     let top_dict = parse_top_dict(&mut s)?;
 
@@ -173,14 +139,14 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     }
 
     // Skip String INDEX.
-    skip_index(&mut s)?;
+    skip_index::<u16>(&mut s)?;
 
     // Parse Global Subroutines INDEX.
-    let global_subrs = parse_index(&mut s)?;
+    let global_subrs = parse_index::<u16>(&mut s)?;
 
     let char_strings = {
         let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
-        parse_index(&mut s)?
+        parse_index::<u16>(&mut s)?
     };
 
     if char_strings.len() == 0 {
@@ -230,7 +196,7 @@ fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
             if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
                 let data = data.get(start..data.len())?;
                 let mut s = Stream::new(data);
-                metadata.local_subrs = parse_index(&mut s)?;
+                metadata.local_subrs = parse_index::<u16>(&mut s)?;
             }
         }
         _ => {}
@@ -256,7 +222,7 @@ fn parse_cid_metadata(data: &[u8], top_dict: TopDict, number_of_glyphs: u16) -> 
 
     metadata.fd_array = {
         let mut s = Stream::new_at(data, fd_array_offset)?;
-        parse_index(&mut s)?
+        parse_index::<u16>(&mut s)?
     };
 
     metadata.fd_select = {
@@ -280,12 +246,13 @@ struct TopDict {
 fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
     let mut top_dict = TopDict::default();
 
-    let index = parse_index(s)?;
+    let index = parse_index::<u16>(s)?;
 
     // The Top DICT INDEX should have only one dictionary.
     let data = index.get(0)?;
 
-    let mut dict_parser = DictionaryParser::new(data);
+    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         match operator.get() {
             top_dict_operator::CHARSET_OFFSET => {
@@ -314,7 +281,8 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
 }
 
 fn parse_private_dict(data: &[u8]) -> Option<usize> {
-    let mut dict_parser = DictionaryParser::new(data);
+    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
             return dict_parser.parse_offset();
@@ -325,7 +293,8 @@ fn parse_private_dict(data: &[u8]) -> Option<usize> {
 }
 
 fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
-    let mut dict_parser = DictionaryParser::new(data);
+    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
             return dict_parser.parse_range();
@@ -345,7 +314,7 @@ fn parse_cid_local_subrs<'a>(
     data: &'a [u8],
     glyph_id: GlyphId,
     cid: &CIDMetadata,
-) -> Option<DataIndex<'a>> {
+) -> Option<Index<'a>> {
     let font_dict_index = cid.fd_select.font_dict_index(glyph_id)?;
     let font_dict_data = cid.fd_array.get(u32::from(font_dict_index))?;
     let private_dict_range = parse_font_dict(font_dict_data)?;
@@ -357,7 +326,7 @@ fn parse_cid_local_subrs<'a>(
     let start = private_dict_range.start.checked_add(subroutines_offset)?;
     let subrs_data = data.get(start..)?;
     let mut s = Stream::new(subrs_data);
-    parse_index(&mut s)
+    parse_index::<u16>(&mut s)
 }
 
 pub fn outline(
@@ -378,7 +347,7 @@ struct CharStringParserContext<'a> {
     has_endchar: bool,
     has_seac: bool,
     glyph_id: GlyphId, // Required to parse local subroutine in CID fonts.
-    local_subrs: Option<DataIndex<'a>>,
+    local_subrs: Option<Index<'a>>,
 }
 
 fn parse_char_string(
@@ -430,38 +399,6 @@ fn parse_char_string(
     bbox.to_rect().ok_or(CFFError::BboxOverflow)
 }
 
-
-pub(crate) struct Builder<'a> {
-    pub builder: &'a mut dyn OutlineBuilder,
-    pub bbox: BBox,
-}
-
-impl<'a> Builder<'a> {
-    #[inline]
-    pub fn move_to(&mut self, x: f32, y: f32) {
-        self.bbox.extend_by(x, y);
-        self.builder.move_to(x, y);
-    }
-
-    #[inline]
-    pub fn line_to(&mut self, x: f32, y: f32) {
-        self.bbox.extend_by(x, y);
-        self.builder.line_to(x, y);
-    }
-
-    #[inline]
-    pub fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        self.bbox.extend_by(x1, y1);
-        self.bbox.extend_by(x2, y2);
-        self.bbox.extend_by(x, y);
-        self.builder.curve_to(x1, y1, x2, y2, x, y);
-    }
-
-    #[inline]
-    pub fn close(&mut self) {
-        self.builder.close();
-    }
-}
 
 fn _parse_char_string(
     ctx: &mut CharStringParserContext,
@@ -1185,32 +1122,6 @@ fn _parse_char_string(
     Ok((x, y))
 }
 
-#[inline]
-pub fn conv_subroutine_index(index: f32, bias: u16) -> Result<u32, CFFError> {
-    conv_subroutine_index_impl(index, bias).ok_or(CFFError::InvalidSubroutineIndex)
-}
-
-#[inline]
-fn conv_subroutine_index_impl(index: f32, bias: u16) -> Option<u32> {
-    let index = i32::try_num_from(index)?;
-    let bias = i32::from(bias);
-
-    let index = index.checked_add(bias)?;
-    u32::try_from(index).ok()
-}
-
-// Adobe Technical Note #5176, Chapter 16 "Local / Global Subrs INDEXes"
-#[inline]
-pub fn calc_subroutine_bias(len: u32) -> u16 {
-    if len < 1240 {
-        107
-    } else if len < 33900 {
-        1131
-    } else {
-        32768
-    }
-}
-
 fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
     let code = u8::try_num_from(n)?;
 
@@ -1224,554 +1135,6 @@ fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
         }
         Charset::Expert | Charset::ExpertSubset => None,
         _ => charset.sid_to_gid(sid),
-    }
-}
-
-fn parse_index<'a>(s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
-    let count: u16 = s.read()?;
-    if count != 0 {
-        parse_index_impl(u32::from(count), s)
-    } else {
-        Some(DataIndex::default())
-    }
-}
-
-#[inline]
-pub fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
-    let offset_size: OffsetSize = try_parse_offset_size(s)?;
-    let offsets_len = (count + 1).checked_mul(offset_size.to_u32())?;
-    let offsets = VarOffsets {
-        data: &s.read_bytes(usize::num_from(offsets_len))?,
-        offset_size,
-    };
-
-    // Last offset indicates a Data Index size.
-    match offsets.last() {
-        Some(last_offset) => {
-            let data = s.read_bytes(usize::num_from(last_offset))?;
-            Some(DataIndex { data, offsets })
-        }
-        None => {
-            Some(DataIndex::default())
-        }
-    }
-}
-
-fn skip_index(s: &mut Stream) -> Option<()> {
-    let count: u16 = s.read()?;
-    if count != 0 {
-        let offset_size: OffsetSize = try_parse_offset_size(s)?;
-        let offsets_len = (u32::from(count) + 1).checked_mul(offset_size.to_u32())?;
-        let offsets = VarOffsets {
-            data: &s.read_bytes(usize::num_from(offsets_len))?,
-            offset_size,
-        };
-
-        if let Some(last_offset) = offsets.last() {
-            s.advance(usize::num_from(last_offset));
-        }
-    }
-
-    Some(())
-}
-
-
-#[derive(Clone, Copy, Debug)]
-pub struct VarOffsets<'a> {
-    pub data: &'a [u8],
-    pub offset_size: OffsetSize,
-}
-
-impl<'a> VarOffsets<'a> {
-    pub fn get(&self, index: u32) -> Option<u32> {
-        if u32::from(index) >= self.len() {
-            return None;
-        }
-
-        let start = usize::num_from(index) * self.offset_size.to_usize();
-        let end = start + self.offset_size.to_usize();
-        let data = self.data.get(start..end)?;
-        let n: u32 = match self.offset_size {
-            OffsetSize::Size1 => u32::from(u8::parse(data)?),
-            OffsetSize::Size2 => u32::from(u16::parse(data)?),
-            OffsetSize::Size3 => U24::parse(data)?.0,
-            OffsetSize::Size4 => u32::parse(data)?,
-        };
-
-        // Offset must be positive.
-        if n == 0 {
-            return None;
-        }
-
-        // Offsets are offset by one byte in the font,
-        // so we have to shift them back.
-        Some(n - 1)
-    }
-
-    #[inline]
-    pub fn last(&self) -> Option<u32> {
-        if !self.is_empty() {
-            self.get(self.len() - 1)
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub fn len(&self) -> u32 {
-        self.data.len() as u32 / self.offset_size as u32
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-
-#[derive(Clone, Copy, Debug)]
-pub struct DataIndex<'a> {
-    pub data: &'a [u8],
-    pub offsets: VarOffsets<'a>,
-}
-
-impl<'a> Default for DataIndex<'a> {
-    #[inline]
-    fn default() -> Self {
-        DataIndex {
-            data: b"",
-            offsets: VarOffsets { data: b"", offset_size: OffsetSize::Size1 },
-        }
-    }
-}
-
-impl<'a> IntoIterator for DataIndex<'a> {
-    type Item = &'a [u8];
-    type IntoIter = DataIndexIter<'a>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        DataIndexIter {
-            data: self,
-            offset_index: 0,
-        }
-    }
-}
-
-impl<'a> DataIndex<'a> {
-    #[inline]
-    pub fn len(&self) -> u32 {
-        if !self.offsets.is_empty() {
-            // Last offset points to the byte after the `Object data`.
-            // We should skip it.
-            self.offsets.len() - 1
-        } else {
-            0
-        }
-    }
-
-    pub fn get(&self, index: u32) -> Option<&'a [u8]> {
-        // Check for overflow first.
-        if index == core::u32::MAX {
-            None
-        } else if u32::from(index + 1) < self.offsets.len() {
-            let start = usize::try_from(self.offsets.get(index)?).ok()?;
-            let end = usize::try_from(self.offsets.get(index + 1)?).ok()?;
-            let data = self.data.get(start..end)?;
-            Some(data)
-        } else {
-            None
-        }
-    }
-}
-
-pub struct DataIndexIter<'a> {
-    data: DataIndex<'a>,
-    offset_index: u32,
-}
-
-impl<'a> Iterator for DataIndexIter<'a> {
-    type Item = &'a [u8];
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.offset_index == self.data.len() {
-            return None;
-        }
-
-        let index = self.offset_index;
-        self.offset_index += 1;
-        self.data.get(index)
-    }
-}
-
-
-#[derive(Clone, Copy, Debug)]
-pub enum OffsetSize {
-    Size1 = 1,
-    Size2 = 2,
-    Size3 = 3,
-    Size4 = 4,
-}
-
-impl OffsetSize {
-    #[inline] fn to_u32(self) -> u32 { self as u32 }
-    #[inline] fn to_usize(self) -> usize { self as usize }
-}
-
-#[inline]
-fn try_parse_offset_size(s: &mut Stream) -> Option<OffsetSize> {
-    match s.read::<u8>()? {
-        1 => Some(OffsetSize::Size1),
-        2 => Some(OffsetSize::Size2),
-        3 => Some(OffsetSize::Size3),
-        4 => Some(OffsetSize::Size4),
-        _ => None,
-    }
-}
-
-
-#[derive(Clone, Copy, Debug)]
-pub struct Operator(pub u16);
-
-impl Operator {
-    #[inline]
-    pub fn get(self) -> u16 { self.0 }
-}
-
-
-struct DictionaryParser<'a> {
-    data: &'a [u8],
-    // The current offset.
-    offset: usize,
-    // Offset to the last operands start.
-    operands_offset: usize,
-    // Actual operands.
-    operands: [i32; MAX_OPERANDS_LEN as usize], // 192B
-    // An amount of operands in the `operands` array.
-    operands_len: u8,
-}
-
-impl<'a> DictionaryParser<'a> {
-    #[inline]
-    fn new(data: &'a [u8]) -> Self {
-        DictionaryParser {
-            data,
-            offset: 0,
-            operands_offset: 0,
-            operands: [0; MAX_OPERANDS_LEN as usize],
-            operands_len: 0,
-        }
-    }
-
-    #[inline(never)]
-    fn parse_next(&mut self) -> Option<Operator> {
-        let mut s = Stream::new_at(self.data, self.offset)?;
-        self.operands_offset = self.offset;
-        while !s.at_end() {
-            let b: u8 = s.read()?;
-            // 0..=21 bytes are operators.
-            if is_dict_one_byte_op(b) {
-                let mut operator = u16::from(b);
-
-                // Check that operator is two byte long.
-                if b == TWO_BYTE_OPERATOR_MARK {
-                    // Use a 1200 'prefix' to make two byte operators more readable.
-                    // 12 3 => 1203
-                    operator = 1200 + u16::from(s.read::<u8>()?);
-                }
-
-                self.offset = s.offset();
-                return Some(Operator(operator));
-            } else {
-                skip_number(b, &mut s)?;
-            }
-        }
-
-        None
-    }
-
-    /// Parses operands of the current operator.
-    ///
-    /// In the DICT structure, operands are defined before an operator.
-    /// So we are trying to find an operator first and the we can actually parse the operands.
-    ///
-    /// Since this methods is pretty expensive and we do not care about most of the operators,
-    /// we can speed up parsing by parsing operands only for required operators.
-    ///
-    /// We still have to "skip" operands during operators search (see `skip_number()`),
-    /// but it's still faster that a naive method.
-    fn parse_operands(&mut self) -> Option<()> {
-        let mut s = Stream::new_at(self.data, self.operands_offset)?;
-        self.operands_len = 0;
-        while !s.at_end() {
-            let b: u8 = s.read()?;
-            // 0..=21 bytes are operators.
-            if is_dict_one_byte_op(b) {
-                break;
-            } else {
-                let op = parse_number(b, &mut s)?;
-                self.operands[usize::from(self.operands_len)] = op;
-                self.operands_len += 1;
-
-                if self.operands_len >= MAX_OPERANDS_LEN {
-                    break;
-                }
-            }
-        }
-
-        Some(())
-    }
-
-    #[inline]
-    fn operands(&self) -> &[i32] {
-        &self.operands[..usize::from(self.operands_len)]
-    }
-
-    #[inline]
-    fn parse_offset(&mut self) -> Option<usize> {
-        self.parse_operands()?;
-        let operands = self.operands();
-        if operands.len() == 1 {
-            usize::try_from(operands[0]).ok()
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    fn parse_range(&mut self) -> Option<Range<usize>> {
-        self.parse_operands()?;
-        let operands = self.operands();
-        if operands.len() == 2 {
-            let len = usize::try_from(operands[0]).ok()?;
-            let start = usize::try_from(operands[1]).ok()?;
-            let end = start.checked_add(len)?;
-            Some(start..end)
-        } else {
-            None
-        }
-    }
-}
-
-// One-byte CFF DICT Operators according to the
-// Adobe Technical Note #5176, Appendix H CFF DICT Encoding.
-pub fn is_dict_one_byte_op(b: u8) -> bool {
-    match b {
-        0..=27 => true,
-        28..=30 => false, // numbers
-        31 => true, // Reserved
-        32..=254 => false, // numbers
-        255 => true, // Reserved
-    }
-}
-
-// Adobe Technical Note #5177, Table 3 Operand Encoding
-pub fn parse_number(b0: u8, s: &mut Stream) -> Option<i32> {
-    match b0 {
-        28 => {
-            let n = i32::from(s.read::<i16>()?);
-            Some(n)
-        }
-        29 => {
-            let n = s.read::<i32>()?;
-            Some(n)
-        }
-        30 => {
-            // We do not parse float, because we don't use it.
-            // And by skipping it we can remove the core::num::dec2flt dependency.
-            while !s.at_end() {
-                let b1: u8 = s.read()?;
-                let nibble1 = b1 >> 4;
-                let nibble2 = b1 & 15;
-                if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {
-                    break;
-                }
-            }
-            Some(0)
-        }
-        32..=246 => {
-            let n = i32::from(b0) - 139;
-            Some(n)
-        }
-        247..=250 => {
-            let b1 = i32::from(s.read::<u8>()?);
-            let n = (i32::from(b0) - 247) * 256 + b1 + 108;
-            Some(n)
-        }
-        251..=254 => {
-            let b1 = i32::from(s.read::<u8>()?);
-            let n = -(i32::from(b0) - 251) * 256 - b1 - 108;
-            Some(n)
-        }
-        _ => None,
-    }
-}
-
-// Just like `parse_number`, but doesn't actually parses the data.
-pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
-    match b0 {
-        28 => s.skip::<u16>(),
-        29 => s.skip::<u32>(),
-        30 => {
-            while !s.at_end() {
-                let b1: u8 = s.read()?;
-                let nibble1 = b1 >> 4;
-                let nibble2 = b1 & 15;
-                if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {
-                    break;
-                }
-            }
-        }
-        32..=246 => {}
-        247..=250 => s.skip::<u8>(),
-        251..=254 => s.skip::<u8>(),
-        _ => return None,
-    }
-
-    Some(())
-}
-
-
-#[derive(Clone, Copy, Debug)]
-struct CharsetFormat1Range {
-    first: StringId,
-    left: u8,
-}
-
-impl FromData for CharsetFormat1Range {
-    const SIZE: usize = 3;
-
-    #[inline]
-    fn parse(data: &[u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        Some(CharsetFormat1Range {
-            first: s.read()?,
-            left: s.read()?,
-        })
-    }
-}
-
-
-#[derive(Clone, Copy, Debug)]
-struct CharsetFormat2Range {
-    first: StringId,
-    left: u16,
-}
-
-impl FromData for CharsetFormat2Range {
-    const SIZE: usize = 4;
-
-    #[inline]
-    fn parse(data: &[u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        Some(CharsetFormat2Range {
-            first: s.read()?,
-            left: s.read()?,
-        })
-    }
-}
-
-
-#[derive(Clone, Copy, Debug)]
-enum Charset<'a> {
-    ISOAdobe,
-    Expert,
-    ExpertSubset,
-    Format0(LazyArray16<'a, StringId>),
-    Format1(LazyArray16<'a, CharsetFormat1Range>),
-    Format2(LazyArray16<'a, CharsetFormat2Range>),
-}
-
-impl Charset<'_> {
-    fn sid_to_gid(&self, sid: StringId) -> Option<GlyphId> {
-        if sid.0 == 0 {
-            return Some(GlyphId(0));
-        }
-
-        match self {
-            Charset::ISOAdobe | Charset::Expert | Charset::ExpertSubset => None,
-            Charset::Format0(ref array) => {
-                // First glyph is omitted, so we have to add 1.
-                array.into_iter().position(|n| n == sid).map(|n| GlyphId(n as u16 + 1))
-            }
-            Charset::Format1(array) => {
-                let mut glyph_id = GlyphId(1);
-                for range in *array {
-                    let last = u32::from(range.first.0) + u32::from(range.left);
-                    if range.first <= sid && u32::from(sid.0) <= last {
-                        glyph_id.0 += sid.0 - range.first.0;
-                        return Some(glyph_id)
-                    }
-
-                    glyph_id.0 += u16::from(range.left) + 1;
-                }
-
-                None
-            }
-            Charset::Format2(array) => {
-                // The same as format 1, but Range::left is u16.
-                let mut glyph_id = GlyphId(1);
-                for range in *array {
-                    let last = u32::from(range.first.0) + u32::from(range.left);
-                    if sid >= range.first && u32::from(sid.0) <= last {
-                        glyph_id.0 += sid.0 - range.first.0;
-                        return Some(glyph_id)
-                    }
-
-                    glyph_id.0 += range.left + 1;
-                }
-
-                None
-            }
-        }
-    }
-}
-
-fn parse_charset<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<Charset<'a>> {
-    if number_of_glyphs < 2 {
-        return None;
-    }
-
-    // -1 everywhere, since `.notdef` is omitted.
-    let format: u8 = s.read()?;
-    match format {
-        0 => Some(Charset::Format0(s.read_array16(number_of_glyphs - 1)?)),
-        1 => {
-            // The number of ranges is not defined, so we have to
-            // read until no glyphs are left.
-            let mut count = 0;
-            {
-                let mut s = s.clone();
-                let mut total_left = number_of_glyphs - 1;
-                while total_left > 0 {
-                    s.skip::<StringId>(); // first
-                    let left: u8 = s.read()?;
-                    total_left = total_left.checked_sub(u16::from(left) + 1)?;
-                    count += 1;
-                }
-            }
-
-            s.read_array16(count).map(Charset::Format1)
-        }
-        2 => {
-            // The same as format 1, but Range::left is u16.
-            let mut count = 0;
-            {
-                let mut s = s.clone();
-                let mut total_left = number_of_glyphs - 1;
-                while total_left > 0 {
-                    s.skip::<StringId>(); // first
-                    let left: u16 = s.read()?;
-                    let left = left.checked_add(1)?;
-                    total_left = total_left.checked_sub(left)?;
-                    count += 1;
-                }
-            }
-
-            s.read_array16(count).map(Charset::Format2)
-        }
-        _ => None,
     }
 }
 
@@ -1834,95 +1197,6 @@ fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSe
 }
 
 
-pub struct ArgumentsStack<'a> {
-    pub data: &'a mut [f32],
-    pub len: usize,
-    pub max_len: usize,
-}
-
-impl<'a> ArgumentsStack<'a> {
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
-    #[inline]
-    pub fn push(&mut self, n: f32) -> Result<(), CFFError> {
-        if self.len == self.max_len {
-            Err(CFFError::ArgumentsStackLimitReached)
-        } else {
-            self.data[self.len] = n;
-            self.len += 1;
-            Ok(())
-        }
-    }
-
-    #[inline]
-    pub fn at(&self, index: usize) -> f32 {
-        self.data[index]
-    }
-
-    #[inline]
-    pub fn pop(&mut self) -> f32 {
-        debug_assert!(!self.is_empty());
-        self.len -= 1;
-        self.data[self.len]
-    }
-
-    #[inline]
-    pub fn reverse(&mut self) {
-        if self.is_empty() {
-            return;
-        }
-
-        // Reverse only the actual data and not the whole stack.
-        let (first, _) = self.data.split_at_mut(self.len);
-        first.reverse();
-    }
-
-    #[inline]
-    pub fn clear(&mut self) {
-        self.len = 0;
-    }
-}
-
-impl core::fmt::Debug for ArgumentsStack<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        f.debug_list().entries(&self.data[..self.len]).finish()
-    }
-}
-
-
-pub trait IsEven {
-    fn is_even(&self) -> bool;
-    fn is_odd(&self) -> bool;
-}
-
-impl IsEven for usize {
-    #[inline]
-    fn is_even(&self) -> bool { (*self) & 1 == 0 }
-
-    #[inline]
-    fn is_odd(&self) -> bool { !self.is_even() }
-}
-
-#[cfg(feature = "std")]
-#[inline]
-pub fn f32_abs(n: f32) -> f32 {
-    n.abs()
-}
-
-#[cfg(not(feature = "std"))]
-#[inline]
-pub fn f32_abs(n: f32) -> f32 {
-    if n.is_sign_negative() { -n } else { n }
-}
-
 /// The Standard Encoding as defined in the Adobe Technical Note #5176 Appendix B.
 const STANDARD_ENCODING: [u8;256] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -1948,7 +1222,7 @@ const STANDARD_ENCODING: [u8;256] = [
 mod tests {
     use super::*;
     use std::vec::Vec;
-    use std::string::{String, ToString};
+    use std::string::String;
     use std::fmt::Write;
     use crate::writer;
     use writer::TtfType::*;
@@ -1973,64 +1247,6 @@ mod tests {
 
         fn close(&mut self) {
             write!(&mut self.0, "Z ").unwrap();
-        }
-    }
-
-    impl core::fmt::Display for CFFError {
-        fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-            match *self {
-                CFFError::ReadOutOfBounds => {
-                    write!(f, "read out of bounds")
-                }
-                CFFError::ZeroBBox => {
-                    write!(f, "zero bbox")
-                }
-                CFFError::InvalidOperator => {
-                    write!(f, "an invalid operator occurred")
-                }
-                CFFError::UnsupportedOperator => {
-                    write!(f, "an unsupported operator occurred")
-                }
-                CFFError::MissingEndChar => {
-                    write!(f, "the 'endchar' operator is missing")
-                }
-                CFFError::DataAfterEndChar => {
-                    write!(f, "unused data left after 'endchar' operator")
-                }
-                CFFError::NestingLimitReached => {
-                    write!(f, "subroutines nesting limit reached")
-                }
-                CFFError::ArgumentsStackLimitReached => {
-                    write!(f, "arguments stack limit reached")
-                }
-                CFFError::InvalidArgumentsStackLength => {
-                    write!(f, "an invalid amount of items are in an arguments stack")
-                }
-                CFFError::BboxOverflow => {
-                    write!(f, "outline's bounding box is too large")
-                }
-                CFFError::MissingMoveTo => {
-                    write!(f, "missing moveto operator")
-                }
-                CFFError::InvalidSubroutineIndex => {
-                    write!(f, "an invalid subroutine index")
-                }
-                CFFError::InvalidItemVariationDataIndex => {
-                    write!(f, "no ItemVariationData with required index")
-                }
-                CFFError::InvalidNumberOfBlendOperands => {
-                    write!(f, "an invalid number of blend operands")
-                }
-                CFFError::BlendRegionsLimitReached => {
-                    write!(f, "only up to 64 blend regions are supported")
-                }
-                CFFError::NoLocalSubroutines => {
-                    write!(f, "no local subroutines")
-                }
-                CFFError::InvalidSeacCode => {
-                    write!(f, "invalid seac code")
-                }
-            }
         }
     }
 
@@ -2258,7 +1474,7 @@ mod tests {
                 let char_str = metadata.char_strings.get(0).unwrap();
                 let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
 
-                assert_eq!(res.unwrap_err().to_string(), $err);
+                assert_eq!(res.unwrap_err(), $err);
             }
         };
     }
@@ -2488,117 +1704,117 @@ mod tests {
     test_cs_err!(reserved_operator, &[
         CFFInt(10), UInt8(2),
         UInt8(operator::ENDCHAR),
-    ], "an invalid operator occurred");
+    ], CFFError::InvalidOperator);
 
     test_cs_err!(line_to_without_move_to, &[
         CFFInt(10), CFFInt(20), UInt8(operator::LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "missing moveto operator");
+    ], CFFError::MissingMoveTo);
 
     // Width must be set only once.
     test_cs_err!(two_vmove_to_with_width, &[
         CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
         CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(move_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(10), CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(move_to_with_not_enought_coords, &[
         CFFInt(10), UInt8(operator::MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(hmove_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::HORIZONTAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(hmove_to_with_not_enought_coords, &[
         UInt8(operator::HORIZONTAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(vmove_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::VERTICAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(vmove_to_with_not_enought_coords, &[
         UInt8(operator::VERTICAL_MOVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(line_to_with_single_coord, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), UInt8(operator::LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(line_to_with_odd_number_of_coord, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(hline_to_without_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         UInt8(operator::HORIZONTAL_LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(vline_to_without_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         UInt8(operator::VERTICAL_LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(curve_to_with_invalid_num_of_coords_1, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(curve_to_with_invalid_num_of_coords_2, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80), CFFInt(90),
         UInt8(operator::CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(hh_curve_to_with_not_enought_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::HH_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(hh_curve_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
         UInt8(operator::HH_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(vv_curve_to_with_not_enought_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::VV_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(vv_curve_to_with_too_many_coords, &[
         CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
         CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
         UInt8(operator::VV_CURVE_TO),
         UInt8(operator::ENDCHAR),
-    ], "an invalid amount of items are in an arguments stack");
+    ], CFFError::InvalidArgumentsStackLength);
 
     test_cs_err!(multiple_endchar, &[
         UInt8(operator::ENDCHAR),
         UInt8(operator::ENDCHAR),
-    ], "unused data left after 'endchar' operator");
+    ], CFFError::DataAfterEndChar);
 
     test_cs_err!(operands_overflow, &[
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
@@ -2606,7 +1822,7 @@ mod tests {
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
         CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-    ], "arguments stack limit reached");
+    ], CFFError::ArgumentsStackLimitReached);
 
     test_cs_err!(operands_overflow_with_4_byte_ints, &[
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
@@ -2619,13 +1835,13 @@ mod tests {
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
         CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-    ], "arguments stack limit reached");
+    ], CFFError::ArgumentsStackLimitReached);
 
     test_cs_err!(bbox_overflow, &[
         CFFInt(32767), UInt8(operator::HORIZONTAL_MOVE_TO),
         CFFInt(32767), UInt8(operator::HORIZONTAL_LINE_TO),
         UInt8(operator::ENDCHAR),
-    ], "outline's bounding box is too large");
+    ], CFFError::BboxOverflow);
 
     #[test]
     fn endchar_in_subr_with_extra_data_1() {
@@ -2652,8 +1868,7 @@ mod tests {
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "unused data left after 'endchar' operator");
+        assert_eq!(res.unwrap_err(), CFFError::DataAfterEndChar);
     }
 
     #[test]
@@ -2681,8 +1896,7 @@ mod tests {
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "unused data left after 'endchar' operator");
+        assert_eq!(res.unwrap_err(), CFFError::DataAfterEndChar);
     }
 
     #[test]
@@ -2710,8 +1924,7 @@ mod tests {
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "unused data left after 'endchar' operator");
+        assert_eq!(res.unwrap_err(), CFFError::DataAfterEndChar);
     }
 
     #[test]
@@ -2734,8 +1947,7 @@ mod tests {
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "subroutines nesting limit reached");
+        assert_eq!(res.unwrap_err(), CFFError::NestingLimitReached);
     }
 
     #[test]
@@ -2758,8 +1970,7 @@ mod tests {
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "subroutines nesting limit reached");
+        assert_eq!(res.unwrap_err(), CFFError::NestingLimitReached);
     }
 
     #[test]
@@ -2785,8 +1996,7 @@ mod tests {
         let mut builder = Builder(String::new());
         let char_str = metadata.char_strings.get(0).unwrap();
         let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err().to_string(),
-                   "subroutines nesting limit reached");
+        assert_eq!(res.unwrap_err(), CFFError::NestingLimitReached);
     }
 
     #[test]
@@ -2841,106 +2051,6 @@ mod tests {
         assert!(parse_metadata(&data).is_none());
     }
 
-    // #[test]
-    // fn index_data_count_overflow() {
-    //     let data = writer::convert(&[
-    //         UInt16(std::u16::MAX), // count
-    //         UInt8(1), // offset size
-    //         // other data doesn't matter
-    //     ]);
-    //
-    //     assert!(parse_index(&mut Stream::new(&data)).is_some());
-    // }
-
-    #[test]
-    fn index_data_invalid_offset_size_0() {
-        let data = writer::convert(&[
-            UInt16(1), // count
-            UInt8(0), // offset size
-            // other data doesn't matter
-        ]);
-
-        assert!(parse_index(&mut Stream::new(&data)).is_none());
-    }
-
-    #[test]
-    fn index_data_invalid_offset_size_5() {
-        let data = writer::convert(&[
-            UInt16(1), // count
-            UInt8(5), // offset size
-            // other data doesn't matter
-        ]);
-
-        assert!(parse_index(&mut Stream::new(&data)).is_none());
-    }
-
-    #[test]
-    fn private_dict_size_overflow() {
-        let data = writer::convert(&[
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(14), // index[1]
-            // Item 0
-            CFFInt(5),
-            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
-            // Item 1
-            CFFInt(std::i32::MAX), // length
-            CFFInt(std::i32::MAX), // offset
-            UInt8(top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET as u8),
-        ]);
-
-        let top_dict = parse_top_dict(&mut Stream::new(&data)).unwrap();
-        assert_eq!(top_dict.char_strings_offset, 5);
-        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
-    }
-
-    #[test]
-    fn private_dict_negative_char_strings_offset() {
-        let data = writer::convert(&[
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(14), // index[1]
-            // Item 0
-            CFFInt(-1),
-            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
-        ]);
-
-        assert!(parse_top_dict(&mut Stream::new(&data)).is_none());
-    }
-
-    #[test]
-    fn private_dict_no_char_strings_offset_operand() {
-        let data = writer::convert(&[
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(14), // index[1]
-            // Item 0
-            // <-- No number here.
-            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
-        ]);
-
-        assert!(parse_top_dict(&mut Stream::new(&data)).is_none());
-    }
-
-    #[test]
-    fn negative_private_dict_offset_and_size() {
-        let data = writer::convert(&[
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(14), // index[1]
-            // Item 0
-            CFFInt(-1),
-            CFFInt(-1),
-            UInt8(top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET as u8),
-        ]);
-
-        assert!(parse_top_dict(&mut Stream::new(&data)).is_none());
-    }
-
     // TODO: return from main
     // TODO: return without endchar
     // TODO: data after return
@@ -2960,12 +2070,65 @@ mod tests {
     // TODO: FLEX1
 
     #[test]
-    fn parse_dict_number() {
-        assert_eq!(parse_number(0xFA, &mut Stream::new(&[0x7C])).unwrap(), 1000);
-        assert_eq!(parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(), -1000);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(), 10000);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(), -10000);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(), 100000);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(), -100000);
+    fn private_dict_size_overflow() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x0C, // index [1]: 14
+            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // length: i32::MAX
+            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // offset: i32::MAX
+            0x12 // operator: 18 (private)
+        ];
+
+        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
+        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
+    }
+
+    #[test]
+    fn private_dict_negative_char_strings_offset() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x03, // index [1]: 3
+            // Item 0
+            0x8A, // offset: -1
+            0x11, // operator: 17 (char_string)
+        ];
+
+        assert!(parse_top_dict(&mut Stream::new(data)).is_none());
+    }
+
+    #[test]
+    fn private_dict_no_char_strings_offset_operand() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x02, // index [1]: 2
+            // Item 0
+            // <-- No number here.
+            0x11, // operator: 17 (char_string)
+        ];
+
+        assert!(parse_top_dict(&mut Stream::new(data)).is_none());
+    }
+
+    #[test]
+    fn negative_private_dict_offset_and_size() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x04, // index [1]: 4
+            // Item 0
+            0x8A, // length: -1
+            0x8A, // offset: -1
+            0x12, // operator: 18 (private)
+        ];
+
+        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
+        assert!(top_dict.private_dict_range.is_none());
     }
 }

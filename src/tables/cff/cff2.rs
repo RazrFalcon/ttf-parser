@@ -7,11 +7,10 @@ use core::ops::Range;
 use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoord};
 use crate::parser::{Stream, Fixed, NumFrom, TryNumFrom};
 use crate::var_store::*;
-use crate::cff::{
-    Builder, DataIndex, IsEven, Operator, ArgumentsStack, CFFError,
-    calc_subroutine_bias, f32_abs, parse_number, skip_number, parse_index_impl,
-    is_dict_one_byte_op, conv_subroutine_index
-};
+use super::{Builder, IsEven, CFFError, f32_abs, calc_subroutine_bias, conv_subroutine_index};
+use super::argstack::ArgumentsStack;
+use super::dict::DictionaryParser;
+use super::index::{Index, parse_index};
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cff2#7-top-dict-data
 // 'Operators in DICT may be preceded by up to a maximum of 513 operands.'
@@ -76,9 +75,9 @@ mod private_dict_operator {
 
 #[derive(Clone, Copy, Default)]
 pub struct Metadata<'a> {
-    global_subrs: DataIndex<'a>,
-    local_subrs: DataIndex<'a>,
-    char_strings: DataIndex<'a>,
+    global_subrs: Index<'a>,
+    local_subrs: Index<'a>,
+    char_strings: Index<'a>,
     item_variation_store: ItemVariationStore<'a>,
 }
 
@@ -106,11 +105,11 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     let mut metadata = Metadata::default();
 
     // Parse Global Subroutines INDEX.
-    metadata.global_subrs = parse_index(&mut s)?;
+    metadata.global_subrs = parse_index::<u32>(&mut s)?;
 
     metadata.char_strings = {
         let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
-        parse_index(&mut s)?
+        parse_index::<u32>(&mut s)?
     };
 
     if let Some(offset) = top_dict.variation_store_offset {
@@ -122,7 +121,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
     // TODO: simplify
     if let Some(offset) = top_dict.font_dict_index_offset {
         let mut s = Stream::new_at(data, offset)?;
-        'outer: for font_dict_data in parse_index(&mut s)? {
+        'outer: for font_dict_data in parse_index::<u32>(&mut s)? {
             if let Some(private_dict_range) = parse_font_dict(font_dict_data) {
                 // 'Private DICT size and offset, from start of the CFF2 table.'
                 let private_dict_data = data.get(private_dict_range.clone())?;
@@ -132,7 +131,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
                     if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
                         let data = data.get(start..data.len())?;
                         let mut s = Stream::new(data);
-                        metadata.local_subrs = parse_index(&mut s)?;
+                        metadata.local_subrs = parse_index::<u32>(&mut s)?;
                         break 'outer;
                     }
                 }
@@ -164,7 +163,8 @@ struct TopDictData {
 fn parse_top_dict(data: &[u8]) -> Option<TopDictData> {
     let mut dict_data = TopDictData::default();
 
-    let mut dict_parser = DictionaryParser::new(data);
+    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == top_dict_operator::CHAR_STRINGS_OFFSET {
             dict_data.char_strings_offset = dict_parser.parse_offset()?;
@@ -186,7 +186,8 @@ fn parse_top_dict(data: &[u8]) -> Option<TopDictData> {
 fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
     let mut private_dict_range = None;
 
-    let mut dict_parser = DictionaryParser::new(data);
+    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == font_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
             dict_parser.parse_operands()?;
@@ -208,7 +209,8 @@ fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
 
 fn parse_private_dict(data: &[u8]) -> Option<usize> {
     let mut subroutines_offset = None;
-    let mut dict_parser = DictionaryParser::new(data);
+    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
             dict_parser.parse_operands()?;
@@ -1004,132 +1006,4 @@ fn _parse_char_string(
     }
 
     Ok((x, y))
-}
-
-fn parse_index<'a>(s: &mut Stream<'a>) -> Option<DataIndex<'a>> {
-    // Unlike in CFF, in CFF2 `count` us u32 and not u16.
-    let count: u32 = s.read()?;
-    if count != 0 && count != core::u32::MAX {
-        parse_index_impl(count, s)
-    } else {
-        Some(DataIndex::default())
-    }
-}
-
-
-struct DictionaryParser<'a> {
-    data: &'a [u8],
-    // The current offset.
-    offset: usize,
-    // Offset to the last operands start.
-    operands_offset: usize,
-    // Actual operands.
-    operands: [i32; MAX_OPERANDS_LEN], // 2052B
-    // An amount of operands in the `operands` array.
-    operands_len: u16,
-}
-
-impl<'a> DictionaryParser<'a> {
-    #[inline]
-    fn new(data: &'a [u8]) -> Self {
-        DictionaryParser {
-            data,
-            offset: 0,
-            operands_offset: 0,
-            operands: [0; MAX_OPERANDS_LEN],
-            operands_len: 0,
-        }
-    }
-
-    #[inline(never)]
-    fn parse_next(&mut self) -> Option<Operator> {
-        let mut s = Stream::new_at(self.data, self.offset)?;
-        self.operands_offset = self.offset;
-        while !s.at_end() {
-            let b: u8 = s.read()?;
-            if is_dict_one_byte_op(b) {
-                let mut operator = u16::from(b);
-
-                // Check that operator is two byte long.
-                if b == TWO_BYTE_OPERATOR_MARK {
-                    // Use a 1200 'prefix' to make two byte operators more readable.
-                    // 12 3 => 1203
-                    operator = 1200 + u16::from(s.read::<u8>()?);
-                }
-
-                self.offset = s.offset();
-                return Some(Operator(operator));
-            } else {
-                skip_number(b, &mut s)?;
-            }
-        }
-
-        None
-    }
-
-    /// Parses operands of the current operator.
-    ///
-    /// In the DICT structure, operands are defined before an operator.
-    /// So we are trying to find an operator first and the we can actually parse the operands.
-    ///
-    /// Since this methods is pretty expensive and we do not care about most of the operators,
-    /// we can speed up parsing by parsing operands only for required operators.
-    ///
-    /// We still have to "skip" operands during operators search (see `skip_number()`),
-    /// but it's still faster that a naive method.
-    fn parse_operands(&mut self) -> Option<()> {
-        let mut s = Stream::new(self.data.get(self.operands_offset..)?);
-        self.operands_len = 0;
-        while !s.at_end() {
-            let b: u8 = s.read()?;
-            if is_dict_one_byte_op(b) {
-                break;
-            } else {
-                let op = parse_number(b, &mut s)?;
-                self.operands[usize::from(self.operands_len)] = op;
-                self.operands_len += 1;
-
-                if self.operands_len >= MAX_OPERANDS_LEN as u16 {
-                    break;
-                }
-            }
-        }
-
-        Some(())
-    }
-
-    #[inline]
-    fn operands(&self) -> &[i32] {
-        &self.operands[..usize::from(self.operands_len)]
-    }
-
-    #[inline]
-    fn parse_offset(&mut self) -> Option<usize> {
-        self.parse_operands()?;
-        let operands = self.operands();
-        if operands.len() == 1 {
-            usize::try_from(operands[0]).ok()
-        } else {
-            None
-        }
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::writer;
-    use writer::TtfType::*;
-    use crate::cff::parse_index_impl;
-
-    #[test]
-    fn index_data_offsets_len_overflow() {
-        let data = writer::convert(&[
-            UInt8(4), // offset size
-            // other data doesn't matter
-        ]);
-
-        assert!(parse_index_impl(std::u32::MAX / 2, &mut Stream::new(&data)).is_none());
-    }
 }

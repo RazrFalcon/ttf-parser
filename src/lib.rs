@@ -521,7 +521,7 @@ pub struct Face<'a> {
     avar: Option<avar::Table<'a>>,
     cbdt: Option<&'a [u8]>,
     cblc: Option<&'a [u8]>,
-    cff_: Option<cff::Metadata<'a>>,
+    cff1: Option<cff1::Metadata<'a>>,
     cff2: Option<cff2::Metadata<'a>>,
     cmap: Option<cmap::Table<'a>>,
     fvar: Option<fvar::Table<'a>>,
@@ -601,7 +601,7 @@ impl<'a> Face<'a> {
             avar: None,
             cbdt: None,
             cblc: None,
-            cff_: None,
+            cff1: None,
             cff2: None,
             cmap: None,
             fvar: None,
@@ -641,7 +641,7 @@ impl<'a> Face<'a> {
             match &table.table_tag.to_bytes() {
                 b"CBDT" => face.cbdt = data.get(range),
                 b"CBLC" => face.cblc = data.get(range),
-                b"CFF " => face.cff_ = data.get(range).and_then(|data| cff::parse_metadata(data)),
+                b"CFF " => face.cff1 = data.get(range).and_then(|data| cff1::parse_metadata(data)),
                 b"CFF2" => face.cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
                 b"GDEF" => face.gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
                 b"HVAR" => face.hvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
@@ -714,7 +714,7 @@ impl<'a> Face<'a> {
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
             TableName::ColorBitmapData              => self.cbdt.is_some(),
             TableName::ColorBitmapLocation          => self.cblc.is_some(),
-            TableName::CompactFontFormat            => self.cff_.is_some(),
+            TableName::CompactFontFormat            => self.cff1.is_some(),
             TableName::CompactFontFormat2           => self.cff2.is_some(),
             TableName::FontVariations               => self.fvar.is_some(),
             TableName::GlyphData                    => self.glyf.is_some(),
@@ -1210,8 +1210,8 @@ impl<'a> Face<'a> {
             return glyf::outline(self.loca?, glyf_table, glyph_id, builder);
         }
 
-        if let Some(ref metadata) = self.cff_ {
-            return cff::outline(metadata, glyph_id, builder);
+        if let Some(ref metadata) = self.cff1 {
+            return cff1::outline(metadata, glyph_id, builder);
         }
 
         if let Some(ref metadata) = self.cff2 {

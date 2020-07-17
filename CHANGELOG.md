@@ -5,8 +5,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `FaceParsingError`
+
 ### Changed
 - (CFF,CFF2) 10% faster parsing.
+- `Face::from_slice` returns `Result` now.
 
 ## [0.7.0] - 2020-07-16
 ### Added

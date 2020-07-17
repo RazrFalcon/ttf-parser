@@ -149,7 +149,10 @@ pub extern "C" fn ttfp_face_init(data: *const c_char, len: usize, index: u32, fa
     // This method invokes a lot of parsing, so let's catch any panics just in case.
     std::panic::catch_unwind(|| {
         let data = unsafe { std::slice::from_raw_parts(data as *const _, len) };
-        let face_rs = ttf_parser::Face::from_slice(data, index).unwrap();
+        let face_rs = match ttf_parser::Face::from_slice(data, index) {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
         unsafe {
             std::ptr::copy(
                 &face_rs as *const ttf_parser::Face as _,

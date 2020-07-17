@@ -156,14 +156,6 @@ is stored as UTF-16 BE.
 `glyph_name_8` is faster than `glyph_name_276`, because for glyph indexes lower than 258
 we are using predefined names, so no parsing is involved.
 
-### Error handling
-
-`ttf-parser` is designed to parse well-formed fonts, so it does not have an `Error` enum.
-It doesn't mean that it will crash or panic on malformed fonts, only that the
-error handling will boil down to `Option::None`. So you will not get a detailed cause of an error.
-By doing so we can simplify an API quite a lot since otherwise, we will have to use
-`Result<Option<T>, Error>`.
-
 ### License
 
 Licensed under either of

@@ -10,9 +10,9 @@ fn main() {
     let now = std::time::Instant::now();
 
     let face = match ttf_parser::Face::from_slice(&font_data, 0) {
-        Some(f) => f,
-        None => {
-            eprint!("Error: failed to open a font.");
+        Ok(f) => f,
+        Err(e) => {
+            eprint!("Error: {}.", e);
             std::process::exit(1);
         },
     };

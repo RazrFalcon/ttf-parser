@@ -22,14 +22,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Technically, should use less than 64KiB of stack in worst case scenario.
 - Most of arithmetic operations are checked.
 - Most of numeric casts are checked.
-
-## Error handling
-
-`ttf-parser` is designed to parse well-formed fonts, so it does not have an `Error` enum.
-It doesn't mean that it will crash or panic on malformed fonts, only that the
-error handling will boil down to `Option::None`. So you will not get a detailed cause of an error.
-By doing so we can simplify an API quite a lot since otherwise, we will have to use
-`Result<Option<T>, Error>`.
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.7.0")]
@@ -65,7 +57,8 @@ mod var_store;
 mod writer;
 
 use tables::*;
-use parser::{Stream, FromData, NumFrom, TryNumFrom, i16_bound, f32_bound};
+use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray32, Offset32, Offset};
+use parser::{i16_bound, f32_bound};
 use head::IndexToLocationFormat;
 pub use fvar::{VariationAxes, VariationAxis};
 pub use gdef::GlyphClass;
@@ -540,6 +533,47 @@ impl VarCoords {
 }
 
 
+/// A list of font face parsing errors.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum FaceParsingError {
+    /// An attempt to read out of bounds detected.
+    ///
+    /// Should occur only on malformed fonts.
+    MalformedFont,
+
+    /// Face data must start with `0x00010000`, `0x4F54544F` or `0x74746366`.
+    UnknownMagic,
+
+    /// The face index is larger than the number of faces in the font.
+    FaceIndexOutOfBounds,
+
+    /// The `head` table is missing or malformed.
+    NoHeadTable,
+
+    /// The `hhea` table is missing or malformed.
+    NoHheaTable,
+
+    /// The `maxp` table is missing or malformed.
+    NoMaxpTable,
+}
+
+impl core::fmt::Display for FaceParsingError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            FaceParsingError::MalformedFont => write!(f, "malformed font"),
+            FaceParsingError::UnknownMagic => write!(f, "unknown magic"),
+            FaceParsingError::FaceIndexOutOfBounds => write!(f, "face index is out of bounds"),
+            FaceParsingError::NoHeadTable => write!(f, "the head table is missing or malformed"),
+            FaceParsingError::NoHheaTable => write!(f, "the hhea table is missing or malformed"),
+            FaceParsingError::NoMaxpTable => write!(f, "the maxp table is missing or malformed"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for FaceParsingError {}
+
+
 /// A font face handle.
 #[derive(Clone)]
 pub struct Face<'a> {
@@ -585,38 +619,39 @@ impl<'a> Face<'a> {
     /// Required tables: `head`, `hhea` and `maxp`.
     ///
     /// If an optional table has an invalid data it will be skipped.
-    pub fn from_slice(data: &'a [u8], index: u32) -> Option<Self> {
-        const OFFSET_TABLE_SIZE: usize = 12;
-
-        let table_data = if let Some(n) = fonts_in_collection(data) {
-            if index < n {
-                // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#ttc-header
-                const OFFSET_32_SIZE: usize = 4;
-                let offset = OFFSET_TABLE_SIZE + OFFSET_32_SIZE * usize::num_from(index);
-                let font_offset: u32 = Stream::read_at(data, offset)?;
-                data.get(usize::num_from(font_offset) .. data.len())?
-            } else {
-                return None;
-            }
-        } else {
-            data
-        };
-
+    pub fn from_slice(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
-        if data.len() < OFFSET_TABLE_SIZE {
-            return None;
+
+        let mut s = Stream::new(data);
+
+        // Read **font** magic.
+        let magic: Magic = s.read().ok_or(FaceParsingError::UnknownMagic)?;
+        if magic == Magic::FontCollection {
+            s.skip::<u32>(); // version
+            let number_of_faces: u32 = s.read().ok_or(FaceParsingError::MalformedFont)?;
+            let offsets: LazyArray32<Offset32> = s.read_array32(number_of_faces)
+                .ok_or(FaceParsingError::MalformedFont)?;
+
+            let face_offset = offsets.get(index).ok_or(FaceParsingError::FaceIndexOutOfBounds)?;
+            // Face offset is from the start of the font data,
+            // so we have to adjust it to the current parser offset.
+            let face_offset = face_offset.to_usize().checked_sub(s.offset())
+                .ok_or(FaceParsingError::MalformedFont)?;
+            s.advance_checked(face_offset).ok_or(FaceParsingError::MalformedFont)?;
+
+            // Read **face** magic.
+            // Each face in a font collection also starts with a magic.
+            let magic: Magic = s.read().ok_or(FaceParsingError::UnknownMagic)?;
+            // And face in a font collection can't be another collection.
+            if magic == Magic::FontCollection {
+                return Err(FaceParsingError::UnknownMagic);
+            }
         }
 
-        let mut s = Stream::new(table_data);
-
-        let magic: Magic = s.read()?;
-        if magic != Magic::TrueType && magic != Magic::OpenType {
-            return None;
-        }
-
-        let num_tables: u16 = s.read()?;
+        let num_tables: u16 = s.read().ok_or(FaceParsingError::MalformedFont)?;
         s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
-        let tables = s.read_array16::<TableRecord>(num_tables)?;
+        let tables = s.read_array16::<TableRecord>(num_tables)
+            .ok_or(FaceParsingError::MalformedFont)?;
 
         let mut face = Face {
             avar: None,
@@ -676,8 +711,8 @@ impl<'a> Face<'a> {
                 b"fvar" => face.fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
                 b"glyf" => face.glyf = data.get(range),
                 b"gvar" => face.gvar = data.get(range).and_then(|data| gvar::Table::parse(data)),
-                b"head" => face.head = data.get(range).and_then(|data| head::parse(data))?,
-                b"hhea" => face.hhea = data.get(range).and_then(|data| hhea::parse(data))?,
+                b"head" => face.head = data.get(range).and_then(|data| head::parse(data)).unwrap_or_default(),
+                b"hhea" => face.hhea = data.get(range).and_then(|data| hhea::parse(data)).unwrap_or_default(),
                 b"hmtx" => hmtx = data.get(range),
                 b"kern" => face.kern = data.get(range).and_then(|data| kern::parse(data)),
                 b"loca" => loca = data.get(range),
@@ -691,11 +726,18 @@ impl<'a> Face<'a> {
             }
         }
 
-        if face.head.is_empty() || face.hhea.is_empty() || number_of_glyphs.is_none() {
-            return None;
+        if face.head.is_empty() {
+            return Err(FaceParsingError::NoHeadTable);
         }
 
-        face.number_of_glyphs = number_of_glyphs?;
+        if face.hhea.is_empty() {
+            return Err(FaceParsingError::NoHheaTable);
+        }
+
+        face.number_of_glyphs = match number_of_glyphs {
+            Some(n) => n,
+            None => return Err(FaceParsingError::NoMaxpTable),
+        };
 
         if let Some(ref fvar) = face.fvar {
             face.coordinates.len = fvar.axes().count().min(MAX_VAR_COORDS as usize) as u8;
@@ -719,7 +761,7 @@ impl<'a> Face<'a> {
             }
         }
 
-        Some(face)
+        Ok(face)
     }
 
     /// Checks that face has a specified table.
@@ -1413,104 +1455,81 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer;
-    use writer::TtfType::*;
 
     #[test]
     fn empty_font() {
-        assert!(Face::from_slice(&[], 0).is_none());
-    }
-
-    #[test]
-    fn incomplete_header() {
-        let data = writer::convert(&[
-            TrueTypeMagic,
-            UInt16(0), // numTables
-            UInt16(0), // searchRange
-            UInt16(0), // entrySelector
-            UInt16(0), // rangeShift
-        ]);
-
-        for i in 0..data.len() {
-            assert!(Face::from_slice(&data[0..i], 0).is_none());
-        }
+        assert_eq!(Face::from_slice(&[], 0).unwrap_err(),
+                   FaceParsingError::UnknownMagic);
     }
 
     #[test]
     fn zero_tables() {
-        let data = writer::convert(&[
-            TrueTypeMagic,
-            UInt16(0), // numTables
-            UInt16(0), // searchRange
-            UInt16(0), // entrySelector
-            UInt16(0), // rangeShift
-        ]);
+        let data = &[
+            0x00, 0x01, 0x00, 0x00, // magic
+            0x00, 0x00, // numTables: 0
+            0x00, 0x00, // searchRange: 0
+            0x00, 0x00, // entrySelector: 0
+            0x00, 0x00, // rangeShift: 0
+        ];
 
-        assert!(Face::from_slice(&data, 0).is_none());
+        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+                   FaceParsingError::NoHeadTable);
     }
 
     #[test]
     fn tables_count_overflow() {
-        let data = writer::convert(&[
-            TrueTypeMagic,
-            UInt16(std::u16::MAX), // numTables
-            UInt16(0), // searchRange
-            UInt16(0), // entrySelector
-            UInt16(0), // rangeShift
-        ]);
+        let data = &[
+            0x00, 0x01, 0x00, 0x00, // magic
+            0xFF, 0xFF, // numTables: u16::MAX
+            0x00, 0x00, // searchRange: 0
+            0x00, 0x00, // entrySelector: 0
+            0x00, 0x00, // rangeShift: 0
+        ];
 
-        assert!(Face::from_slice(&data, 0).is_none());
+        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+                   FaceParsingError::MalformedFont);
     }
 
     #[test]
     fn empty_font_collection() {
-        let data = writer::convert(&[
-            FontCollectionMagic,
-            UInt16(1), // majorVersion
-            UInt16(0), // minorVersion
-            UInt32(0), // numFonts
-        ]);
+        let data = &[
+            0x74, 0x74, 0x63, 0x66, // magic
+            0x00, 0x00, // majorVersion: 0
+            0x00, 0x00, // minorVersion: 0
+            0x00, 0x00, 0x00, 0x00, // numFonts: 0
+        ];
 
-        assert_eq!(fonts_in_collection(&data), Some(0));
-        assert!(Face::from_slice(&data, 0).is_none());
+        assert_eq!(fonts_in_collection(data), Some(0));
+        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+                   FaceParsingError::FaceIndexOutOfBounds);
     }
 
     #[test]
     fn font_collection_num_fonts_overflow() {
-        let data = writer::convert(&[
-            FontCollectionMagic,
-            UInt16(1), // majorVersion
-            UInt16(0), // minorVersion
-            UInt32(std::u32::MAX), // numFonts
-        ]);
+        let data = &[
+            0x74, 0x74, 0x63, 0x66, // magic
+            0x00, 0x00, // majorVersion: 0
+            0x00, 0x00, // minorVersion: 0
+            0xFF, 0xFF, 0xFF, 0xFF, // numFonts: u32::MAX
+        ];
 
-        assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
-        assert!(Face::from_slice(&data, 0).is_none());
+        assert_eq!(fonts_in_collection(data), Some(std::u32::MAX));
+        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+                   FaceParsingError::MalformedFont);
     }
 
     #[test]
-    fn font_index_overflow_1() {
-        let data = writer::convert(&[
-            FontCollectionMagic,
-            UInt16(1), // majorVersion
-            UInt16(0), // minorVersion
-            UInt32(1), // numFonts
-        ]);
+    fn font_index_overflow() {
+        let data = &[
+            0x74, 0x74, 0x63, 0x66, // magic
+            0x00, 0x00, // majorVersion: 0
+            0x00, 0x00, // minorVersion: 0
+            0x00, 0x00, 0x00, 0x01, // numFonts: 1
+            0x00, 0x00, 0x00, 0x0C, // offset [0]: 12
+        ];
 
-        assert_eq!(fonts_in_collection(&data), Some(1));
-        assert!(Face::from_slice(&data, std::u32::MAX).is_none());
-    }
-
-    #[test]
-    fn font_index_overflow_2() {
-        let data = writer::convert(&[
-            FontCollectionMagic,
-            UInt16(1), // majorVersion
-            UInt16(0), // minorVersion
-            UInt32(std::u32::MAX), // numFonts
-        ]);
-
-        assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
-        assert!(Face::from_slice(&data, std::u32::MAX - 1).is_none());
+        assert_eq!(fonts_in_collection(data), Some(1));
+        assert_eq!(Face::from_slice(data, std::u32::MAX).unwrap_err(),
+                   FaceParsingError::FaceIndexOutOfBounds);
     }
 }

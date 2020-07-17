@@ -79,7 +79,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Exclude IO operations.
     let now = std::time::Instant::now();
 
-    let mut face = ttf::Face::from_slice(&font_data, 0).ok_or("failed to open a font")?;
+    let mut face = ttf::Face::from_slice(&font_data, 0)?;
     if face.is_variable() {
         for variation in args.variations {
             face.set_variation(variation.axis, variation.value)

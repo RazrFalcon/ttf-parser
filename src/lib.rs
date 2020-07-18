@@ -1152,12 +1152,20 @@ impl<'a> Face<'a> {
 
     /// Returns glyph's name.
     ///
-    /// Uses the `post` table as a source.
+    /// Uses the `post` and `CFF` tables as sources.
     ///
     /// Returns `None` when no name is associated with a `glyph`.
     #[inline]
     pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&str> {
-        self.post.and_then(|post| post.glyph_name(glyph_id))
+        if let Some(name) = self.post.and_then(|post| post.glyph_name(glyph_id)) {
+            return Some(name);
+        }
+
+        if let Some(name) = self.cff1.as_ref().and_then(|cff1| cff1::glyph_name(cff1, glyph_id)) {
+            return Some(name);
+        }
+
+        None
     }
 
     /// Checks that face has

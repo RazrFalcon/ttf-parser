@@ -497,11 +497,11 @@ int16_t ttfp_get_glyph_y_origin(const ttfp_face *face, uint16_t glyph_id);
 /**
  * @brief Returns glyph's name.
  *
- * Uses the `post` table as a source.
+ * Uses the `post` and `CFF` tables as sources.
  *
  * A glyph name cannot be larger than 255 bytes + 1 byte for '\0'.
  *
- * @param name A char buffer longer than 256 bytes.
+ * @param name A char buffer larger than 256 bytes.
  * @return `true` on success.
  */
 bool ttfp_get_glyph_name(const ttfp_face *face, uint16_t glyph_id, char *name);

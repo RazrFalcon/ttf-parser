@@ -5,6 +5,7 @@ mod charset;
 mod charstring;
 mod dict;
 mod index;
+mod std_names;
 
 use core::convert::TryFrom;
 

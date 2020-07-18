@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Face::variation_coordinates`
 - `Face::has_non_default_variation_coordinates`
 - Allow `true` magic.
+- `Face::glyph_name` can lookup CFF names too.
 
 ### Changed
 - (CFF,CFF2) 10% faster parsing.

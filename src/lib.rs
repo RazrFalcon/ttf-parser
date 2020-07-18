@@ -114,30 +114,31 @@ impl FromData for Magic {
 /// Where 0 is a default value.
 ///
 /// The number is stored as f2.16
+#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Default, Debug)]
-struct NormalizedCoord(i16);
+pub struct NormalizedCoordinate(i16);
 
-impl From<i16> for NormalizedCoord {
+impl From<i16> for NormalizedCoordinate {
     /// Creates a new coordinate.
     ///
     /// The provided number will be clamped to the -16384..16384 range.
     #[inline]
     fn from(n: i16) -> Self {
-        NormalizedCoord(i16_bound(-16384, n, 16384))
+        NormalizedCoordinate(i16_bound(-16384, n, 16384))
     }
 }
 
-impl From<f32> for NormalizedCoord {
+impl From<f32> for NormalizedCoordinate {
     /// Creates a new coordinate.
     ///
     /// The provided number will be clamped to the -1.0..1.0 range.
     #[inline]
     fn from(n: f32) -> Self {
-        NormalizedCoord((f32_bound(-1.0, n, 1.0) * 16384.0) as i16)
+        NormalizedCoordinate((f32_bound(-1.0, n, 1.0) * 16384.0) as i16)
     }
 }
 
-impl NormalizedCoord {
+impl NormalizedCoordinate {
     /// Returns the coordinate value as f2.14.
     #[inline]
     pub fn get(self) -> i16 {
@@ -515,18 +516,18 @@ const MAX_VAR_COORDS: u8 = 32;
 
 #[derive(Clone, Default)]
 struct VarCoords {
-    data: [NormalizedCoord; MAX_VAR_COORDS as usize],
+    data: [NormalizedCoordinate; MAX_VAR_COORDS as usize],
     len: u8,
 }
 
 impl VarCoords {
     #[inline]
-    fn as_slice(&self) -> &[NormalizedCoord] {
+    fn as_slice(&self) -> &[NormalizedCoordinate] {
         &self.data[0..usize::from(self.len)]
     }
 
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [NormalizedCoord] {
+    fn as_mut_slice(&mut self) -> &mut [NormalizedCoordinate] {
         let end = usize::from(self.len);
         &mut self.data[0..end]
     }
@@ -1403,6 +1404,18 @@ impl<'a> Face<'a> {
         Some(())
     }
 
+    /// Returns the current normalized variation coordinates.
+    #[inline]
+    pub fn variation_coordinates(&self) -> &[NormalizedCoordinate] {
+        self.coordinates.as_slice()
+    }
+
+    /// Checks that face has non-default variation coordinates.
+    #[inline]
+    pub fn has_non_default_variation_coordinates(&self) -> bool {
+        self.coordinates.as_slice().iter().any(|c| c.0 != 0)
+    }
+
     #[inline]
     fn metrics_var_offset(&self, tag: Tag) -> f32 {
         self.mvar.and_then(|table| table.metrics_offset(tag, self.coords())).unwrap_or(0.0)
@@ -1426,7 +1439,7 @@ impl<'a> Face<'a> {
     }
 
     #[inline]
-    fn coords(&self) -> &[NormalizedCoord] {
+    fn coords(&self) -> &[NormalizedCoordinate] {
         self.coordinates.as_slice()
     }
 }

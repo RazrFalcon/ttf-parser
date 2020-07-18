@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - `FaceParsingError`
+- `NormalizedCoordinate`
+- `Face::variation_coordinates`
+- `Face::has_non_default_variation_coordinates`
 - Allow `true` magic.
 
 ### Changed

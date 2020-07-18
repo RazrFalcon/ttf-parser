@@ -1,6 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
 
-use crate::{Tag, NormalizedCoord};
+use crate::{Tag, NormalizedCoordinate};
 use crate::parser::{Stream, FromData, Offset, Offset16, LazyArray16};
 use crate::var_store::ItemVariationStore;
 
@@ -64,7 +64,7 @@ impl<'a> Table<'a> {
         })
     }
 
-    pub fn metrics_offset(&self, tag: Tag, coordinates: &[NormalizedCoord]) -> Option<f32> {
+    pub fn metrics_offset(&self, tag: Tag, coordinates: &[NormalizedCoordinate]) -> Option<f32> {
         let (_, record) = self.records.binary_search_by(|r| r.value_tag.cmp(&tag))?;
         self.variation_store.parse_delta(
             record.delta_set_outer_index,

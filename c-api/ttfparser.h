@@ -636,6 +636,18 @@ bool ttfp_get_variation_axis_by_tag(const ttfp_face *face, ttfp_tag tag, ttfp_va
  */
 bool ttfp_set_variation(ttfp_face *face, ttfp_tag axis, float value);
 
+/**
+ * @brief Returns the current normalized variation coordinates.
+ *
+ * Values represented as f2.16
+ */
+const int16_t* ttfp_get_variation_coordinates(const ttfp_face *face);
+
+/**
+ * @brief Checks that face has non-default variation coordinates.
+ */
+bool ttfp_has_non_default_variation_coordinates(const ttfp_face *face);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus

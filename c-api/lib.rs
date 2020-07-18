@@ -830,6 +830,20 @@ pub extern "C" fn ttfp_set_variation(face: *mut ttfp_face, axis: Tag, value: f32
     face_from_mut_ptr(face).set_variation(axis, value).is_some()
 }
 
+/// @brief Returns the current normalized variation coordinates.
+///
+/// Values represented as f2.16
+#[no_mangle]
+pub extern "C" fn ttfp_get_variation_coordinates(face: *const ttfp_face) -> *const i16 {
+    face_from_ptr(face).variation_coordinates().as_ptr() as _
+}
+
+/// @brief Checks that face has non-default variation coordinates.
+#[no_mangle]
+pub extern "C" fn ttfp_has_non_default_variation_coordinates(face: *const ttfp_face) -> bool {
+    face_from_ptr(face).has_non_default_variation_coordinates()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

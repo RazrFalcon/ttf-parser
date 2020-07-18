@@ -2,7 +2,7 @@
 
 use core::num::NonZeroU16;
 
-use crate::{Tag, NormalizedCoord};
+use crate::{Tag, NormalizedCoordinate};
 use crate::parser::{Stream, FromData, Fixed, Offset16, Offset, LazyArray16, LazyArrayIter16, f32_bound};
 
 
@@ -22,7 +22,7 @@ pub struct VariationAxis {
 
 impl VariationAxis {
     /// Returns a normalized variation coordinate for this axis.
-    pub(crate) fn normalized_value(&self, mut v: f32) -> NormalizedCoord {
+    pub(crate) fn normalized_value(&self, mut v: f32) -> NormalizedCoordinate {
         // Based on
         // https://docs.microsoft.com/en-us/typography/opentype/spec/avar#overview
 
@@ -35,7 +35,7 @@ impl VariationAxis {
             v = (v - self.def_value) / (self.max_value - self.def_value);
         }
 
-        NormalizedCoord::from(v)
+        NormalizedCoordinate::from(v)
     }
 }
 

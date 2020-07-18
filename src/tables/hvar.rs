@@ -2,7 +2,7 @@
 
 use core::convert::TryFrom;
 
-use crate::{GlyphId, NormalizedCoord};
+use crate::{GlyphId, NormalizedCoordinate};
 use crate::parser::{Stream, Offset, Offset32};
 use crate::var_store::ItemVariationStore;
 
@@ -87,7 +87,7 @@ impl<'a> DeltaSetIndexMap<'a> {
 pub(crate) fn glyph_advance_offset(
     table: Table,
     glyph_id: GlyphId,
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
 ) -> Option<f32> {
     let (outer_idx, inner_idx) = if let Some(offset) = table.advance_width_mapping_offset {
         DeltaSetIndexMap::new(table.data.get(offset.to_usize()..)?).map(glyph_id)?
@@ -106,7 +106,7 @@ pub(crate) fn glyph_advance_offset(
 pub(crate) fn glyph_side_bearing_offset(
     table: Table,
     glyph_id: GlyphId,
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
 ) -> Option<f32> {
     let set_data = table.data.get(table.lsb_mapping_offset?.to_usize()..)?;
     let (outer_idx, inner_idx) = DeltaSetIndexMap::new(set_data).map(glyph_id)?;

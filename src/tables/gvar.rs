@@ -5,7 +5,7 @@ use core::cmp;
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
-use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoord};
+use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoordinate};
 use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16, F2DOT14};
 use crate::glyf::{self, Transform};
 
@@ -77,7 +77,7 @@ impl<'a> Table<'a> {
     fn parse_variation_data(
         &self,
         glyph_id: GlyphId,
-        coordinates: &[NormalizedCoord],
+        coordinates: &[NormalizedCoordinate],
         points_len: u16,
         tuples: &mut VariationTuples<'a>,
     ) -> Option<()> {
@@ -115,7 +115,7 @@ pub(crate) fn outline(
     loca_table: loca::Table,
     glyf_table: &[u8],
     gvar_table: &Table,
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
@@ -135,7 +135,7 @@ fn outline_var_impl<'a>(
     gvar_table: &Table,
     glyph_id: GlyphId,
     data: &[u8],
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
     depth: u8,
     builder: &mut glyf::Builder,
 ) -> Option<()> {
@@ -224,7 +224,7 @@ fn outline_var_impl<'a>(
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuple-variation-store-header
 fn parse_variation_data<'a>(
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
     shared_tuple_records: &LazyArray16<F2DOT14>,
     points_len: u16,
     data: &'a [u8],
@@ -412,7 +412,7 @@ struct TupleVariationHeaderData {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuplevariationheader
 fn parse_variation_tuples<'a>(
     count: u16,
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
     shared_tuple_records: &LazyArray16<F2DOT14>,
     shared_point_numbers: Option<PackedPointsIter<'a>>,
     points_len: u16,
@@ -476,7 +476,7 @@ fn parse_variation_tuples<'a>(
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuplevariationheader
 fn parse_tuple_variation_header(
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
     shared_tuple_records: &LazyArray16<F2DOT14>,
     s: &mut Stream,
 ) -> Option<TupleVariationHeaderData> {

@@ -2,7 +2,7 @@
 //!
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store
 
-use crate::NormalizedCoord;
+use crate::NormalizedCoordinate;
 use crate::parser::{Stream, FromData, LazyArray16, NumFrom};
 
 
@@ -72,7 +72,7 @@ impl<'a> ItemVariationStore<'a> {
         &self,
         outer_index: u16,
         inner_index: u16,
-        coordinates: &[NormalizedCoord],
+        coordinates: &[NormalizedCoordinate],
     ) -> Option<f32> {
         let offset = self.data_offsets.get(outer_index)?;
         let mut s = Stream::new_at(self.data, usize::num_from(offset))?;
@@ -118,7 +118,7 @@ impl<'a> VariationRegionList<'a> {
     pub(crate) fn evaluate_region(
         &self,
         index: u16,
-        coordinates: &[NormalizedCoord],
+        coordinates: &[NormalizedCoordinate],
     ) -> f32 {
         let mut v = 1.0;
         for (i, coord) in coordinates.iter().enumerate() {

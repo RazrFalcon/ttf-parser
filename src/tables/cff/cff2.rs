@@ -4,7 +4,7 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoord};
+use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoordinate};
 use crate::parser::{Stream, NumFrom, TryNumFrom};
 use crate::var_store::*;
 use super::{Builder, CFFError, calc_subroutine_bias, conv_subroutine_index};
@@ -146,7 +146,7 @@ pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
 
 pub(crate) fn outline(
     metadata: &Metadata,
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
@@ -277,7 +277,7 @@ impl Scalars {
 
 struct CharStringParserContext<'a> {
     metadata: &'a Metadata<'a>,
-    coordinates: &'a [NormalizedCoord],
+    coordinates: &'a [NormalizedCoordinate],
     scalars: Scalars,
     had_vsindex: bool,
     had_blend: bool,
@@ -304,7 +304,7 @@ impl CharStringParserContext<'_> {
 fn parse_char_string(
     data: &[u8],
     metadata: &Metadata,
-    coordinates: &[NormalizedCoord],
+    coordinates: &[NormalizedCoordinate],
     builder: &mut dyn OutlineBuilder,
 ) -> Result<Rect, CFFError> {
     let mut ctx = CharStringParserContext {

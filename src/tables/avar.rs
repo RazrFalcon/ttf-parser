@@ -3,7 +3,7 @@
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
-use crate::NormalizedCoord;
+use crate::NormalizedCoordinate;
 use crate::parser::{Stream, FromData, LazyArray16};
 
 
@@ -41,7 +41,7 @@ impl<'a> Table<'a> {
         })
     }
 
-    pub fn map_coordinates(&self, coordinates: &mut [NormalizedCoord]) -> Option<()> {
+    pub fn map_coordinates(&self, coordinates: &mut [NormalizedCoordinate]) -> Option<()> {
         if usize::from(self.axis_count.get()) != coordinates.len() {
             return None;
         }
@@ -50,7 +50,7 @@ impl<'a> Table<'a> {
         for coord in coordinates {
             let count: u16 = s.read()?;
             let map = s.read_array16::<AxisValueMapRecord>(count)?;
-            *coord = NormalizedCoord::from(map_value(&map, coord.0)?);
+            *coord = NormalizedCoordinate::from(map_value(&map, coord.0)?);
         }
 
         Some(())

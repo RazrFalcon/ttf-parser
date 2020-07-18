@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - `FaceParsingError`
+- Allow `true` magic.
 
 ### Changed
 - (CFF,CFF2) 10% faster parsing.

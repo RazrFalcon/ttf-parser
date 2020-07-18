@@ -99,7 +99,7 @@ impl FromData for Magic {
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         match u32::parse(data)? {
-            0x00010000 => Some(Magic::TrueType),
+            0x00010000 | 0x74727565 => Some(Magic::TrueType),
             0x4F54544F => Some(Magic::OpenType),
             0x74746366 => Some(Magic::FontCollection),
             _ => None,

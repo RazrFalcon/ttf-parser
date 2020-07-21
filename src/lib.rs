@@ -65,7 +65,7 @@ pub use gdef::GlyphClass;
 pub use ggg::*;
 pub use name::*;
 pub use os2::*;
-pub use tables::kern;
+pub use tables::{cmap, kern};
 
 
 /// A type-safe wrapper for glyph ID.
@@ -585,7 +585,7 @@ pub struct Face<'a> {
     cblc: Option<&'a [u8]>,
     cff1: Option<cff1::Metadata<'a>>,
     cff2: Option<cff2::Metadata<'a>>,
-    cmap: Option<cmap::Table<'a>>,
+    cmap: Option<cmap::Subtables<'a>>,
     fvar: Option<fvar::Table<'a>>,
     gdef: Option<gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
@@ -713,7 +713,7 @@ impl<'a> Face<'a> {
                 b"VORG" => face.vorg = data.get(range).and_then(|data| vorg::Table::parse(data)),
                 b"VVAR" => face.vvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
                 b"avar" => face.avar = data.get(range).and_then(|data| avar::Table::parse(data)),
-                b"cmap" => face.cmap = data.get(range).and_then(|data| cmap::Table::parse(data)),
+                b"cmap" => face.cmap = data.get(range).and_then(|data| cmap::parse(data)),
                 b"fvar" => face.fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
                 b"glyf" => face.glyf = data.get(range),
                 b"gvar" => face.gvar = data.get(range).and_then(|data| gvar::Table::parse(data)),
@@ -1066,14 +1066,37 @@ impl<'a> Face<'a> {
         self.number_of_glyphs.get()
     }
 
+    /// Returns an iterator over
+    /// [character to glyph index mapping](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap).
+    ///
+    /// This is a more low-level alternative to `Face::glyph_index`.
+    ///
+    /// An iterator can be empty.
+    #[inline]
+    pub fn character_mapping_subtables(&self) -> cmap::Subtables {
+        self.cmap.unwrap_or_default()
+    }
+
     /// Resolves a Glyph ID for a code point.
     ///
     /// Returns `None` instead of `0` when glyph is not found.
     ///
     /// All subtable formats except Mixed Coverage (8) are supported.
+    ///
+    /// If you need a more low-level control, prefer `Face::character_mapping_subtables`.
     #[inline]
     pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
-        cmap::glyph_index(self.cmap.as_ref()?, c)
+        for encoding in self.character_mapping_subtables() {
+            if !encoding.is_unicode() {
+                continue;
+            }
+
+            if let Some(id) = encoding.glyph_index(u32::from(c)) {
+                return Some(id);
+            }
+        }
+
+        None
     }
 
     /// Resolves a variation of a Glyph ID from two code points.
@@ -1085,7 +1108,14 @@ impl<'a> Face<'a> {
     /// Returns `None` instead of `0` when glyph is not found.
     #[inline]
     pub fn glyph_variation_index(&self, c: char, variation: char) -> Option<GlyphId> {
-        cmap::glyph_variation_index(self.cmap.as_ref()?, c, variation)
+        let res = self.character_mapping_subtables()
+            .find(|e| e.format() == cmap::Format::UnicodeVariationSequences)
+            .and_then(|e| e.glyph_variation_index(c, variation))?;
+
+        match res {
+            cmap::GlyphVariationResult::Found(v) => Some(v),
+            cmap::GlyphVariationResult::UseDefault => self.glyph_index(c),
+        }
     }
 
     /// Returns glyph's horizontal advance.

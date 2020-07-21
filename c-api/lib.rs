@@ -199,12 +199,11 @@ pub extern "C" fn ttfp_get_name_record(
         Some(rec) => {
             unsafe {
                 (*record).platform_id = match rec.platform_id() {
-                    Some(ttf_parser::PlatformId::Unicode) => 0,
-                    Some(ttf_parser::PlatformId::Macintosh) => 1,
-                    Some(ttf_parser::PlatformId::Iso) => 2,
-                    Some(ttf_parser::PlatformId::Windows) => 3,
-                    Some(ttf_parser::PlatformId::Custom) => 4,
-                    None => return false,
+                    ttf_parser::PlatformId::Unicode => 0,
+                    ttf_parser::PlatformId::Macintosh => 1,
+                    ttf_parser::PlatformId::Iso => 2,
+                    ttf_parser::PlatformId::Windows => 3,
+                    ttf_parser::PlatformId::Custom => 4,
                 };
 
                 (*record).encoding_id = rec.encoding_id();

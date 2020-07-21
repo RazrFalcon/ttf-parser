@@ -4,10 +4,12 @@ use core::convert::TryFrom;
 
 use crate::parser::Stream;
 
-pub fn parse(mut s: Stream, code_point: u32) -> Option<u16> {
+pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     // This subtable supports code points only in a u16 range.
     let code_point = u16::try_from(code_point).ok()?;
 
+    let mut s = Stream::new(data);
+    s.skip::<u16>(); // format
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
     let first_code_point: u16 = s.read()?;

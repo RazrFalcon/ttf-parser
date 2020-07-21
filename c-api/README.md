@@ -36,4 +36,5 @@ and then manually edited a bit.
 
 ## Missing API
 
-- `Font::kerning_subtables`
+- `Face::character_mapping_subtables`
+- `Face::kerning_subtables`

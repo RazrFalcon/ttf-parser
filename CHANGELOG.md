@@ -13,14 +13,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Allow `true` magic.
 - `Face::glyph_name` can lookup CFF names too.
 - `Face::table_data`
+- `Face::character_mapping_subtables`
 
 ### Changed
 - (CFF,CFF2) 10% faster parsing.
 - `Face::from_slice` returns `Result` now.
+- `Name::platform_id` returns `PlatformId` instead of `Option<PlatformId>` now.
+- The `cmap` module became public.
 
 ### Fixed
 - `Face::width` parsing.
 - Possible u32 overflow on 32-bit platforms during `Face::from_slice`.
+- (cmap) `Face::glyph_variation_index` processing when the encoding table has only one glyph.
 
 ## [0.7.0] - 2020-07-16
 ### Added

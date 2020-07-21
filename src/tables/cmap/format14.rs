@@ -52,9 +52,10 @@ struct UnicodeRangeRecord {
 }
 
 impl UnicodeRangeRecord {
-    fn contains(&self, c: char) -> bool {
+    fn contains(&self, c: u32) -> bool {
+        // Never overflows, since `start_unicode_value` is actually u24.
         let end = self.start_unicode_value + u32::from(self.additional_count);
-        self.start_unicode_value >= u32::from(c) && u32::from(c) < end
+        (self.start_unicode_value..=end).contains(&c)
     }
 }
 
@@ -72,24 +73,27 @@ impl FromData for UnicodeRangeRecord {
 }
 
 
-pub fn parse(
-    table: &super::Table,
-    data: &[u8],
-    c: char,
-    variation: u32,
-) -> Option<GlyphId> {
-    let cp = u32::from(c);
+/// A result of a variation glyph mapping.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum GlyphVariationResult {
+    /// Glyph was found in the variation encoding table.
+    Found(GlyphId),
+    /// Glyph should be looked in other, non-variation tables.
+    ///
+    /// Basically, you should use `Encoding::glyph_index` or `Face::glyph_index`
+    /// in this case.
+    UseDefault,
+}
 
+
+pub fn parse(data: &[u8], c: u32, variation: u32) -> Option<GlyphVariationResult> {
     let mut s = Stream::new(data);
     s.skip::<u16>(); // format
     s.skip::<u32>(); // length
     let count: u32 = s.read()?;
     let records = s.read_array32::<VariationSelectorRecord>(count)?;
 
-    let (_, record) = match records.binary_search_by(|v| v.var_selector.cmp(&variation)) {
-        Some(v) => v,
-        None => return None,
-    };
+    let (_, record) = records.binary_search_by(|v| v.var_selector.cmp(&variation))?;
 
     if let Some(offset) = record.default_uvs_offset {
         let data = data.get(offset.to_usize()..)?;
@@ -98,8 +102,7 @@ pub fn parse(
         let ranges = s.read_array32::<UnicodeRangeRecord>(count)?;
         for range in ranges {
             if range.contains(c) {
-                // This is a default glyph.
-                return super::glyph_index(table, c);
+                return Some(GlyphVariationResult::UseDefault);
             }
         }
     }
@@ -109,9 +112,8 @@ pub fn parse(
         let mut s = Stream::new(data);
         let count: u32 = s.read()?;
         let uvs_mappings = s.read_array32::<UVSMappingRecord>(count)?;
-        if let Some((_, mapping)) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&cp)) {
-            return Some(mapping.glyph_id);
-        }
+        let (_, mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&c))?;
+        return Some(GlyphVariationResult::Found(mapping.glyph_id));
     }
 
     None

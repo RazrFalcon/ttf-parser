@@ -2,7 +2,9 @@
 
 use crate::parser::{Stream, NumFrom};
 
-pub fn parse(mut s: Stream, code_point: u32) -> Option<u16> {
+pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
+    let mut s = Stream::new(data);
+    s.skip::<u16>(); // format
     let length: u16 = s.read()?;
     s.skip::<u16>(); // language
 

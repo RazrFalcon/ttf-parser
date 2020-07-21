@@ -55,9 +55,12 @@ pub enum PlatformId {
     Custom,
 }
 
-impl PlatformId {
-    pub(crate) fn from_u16(n: u16) -> Option<Self> {
-        match n {
+impl FromData for PlatformId {
+    const SIZE: usize = 2;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        match u16::parse(data)? {
             0 => Some(PlatformId::Unicode),
             1 => Some(PlatformId::Macintosh),
             2 => Some(PlatformId::Iso),
@@ -89,7 +92,7 @@ fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
 
 #[derive(Clone, Copy)]
 struct NameRecord {
-    platform_id: u16,
+    platform_id: PlatformId,
     encoding_id: u16,
     language_id: u16,
     name_id: u16,
@@ -104,7 +107,7 @@ impl FromData for NameRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(NameRecord {
-            platform_id: s.read::<u16>()?,
+            platform_id: s.read::<PlatformId>()?,
             encoding_id: s.read::<u16>()?,
             language_id: s.read::<u16>()?,
             name_id: s.read::<u16>()?,
@@ -124,8 +127,8 @@ pub struct Name<'a> {
 
 impl<'a> Name<'a> {
     /// Returns the platform ID.
-    pub fn platform_id(&self) -> Option<PlatformId> {
-        PlatformId::from_u16(self.data.platform_id)
+    pub fn platform_id(&self) -> PlatformId {
+        self.data.platform_id
     }
 
     /// Returns the platform-specific encoding ID.
@@ -176,7 +179,7 @@ impl<'a> Name<'a> {
     /// Checks that the current Name data has a Unicode encoding.
     #[inline]
     pub fn is_unicode(&self) -> bool {
-        is_unicode_encoding(self.platform_id().unwrap(), self.encoding_id())
+        is_unicode_encoding(self.platform_id(), self.encoding_id())
     }
 
     #[cfg(feature = "std")]
@@ -223,24 +226,13 @@ impl<'a> core::fmt::Debug for Name<'a> {
 
 
 /// An iterator over font's names.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 #[allow(missing_debug_implementations)]
 pub struct Names<'a> {
     names: &'a [u8],
     storage: &'a [u8],
     index: u16,
     total: u16,
-}
-
-impl Default for Names<'_> {
-    fn default() -> Self {
-        Names {
-            names: &[],
-            storage: &[],
-            index: 0,
-            total: 0,
-        }
-    }
 }
 
 impl<'a> Names<'a> {

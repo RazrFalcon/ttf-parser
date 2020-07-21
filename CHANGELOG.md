@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 - `Face::width` parsing.
+- Possible u32 overflow on 32-bit platforms during `Face::from_slice`.
 
 ## [0.7.0] - 2020-07-16
 ### Added

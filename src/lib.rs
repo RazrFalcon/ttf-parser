@@ -697,7 +697,8 @@ impl<'a> Face<'a> {
         for table in tables {
             let offset = usize::num_from(table.offset);
             let length = usize::num_from(table.length);
-            let range = offset..(offset + length);
+            let end = offset.checked_add(length).ok_or(FaceParsingError::MalformedFont)?;
+            let range = offset..end;
 
             match &table.table_tag.to_bytes() {
                 b"CBDT" => face.cbdt = data.get(range),
@@ -812,8 +813,8 @@ impl<'a> Face<'a> {
         let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
         let offset = usize::num_from(table.offset);
         let length = usize::num_from(table.length);
-        let range = offset..(offset + length);
-        self.font_data.get(range)
+        let end = offset.checked_add(length)?;
+        self.font_data.get(offset..end)
     }
 
     /// Returns an iterator over [Name Records].

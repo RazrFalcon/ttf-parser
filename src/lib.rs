@@ -57,7 +57,7 @@ mod var_store;
 mod writer;
 
 use tables::*;
-use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray32, Offset32, Offset};
+use parser::{Stream, FromData, NumFrom, TryNumFrom, Offset32, Offset};
 use parser::{i16_bound, f32_bound};
 use head::IndexToLocationFormat;
 pub use fvar::{VariationAxes, VariationAxis};
@@ -503,10 +503,10 @@ impl FromData for TableRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(TableRecord {
-            table_tag: s.read()?,
-            check_sum: s.read()?,
-            offset: s.read()?,
-            length: s.read()?,
+            table_tag: s.read::<Tag>()?,
+            check_sum: s.read::<u32>()?,
+            offset: s.read::<u32>()?,
+            length: s.read::<u32>()?,
         })
     }
 }
@@ -630,7 +630,7 @@ impl<'a> Face<'a> {
         if magic == Magic::FontCollection {
             s.skip::<u32>(); // version
             let number_of_faces: u32 = s.read().ok_or(FaceParsingError::MalformedFont)?;
-            let offsets: LazyArray32<Offset32> = s.read_array32(number_of_faces)
+            let offsets = s.read_array32::<Offset32>(number_of_faces)
                 .ok_or(FaceParsingError::MalformedFont)?;
 
             let face_offset = offsets.get(index).ok_or(FaceParsingError::FaceIndexOutOfBounds)?;
@@ -1469,7 +1469,7 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     }
 
     s.skip::<u32>(); // version
-    s.read()
+    s.read::<u32>()
 }
 
 

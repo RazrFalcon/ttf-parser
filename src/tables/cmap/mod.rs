@@ -26,9 +26,9 @@ impl FromData for EncodingRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(EncodingRecord {
-            platform_id: s.read()?,
-            encoding_id: s.read()?,
-            offset: s.read()?,
+            platform_id: s.read::<u16>()?,
+            encoding_id: s.read::<u16>()?,
+            offset: s.read::<u32>()?,
         })
     }
 }
@@ -45,7 +45,7 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
         let count: u16 = s.read()?;
-        let records = s.read_array16(count)?;
+        let records = s.read_array16::<EncodingRecord>(count)?;
 
         Some(Table {
             data,
@@ -58,7 +58,7 @@ pub fn glyph_index(table: &Table, c: char) -> Option<GlyphId> {
     for record in table.records {
         let subtable_data = table.data.get(usize::num_from(record.offset)..)?;
         let mut s = Stream::new(subtable_data);
-        let format = match parse_format(s.read()?) {
+        let format = match parse_format(s.read::<u16>()?) {
             Some(format) => format,
             None => continue,
         };
@@ -117,7 +117,7 @@ pub fn glyph_variation_index(table: &Table, c: char, variation: char) -> Option<
     for record in table.records {
         let subtable_data = table.data.get(usize::num_from(record.offset)..)?;
         let mut s = Stream::new(subtable_data);
-        let format = match parse_format(s.read()?) {
+        let format = match parse_format(s.read::<u16>()?) {
             Some(format) => format,
             None => continue,
         };

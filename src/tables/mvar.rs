@@ -19,9 +19,9 @@ impl FromData for ValueRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(ValueRecord {
-            value_tag: s.read()?,
-            delta_set_outer_index: s.read()?,
-            delta_set_inner_index: s.read()?,
+            value_tag: s.read::<Tag>()?,
+            delta_set_outer_index: s.read::<u16>()?,
+            delta_set_inner_index: s.read::<u16>()?,
         })
     }
 }

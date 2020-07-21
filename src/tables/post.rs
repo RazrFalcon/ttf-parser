@@ -293,8 +293,8 @@ impl<'a> Table<'a> {
         }
 
         let underline = LineMetrics {
-            position: Stream::read_at(data, UNDERLINE_POSITION_OFFSET)?,
-            thickness: Stream::read_at(data, UNDERLINE_THICKNESS_OFFSET)?,
+            position: Stream::read_at::<i16>(data, UNDERLINE_POSITION_OFFSET)?,
+            thickness: Stream::read_at::<i16>(data, UNDERLINE_THICKNESS_OFFSET)?,
         };
 
         let mut name_indexes = LazyArray16::default();
@@ -304,7 +304,7 @@ impl<'a> Table<'a> {
         if version == 0x00020000 {
             let mut s = Stream::new_at(data, TABLE_SIZE)?;
             let count: u16 = s.read()?;
-            name_indexes = s.read_array16(count)?;
+            name_indexes = s.read_array16::<u16>(count)?;
             names = s.tail()?;
         }
 

@@ -23,20 +23,20 @@ pub fn parse(data: &[u8]) -> Option<&[u8]> {
 
 #[inline]
 pub fn ascender(data: &[u8]) -> i16 {
-    Stream::read_at(data, ASCENDER_OFFSET).unwrap_or(0)
+    Stream::read_at::<i16>(data, ASCENDER_OFFSET).unwrap_or(0)
 }
 
 #[inline]
 pub fn descender(data: &[u8]) -> i16 {
-    Stream::read_at(data, DESCENDER_OFFSET).unwrap_or(0)
+    Stream::read_at::<i16>(data, DESCENDER_OFFSET).unwrap_or(0)
 }
 
 #[inline]
 pub fn line_gap(data: &[u8]) -> i16 {
-    Stream::read_at(data, LINE_GAP_OFFSET).unwrap_or(0)
+    Stream::read_at::<i16>(data, LINE_GAP_OFFSET).unwrap_or(0)
 }
 
 #[inline]
 pub fn num_of_long_ver_metrics(data: &[u8]) -> Option<NonZeroU16> {
-    Stream::read_at(data, NUM_OF_LONG_VER_METRICS_OFFSET).and_then(NonZeroU16::new)
+    Stream::read_at::<u16>(data, NUM_OF_LONG_VER_METRICS_OFFSET).and_then(NonZeroU16::new)
 }

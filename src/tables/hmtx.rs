@@ -19,8 +19,8 @@ impl FromData for HorizontalMetrics {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(HorizontalMetrics {
-            advance_width: s.read()?,
-            lsb: s.read()?,
+            advance_width: s.read::<u16>()?,
+            lsb: s.read::<i16>()?,
         })
     }
 }
@@ -40,7 +40,7 @@ impl<'a> Table<'a> {
         number_of_glyphs: NonZeroU16,
     ) -> Option<Self> {
         let mut s = Stream::new(data);
-        let metrics = s.read_array16(number_of_hmetrics.get())?;
+        let metrics = s.read_array16::<HorizontalMetrics>(number_of_hmetrics.get())?;
 
         let mut number_of_metrics = number_of_hmetrics.get();
 
@@ -50,7 +50,7 @@ impl<'a> Table<'a> {
         let bearings_count = number_of_glyphs.get().checked_sub(number_of_hmetrics.get());
         let bearings = if let Some(count) = bearings_count {
             number_of_metrics += count;
-            s.read_array16(count)
+            s.read_array16::<i16>(count)
         } else {
             None
         };

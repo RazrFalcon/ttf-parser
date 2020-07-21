@@ -87,8 +87,8 @@ impl FromData for KerningRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(KerningRecord {
-            pair: s.read()?,
-            value: s.read()?,
+            pair: s.read::<u32>()?,
+            value: s.read::<i16>()?,
         })
     }
 }
@@ -331,7 +331,7 @@ fn parse_format2(left: GlyphId, right: GlyphId, header_len: u8, data: &[u8]) -> 
     // Classes are already premultiplied, so we only need to sum them.
     let index = usize::from(left_class) + usize::from(right_class);
     let value_offset = index.checked_sub(header_len)?;
-    Stream::read_at(data, value_offset)
+    Stream::read_at::<i16>(data, value_offset)
 }
 
 fn get_format2_class(glyph_id: u16, offset: usize, data: &[u8]) -> Option<u16> {
@@ -468,8 +468,8 @@ pub mod state_machine {
         fn parse(data: &[u8]) -> Option<Self> {
             let mut s = Stream::new(data);
             Some(Entry {
-                new_state: s.read()?,
-                flags: s.read()?,
+                new_state: s.read::<u16>()?,
+                flags: s.read::<u16>()?,
             })
         }
     }
@@ -545,13 +545,13 @@ pub mod state_machine {
                 usize::from(state.0) * usize::from(self.number_of_classes) + usize::from(class)
             )?;
 
-            Stream::read_at(self.entry_table, usize::from(*entry_idx) * Entry::SIZE)
+            Stream::read_at::<Entry>(self.entry_table, usize::from(*entry_idx) * Entry::SIZE)
         }
 
         /// Returns kerning at offset.
         #[inline]
         pub fn kerning(&self, offset: ValueOffset) -> Option<i16> {
-            Stream::read_at(self.actions, usize::from(offset.0))
+            Stream::read_at::<i16>(self.actions, usize::from(offset.0))
         }
 
         /// Produces a new state.

@@ -51,7 +51,7 @@ impl<'a> Table<'a> {
 
         let shared_tuple_records = {
             let mut sub_s = Stream::new_at(data, shared_tuples_offset.to_usize())?;
-            sub_s.read_array16(shared_tuple_count.checked_mul(axis_count.get())?)?
+            sub_s.read_array16::<F2DOT14>(shared_tuple_count.checked_mul(axis_count.get())?)?
         };
 
         let glyphs_variation_data = data.get(glyph_variation_data_array_offset.to_usize()..)?;
@@ -59,9 +59,9 @@ impl<'a> Table<'a> {
             let offsets_count = glyph_count.checked_add(1)?;
             let is_long_format = flags & 1 == 1; // The first bit indicates a long format.
             if is_long_format {
-                GlyphVariationDataOffsets::Long(s.read_array16(offsets_count)?)
+                GlyphVariationDataOffsets::Long(s.read_array16::<Offset32>(offsets_count)?)
             } else {
-                GlyphVariationDataOffsets::Short(s.read_array16(offsets_count)?)
+                GlyphVariationDataOffsets::Short(s.read_array16::<Offset16>(offsets_count)?)
             }
         };
 
@@ -496,7 +496,7 @@ fn parse_tuple_variation_header(
     let axis_count = coordinates.len() as u16;
 
     let peak_tuple = if has_embedded_peak_tuple {
-        s.read_array16(axis_count)?
+        s.read_array16::<F2DOT14>(axis_count)?
     } else {
         // Use shared tuples.
         let start = tuple_index.checked_mul(axis_count)?;
@@ -505,7 +505,7 @@ fn parse_tuple_variation_header(
     };
 
     let (start_tuple, end_tuple) = if has_intermediate_region {
-        (s.read_array16(axis_count)?, s.read_array16(axis_count)?)
+        (s.read_array16::<F2DOT14>(axis_count)?, s.read_array16::<F2DOT14>(axis_count)?)
     } else {
         (LazyArray16::<F2DOT14>::default(), LazyArray16::<F2DOT14>::default())
     };
@@ -1021,7 +1021,7 @@ mod packed_deltas {
                     return None;
                 }
 
-                let control = Control(Stream::read_at(data, usize::from(self.data_offset))?);
+                let control = Control(Stream::read_at::<u8>(data, usize::from(self.data_offset))?);
                 self.data_offset += 1;
 
                 self.run_deltas_left = control.run_count();

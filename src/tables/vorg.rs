@@ -17,8 +17,8 @@ impl FromData for VertOriginYMetrics {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(VertOriginYMetrics {
-            glyph_index: s.read()?,
-            vert_origin_y: s.read()?,
+            glyph_index: s.read::<GlyphId>()?,
+            vert_origin_y: s.read::<i16>()?,
         })
     }
 }
@@ -41,7 +41,7 @@ impl<'a> Table<'a> {
 
         let default_y: i16 = s.read()?;
         let count: u16 = s.read()?;
-        let origins = s.read_array16(count)?;
+        let origins = s.read_array16::<VertOriginYMetrics>(count)?;
 
         Some(Table {
             default_y,

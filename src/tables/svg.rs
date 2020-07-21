@@ -19,10 +19,10 @@ impl FromData for SvgDocumentRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(SvgDocumentRecord {
-            start_glyph_id: s.read()?,
-            end_glyph_id: s.read()?,
-            svg_doc_offset: s.read()?,
-            svg_doc_length: s.read()?,
+            start_glyph_id: s.read::<GlyphId>()?,
+            end_glyph_id: s.read::<GlyphId>()?,
+            svg_doc_offset: s.read::<Option<Offset32>>()?,
+            svg_doc_length: s.read::<u32>()?,
         })
     }
 }

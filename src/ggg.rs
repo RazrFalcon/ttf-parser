@@ -24,9 +24,9 @@ impl FromData for RangeRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(RangeRecord {
-            start_glyph_id: s.read()?,
-            end_glyph_id: s.read()?,
-            value: s.read()?,
+            start_glyph_id: s.read::<GlyphId>()?,
+            end_glyph_id: s.read::<GlyphId>()?,
+            value: s.read::<u16>()?,
         })
     }
 }

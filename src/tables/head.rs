@@ -39,10 +39,10 @@ pub fn units_per_em(data: &[u8]) -> Option<u16> {
 pub fn global_bbox(data: &[u8]) -> Option<Rect> {
     let mut s = Stream::new_at(data, BBOX_OFFSET)?;
     Some(Rect {
-        x_min: s.read()?,
-        y_min: s.read()?,
-        x_max: s.read()?,
-        y_max: s.read()?,
+        x_min: s.read::<i16>()?,
+        y_min: s.read::<i16>()?,
+        x_max: s.read::<i16>()?,
+        y_max: s.read::<i16>()?,
     })
 }
 

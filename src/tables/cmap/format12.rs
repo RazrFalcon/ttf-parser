@@ -18,9 +18,9 @@ impl FromData for SequentialMapGroup {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(SequentialMapGroup {
-            start_char_code: s.read()?,
-            end_char_code: s.read()?,
-            start_glyph_id: s.read()?,
+            start_char_code: s.read::<u32>()?,
+            end_char_code: s.read::<u32>()?,
+            start_glyph_id: s.read::<u32>()?,
         })
     }
 }

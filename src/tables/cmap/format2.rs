@@ -23,10 +23,10 @@ impl FromData for SubHeaderRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(SubHeaderRecord {
-            first_code: s.read()?,
-            entry_count: s.read()?,
-            id_delta: s.read()?,
-            id_range_offset: s.read()?,
+            first_code: s.read::<u16>()?,
+            entry_count: s.read::<u16>()?,
+            id_delta: s.read::<i16>()?,
+            id_range_offset: s.read::<u16>()?,
         })
     }
 }

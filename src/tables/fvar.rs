@@ -63,7 +63,7 @@ impl<'a> Table<'a> {
         let axis_count = NonZeroU16::new(axis_count)?;
 
         let mut s = Stream::new_at(data, axes_array_offset.to_usize())?;
-        let axes = s.read_array16(axis_count.get())?;
+        let axes = s.read_array16::<VariationAxisRecord>(axis_count.get())?;
 
         Some(Table { axes })
     }
@@ -128,12 +128,12 @@ impl FromData for VariationAxisRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(VariationAxisRecord {
-            axis_tag: s.read()?,
+            axis_tag: s.read::<Tag>()?,
             min_value: s.read::<Fixed>()?.0,
             def_value: s.read::<Fixed>()?.0,
             max_value: s.read::<Fixed>()?.0,
-            flags: s.read()?,
-            axis_name_id: s.read()?,
+            flags: s.read::<u16>()?,
+            axis_name_id: s.read::<u16>()?,
         })
     }
 }

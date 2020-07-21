@@ -18,8 +18,8 @@ impl FromData for VariationSelectorRecord {
         let mut s = Stream::new(data);
         Some(VariationSelectorRecord {
             var_selector: s.read::<U24>()?.0,
-            default_uvs_offset: s.read()?,
-            non_default_uvs_offset: s.read()?,
+            default_uvs_offset: s.read::<Option<Offset32>>()?,
+            non_default_uvs_offset: s.read::<Option<Offset32>>()?,
         })
     }
 }
@@ -39,7 +39,7 @@ impl FromData for UVSMappingRecord {
         let mut s = Stream::new(data);
         Some(UVSMappingRecord {
             unicode_value: s.read::<U24>()?.0,
-            glyph_id: s.read()?,
+            glyph_id: s.read::<GlyphId>()?,
         })
     }
 }
@@ -66,7 +66,7 @@ impl FromData for UnicodeRangeRecord {
         let mut s = Stream::new(data);
         Some(UnicodeRangeRecord {
             start_unicode_value: s.read::<U24>()?.0,
-            additional_count: s.read()?,
+            additional_count: s.read::<u8>()?,
         })
     }
 }

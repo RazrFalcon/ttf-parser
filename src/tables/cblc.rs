@@ -199,8 +199,8 @@ impl FromData for GlyphIdOffsetPair {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(GlyphIdOffsetPair {
-            glyph_id: s.read()?,
-            offset: s.read()?,
+            glyph_id: s.read::<GlyphId>()?,
+            offset: s.read::<Offset16>()?,
         })
     }
 }

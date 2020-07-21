@@ -30,10 +30,10 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
         match format {
             IndexToLocationFormat::Short => {
-                Some(Table::Short(s.read_array16(total)?))
+                Some(Table::Short(s.read_array16::<u16>(total)?))
             }
             IndexToLocationFormat::Long => {
-                Some(Table::Long(s.read_array16(total)?))
+                Some(Table::Long(s.read_array16::<u32>(total)?))
             }
         }
     }

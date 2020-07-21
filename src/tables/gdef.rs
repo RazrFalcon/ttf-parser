@@ -64,7 +64,7 @@ impl<'a> Table<'a> {
                 let format: u16 = s.read()?;
                 if format == 1 {
                     if let Some(count) = s.read::<u16>() {
-                        if let Some(array) = s.read_array16(count) {
+                        if let Some(array) = s.read_array16::<Offset32>(count) {
                             table.mark_glyph_coverage_offsets = Some((subdata, array));
                         }
                     }

@@ -30,8 +30,8 @@ impl<'a> Table<'a> {
         Some(Table {
             data,
             variation_store,
-            advance_width_mapping_offset: s.read()?,
-            lsb_mapping_offset: s.read()?,
+            advance_width_mapping_offset: s.read::<Option<Offset32>>()?,
+            lsb_mapping_offset: s.read::<Option<Offset32>>()?,
         })
     }
 }

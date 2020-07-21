@@ -183,7 +183,7 @@ impl<'a> Table<'a> {
 
     #[inline]
     pub fn weight(&self) -> Weight {
-        Weight::from(Stream::read_at(self.data, US_WEIGHT_CLASS_OFFSET).unwrap_or(0))
+        Weight::from(Stream::read_at::<u16>(self.data, US_WEIGHT_CLASS_OFFSET).unwrap_or(0))
     }
 
     #[inline]
@@ -241,15 +241,15 @@ impl<'a> Table<'a> {
             None
         } else {
             // We cannot use SafeStream here, because x height is an optional data.
-            Stream::read_at(self.data, SX_HEIGHT_OFFSET)
+            Stream::read_at::<i16>(self.data, SX_HEIGHT_OFFSET)
         }
     }
 
     #[inline]
     pub fn strikeout_metrics(&self) -> LineMetrics {
         LineMetrics {
-            thickness: Stream::read_at(self.data, Y_STRIKEOUT_SIZE_OFFSET).unwrap_or(0),
-            position: Stream::read_at(self.data, Y_STRIKEOUT_POSITION_OFFSET).unwrap_or(0),
+            thickness: Stream::read_at::<i16>(self.data, Y_STRIKEOUT_SIZE_OFFSET).unwrap_or(0),
+            position: Stream::read_at::<i16>(self.data, Y_STRIKEOUT_POSITION_OFFSET).unwrap_or(0),
         }
     }
 
@@ -257,10 +257,10 @@ impl<'a> Table<'a> {
     pub fn subscript_metrics(&self) -> ScriptMetrics {
         let mut s = Stream::new_at(self.data, Y_SUBSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
         ScriptMetrics {
-            x_size: s.read().unwrap_or(0),
-            y_size: s.read().unwrap_or(0),
-            x_offset: s.read().unwrap_or(0),
-            y_offset: s.read().unwrap_or(0),
+            x_size: s.read::<i16>().unwrap_or(0),
+            y_size: s.read::<i16>().unwrap_or(0),
+            x_offset: s.read::<i16>().unwrap_or(0),
+            y_offset: s.read::<i16>().unwrap_or(0),
         }
     }
 
@@ -268,30 +268,30 @@ impl<'a> Table<'a> {
     pub fn superscript_metrics(&self) -> ScriptMetrics {
         let mut s = Stream::new_at(self.data, Y_SUPERSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
         ScriptMetrics {
-            x_size: s.read().unwrap_or(0),
-            y_size: s.read().unwrap_or(0),
-            x_offset: s.read().unwrap_or(0),
-            y_offset: s.read().unwrap_or(0),
+            x_size: s.read::<i16>().unwrap_or(0),
+            y_size: s.read::<i16>().unwrap_or(0),
+            x_offset: s.read::<i16>().unwrap_or(0),
+            y_offset: s.read::<i16>().unwrap_or(0),
         }
     }
 
     #[inline]
     pub fn typo_ascender(&self) -> i16 {
-        Stream::read_at(self.data, S_TYPO_ASCENDER_OFFSET).unwrap_or(0)
+        Stream::read_at::<i16>(self.data, S_TYPO_ASCENDER_OFFSET).unwrap_or(0)
     }
 
     #[inline]
     pub fn typo_descender(&self) -> i16 {
-        Stream::read_at(self.data, S_TYPO_DESCENDER_OFFSET).unwrap_or(0)
+        Stream::read_at::<i16>(self.data, S_TYPO_DESCENDER_OFFSET).unwrap_or(0)
     }
 
     #[inline]
     pub fn typo_line_gap(&self) -> i16 {
-        Stream::read_at(self.data, S_TYPO_LINE_GAP_OFFSET).unwrap_or(0)
+        Stream::read_at::<i16>(self.data, S_TYPO_LINE_GAP_OFFSET).unwrap_or(0)
     }
 
     #[inline]
     fn fs_selection(&self) -> u16 {
-        Stream::read_at(self.data, FS_SELECTION_OFFSET).unwrap_or(0)
+        Stream::read_at::<u16>(self.data, FS_SELECTION_OFFSET).unwrap_or(0)
     }
 }

@@ -120,8 +120,8 @@ impl FromData for AxisValueMapRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(AxisValueMapRecord {
-            from_coordinate: s.read()?,
-            to_coordinate: s.read()?,
+            from_coordinate: s.read::<i16>()?,
+            to_coordinate: s.read::<i16>()?,
         })
     }
 }

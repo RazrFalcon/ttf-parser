@@ -229,7 +229,7 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let flags = CompositeGlyphFlags(self.stream.read()?);
+        let flags = CompositeGlyphFlags(self.stream.read::<u16>()?);
         let glyph_id: GlyphId = self.stream.read()?;
 
         let mut ts = Transform::default();
@@ -395,9 +395,9 @@ impl<'a> Iterator for FlagsIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.repeats == 0 {
-            self.flags = SimpleGlyphFlags(self.stream.read().unwrap_or_default());
+            self.flags = SimpleGlyphFlags(self.stream.read::<u8>().unwrap_or_default());
             if self.flags.repeat_flag() {
-                self.repeats = self.stream.read().unwrap_or(0);
+                self.repeats = self.stream.read::<u8>().unwrap_or(0);
             }
         } else {
             self.repeats -= 1;
@@ -519,10 +519,10 @@ pub(crate) fn glyph_bbox(
     s.skip::<i16>(); // number_of_contours
     // It's faster to parse the rect directly, instead of using `FromData`.
     Some(Rect {
-        x_min: s.read()?,
-        y_min: s.read()?,
-        x_max: s.read()?,
-        y_max: s.read()?,
+        x_min: s.read::<i16>()?,
+        y_min: s.read::<i16>()?,
+        x_max: s.read::<i16>()?,
+        y_max: s.read::<i16>()?,
     })
 }
 
@@ -542,10 +542,10 @@ fn outline_impl(
     let number_of_contours: i16 = s.read()?;
     // It's faster to parse the rect directly, instead of using `FromData`.
     let rect = Rect {
-        x_min: s.read()?,
-        y_min: s.read()?,
-        x_max: s.read()?,
-        y_max: s.read()?,
+        x_min: s.read::<i16>()?,
+        y_min: s.read::<i16>()?,
+        x_max: s.read::<i16>()?,
+        y_max: s.read::<i16>()?,
     };
 
     if number_of_contours > 0 {
@@ -623,7 +623,7 @@ fn resolve_coords_len(
     let mut x_coords_len = 0;
     let mut y_coords_len = 0;
     while flags_left > 0 {
-        let flags = SimpleGlyphFlags(s.read()?);
+        let flags = SimpleGlyphFlags(s.read::<u8>()?);
 
         // The number of times a glyph point repeats.
         repeats = if flags.repeat_flag() {

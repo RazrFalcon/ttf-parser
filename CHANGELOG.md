@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - (CFF,CFF2) 10% faster parsing.
 - `Face::from_slice` returns `Result` now.
 
+### Fixed
+- `Face::width` parsing.
+
 ## [0.7.0] - 2020-07-16
 ### Added
 - (CFF) CID fonts support.

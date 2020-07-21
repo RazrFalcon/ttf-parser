@@ -730,7 +730,7 @@ impl FDSelect<'_> {
                     if (prev_first_glyph..curr_first_glyph).contains(&glyph_id) {
                         return Some(prev_index);
                     } else {
-                        prev_index = s.read()?;
+                        prev_index = s.read::<u8>()?;
                     }
 
                     prev_first_glyph = curr_first_glyph;
@@ -745,7 +745,7 @@ impl FDSelect<'_> {
 fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSelect<'a>> {
     let format: u8 = s.read()?;
     match format {
-        0 => Some(FDSelect::Format0(s.read_array16(number_of_glyphs)?)),
+        0 => Some(FDSelect::Format0(s.read_array16::<u8>(number_of_glyphs)?)),
         3 => Some(FDSelect::Format3(s.tail()?)),
         _ => None,
     }

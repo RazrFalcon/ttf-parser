@@ -104,12 +104,12 @@ impl FromData for NameRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(NameRecord {
-            platform_id: s.read()?,
-            encoding_id: s.read()?,
-            language_id: s.read()?,
-            name_id: s.read()?,
-            length: s.read()?,
-            offset: s.read()?,
+            platform_id: s.read::<u16>()?,
+            encoding_id: s.read::<u16>()?,
+            language_id: s.read::<u16>()?,
+            name_id: s.read::<u16>()?,
+            length: s.read::<u16>()?,
+            offset: s.read::<u16>()?,
         })
     }
 }
@@ -272,7 +272,7 @@ impl<'a> Iterator for Names<'a> {
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         Some(Name {
-            data: Stream::read_at(self.names, NameRecord::SIZE * n)?,
+            data: Stream::read_at::<NameRecord>(self.names, NameRecord::SIZE * n)?,
             strings: self.storage,
         })
     }

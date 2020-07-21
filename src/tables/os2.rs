@@ -188,7 +188,7 @@ impl<'a> Table<'a> {
 
     #[inline]
     pub fn width(&self) -> Width {
-        match Stream::read_at(self.data, US_WIDTH_CLASS_OFFSET).unwrap_or(0) {
+        match Stream::read_at::<u16>(self.data, US_WIDTH_CLASS_OFFSET).unwrap_or(0) {
             1 => Width::UltraCondensed,
             2 => Width::ExtraCondensed,
             3 => Width::Condensed,

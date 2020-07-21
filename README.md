@@ -86,7 +86,7 @@ There are roughly three types of TrueType tables:
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
 | Dynamic lib size  | <300KiB<sup>2</sup>    | ~760KiB<sup>3</sup> | ? (header-only)                |
-| Tested version    | 0.7.0                  | 2.9.1               | 1.24                           |
+| Tested version    | 0.8.0                  | 2.9.1               | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
 Legend:
@@ -126,18 +126,22 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 And here are some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff  ... bench:         858 ns/iter (+/- 40)
-test outline_glyph_276_from_cff2 ... bench:         793 ns/iter (+/- 30)
-test from_data_otf_cff           ... bench:         746 ns/iter (+/- 10)
-test from_data_otf_cff2          ... bench:         709 ns/iter (+/- 75)
-test outline_glyph_276_from_glyf ... bench:         606 ns/iter (+/- 10)
-test outline_glyph_8_from_cff2   ... bench:         470 ns/iter (+/- 11)
-test from_data_ttf               ... bench:         351 ns/iter (+/- 5)
-test glyph_name_276              ... bench:         299 ns/iter (+/- 4)
-test outline_glyph_8_from_cff    ... bench:         299 ns/iter (+/- 7)
-test outline_glyph_8_from_glyf   ... bench:         266 ns/iter (+/- 4)
-test family_name                 ... bench:         198 ns/iter (+/- 3)
-test glyph_index_u41             ... bench:          13 ns/iter (+/- 0)
+test outline_glyph_276_from_cff2 ... bench:         778 ns/iter (+/- 15)
+test from_data_otf_cff           ... bench:         760 ns/iter (+/- 13)
+test from_data_otf_cff2          ... bench:         709 ns/iter (+/- 25)
+test outline_glyph_276_from_cff  ... bench:         678 ns/iter (+/- 41)
+test outline_glyph_276_from_glyf ... bench:         649 ns/iter (+/- 11)
+test outline_glyph_8_from_cff2   ... bench:         476 ns/iter (+/- 14)
+test from_data_ttf               ... bench:         352 ns/iter (+/- 11)
+test glyph_name_post_276         ... bench:         223 ns/iter (+/- 5)
+test outline_glyph_8_from_cff    ... bench:         261 ns/iter (+/- 13)
+test outline_glyph_8_from_glyf   ... bench:         281 ns/iter (+/- 5)
+test family_name                 ... bench:         183 ns/iter (+/- 102)
+test glyph_name_cff_276          ... bench:         109 ns/iter (+/- 1)
+test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
+test glyph_name_cff_8            ... bench:           7 ns/iter (+/- 0)
+test glyph_name_post_8           ... bench:           2 ns/iter (+/- 0)
+
 test subscript_metrics           ... bench:           2 ns/iter (+/- 0)
 test glyph_hor_advance           ... bench:           2 ns/iter (+/- 0)
 test glyph_hor_side_bearing      ... bench:           2 ns/iter (+/- 0)
@@ -149,12 +153,6 @@ test x_height                    ... bench:           1 ns/iter (+/- 0)
 test units_per_em                ... bench:         0.5 ns/iter (+/- 0)
 test width                       ... bench:         0.2 ns/iter (+/- 0)
 ```
-
-`family_name` is expensive, because it allocates a `String` and the original data
-is stored as UTF-16 BE.
-
-`glyph_name_8` is faster than `glyph_name_276`, because for glyph indexes lower than 258
-we are using predefined names, so no parsing is involved.
 
 ### License
 

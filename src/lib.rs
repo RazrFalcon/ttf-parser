@@ -24,7 +24,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Most of numeric casts are checked.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.7.0")]
+#![doc(html_root_url = "https://docs.rs/ttf-parser/0.8.0")]
 
 #![no_std]
 #![forbid(unsafe_code)]

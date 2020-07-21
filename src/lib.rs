@@ -57,7 +57,7 @@ mod var_store;
 mod writer;
 
 use tables::*;
-use parser::{Stream, FromData, NumFrom, TryNumFrom, Offset32, Offset};
+use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, Offset32, Offset};
 use parser::{i16_bound, f32_bound};
 use head::IndexToLocationFormat;
 pub use fvar::{VariationAxes, VariationAxis};
@@ -578,6 +578,8 @@ impl std::error::Error for FaceParsingError {}
 /// A font face handle.
 #[derive(Clone)]
 pub struct Face<'a> {
+    font_data: &'a [u8], // The input data. Used by Face::table_data.
+    table_records: LazyArray16<'a, TableRecord>,
     avar: Option<avar::Table<'a>>,
     cbdt: Option<&'a [u8]>,
     cblc: Option<&'a [u8]>,
@@ -655,6 +657,8 @@ impl<'a> Face<'a> {
             .ok_or(FaceParsingError::MalformedFont)?;
 
         let mut face = Face {
+            font_data: data,
+            table_records: tables,
             avar: None,
             cbdt: None,
             cblc: None,
@@ -799,6 +803,17 @@ impl<'a> Face<'a> {
             TableName::VerticalOrigin               => self.vorg.is_some(),
             TableName::WindowsMetrics               => self.os_2.is_some(),
         }
+    }
+
+    /// Returns the raw data of a selected table.
+    ///
+    /// Useful if you want to parse the data manually.
+    pub fn table_data(&self, tag: Tag) -> Option<&'a [u8]> {
+        let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
+        let offset = usize::num_from(table.offset);
+        let length = usize::num_from(table.length);
+        let range = offset..(offset + length);
+        self.font_data.get(range)
     }
 
     /// Returns an iterator over [Name Records].
@@ -1200,8 +1215,6 @@ impl<'a> Face<'a> {
     ///
     /// `set_index` allows checking a specific glyph coverage set.
     /// Otherwise all sets will be checked.
-    ///
-    /// Returns `Ok(false)` when *Mark Glyph Sets Table* is not set.
     #[inline]
     pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u16>) -> bool {
         try_opt_or!(self.gdef, false).is_mark_glyph(glyph_id, set_index)

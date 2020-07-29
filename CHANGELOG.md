@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - `Face::is_monospaced`
 - `Face::italic_angle`
-- `Face::typo_ascender`
-- `Face::typo_descender`
-- `Face::typo_line_gap`
+- `Face::typographic_ascender`
+- `Face::typographic_descender`
+- `Face::typographic_line_gap`
 - `Face::captial_height`
 
 ## [0.8.0] - 2020-07-21

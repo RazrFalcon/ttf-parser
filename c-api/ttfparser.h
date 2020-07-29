@@ -292,6 +292,13 @@ bool ttfp_is_bold(const ttfp_face *face);
 bool ttfp_is_oblique(const ttfp_face *face);
 
 /**
+ * @brief Checks that face is marked as *Monospaced*.
+ *
+ * @return `false` when `post` table is not present.
+ */
+bool ttfp_is_monospaced(const ttfp_face *face);
+
+/**
  * @brief Checks that face is variable.
  *
  * Simply checks the presence of a `fvar` table.
@@ -312,6 +319,13 @@ uint16_t ttfp_get_weight(const ttfp_face *face);
  *         or when value is invalid.
  */
 uint16_t ttfp_get_width(const ttfp_face *face);
+
+/**
+ * @brief Returns face's italic angle.
+ *
+ * @return Face's italic angle or `0.0` when `post` table is not present.
+ */
+float ttfp_get_italic_angle(const ttfp_face *face);
 
 /**
  * @brief Returns a horizontal face ascender.
@@ -340,6 +354,42 @@ int16_t ttfp_get_height(const ttfp_face *face);
  * This function is affected by variation axes.
  */
 int16_t ttfp_get_line_gap(const ttfp_face *face);
+
+/**
+ * @brief Returns a horizontal typographic face ascender.
+ *
+ * Prefer `ttfp_get_ascender` unless you explicitly want this. This is a more
+ * low-level alternative.
+ *
+ * This function is affected by variation axes.
+ *
+ * @return `0` when OS/2 table is not present.
+ */
+int16_t ttfp_get_typographic_ascender(const ttfp_face *face);
+
+/**
+ * @brief Returns a horizontal typographic face ascender.
+ *
+ * Prefer `ttfp_get_descender` unless you explicitly want this. This is a more
+ * low-level alternative.
+ *
+ * This function is affected by variation axes.
+ *
+ * @return `0` when OS/2 table is not present.
+ */
+int16_t ttfp_get_typographic_descender(const ttfp_face *face);
+
+/**
+ * @brief Returns a horizontal typographic face line gap.
+ *
+ * Prefer `ttfp_get_line_gap` unless you explicitly want this. This is a more
+ * low-level alternative.
+ *
+ * This function is affected by variation axes.
+ *
+ * @return `0` when OS/2 table is not present.
+ */
+int16_t ttfp_get_typographic_line_gap(const ttfp_face *face);
 
 /**
  * @brief Returns a vertical face ascender.

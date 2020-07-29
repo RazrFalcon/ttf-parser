@@ -285,6 +285,14 @@ pub extern "C" fn ttfp_is_oblique(face: *const ttfp_face) -> bool {
     face_from_ptr(face).is_oblique()
 }
 
+/// @brief Checks that face is marked as *Monospaced*.
+///
+/// @return `false` when `post` table is not present.
+#[no_mangle]
+pub extern "C" fn ttfp_is_monospaced(face: *const ttfp_face) -> bool {
+    face_from_ptr(face).is_monospaced()
+}
+
 /// @brief Checks that face is variable.
 ///
 /// Simply checks the presence of a `fvar` table.
@@ -308,6 +316,14 @@ pub extern "C" fn ttfp_get_weight(face: *const ttfp_face) -> u16 {
 #[no_mangle]
 pub extern "C" fn ttfp_get_width(face: *const ttfp_face) -> u16 {
     face_from_ptr(face).width().to_number()
+}
+
+/// @brief Returns face's italic angle.
+///
+/// @return Face's italic angle or `0.0` when `post` table is not present.
+#[no_mangle]
+pub extern "C" fn ttfp_get_italic_angle(face: *const ttfp_face) -> f32 {
+    face_from_ptr(face).italic_angle().unwrap_or(0.0)
 }
 
 /// @brief Returns a horizontal face ascender.
@@ -340,6 +356,45 @@ pub extern "C" fn ttfp_get_height(face: *const ttfp_face) -> i16 {
 #[no_mangle]
 pub extern "C" fn ttfp_get_line_gap(face: *const ttfp_face) -> i16 {
     face_from_ptr(face).line_gap()
+}
+
+/// @brief Returns a horizontal typographic face ascender.
+///
+/// Prefer `ttfp_get_ascender` unless you explicitly want this. This is a more
+/// low-level alternative.
+///
+/// This function is affected by variation axes.
+///
+/// @return `0` when OS/2 table is not present.
+#[no_mangle]
+pub extern "C" fn ttfp_get_typographic_ascender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).typographic_ascender().unwrap_or(0)
+}
+
+/// @brief Returns a horizontal typographic face descender.
+///
+/// Prefer `ttfp_get_descender` unless you explicitly want this. This is a more
+/// low-level alternative.
+///
+/// This function is affected by variation axes.
+///
+/// @return `0` when OS/2 table is not present.
+#[no_mangle]
+pub extern "C" fn ttfp_get_typographic_descender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).typographic_descender().unwrap_or(0)
+}
+
+/// @brief Returns a horizontal typographic face line gap.
+///
+/// Prefer `ttfp_get_line_gap` unless you explicitly want this. This is a more
+/// low-level alternative.
+///
+/// This function is affected by variation axes.
+///
+/// @return `0` when OS/2 table is not present.
+#[no_mangle]
+pub extern "C" fn ttfp_get_typographic_line_gap(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).typographic_line_gap().unwrap_or(0)
 }
 
 /// @brief Returns a vertical face ascender.
@@ -398,6 +453,16 @@ pub extern "C" fn ttfp_get_units_per_em(face: *const ttfp_face) -> u16 {
 #[no_mangle]
 pub extern "C" fn ttfp_get_x_height(face: *const ttfp_face) -> i16 {
     face_from_ptr(face).x_height().unwrap_or(0)
+}
+
+/// @brief Returns face's capital height.
+///
+/// This function is affected by variation axes.
+///
+/// @return capital height or 0 when OS/2 table is not present or when its version is < 2.
+#[no_mangle]
+pub extern "C" fn ttfp_get_capital_height(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).capital_height().unwrap_or(0)
 }
 
 /// @brief Returns face's underline metrics.

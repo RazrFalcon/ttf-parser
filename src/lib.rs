@@ -859,6 +859,14 @@ impl<'a> Face<'a> {
         try_opt_or!(self.os_2, false).is_oblique()
     }
 
+    /// Checks that face is marked as *Monospaced*.
+    ///
+    /// Returns `false` when `post` table is not present.
+    #[inline]
+    pub fn is_monospaced(&self) -> bool {
+        try_opt_or!(self.post, false).is_monospaced()
+    }
+
     /// Checks that face is variable.
     ///
     /// Simply checks the presence of a `fvar` table.
@@ -882,6 +890,14 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn width(&self) -> Width {
         try_opt_or!(self.os_2, Width::default()).width()
+    }
+
+    /// Returns face's italic angle.
+    ///
+    /// Returns `None` when `post` table is not present.
+    #[inline]
+    pub fn italic_angle(&self) -> Option<f32> {
+        self.post.map(|table| table.italic_angle())
     }
 
     #[inline]
@@ -934,6 +950,54 @@ impl<'a> Face<'a> {
         } else {
             hhea::line_gap(self.hhea)
         }
+    }
+
+    /// Returns a horizontal typographic face ascender.
+    ///
+    /// Prefer `Face::ascender` unless you explicitly want this. This is a more
+    /// low-level alternative.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn typographic_ascender(&self) -> Option<i16> {
+        self.os_2.map(|table| {
+            let v = table.typo_ascender();
+            self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
+        })
+    }
+
+    /// Returns a horizontal typographic face descender.
+    ///
+    /// Prefer `Face::descender` unless you explicitly want this. This is a more
+    /// low-level alternative.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn typographic_descender(&self) -> Option<i16> {
+        self.os_2.map(|table| {
+            let v = table.typo_descender();
+            self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
+        })
+    }
+
+    /// Returns a horizontal typographic face line gap.
+    ///
+    /// Prefer `Face::line_gap` unless you explicitly want this. This is a more
+    /// low-level alternative.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn typographic_line_gap(&self) -> Option<i16> {
+        self.os_2.map(|table| {
+            let v = table.typo_line_gap();
+            self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
+        })
     }
 
     // TODO: does this affected by USE_TYPO_METRICS?
@@ -990,6 +1054,17 @@ impl<'a> Face<'a> {
     pub fn x_height(&self) -> Option<i16> {
         self.os_2.and_then(|os_2| os_2.x_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"xhgt"), v))
+    }
+
+    /// Returns face's capital height.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present or when its version is < 2.
+    #[inline]
+    pub fn capital_height(&self) -> Option<i16> {
+        self.os_2.and_then(|os_2| os_2.cap_height())
+            .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"cpht"), v))
     }
 
     /// Returns face's underline metrics.

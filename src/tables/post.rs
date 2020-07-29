@@ -1,12 +1,14 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 
 use crate::{LineMetrics, GlyphId};
-use crate::parser::{Stream, LazyArray16};
+use crate::parser::{Stream, Fixed, LazyArray16};
 
 
 const TABLE_SIZE: usize = 32;
+const ITALIC_ANGLE_OFFSET: usize = 4;
 const UNDERLINE_POSITION_OFFSET: usize = 8;
 const UNDERLINE_THICKNESS_OFFSET: usize = 10;
+const IS_FIXED_PITCH_OFFSET: usize = 12;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
 const MACINTOSH_NAMES: &[&str] = &[
@@ -273,7 +275,9 @@ const MACINTOSH_NAMES: &[&str] = &[
 
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
+    italic_angle: f32,
     underline: LineMetrics,
+    is_monospaced: bool,
     name_indexes: LazyArray16<'a, u16>,
     names: &'a [u8],
 }
@@ -292,10 +296,14 @@ impl<'a> Table<'a> {
             return None;
         }
 
+        let italic_angle = Stream::read_at::<Fixed>(data, ITALIC_ANGLE_OFFSET)?.0;
+
         let underline = LineMetrics {
             position: Stream::read_at::<i16>(data, UNDERLINE_POSITION_OFFSET)?,
             thickness: Stream::read_at::<i16>(data, UNDERLINE_THICKNESS_OFFSET)?,
         };
+
+        let is_monospaced = Stream::read_at::<u32>(data, IS_FIXED_PITCH_OFFSET)? != 0;
 
         let mut name_indexes = LazyArray16::default();
         let mut names: &[u8] = &[];
@@ -309,15 +317,27 @@ impl<'a> Table<'a> {
         }
 
         Some(Table {
+            italic_angle,
             underline,
+            is_monospaced,
             name_indexes,
             names,
         })
     }
 
     #[inline]
+    pub fn italic_angle(&self) -> f32 {
+        self.italic_angle
+    }
+
+    #[inline]
     pub fn underline_metrics(&self) -> LineMetrics {
         self.underline
+    }
+
+    #[inline]
+    pub fn is_monospaced(&self) -> bool {
+        self.is_monospaced
     }
 
     #[inline]

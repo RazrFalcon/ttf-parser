@@ -15,6 +15,7 @@ const S_TYPO_ASCENDER_OFFSET: usize = 68;
 const S_TYPO_DESCENDER_OFFSET: usize = 70;
 const S_TYPO_LINE_GAP_OFFSET: usize = 72;
 const SX_HEIGHT_OFFSET: usize = 86;
+const S_CAP_HEIGHT_OFFSET: usize = 88;
 
 
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
@@ -242,6 +243,15 @@ impl<'a> Table<'a> {
         } else {
             // We cannot use SafeStream here, because x height is an optional data.
             Stream::read_at::<i16>(self.data, SX_HEIGHT_OFFSET)
+        }
+    }
+
+    #[inline]
+    pub fn cap_height(&self) -> Option<i16> {
+        if self.version < 2 {
+            None
+        } else {
+            Stream::read_at::<i16>(self.data, S_CAP_HEIGHT_OFFSET)
         }
     }
 

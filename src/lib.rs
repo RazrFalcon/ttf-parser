@@ -859,6 +859,14 @@ impl<'a> Face<'a> {
         try_opt_or!(self.os_2, false).is_oblique()
     }
 
+    /// Checks that face is marked as *Monospaced*.
+    ///
+    /// Returns `false` when `post` table is not present.
+    #[inline]
+    pub fn is_monospaced(&self) -> bool {
+        try_opt_or!(self.post, false).is_monospaced()
+    }
+
     /// Checks that face is variable.
     ///
     /// Simply checks the presence of a `fvar` table.
@@ -882,6 +890,14 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn width(&self) -> Width {
         try_opt_or!(self.os_2, Width::default()).width()
+    }
+
+    /// Returns face's italic angle.
+    ///
+    /// Returns `0.0` when `post` table is not present.
+    #[inline]
+    pub fn italic_angle(&self) -> f32 {
+        try_opt_or!(self.post, 0.0).italic_angle()
     }
 
     #[inline]

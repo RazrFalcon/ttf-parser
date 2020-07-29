@@ -894,10 +894,10 @@ impl<'a> Face<'a> {
 
     /// Returns face's italic angle.
     ///
-    /// Returns `0.0` when `post` table is not present.
+    /// Returns `None` when `post` table is not present.
     #[inline]
-    pub fn italic_angle(&self) -> f32 {
-        try_opt_or!(self.post, 0.0).italic_angle()
+    pub fn italic_angle(&self) -> Option<f32> {
+        self.post.map(|table| table.italic_angle())
     }
 
     #[inline]
@@ -952,7 +952,10 @@ impl<'a> Face<'a> {
         }
     }
 
-    /// Returns a horizontal typo face ascender.
+    /// Returns a horizontal typographic face ascender.
+    ///
+    /// Prefer `Face::ascender` unless you explicitly want this. This is a more
+    /// low-level alternative.
     ///
     /// This method is affected by variation axes.
     ///
@@ -965,7 +968,10 @@ impl<'a> Face<'a> {
         })
     }
 
-    /// Returns a horizontal typo face descender.
+    /// Returns a horizontal typographic face descender.
+    ///
+    /// Prefer `Face::descender` unless you explicitly want this. This is a more
+    /// low-level alternative.
     ///
     /// This method is affected by variation axes.
     ///
@@ -978,7 +984,10 @@ impl<'a> Face<'a> {
         })
     }
 
-    /// Returns a horizontal typo face line gap.
+    /// Returns a horizontal typographic face line gap.
+    ///
+    /// Prefer `Face::line_gap` unless you explicitly want this. This is a more
+    /// low-level alternative.
     ///
     /// This method is affected by variation axes.
     ///
@@ -1047,13 +1056,13 @@ impl<'a> Face<'a> {
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"xhgt"), v))
     }
 
-    /// Returns face's cap height.
+    /// Returns face's capital height.
     ///
     /// This method is affected by variation axes.
     ///
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
-    pub fn cap_height(&self) -> Option<i16> {
+    pub fn capital_height(&self) -> Option<i16> {
         self.os_2.and_then(|os_2| os_2.cap_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"cpht"), v))
     }

@@ -58,7 +58,7 @@ There are roughly three types of TrueType tables:
 | `CBLC` table      | ✓                      | ✓                   |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ~ (no `seac` support)          |
 | `CFF2` table      | ✓                      | ✓                   |                                |
-| `cmap` table      | ~ (no 8; Unicode-only) | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
+| `cmap` table      | ~ (no 8)               | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
 | `EBDT` table      |                        | ✓                   |                                |
 | `EBLC` table      |                        | ✓                   |                                |
 | `fvar` table      | ✓                      | ✓                   |                                |

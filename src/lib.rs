@@ -936,6 +936,45 @@ impl<'a> Face<'a> {
         }
     }
 
+    /// Returns a horizontal typo face ascender.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn typo_ascender(&self) -> Option<i16> {
+        self.os_2.map(|table| {
+            let v = table.typo_ascender();
+            self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
+        })
+    }
+
+    /// Returns a horizontal typo face descender.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn typo_descender(&self) -> Option<i16> {
+        self.os_2.map(|table| {
+            let v = table.typo_descender();
+            self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
+        })
+    }
+
+    /// Returns a horizontal typo face line gap.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present.
+    #[inline]
+    pub fn typo_line_gap(&self) -> Option<i16> {
+        self.os_2.map(|table| {
+            let v = table.typo_line_gap();
+            self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
+        })
+    }
+
     // TODO: does this affected by USE_TYPO_METRICS?
 
     /// Returns a vertical face ascender.
@@ -990,6 +1029,17 @@ impl<'a> Face<'a> {
     pub fn x_height(&self) -> Option<i16> {
         self.os_2.and_then(|os_2| os_2.x_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"xhgt"), v))
+    }
+
+    /// Returns face's cap height.
+    ///
+    /// This method is affected by variation axes.
+    ///
+    /// Returns `None` when OS/2 table is not present or when its version is < 2.
+    #[inline]
+    pub fn cap_height(&self) -> Option<i16> {
+        self.os_2.and_then(|os_2| os_2.cap_height())
+            .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"cpht"), v))
     }
 
     /// Returns face's underline metrics.

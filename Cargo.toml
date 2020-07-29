@@ -1,6 +1,6 @@
 [package]
 name = "ttf-parser"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
 keywords = ["ttf", "truetype", "opentype"]
 categories = ["parser-implementations"]

@@ -12,8 +12,8 @@
 
 #define TTFP_MAJOR_VERSION 0
 #define TTFP_MINOR_VERSION 8
-#define TTFP_PATCH_VERSION 0
-#define TTFP_VERSION "0.8.0"
+#define TTFP_PATCH_VERSION 1
+#define TTFP_VERSION "0.8.1"
 
 /**
  * @brief A table name.

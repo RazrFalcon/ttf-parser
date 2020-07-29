@@ -367,8 +367,8 @@ pub extern "C" fn ttfp_get_line_gap(face: *const ttfp_face) -> i16 {
 ///
 /// @return `0` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_get_typo_ascender(face: *const ttfp_face) -> i16 {
-    face_from_ptr(face).typo_ascender().unwrap_or(0)
+pub extern "C" fn ttfp_get_typographic_ascender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).typographic_ascender().unwrap_or(0)
 }
 
 /// @brief Returns a horizontal typographic face descender.
@@ -380,8 +380,8 @@ pub extern "C" fn ttfp_get_typo_ascender(face: *const ttfp_face) -> i16 {
 ///
 /// @return `0` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_get_typo_descender(face: *const ttfp_face) -> i16 {
-    face_from_ptr(face).typo_descender().unwrap_or(0)
+pub extern "C" fn ttfp_get_typographic_descender(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).typographic_descender().unwrap_or(0)
 }
 
 /// @brief Returns a horizontal typographic face line gap.
@@ -393,8 +393,8 @@ pub extern "C" fn ttfp_get_typo_descender(face: *const ttfp_face) -> i16 {
 ///
 /// @return `0` when OS/2 table is not present.
 #[no_mangle]
-pub extern "C" fn ttfp_get_typo_line_gap(face: *const ttfp_face) -> i16 {
-    face_from_ptr(face).typo_line_gap().unwrap_or(0)
+pub extern "C" fn ttfp_get_typographic_line_gap(face: *const ttfp_face) -> i16 {
+    face_from_ptr(face).typographic_line_gap().unwrap_or(0)
 }
 
 /// @brief Returns a vertical face ascender.

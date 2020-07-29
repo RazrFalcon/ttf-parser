@@ -961,7 +961,7 @@ impl<'a> Face<'a> {
     ///
     /// Returns `None` when OS/2 table is not present.
     #[inline]
-    pub fn typo_ascender(&self) -> Option<i16> {
+    pub fn typographic_ascender(&self) -> Option<i16> {
         self.os_2.map(|table| {
             let v = table.typo_ascender();
             self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
@@ -977,7 +977,7 @@ impl<'a> Face<'a> {
     ///
     /// Returns `None` when OS/2 table is not present.
     #[inline]
-    pub fn typo_descender(&self) -> Option<i16> {
+    pub fn typographic_descender(&self) -> Option<i16> {
         self.os_2.map(|table| {
             let v = table.typo_descender();
             self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
@@ -993,7 +993,7 @@ impl<'a> Face<'a> {
     ///
     /// Returns `None` when OS/2 table is not present.
     #[inline]
-    pub fn typo_line_gap(&self) -> Option<i16> {
+    pub fn typographic_line_gap(&self) -> Option<i16> {
         self.os_2.map(|table| {
             let v = table.typo_line_gap();
             self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)

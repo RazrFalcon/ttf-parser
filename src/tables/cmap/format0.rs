@@ -42,7 +42,7 @@ pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
 }
 
 #[cfg(test)]
-mod format0_tests {
+mod tests {
     use super::{parse, codepoints};
 
     #[test]
@@ -60,7 +60,7 @@ mod format0_tests {
         assert_eq!(parse(&data, 0), None);
         assert_eq!(parse(&data, 0x40), Some(100));
         assert_eq!(parse(&data, 100), None);
-      
+
         let mut vec = vec![];
         codepoints(&data, |c| vec.push(c));
         assert_eq!(vec, [0x40]);

@@ -128,7 +128,7 @@ pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
 }
 
 #[cfg(test)]
-mod format2_tests {
+mod tests {
     use crate::parser::FromData;
     use super::{parse, codepoints};
 
@@ -163,7 +163,7 @@ mod format2_tests {
         codepoints(&data, |c| vec.push(c));
         assert_eq!(vec, [10256, 10257, 10258, 254, 255]);
     }
-    
+
     #[test]
     fn codepoint_at_range_end() {
         let mut data = vec![

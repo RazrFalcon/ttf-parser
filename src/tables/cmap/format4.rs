@@ -91,7 +91,7 @@ pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
 }
 
 #[cfg(test)]
-mod format4_tests {
+mod tests {
     use super::{parse, codepoints};
 
     #[test]

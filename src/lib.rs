@@ -542,7 +542,7 @@ pub enum FaceParsingError {
     /// Should occur only on malformed fonts.
     MalformedFont,
 
-    /// Face data must start with `0x00010000`, `0x4F54544F` or `0x74746366`.
+    /// Face data must start with `0x00010000`, `0x74727565`, `0x4F54544F` or `0x74746366`.
     UnknownMagic,
 
     /// The face index is larger than the number of faces in the font.

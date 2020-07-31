@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Face::typographic_ascender`
 - `Face::typographic_descender`
 - `Face::typographic_line_gap`
-- `Face::captial_height`
+- `Face::capital_height`
 
 ## [0.8.0] - 2020-07-21
 ### Added

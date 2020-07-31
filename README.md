@@ -141,7 +141,6 @@ test glyph_name_cff_276          ... bench:         109 ns/iter (+/- 1)
 test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
 test glyph_name_cff_8            ... bench:           7 ns/iter (+/- 0)
 test glyph_name_post_8           ... bench:           2 ns/iter (+/- 0)
-
 test subscript_metrics           ... bench:           2 ns/iter (+/- 0)
 test glyph_hor_advance           ... bench:           2 ns/iter (+/- 0)
 test glyph_hor_side_bearing      ... bench:           2 ns/iter (+/- 0)

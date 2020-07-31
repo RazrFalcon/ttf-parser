@@ -122,7 +122,7 @@ impl<'a> Subtable<'a> {
 
     /// Maps a character to a glyph ID.
     ///
-    /// This is a low-level method and unlike `Face::glyph_index` is doesn't
+    /// This is a low-level method and unlike `Face::glyph_index` it doesn't
     /// check that the current encoding is Unicode.
     /// It simply maps a `u32` codepoint number to a glyph ID.
     ///
@@ -178,6 +178,54 @@ impl<'a> Subtable<'a> {
             format14::parse(self.subtable_data, u32::from(c), u32::from(variation))
         } else {
             None
+        }
+    }
+
+    /// Calls `f` for all codepoints contained in this subtable.
+    ///
+    /// This is a low-level method and it doesn't check that the current
+    /// encoding is Unicode. It simply calls the function `f` for all `u32`
+    /// codepoints that are present in this subtable.
+    ///
+    /// Note that this may list codepoints for which `glyph_index` still returns
+    /// `None` because this method finds all codepoints which were _defined_ in
+    /// this subtable. The subtable may still map them to glyph ID `0`.
+    ///
+    /// Returns without doing anything:
+    /// - when format is `MixedCoverage`, since it's not supported.
+    /// - when format is `UnicodeVariationSequences`, since it's not supported.
+    pub fn codepoints<F>(&self, f: F)
+    where
+        F: FnMut(u32),
+    {
+        match self.format {
+            Format::ByteEncodingTable => {
+                format0::codepoints(self.subtable_data, f);
+            }
+            Format::HighByteMappingThroughTable => {
+                format2::codepoints(self.subtable_data, f);
+            },
+            Format::SegmentMappingToDeltaValues => {
+                format4::codepoints(self.subtable_data, f);
+            },
+            Format::TrimmedTableMapping => {
+                format6::codepoints(self.subtable_data, f);
+            },
+            Format::MixedCoverage => {
+                // Unsupported
+            },
+            Format::TrimmedArray => {
+                format10::codepoints(self.subtable_data, f);
+            },
+            Format::SegmentedCoverage => {
+                format12::codepoints(self.subtable_data, f);
+            }
+            Format::ManyToOneRangeMappings => {
+                format13::codepoints(self.subtable_data, f);
+            },
+            Format::UnicodeVariationSequences => {
+                // Unsupported
+            },
         }
     }
 }

@@ -43,3 +43,18 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
 
     None
 }
+
+pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) {
+    let mut s = Stream::new(data);
+    s.skip::<u16>(); // format
+    s.skip::<u16>(); // reserved
+    s.skip::<u32>(); // length
+    s.skip::<u32>(); // language
+    let count: u32 = try_opt_or!(s.read(), ());
+    let groups = try_opt_or!(s.read_array32::<SequentialMapGroup>(count), ());
+    for group in groups {
+        for code_point in group.start_char_code..=group.end_char_code {
+            f(code_point);
+        }
+    }
+}

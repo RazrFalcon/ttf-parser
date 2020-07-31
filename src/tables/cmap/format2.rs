@@ -63,7 +63,7 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
 
     let first_code = sub_header.first_code;
     let range_end = first_code.checked_add(sub_header.entry_count)?;
-    if low_byte < first_code || low_byte > range_end {
+    if low_byte < first_code || low_byte >= range_end {
         return None;
     }
 
@@ -90,4 +90,38 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     }
 
     u16::try_from((i32::from(glyph) + i32::from(sub_header.id_delta)) % 65536).ok()
+}
+
+#[cfg(test)]
+mod format2_tests {
+    use crate::parser::FromData;
+    use super::parse;
+
+    #[test]
+    fn codepoint_at_range_end() {
+        let mut data = vec![
+            0x00, 0x02, // format: 2
+            0x02, 0x14, // subtable size: 532
+            0x00, 0x00, // language ID: 0
+        ];
+
+        // Only single bytes.
+        data.extend(std::iter::repeat(0x00).take(256 * u16::SIZE));
+        data.extend(&[
+            // First sub header (for single byte mapping)
+            0x00, 0x28, // first code: 40
+            0x00, 0x02, // entry count: 2
+            0x00, 0x00, // id delta: 0
+            0x00, 0x02, // id range offset: 2
+            // Glyph index
+            0x00, 0x64, // glyph ID [0]: 100
+            0x03, 0xE8, // glyph ID [1]: 1000
+            0x03, 0xE8, // glyph ID [2]: 10000 (unused)
+        ]);
+
+        assert_eq!(parse(&data, 39), None);
+        assert_eq!(parse(&data, 40), Some(100));
+        assert_eq!(parse(&data, 41), Some(1000));
+        assert_eq!(parse(&data, 42), None);
+    }
 }

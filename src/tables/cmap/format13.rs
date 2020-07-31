@@ -22,7 +22,7 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     None
 }
 
-pub fn codepoints(data: &[u8], f: impl FnMut(u32)) {
+pub fn codepoints(data: &[u8], f: impl FnMut(u32)) -> Option<()> {
     // Only the glyph id mapping differs for this table. The code points are the
     // same as for format 12.
     super::format12::codepoints(data, f)

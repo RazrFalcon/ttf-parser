@@ -92,43 +92,39 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     u16::try_from((i32::from(glyph) + i32::from(sub_header.id_delta)) % 65536).ok()
 }
 
-pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) {
+pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
     let mut s = Stream::new(data);
     s.skip::<u16>(); // format
     s.skip::<u16>(); // length
     s.skip::<u16>(); // language
-    let sub_header_keys = try_opt_or!(s.read_array16::<u16>(256), ());
+    let sub_header_keys = s.read_array16::<u16>(256)?;
 
     // The maximum index in a sub_header_keys is a sub_headers count.
-    let sub_headers_count =
-        try_opt_or!(sub_header_keys.into_iter().map(|n| n / 8).max(), ()) + 1;
-
-    let sub_headers =
-        try_opt_or!(s.read_array16::<SubHeaderRecord>(sub_headers_count), ());
+    let sub_headers_count = sub_header_keys.into_iter().map(|n| n / 8).max()? + 1;
+    let sub_headers = s.read_array16::<SubHeaderRecord>(sub_headers_count)?;
 
     for first_byte in 0u16..256 {
-        let i = try_opt_or!(sub_header_keys.get(first_byte), ()) / 8;
-        let sub_header = try_opt_or!(sub_headers.get(i), ());
+        let i = sub_header_keys.get(first_byte)? / 8;
+        let sub_header = sub_headers.get(i)?;
         let first_code = sub_header.first_code;
 
         if i == 0 {
             // This is a single byte code.
-            let range_end = try_opt_or!(
-                first_code.checked_add(sub_header.entry_count), ()
-            );
-
+            let range_end = first_code.checked_add(sub_header.entry_count)?;
             if first_byte >= first_code && first_byte < range_end {
                 f(u32::from(first_byte));
             }
         } else {
             // This is a two byte code.
-            let base = try_opt_or!(first_code.checked_add(first_byte << 8), ());
+            let base = first_code.checked_add(first_byte << 8)?;
             for k in 0..sub_header.entry_count {
-                let code_point = try_opt_or!(base.checked_add(k), ());
+                let code_point = base.checked_add(k)?;
                 f(u32::from(code_point));
             }
         }
     }
+
+    Some(())
 }
 
 #[cfg(test)]

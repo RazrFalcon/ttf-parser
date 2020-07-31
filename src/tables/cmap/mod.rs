@@ -194,39 +194,38 @@ impl<'a> Subtable<'a> {
     /// Returns without doing anything:
     /// - when format is `MixedCoverage`, since it's not supported.
     /// - when format is `UnicodeVariationSequences`, since it's not supported.
-    pub fn codepoints<F>(&self, f: F)
-    where
-        F: FnMut(u32),
-    {
-        match self.format {
+    pub fn codepoints<F: FnMut(u32)>(&self, f: F) {
+        let _ = match self.format {
             Format::ByteEncodingTable => {
-                format0::codepoints(self.subtable_data, f);
+                format0::codepoints(self.subtable_data, f)
             }
             Format::HighByteMappingThroughTable => {
-                format2::codepoints(self.subtable_data, f);
+                format2::codepoints(self.subtable_data, f)
             },
             Format::SegmentMappingToDeltaValues => {
-                format4::codepoints(self.subtable_data, f);
+                format4::codepoints(self.subtable_data, f)
             },
             Format::TrimmedTableMapping => {
-                format6::codepoints(self.subtable_data, f);
+                format6::codepoints(self.subtable_data, f)
             },
             Format::MixedCoverage => {
                 // Unsupported
+                None
             },
             Format::TrimmedArray => {
-                format10::codepoints(self.subtable_data, f);
+                format10::codepoints(self.subtable_data, f)
             },
             Format::SegmentedCoverage => {
-                format12::codepoints(self.subtable_data, f);
+                format12::codepoints(self.subtable_data, f)
             }
             Format::ManyToOneRangeMappings => {
-                format13::codepoints(self.subtable_data, f);
+                format13::codepoints(self.subtable_data, f)
             },
             Format::UnicodeVariationSequences => {
                 // Unsupported
+                None
             },
-        }
+        };
     }
 }
 

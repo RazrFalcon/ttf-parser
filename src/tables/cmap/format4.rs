@@ -66,26 +66,28 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     None
 }
 
-pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) {
+pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
     let mut s = Stream::new(data);
     s.advance(6); // format + length + language
-    let seg_count_x2: u16 = try_opt_or!(s.read(), ());
+    let seg_count_x2: u16 = s.read()?;
     if seg_count_x2 < 2 {
-        return;
+        return None;
     }
 
     let seg_count = seg_count_x2 / 2;
     s.advance(6); // searchRange + entrySelector + rangeShift
 
-    let end_codes = try_opt_or!(s.read_array16::<u16>(seg_count), ());
+    let end_codes = s.read_array16::<u16>(seg_count)?;
     s.skip::<u16>(); // reservedPad
-    let start_codes = try_opt_or!(s.read_array16::<u16>(seg_count), ());
+    let start_codes = s.read_array16::<u16>(seg_count)?;
 
     for (start, end) in start_codes.into_iter().zip(end_codes) {
         for code_point in start..=end {
             f(u32::from(code_point));
         }
     }
+
+    Some(())
 }
 
 #[cfg(test)]

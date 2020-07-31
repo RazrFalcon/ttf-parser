@@ -16,7 +16,7 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     }
 }
 
-pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) {
+pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
     let mut s = Stream::new(data);
     s.skip::<u16>(); // format
     s.skip::<u16>(); // length
@@ -28,11 +28,13 @@ pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) {
         // always simply call `f` for `0..256` which would be kind of pointless
         // (this array always has length 256 even when the face has only fewer
         // glyphs).
-        let glyph_id: u8 = try_opt_or!(s.read(), ());
+        let glyph_id: u8 = s.read()?;
         if glyph_id != 0 {
             f(code_point);
         }
     }
+
+    Some(())
 }
 
 #[cfg(test)]

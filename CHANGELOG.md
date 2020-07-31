@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - `cmap::Subtable::codepoints`
 
+### Fixed
+- (cmap) Incorrectly returning glyph ID `0` instead of `None` for format 0
+- (cmap) Possible invalid glyph mapping for format 2
+
 ## [0.8.1] - 2020-07-29
 ### Added
 - `Face::is_monospaced`

@@ -66,9 +66,33 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     None
 }
 
+pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
+    let mut s = Stream::new(data);
+    s.advance(6); // format + length + language
+    let seg_count_x2: u16 = s.read()?;
+    if seg_count_x2 < 2 {
+        return None;
+    }
+
+    let seg_count = seg_count_x2 / 2;
+    s.advance(6); // searchRange + entrySelector + rangeShift
+
+    let end_codes = s.read_array16::<u16>(seg_count)?;
+    s.skip::<u16>(); // reservedPad
+    let start_codes = s.read_array16::<u16>(seg_count)?;
+
+    for (start, end) in start_codes.into_iter().zip(end_codes) {
+        for code_point in start..=end {
+            f(u32::from(code_point));
+        }
+    }
+
+    Some(())
+}
+
 #[cfg(test)]
-mod format4_tests {
-    use super::parse;
+mod tests {
+    use super::{parse, codepoints};
 
     #[test]
     fn single_glyph() {
@@ -456,5 +480,30 @@ mod format4_tests {
         ];
 
         assert_eq!(parse(data, 0x41), None);
+    }
+
+    #[test]
+    fn collect_codepoints() {
+        let data = &[
+            0x00, 0x04, // format: 4
+            0x00, 0x18, // subtable size: 24
+            0x00, 0x00, // language ID: 0
+            0x00, 0x04, // 2 x segCount: 4
+            0x00, 0x02, // search range: 2
+            0x00, 0x00, // entry selector: 0
+            0x00, 0x02, // range shift: 2
+            // End character codes
+            0x00, 0x22, // char code [0]: 34
+            0xFF, 0xFF, // char code [1]: 65535
+            0x00, 0x00, // reserved: 0
+            // Start character codes
+            0x00, 0x1B, // char code [0]: 27
+            0xFF, 0xFD, // char code [1]: 65533
+            // codepoints does not care about glyph ids
+        ];
+
+        let mut vec = vec![];
+        codepoints(data, |c| vec.push(c));
+        assert_eq!(vec, [27, 28, 29, 30, 31, 32, 33, 34, 65533, 65534, 65535]);
     }
 }

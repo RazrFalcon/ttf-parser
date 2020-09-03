@@ -50,7 +50,7 @@ There are roughly three types of TrueType tables:
 | Thread safe       | ✓                      |                     | ~ (mostly reentrant)           |
 | Zero allocation   | ✓                      |                     |                                |
 | Variable fonts    | ✓                      | ✓                   |                                |
-| Rendering         |                        | ✓                   | ~ (very primitive)             |
+| Rendering         | -<sup>1</sup>          | ✓                   | ~ (very primitive)             |
 | `avar` table      | ✓                      | ✓                   |                                |
 | `bdat` table      |                        | ✓                   |                                |
 | `bloc` table      |                        | ✓                   |                                |
@@ -64,7 +64,7 @@ There are roughly three types of TrueType tables:
 | `fvar` table      | ✓                      | ✓                   |                                |
 | `gasp` table      |                        | ✓                   |                                |
 | `GDEF` table      | ~                      |                     |                                |
-| `glyf` table      | ~<sup>1</sup>          | ✓                   | ~<sup>1</sup>                  |
+| `glyf` table      | ~<sup>2</sup>          | ✓                   | ~<sup>2</sup>                  |
 | `GPOS` table      |                        |                     | ~ (only 2)                     |
 | `GSUB` table      |                        |                     |                                |
 | `gvar` table      | ✓                      | ✓                   |                                |
@@ -85,7 +85,7 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Dynamic lib size  | <300KiB<sup>2</sup>    | ~760KiB<sup>3</sup> | ? (header-only)                |
+| Dynamic lib size  | <300KiB<sup>3</sup>    | ~760KiB<sup>4</sup> | ? (header-only)                |
 | Tested version    | 0.8.0                  | 2.9.1               | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
@@ -97,11 +97,16 @@ Legend:
 
 Notes:
 
-1. Matching points are not supported.
-2. When using from Rust, the library binary overhead depends on used methods
+1. While `ttf-parser` doesn't support rendering by itself,
+   there are mutliple rendering libraries on top of it:
+   [rusttype](https://gitlab.redox-os.org/redox-os/rusttype),
+   [ab-glyph](https://github.com/alexheretic/ab-glyph)
+   and [fontdue](https://github.com/mooman219/fontdue).
+2. Matching points are not supported.
+3. When using from Rust, the library binary overhead depends on used methods
    and can vary from 10KiB up to 100KiB.<br/>
    When using from C, we have to include the Rust's std too, which blows up the size.
-3. Depends on build flags.
+4. Depends on build flags.
 
 ### Performance
 

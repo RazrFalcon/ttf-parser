@@ -48,8 +48,8 @@ macro_rules! try_opt_or {
     };
 }
 
+pub mod parser;
 mod ggg;
-mod parser;
 mod tables;
 mod var_store;
 

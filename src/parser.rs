@@ -1,3 +1,8 @@
+//! Binary parsing utils.
+//!
+//! This module should not be used directly, unless you're planning to parse
+//! some tables manually.
+
 use core::ops::Range;
 use core::convert::{TryFrom, TryInto};
 
@@ -68,8 +73,11 @@ impl FromData for i32 {
     }
 }
 
-
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+/// A u24 number.
+///
+/// Stored as u32, but encoded as 3 bytes in the font.
+///
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
 #[derive(Clone, Copy, Debug)]
 pub struct U24(pub u32);
 
@@ -121,24 +129,32 @@ impl FromData for Fixed {
 }
 
 
+/// A safe u32 to usize casting.
+///
+/// Rust doesn't implement `From<u32> for usize`,
+/// because it has to support 16 bit targets.
+/// We don't, so we can allow this.
 pub trait NumFrom<T>: Sized {
+    /// Converts u32 into usize.
     fn num_from(_: T) -> Self;
 }
 
-// Rust doesn't implement `From<u32> for usize`,
-// because it has to support 16 bit targets.
-// We don't, so we can allow this.
 impl NumFrom<u32> for usize {
     #[inline]
     fn num_from(v: u32) -> Self {
-        debug_assert!(core::mem::size_of::<usize>() >= 4);
-        v as usize
+        #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+        {
+            v as usize
+        }
+
+        // compilation error on 16 bit targets
     }
 }
 
 
 /// Just like TryFrom<N>, but for numeric types not supported by the Rust's std.
 pub trait TryNumFrom<T>: Sized {
+    /// Casts between numeric types.
     fn try_num_from(_: T) -> Option<Self>;
 }
 
@@ -490,18 +506,23 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
 }
 
 
-#[derive(Clone, Copy, Default)]
+/// A streaming binary parser.
+#[derive(Clone, Copy, Default, Debug)]
 pub struct Stream<'a> {
     data: &'a [u8],
     offset: usize,
 }
 
 impl<'a> Stream<'a> {
+    /// Creates a new `Stream` parser.
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
         Stream { data, offset: 0 }
     }
 
+    /// Creates a new `Stream` parser at offset.
+    ///
+    /// Returns `None` when `offset` is out of bounds.
     #[inline]
     pub fn new_at(data: &'a [u8], offset: usize) -> Option<Self> {
         if offset <= data.len() {
@@ -511,36 +532,51 @@ impl<'a> Stream<'a> {
         }
     }
 
+    /// Checks that stream reached the end of the data.
     #[inline]
     pub fn at_end(&self) -> bool {
         self.offset >= self.data.len()
     }
 
+    /// Jumps to the end of the stream.
+    ///
+    /// Useful to indicate that we parsed all the data.
     #[inline]
     pub fn jump_to_end(&mut self) {
         self.offset = self.data.len();
     }
 
+    /// Returns the current offset.
     #[inline]
     pub fn offset(&self) -> usize {
         self.offset
     }
 
+    /// Returns the trailing data.
+    ///
+    /// Returns `None` when `Stream` is reached the end.
     #[inline]
     pub fn tail(&self) -> Option<&'a [u8]> {
         self.data.get(self.offset..)
     }
 
+    /// Advances by `FromData::SIZE`.
+    ///
+    /// Doesn't check bounds.
     #[inline]
     pub fn skip<T: FromData>(&mut self) {
         self.advance(T::SIZE);
     }
 
+    /// Advances by the specified `len`.
+    ///
+    /// Doesn't check bounds.
     #[inline]
     pub fn advance(&mut self, len: usize) {
         self.offset += len;
     }
 
+    /// Advances by the specified `len` and checks for bounds.
     #[inline]
     pub fn advance_checked(&mut self, len: usize) -> Option<()> {
         if self.offset + len <= self.data.len() {
@@ -551,16 +587,22 @@ impl<'a> Stream<'a> {
         }
     }
 
+    /// Parses the type from the steam.
+    ///
+    /// Returns `None` when there is not enough data left in the stream
+    /// or the type parsing failed.
     #[inline]
     pub fn read<T: FromData>(&mut self) -> Option<T> {
         self.read_bytes(T::SIZE).and_then(T::parse)
     }
 
+    /// Parses the type from the steam at offset.
     #[inline]
     pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> Option<T> {
         data.get(offset..offset + T::SIZE).and_then(T::parse)
     }
 
+    /// Reads N bytes from the stream.
     #[inline]
     pub fn read_bytes(&mut self, len: usize) -> Option<&'a [u8]> {
         let v = self.data.get(self.offset..self.offset + len)?;
@@ -568,12 +610,14 @@ impl<'a> Stream<'a> {
         Some(v)
     }
 
+    /// Reads the next `count` types as a slice.
     #[inline]
     pub fn read_array16<T: FromData>(&mut self, count: u16) -> Option<LazyArray16<'a, T>> {
         let len = usize::from(count) * T::SIZE;
         self.read_bytes(len).map(LazyArray16::new)
     }
 
+    /// Reads the next `count` types as a slice.
     #[inline]
     pub fn read_array32<T: FromData>(&mut self, count: u32) -> Option<LazyArray32<'a, T>> {
         let len = usize::num_from(count) * T::SIZE;
@@ -582,12 +626,17 @@ impl<'a> Stream<'a> {
 }
 
 
+/// A common offset methods.
 pub trait Offset {
+    /// Converts the offset to `usize`.
     fn to_usize(&self) -> usize;
+
+    /// Checks that offset is null.
     fn is_null(&self) -> bool { self.to_usize() == 0 }
 }
 
 
+/// A type-safe u16 offset.
 #[derive(Clone, Copy, Debug)]
 pub struct Offset16(pub u16);
 
@@ -618,6 +667,7 @@ impl FromData for Option<Offset16> {
 }
 
 
+/// A type-safe u32 offset.
 #[derive(Clone, Copy, Debug)]
 pub struct Offset32(pub u32);
 
@@ -650,13 +700,13 @@ impl FromData for Option<Offset32> {
 
 
 #[inline]
-pub fn i16_bound(min: i16, val: i16, max: i16) -> i16 {
+pub(crate) fn i16_bound(min: i16, val: i16, max: i16) -> i16 {
     use core::cmp;
     cmp::max(min, cmp::min(max, val))
 }
 
 #[inline]
-pub fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
+pub(crate) fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
     debug_assert!(min.is_finite());
     debug_assert!(val.is_finite());
     debug_assert!(max.is_finite());

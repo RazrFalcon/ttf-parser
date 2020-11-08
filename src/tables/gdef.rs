@@ -1,8 +1,9 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 
-use crate::GlyphId;
+use crate::{GlyphId, NormalizedCoordinate};
 use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16};
 use crate::ggg::{Class, ClassDefinitionTable, CoverageTable};
+use crate::var_store::ItemVariationStore;
 
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
@@ -21,6 +22,7 @@ pub struct Table<'a> {
     glyph_classes: Option<ClassDefinitionTable<'a>>,
     mark_attach_classes: Option<ClassDefinitionTable<'a>>,
     mark_glyph_coverage_offsets: Option<(&'a [u8], LazyArray16<'a, Offset32>)>,
+    variation_store: Option<ItemVariationStore<'a>>,
 }
 
 impl<'a> Table<'a> {
@@ -39,9 +41,11 @@ impl<'a> Table<'a> {
         let mut mark_glyph_sets_def_offset: Option<Offset16> = None;
         if version > 0x00010000 {
             mark_glyph_sets_def_offset = s.read()?;
+        }
 
-            // version > 0x00010003
-            // s.skip::<Offset32>(); // itemVarStoreOffset
+        let mut var_store_offset: Option<Offset32> = None;
+        if version > 0x00010002 {
+            var_store_offset = s.read();
         }
 
         let mut table = Table::default();
@@ -69,6 +73,13 @@ impl<'a> Table<'a> {
                         }
                     }
                 }
+            }
+        }
+
+        if let Some(offset) = var_store_offset {
+            if let Some(subdata) = data.get(offset.to_usize()..) {
+                let s = Stream::new(subdata);
+                table.variation_store = ItemVariationStore::parse(s);
             }
         }
 
@@ -101,6 +112,17 @@ impl<'a> Table<'a> {
     #[inline]
     pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u16>) -> bool {
         is_mark_glyph_impl(self, glyph_id, set_index).is_some()
+    }
+
+    #[inline]
+    pub fn variation_delta(
+        &self,
+        outer_index: u16,
+        inner_index: u16,
+        coordinates: &[NormalizedCoordinate],
+    ) -> Option<f32> {
+        self.variation_store
+            .and_then(|store| store.parse_delta(outer_index, inner_index, coordinates))
     }
 }
 

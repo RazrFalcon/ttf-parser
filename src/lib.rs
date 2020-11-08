@@ -1326,6 +1326,15 @@ impl<'a> Face<'a> {
         try_opt_or!(self.gdef, false).is_mark_glyph(glyph_id, set_index)
     }
 
+    /// Returns glyph's variation delta at a specified index according to
+    /// [Item Variation Store Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#item-variation-store-table).
+    #[inline]
+    pub fn glyph_variation_delta(&self, outer_index: u16, inner_index: u16) -> Option<f32> {
+        self.gdef.and_then(|gdef|
+            gdef.variation_delta(outer_index, inner_index, self.coordinates.as_slice()))
+    }
+
     /// Returns a iterator over kerning subtables.
     ///
     /// Supports both

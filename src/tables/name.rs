@@ -251,8 +251,12 @@ impl<'a> Iterator for Names<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.total {
+            let index = usize::from(self.index);
             self.index += 1;
-            self.nth(usize::from(self.index) - 1)
+            Some(Name {
+                data: Stream::read_at::<NameRecord>(self.names, NameRecord::SIZE * index)?,
+                strings: self.storage,
+            })
         } else {
             None
         }
@@ -260,13 +264,6 @@ impl<'a> Iterator for Names<'a> {
 
     fn count(self) -> usize {
         usize::from(self.total)
-    }
-
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        Some(Name {
-            data: Stream::read_at::<NameRecord>(self.names, NameRecord::SIZE * n)?,
-            strings: self.storage,
-        })
     }
 }
 

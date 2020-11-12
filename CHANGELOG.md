@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - `Face::glyph_variation_delta`
 
+### Fixed
+- `Iterator::nth` implementation for `cmap::Subtables` and `Names`.
+
 ## [0.8.2] - 2020-07-31
 ### Added
 - `cmap::Subtable::codepoints`

@@ -362,11 +362,6 @@ impl<'a, T: FromData> Iterator for LazyArrayIter16<'a, T> {
         self.index += 1; // TODO: check
         self.data.get(self.index - 1)
     }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.data.get(u16::try_from(n).ok()?)
-    }
 }
 
 
@@ -497,11 +492,6 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
     #[inline]
     fn count(self) -> usize {
         usize::num_from(self.data.len())
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.data.get(u32::try_from(n).ok()?)
     }
 }
 

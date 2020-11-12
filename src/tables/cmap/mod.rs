@@ -44,8 +44,18 @@ impl<'a> Iterator for Subtables<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.records.len() {
+            let index = u16::try_from(self.index).ok()?;
             self.index += 1;
-            self.nth(usize::from(self.index) - 1)
+
+            let record = self.records.get(index)?;
+            let subtable_data = self.data.get(usize::num_from(record.offset)..)?;
+            let format: Format = Stream::read_at(subtable_data, 0)?;
+            Some(Subtable {
+                platform_id: record.platform_id,
+                encoding_id: record.encoding_id,
+                format,
+                subtable_data,
+            })
         } else {
             None
         }
@@ -54,20 +64,6 @@ impl<'a> Iterator for Subtables<'a> {
     #[inline]
     fn count(self) -> usize {
         usize::from(self.records.len())
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let index = u16::try_from(n).ok()?;
-        let record = self.records.get(index)?;
-        let subtable_data = self.data.get(usize::num_from(record.offset)..)?;
-        let format: Format = Stream::read_at(subtable_data, 0)?;
-        Some(Subtable {
-            platform_id: record.platform_id,
-            encoding_id: record.encoding_id,
-            format,
-            subtable_data,
-        })
     }
 }
 

@@ -1353,7 +1353,8 @@ impl<'a> Face<'a> {
     /// You must check `outline_glyph()` result before using
     /// `OutlineBuilder`'s output.
     ///
-    /// `glyf`, `gvar`, `CFF` and `CFF2` tables are supported.
+    /// `gvar`, `glyf`, `CFF` and `CFF2` tables are supported.
+    /// And they will be accesses in this specific order.
     ///
     /// This method is affected by variation axes.
     ///
@@ -1470,6 +1471,7 @@ impl<'a> Face<'a> {
     ///
     /// There are multiple ways an image can be stored in a TrueType font
     /// and this method supports only `sbix`, `CBLC`+`CBDT`.
+    /// Font's tables be accesses in this specific order.
     #[inline]
     pub fn glyph_raster_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<RasterGlyphImage> {
         if let Some(sbix_data) = self.sbix {

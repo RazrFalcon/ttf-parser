@@ -693,6 +693,15 @@ pub extern "C" fn ttfp_is_mark_glyph(face: *const ttfp_face, glyph_id: GlyphId) 
     face_from_ptr(face).is_mark_glyph(glyph_id, None)
 }
 
+/// @brief Returns glyph's variation delta at a specified index according to
+/// Item Variation Store Table.
+///
+/// @return Delta or `0.0` when there is no delta.
+#[no_mangle]
+pub extern "C" fn ttfp_glyph_variation_delta(face: *const ttfp_face, outer_index: u16, inner_index: u16) -> f32 {
+    face_from_ptr(face).glyph_variation_delta(outer_index, inner_index).unwrap_or(0.0)
+}
+
 /// @brief Outlines a glyph and returns its tight bounding box.
 ///
 /// **Warning**: since `ttf-parser` is a pull parser,

@@ -576,6 +576,14 @@ uint16_t ttfp_get_glyph_mark_attachment_class(const ttfp_face *face, uint16_t gl
 bool ttfp_is_mark_glyph(const ttfp_face *face, uint16_t glyph_id);
 
 /**
+ * @brief Returns glyph's variation delta at a specified index according to
+ * Item Variation Store Table.
+ *
+ * @return Delta or `0.0` when there is no delta.
+ */
+float ttfp_glyph_variation_delta(const ttfp_face *face, uint16_t outer_index, uint16_t inner_index);
+
+/**
  * @brief Outlines a glyph and returns its tight bounding box.
  *
  * **Warning**: since `ttf-parser` is a pull parser,

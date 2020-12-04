@@ -19,6 +19,15 @@ pub trait FromData: Sized {
     fn parse(data: &[u8]) -> Option<Self>;
 }
 
+impl FromData for () {
+    const SIZE: usize = 0;
+
+    #[inline]
+    fn parse(_: &[u8]) -> Option<Self> {
+        Some(())
+    }
+}
+
 impl FromData for u8 {
     const SIZE: usize = 1;
 

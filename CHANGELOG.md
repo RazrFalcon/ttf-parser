@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Removed
+- `kern` AAT subtable 1 aka `kern::state_machine`.
+  Mainly because it's useless without a proper shaping.
 
 ## [0.8.3] - 2020-11-15
 ### Added

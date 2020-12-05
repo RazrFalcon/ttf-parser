@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.9.0] - 2020-12-05
 ### Removed
 - `kern` AAT subtable 1 aka `kern::state_machine`.
   Mainly because it's useless without a proper shaping.
@@ -196,7 +198,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.0...v0.8.1

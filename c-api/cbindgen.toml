@@ -6,6 +6,9 @@ documentation_style = "doxy"
 header = "/**\n * @file ttfparser.h\n *\n * A C API for the Rust's ttf-parser library.\n */"
 cpp_compat = true
 
+[defines]
+"feature = variable-fonts" = "TTFP_VARIABLE_FONTS"
+
 [fn]
 sort_by = "None"
 

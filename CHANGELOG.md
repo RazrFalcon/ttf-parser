@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `variable-fonts` build feature. Enabled by default.
+  By disabling it you can reduce `ttf-parser` binary size overhead almost twice.
 
 ## [0.9.0] - 2020-12-05
 ### Removed

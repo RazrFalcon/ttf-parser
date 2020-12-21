@@ -11,31 +11,42 @@ jobs:
     strategy:
       matrix:
         rust:
-          - stable
           - 1.35.0
+          - stable
     steps:
     - name: Checkout
       uses: actions/checkout@v2
 
-    - name: Build without std
+    - name: Build
       run: cargo build --no-default-features
 
     - name: Build with std
-      run: cargo build
+      run: cargo build --no-default-features --features std
+
+    - name: Build with variable-fonts
+      run: cargo build --no-default-features --features variable-fonts
+
+    - name: Build with all features
+      run: cargo build --all-features
 
     - name: Run tests
       run: cargo test
 
+    - name: Build C API
+      working-directory: c-api
+      run: cargo build --no-default-features
+
+    - name: Build C API with variable-fonts
+      working-directory: c-api
+      run: cargo build --no-default-features --features variable-fonts
+
     - name: Test C API
+      working-directory: c-api
       run: |
-        cd c-api
         cargo build
         gcc test.c -o test -L./target/debug/ -lttfparser -Werror -fsanitize=address
         env LD_LIBRARY_PATH=./target/debug/ ./test
-        cd ..
 
     - name: Build benches
-      run: |
-        cd benches
-        cargo bench dummy # `cargo build` will not actually build it
-        cd ..
+      working-directory: benches
+      run: cargo bench dummy # `cargo build` will not actually build it

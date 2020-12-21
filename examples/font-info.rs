@@ -46,11 +46,13 @@ fn main() {
     println!("Superscript: {:?}", face.superscript_metrics());
     println!("Variable: {:?}", face.is_variable());
 
-    if face.is_variable() {
-        println!("Variation axes:");
-        for axis in face.variation_axes() {
-            println!("  {} {}..{}, default {}",
-                     axis.tag, axis.min_value, axis.max_value, axis.def_value);
+    #[cfg(feature = "variable-fonts")] {
+        if face.is_variable() {
+            println!("Variation axes:");
+            for axis in face.variation_axes() {
+                println!("  {} {}..{}, default {}",
+                         axis.tag, axis.min_value, axis.max_value, axis.def_value);
+            }
         }
     }
 

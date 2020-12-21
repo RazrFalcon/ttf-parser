@@ -1,9 +1,11 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 
-use crate::{GlyphId, NormalizedCoordinate};
+use crate::GlyphId;
 use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16};
 use crate::ggg::{Class, ClassDefinitionTable, CoverageTable};
-use crate::var_store::ItemVariationStore;
+
+#[cfg(feature = "variable-fonts")] use crate::NormalizedCoordinate;
+#[cfg(feature = "variable-fonts")] use crate::var_store::ItemVariationStore;
 
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
@@ -22,7 +24,7 @@ pub struct Table<'a> {
     glyph_classes: Option<ClassDefinitionTable<'a>>,
     mark_attach_classes: Option<ClassDefinitionTable<'a>>,
     mark_glyph_coverage_offsets: Option<(&'a [u8], LazyArray16<'a, Offset32>)>,
-    variation_store: Option<ItemVariationStore<'a>>,
+    #[cfg(feature = "variable-fonts")] variation_store: Option<ItemVariationStore<'a>>,
 }
 
 impl<'a> Table<'a> {
@@ -43,9 +45,15 @@ impl<'a> Table<'a> {
             mark_glyph_sets_def_offset = s.read()?;
         }
 
+        #[allow(unused_mut)]
+        #[allow(unused_variables)]
         let mut var_store_offset: Option<Offset32> = None;
-        if version > 0x00010002 {
-            var_store_offset = s.read();
+
+        #[cfg(feature = "variable-fonts")]
+        {
+            if version > 0x00010002 {
+                var_store_offset = s.read();
+            }
         }
 
         let mut table = Table::default();
@@ -76,10 +84,13 @@ impl<'a> Table<'a> {
             }
         }
 
-        if let Some(offset) = var_store_offset {
-            if let Some(subdata) = data.get(offset.to_usize()..) {
-                let s = Stream::new(subdata);
-                table.variation_store = ItemVariationStore::parse(s);
+        #[cfg(feature = "variable-fonts")]
+        {
+            if let Some(offset) = var_store_offset {
+                if let Some(subdata) = data.get(offset.to_usize()..) {
+                    let s = Stream::new(subdata);
+                    table.variation_store = ItemVariationStore::parse(s);
+                }
             }
         }
 
@@ -114,6 +125,7 @@ impl<'a> Table<'a> {
         is_mark_glyph_impl(self, glyph_id, set_index).is_some()
     }
 
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn variation_delta(
         &self,

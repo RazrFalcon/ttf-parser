@@ -3,10 +3,10 @@
 use std::convert::TryFrom;
 use std::os::raw::{c_void, c_char};
 
-use ttf_parser::{GlyphId, Tag};
+use ttf_parser::GlyphId;
+#[cfg(feature = "variable-fonts")] use ttf_parser::Tag;
 
 /// @brief An opaque pointer to the font face structure.
-#[repr(C)]
 pub struct ttfp_face {
     _unused: [u8; 0],
 }
@@ -112,6 +112,7 @@ fn face_from_ptr(face: *const ttfp_face) -> &'static ttf_parser::Face<'static> {
     unsafe { &*(face as *const ttf_parser::Face) }
 }
 
+#[cfg(feature = "variable-fonts")]
 fn face_from_mut_ptr(face: *const ttfp_face) -> &'static mut ttf_parser::Face<'static> {
     unsafe { &mut *(face as *mut ttf_parser::Face) }
 }
@@ -697,6 +698,7 @@ pub extern "C" fn ttfp_is_mark_glyph(face: *const ttfp_face, glyph_id: GlyphId) 
 /// Item Variation Store Table.
 ///
 /// @return Delta or `0.0` when there is no delta.
+#[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_glyph_variation_delta(face: *const ttfp_face, outer_index: u16, inner_index: u16) -> f32 {
     face_from_ptr(face).glyph_variation_delta(outer_index, inner_index).unwrap_or(0.0)
@@ -850,12 +852,14 @@ pub extern "C" fn ttfp_get_glyph_svg_image(
 }
 
 /// @brief Returns the amount of variation axes.
+#[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_get_variation_axes_count(face: *const ttfp_face) -> u16 {
     face_from_ptr(face).variation_axes().count() as u16
 }
 
 /// @brief Returns a variation axis by index.
+#[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_get_variation_axis(
     face: *const ttfp_face,
@@ -872,6 +876,7 @@ pub extern "C" fn ttfp_get_variation_axis(
 }
 
 /// @brief Returns a variation axis by tag.
+#[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_get_variation_axis_by_tag(
     face: *const ttfp_face,
@@ -898,6 +903,7 @@ pub extern "C" fn ttfp_get_variation_axis_by_tag(
 /// Since coordinates are stored on the stack, we allow only 32 of them.
 ///
 /// @return `false` when face is not variable or doesn't have such axis.
+#[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_set_variation(face: *mut ttfp_face, axis: Tag, value: f32) -> bool {
     face_from_mut_ptr(face).set_variation(axis, value).is_some()
@@ -906,12 +912,14 @@ pub extern "C" fn ttfp_set_variation(face: *mut ttfp_face, axis: Tag, value: f32
 /// @brief Returns the current normalized variation coordinates.
 ///
 /// Values represented as f2.16
+#[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_get_variation_coordinates(face: *const ttfp_face) -> *const i16 {
     face_from_ptr(face).variation_coordinates().as_ptr() as _
 }
 
 /// @brief Checks that face has non-default variation coordinates.
+#[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_has_non_default_variation_coordinates(face: *const ttfp_face) -> bool {
     face_from_ptr(face).has_non_default_variation_coordinates()

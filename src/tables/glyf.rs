@@ -152,6 +152,7 @@ pub struct Transform {
 }
 
 impl Transform {
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn new_translate(tx: f32, ty: f32) -> Self {
         Transform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: tx, f: ty }
@@ -295,6 +296,7 @@ pub struct GlyphPointsIter<'a> {
     pub points_left: u16, // Number of points left in the glyph.
 }
 
+#[cfg(feature = "variable-fonts")]
 impl GlyphPointsIter<'_> {
     #[inline]
     pub fn current_contour(&self) -> u16 {

@@ -51,16 +51,16 @@ macro_rules! try_opt_or {
 pub mod parser;
 mod ggg;
 mod tables;
-mod var_store;
+#[cfg(feature = "variable-fonts")] mod var_store;
 
 #[cfg(feature = "std")]
 mod writer;
 
 use tables::*;
 use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, Offset32, Offset};
-use parser::{i16_bound, f32_bound};
 use head::IndexToLocationFormat;
-pub use fvar::{VariationAxes, VariationAxis};
+
+#[cfg(feature = "variable-fonts")] pub use fvar::{VariationAxes, VariationAxis};
 pub use gdef::GlyphClass;
 pub use ggg::*;
 pub use name::*;
@@ -124,7 +124,7 @@ impl From<i16> for NormalizedCoordinate {
     /// The provided number will be clamped to the -16384..16384 range.
     #[inline]
     fn from(n: i16) -> Self {
-        NormalizedCoordinate(i16_bound(-16384, n, 16384))
+        NormalizedCoordinate(parser::i16_bound(-16384, n, 16384))
     }
 }
 
@@ -134,7 +134,7 @@ impl From<f32> for NormalizedCoordinate {
     /// The provided number will be clamped to the -1.0..1.0 range.
     #[inline]
     fn from(n: f32) -> Self {
-        NormalizedCoordinate((f32_bound(-1.0, n, 1.0) * 16384.0) as i16)
+        NormalizedCoordinate((parser::f32_bound(-1.0, n, 1.0) * 16384.0) as i16)
     }
 }
 
@@ -512,14 +512,17 @@ impl FromData for TableRecord {
 }
 
 
-const MAX_VAR_COORDS: u8 = 32;
+#[cfg(feature = "variable-fonts")]
+const MAX_VAR_COORDS: usize = 32;
 
+#[cfg(feature = "variable-fonts")]
 #[derive(Clone, Default)]
 struct VarCoords {
-    data: [NormalizedCoordinate; MAX_VAR_COORDS as usize],
+    data: [NormalizedCoordinate; MAX_VAR_COORDS],
     len: u8,
 }
 
+#[cfg(feature = "variable-fonts")]
 impl VarCoords {
     #[inline]
     fn as_slice(&self) -> &[NormalizedCoordinate] {
@@ -580,23 +583,18 @@ impl std::error::Error for FaceParsingError {}
 pub struct Face<'a> {
     font_data: &'a [u8], // The input data. Used by Face::table_data.
     table_records: LazyArray16<'a, TableRecord>,
-    avar: Option<avar::Table<'a>>,
+
     cbdt: Option<&'a [u8]>,
     cblc: Option<&'a [u8]>,
     cff1: Option<cff1::Metadata<'a>>,
-    cff2: Option<cff2::Metadata<'a>>,
     cmap: Option<cmap::Subtables<'a>>,
-    fvar: Option<fvar::Table<'a>>,
     gdef: Option<gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
-    gvar: Option<gvar::Table<'a>>,
     head: &'a [u8],
     hhea: &'a [u8],
     hmtx: Option<hmtx::Table<'a>>,
-    hvar: Option<hvar::Table<'a>>,
     kern: Option<kern::Subtables<'a>>,
     loca: Option<loca::Table<'a>>,
-    mvar: Option<mvar::Table<'a>>,
     name: Option<name::Names<'a>>,
     os_2: Option<os2::Table<'a>>,
     post: Option<post::Table<'a>>,
@@ -605,9 +603,18 @@ pub struct Face<'a> {
     sbix: Option<&'a [u8]>,
     svg_: Option<&'a [u8]>,
     vorg: Option<vorg::Table<'a>>,
-    vvar: Option<hvar::Table<'a>>,
+
+    // Variable font tables.
+    #[cfg(feature = "variable-fonts")] avar: Option<avar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")] cff2: Option<cff2::Metadata<'a>>,
+    #[cfg(feature = "variable-fonts")] fvar: Option<fvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")] gvar: Option<gvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")] hvar: Option<hvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")] mvar: Option<mvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")] vvar: Option<hvar::Table<'a>>,
+
     number_of_glyphs: NonZeroU16,
-    coordinates: VarCoords,
+    #[cfg(feature = "variable-fonts")] coordinates: VarCoords,
 }
 
 impl<'a> Face<'a> {
@@ -659,23 +666,17 @@ impl<'a> Face<'a> {
         let mut face = Face {
             font_data: data,
             table_records: tables,
-            avar: None,
             cbdt: None,
             cblc: None,
             cff1: None,
-            cff2: None,
             cmap: None,
-            fvar: None,
             gdef: None,
             glyf: None,
-            gvar: None,
             head: &[],
             hhea: &[],
             hmtx: None,
-            hvar: None,
             kern: None,
             loca: None,
-            mvar: None,
             name: None,
             os_2: None,
             post: None,
@@ -684,9 +685,15 @@ impl<'a> Face<'a> {
             sbix: None,
             svg_: None,
             vorg: None,
-            vvar: None,
+            #[cfg(feature = "variable-fonts")] avar: None,
+            #[cfg(feature = "variable-fonts")] cff2: None,
+            #[cfg(feature = "variable-fonts")] fvar: None,
+            #[cfg(feature = "variable-fonts")] gvar: None,
+            #[cfg(feature = "variable-fonts")] hvar: None,
+            #[cfg(feature = "variable-fonts")] mvar: None,
+            #[cfg(feature = "variable-fonts")] vvar: None,
             number_of_glyphs: NonZeroU16::new(1).unwrap(), // dummy
-            coordinates: VarCoords::default(),
+            #[cfg(feature = "variable-fonts")] coordinates: VarCoords::default(),
         };
 
         let mut number_of_glyphs = None;
@@ -704,18 +711,25 @@ impl<'a> Face<'a> {
                 b"CBDT" => face.cbdt = data.get(range),
                 b"CBLC" => face.cblc = data.get(range),
                 b"CFF " => face.cff1 = data.get(range).and_then(|data| cff1::parse_metadata(data)),
+                #[cfg(feature = "variable-fonts")]
                 b"CFF2" => face.cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
                 b"GDEF" => face.gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
+                #[cfg(feature = "variable-fonts")]
                 b"HVAR" => face.hvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
+                #[cfg(feature = "variable-fonts")]
                 b"MVAR" => face.mvar = data.get(range).and_then(|data| mvar::Table::parse(data)),
                 b"OS/2" => face.os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
                 b"SVG " => face.svg_ = data.get(range),
                 b"VORG" => face.vorg = data.get(range).and_then(|data| vorg::Table::parse(data)),
+                #[cfg(feature = "variable-fonts")]
                 b"VVAR" => face.vvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
+                #[cfg(feature = "variable-fonts")]
                 b"avar" => face.avar = data.get(range).and_then(|data| avar::Table::parse(data)),
                 b"cmap" => face.cmap = data.get(range).and_then(|data| cmap::parse(data)),
+                #[cfg(feature = "variable-fonts")]
                 b"fvar" => face.fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
                 b"glyf" => face.glyf = data.get(range),
+                #[cfg(feature = "variable-fonts")]
                 b"gvar" => face.gvar = data.get(range).and_then(|data| gvar::Table::parse(data)),
                 b"head" => face.head = data.get(range).and_then(|data| head::parse(data)).unwrap_or_default(),
                 b"hhea" => face.hhea = data.get(range).and_then(|data| hhea::parse(data)).unwrap_or_default(),
@@ -745,8 +759,10 @@ impl<'a> Face<'a> {
             None => return Err(FaceParsingError::NoMaxpTable),
         };
 
-        if let Some(ref fvar) = face.fvar {
-            face.coordinates.len = fvar.axes().count().min(MAX_VAR_COORDS as usize) as u8;
+        #[cfg(feature = "variable-fonts")] {
+            if let Some(ref fvar) = face.fvar {
+                face.coordinates.len = fvar.axes().count().min(MAX_VAR_COORDS) as u8;
+            }
         }
 
         if let Some(data) = hmtx {
@@ -773,6 +789,7 @@ impl<'a> Face<'a> {
     /// Checks that face has a specified table.
     ///
     /// Will return `true` only for tables that were successfully parsed.
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn has_table(&self, name: TableName) -> bool {
         match name {
@@ -801,6 +818,43 @@ impl<'a> Face<'a> {
             TableName::VerticalHeader               => self.vhea.is_some(),
             TableName::VerticalMetrics              => self.vmtx.is_some(),
             TableName::VerticalMetricsVariations    => self.vvar.is_some(),
+            TableName::VerticalOrigin               => self.vorg.is_some(),
+            TableName::WindowsMetrics               => self.os_2.is_some(),
+        }
+    }
+
+    /// Checks that face has a specified table.
+    ///
+    /// Will return `true` only for tables that were successfully parsed.
+    #[cfg(not(feature = "variable-fonts"))]
+    #[inline]
+    pub fn has_table(&self, name: TableName) -> bool {
+        match name {
+            TableName::Header                       => true,
+            TableName::HorizontalHeader             => true,
+            TableName::MaximumProfile               => true,
+            TableName::AxisVariations               => false,
+            TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
+            TableName::ColorBitmapData              => self.cbdt.is_some(),
+            TableName::ColorBitmapLocation          => self.cblc.is_some(),
+            TableName::CompactFontFormat            => self.cff1.is_some(),
+            TableName::CompactFontFormat2           => false,
+            TableName::FontVariations               => false,
+            TableName::GlyphData                    => self.glyf.is_some(),
+            TableName::GlyphDefinition              => self.gdef.is_some(),
+            TableName::GlyphVariations              => false,
+            TableName::HorizontalMetrics            => self.hmtx.is_some(),
+            TableName::HorizontalMetricsVariations  => false,
+            TableName::IndexToLocation              => self.loca.is_some(),
+            TableName::Kerning                      => self.kern.is_some(),
+            TableName::MetricsVariations            => false,
+            TableName::Naming                       => self.name.is_some(),
+            TableName::PostScript                   => self.post.is_some(),
+            TableName::ScalableVectorGraphics       => self.svg_.is_some(),
+            TableName::StandardBitmapGraphics       => self.sbix.is_some(),
+            TableName::VerticalHeader               => self.vhea.is_some(),
+            TableName::VerticalMetrics              => self.vmtx.is_some(),
+            TableName::VerticalMetricsVariations    => false,
             TableName::VerticalOrigin               => self.vorg.is_some(),
             TableName::WindowsMetrics               => self.os_2.is_some(),
         }
@@ -872,8 +926,14 @@ impl<'a> Face<'a> {
     /// Simply checks the presence of a `fvar` table.
     #[inline]
     pub fn is_variable(&self) -> bool {
-        // `fvar::Table::parse` already checked that `axisCount` is non-zero.
-        self.fvar.is_some()
+        #[cfg(feature = "variable-fonts")] {
+            // `fvar::Table::parse` already checked that `axisCount` is non-zero.
+            self.fvar.is_some()
+        }
+
+        #[cfg(not(feature = "variable-fonts"))] {
+            false
+        }
     }
 
     /// Returns face's weight.
@@ -1075,10 +1135,12 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn underline_metrics(&self) -> Option<LineMetrics> {
         let mut metrics = self.post?.underline_metrics();
+
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"undo"), &mut metrics.position);
             self.apply_metrics_variation_to(Tag::from_bytes(b"unds"), &mut metrics.thickness);
         }
+
         Some(metrics)
     }
 
@@ -1090,10 +1152,12 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
         let mut metrics = self.os_2?.strikeout_metrics();
+
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"stro"), &mut metrics.position);
             self.apply_metrics_variation_to(Tag::from_bytes(b"strs"), &mut metrics.thickness);
         }
+
         Some(metrics)
     }
 
@@ -1105,12 +1169,14 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
         let mut metrics = self.os_2?.subscript_metrics();
+
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"sbxs"), &mut metrics.x_size);
             self.apply_metrics_variation_to(Tag::from_bytes(b"sbys"), &mut metrics.y_size);
             self.apply_metrics_variation_to(Tag::from_bytes(b"sbxo"), &mut metrics.x_offset);
             self.apply_metrics_variation_to(Tag::from_bytes(b"sbyo"), &mut metrics.y_offset);
         }
+
         Some(metrics)
     }
 
@@ -1122,12 +1188,14 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
         let mut metrics = self.os_2?.superscript_metrics();
+
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"spxs"), &mut metrics.x_size);
             self.apply_metrics_variation_to(Tag::from_bytes(b"spys"), &mut metrics.y_size);
             self.apply_metrics_variation_to(Tag::from_bytes(b"spxo"), &mut metrics.x_offset);
             self.apply_metrics_variation_to(Tag::from_bytes(b"spyo"), &mut metrics.y_offset);
         }
+
         Some(metrics)
     }
 
@@ -1198,17 +1266,23 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_hor_advance(&self, glyph_id: GlyphId) -> Option<u16> {
-        let mut advance = self.hmtx?.advance(glyph_id)? as f32;
+        #[cfg(feature = "variable-fonts")] {
+            let mut advance = self.hmtx?.advance(glyph_id)? as f32;
 
-        if self.is_variable() {
-            // Ignore variation offset when `hvar` is not set.
-            if let Some(hvar_data) = self.hvar {
-                // We can't use `round()` in `no_std`, so this is the next best thing.
-                advance += hvar::glyph_advance_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+            if self.is_variable() {
+                // Ignore variation offset when `hvar` is not set.
+                if let Some(hvar_data) = self.hvar {
+                    // We can't use `round()` in `no_std`, so this is the next best thing.
+                    advance += hvar::glyph_advance_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+                }
             }
+
+            u16::try_num_from(advance)
         }
 
-        u16::try_num_from(advance)
+        #[cfg(not(feature = "variable-fonts"))] {
+            self.hmtx?.advance(glyph_id)
+        }
     }
 
     /// Returns glyph's vertical advance.
@@ -1216,17 +1290,23 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_ver_advance(&self, glyph_id: GlyphId) -> Option<u16> {
-        let mut advance = self.vmtx?.advance(glyph_id)? as f32;
+        #[cfg(feature = "variable-fonts")] {
+            let mut advance = self.vmtx?.advance(glyph_id)? as f32;
 
-        if self.is_variable() {
-            // Ignore variation offset when `vvar` is not set.
-            if let Some(vvar_data) = self.vvar {
-                // We can't use `round()` in `no_std`, so this is the next best thing.
-                advance += hvar::glyph_advance_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+            if self.is_variable() {
+                // Ignore variation offset when `vvar` is not set.
+                if let Some(vvar_data) = self.vvar {
+                    // We can't use `round()` in `no_std`, so this is the next best thing.
+                    advance += hvar::glyph_advance_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+                }
             }
+
+            u16::try_num_from(advance)
         }
 
-        u16::try_num_from(advance)
+        #[cfg(not(feature = "variable-fonts"))] {
+            self.vmtx?.advance(glyph_id)
+        }
     }
 
     /// Returns glyph's horizontal side bearing.
@@ -1234,17 +1314,23 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_hor_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
-        let mut bearing = self.hmtx?.side_bearing(glyph_id)? as f32;
+        #[cfg(feature = "variable-fonts")] {
+            let mut bearing = self.hmtx?.side_bearing(glyph_id)? as f32;
 
-        if self.is_variable() {
-            // Ignore variation offset when `hvar` is not set.
-            if let Some(hvar_data) = self.hvar {
-                // We can't use `round()` in `no_std`, so this is the next best thing.
-                bearing += hvar::glyph_side_bearing_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+            if self.is_variable() {
+                // Ignore variation offset when `hvar` is not set.
+                if let Some(hvar_data) = self.hvar {
+                    // We can't use `round()` in `no_std`, so this is the next best thing.
+                    bearing += hvar::glyph_side_bearing_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+                }
             }
+
+            i16::try_num_from(bearing)
         }
 
-        i16::try_num_from(bearing)
+        #[cfg(not(feature = "variable-fonts"))] {
+            self.hmtx?.side_bearing(glyph_id)
+        }
     }
 
     /// Returns glyph's vertical side bearing.
@@ -1252,17 +1338,23 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
-        let mut bearing = self.vmtx?.side_bearing(glyph_id)? as f32;
+        #[cfg(feature = "variable-fonts")] {
+            let mut bearing = self.vmtx?.side_bearing(glyph_id)? as f32;
 
-        if self.is_variable() {
-            // Ignore variation offset when `vvar` is not set.
-            if let Some(vvar_data) = self.vvar {
-                // We can't use `round()` in `no_std`, so this is the next best thing.
-                bearing += hvar::glyph_side_bearing_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+            if self.is_variable() {
+                // Ignore variation offset when `vvar` is not set.
+                if let Some(vvar_data) = self.vvar {
+                    // We can't use `round()` in `no_std`, so this is the next best thing.
+                    bearing += hvar::glyph_side_bearing_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+                }
             }
+
+            i16::try_num_from(bearing)
         }
 
-        i16::try_num_from(bearing)
+        #[cfg(not(feature = "variable-fonts"))] {
+            self.vmtx?.side_bearing(glyph_id)
+        }
     }
 
     /// Returns glyph's vertical origin according to
@@ -1329,6 +1421,7 @@ impl<'a> Face<'a> {
     /// Returns glyph's variation delta at a specified index according to
     /// [Item Variation Store Table](
     /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#item-variation-store-table).
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn glyph_variation_delta(&self, outer_index: u16, inner_index: u16) -> Option<f32> {
         self.gdef.and_then(|gdef|
@@ -1403,8 +1496,10 @@ impl<'a> Face<'a> {
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
     ) -> Option<Rect> {
-        if let Some(ref gvar_table) = self.gvar {
-            return gvar::outline(self.loca?, self.glyf?, gvar_table, self.coords(), glyph_id, builder);
+        #[cfg(feature = "variable-fonts")] {
+            if let Some(ref gvar_table) = self.gvar {
+                return gvar::outline(self.loca?, self.glyf?, gvar_table, self.coords(), glyph_id, builder);
+            }
         }
 
         if let Some(glyf_table) = self.glyf {
@@ -1415,8 +1510,10 @@ impl<'a> Face<'a> {
             return cff1::outline(metadata, glyph_id, builder);
         }
 
-        if let Some(ref metadata) = self.cff2 {
-            return cff2::outline(metadata, self.coords(), glyph_id, builder);
+        #[cfg(feature = "variable-fonts")] {
+            if let Some(ref metadata) = self.cff2 {
+                return cff2::outline(metadata, self.coords(), glyph_id, builder);
+            }
         }
 
         None
@@ -1435,7 +1532,17 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Option<Rect> {
-        if !self.is_variable() {
+        #[cfg(feature = "variable-fonts")]
+        {
+            if !self.is_variable() {
+                if let Some(glyf_table) = self.glyf {
+                    return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "variable-fonts"))]
+        {
             if let Some(glyf_table) = self.glyf {
                 return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
             }
@@ -1503,6 +1610,7 @@ impl<'a> Face<'a> {
     }
 
     /// Returns an iterator over variation axes.
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn variation_axes(&self) -> VariationAxes {
         self.fvar.map(|fvar| fvar.axes()).unwrap_or_default()
@@ -1517,6 +1625,7 @@ impl<'a> Face<'a> {
     /// Since coordinates are stored on the stack, we allow only 32 of them.
     ///
     /// Returns `None` when face is not variable or doesn't have such axis.
+    #[cfg(feature = "variable-fonts")]
     pub fn set_variation(&mut self, axis: Tag, value: f32) -> Option<()> {
         if !self.is_variable() {
             return None;
@@ -1524,7 +1633,7 @@ impl<'a> Face<'a> {
 
         let v = self.variation_axes().enumerate().find(|(_, a)| a.tag == axis);
         if let Some((idx, a)) = v {
-            if idx >= usize::from(MAX_VAR_COORDS) {
+            if idx >= MAX_VAR_COORDS {
                 return None;
             }
 
@@ -1543,17 +1652,20 @@ impl<'a> Face<'a> {
     }
 
     /// Returns the current normalized variation coordinates.
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn variation_coordinates(&self) -> &[NormalizedCoordinate] {
         self.coordinates.as_slice()
     }
 
     /// Checks that face has non-default variation coordinates.
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn has_non_default_variation_coordinates(&self) -> bool {
         self.coordinates.as_slice().iter().any(|c| c.0 != 0)
     }
 
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     fn metrics_var_offset(&self, tag: Tag) -> f32 {
         self.mvar.and_then(|table| table.metrics_offset(tag, self.coords())).unwrap_or(0.0)
@@ -1565,6 +1677,8 @@ impl<'a> Face<'a> {
         value
     }
 
+
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     fn apply_metrics_variation_to(&self, tag: Tag, value: &mut i16) {
         if self.is_variable() {
@@ -1576,6 +1690,12 @@ impl<'a> Face<'a> {
         }
     }
 
+    #[cfg(not(feature = "variable-fonts"))]
+    #[inline]
+    fn apply_metrics_variation_to(&self, _: Tag, _: &mut i16) {
+    }
+
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     fn coords(&self) -> &[NormalizedCoordinate] {
         self.coordinates.as_slice()

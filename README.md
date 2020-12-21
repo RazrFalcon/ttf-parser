@@ -85,7 +85,6 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Dynamic lib size  | <300KiB<sup>3</sup>    | ~760KiB<sup>4</sup> | ? (header-only)                |
 | Tested version    | 0.9.0                  | 2.9.1               | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
@@ -103,10 +102,6 @@ Notes:
    [ab-glyph](https://github.com/alexheretic/ab-glyph)
    and [fontdue](https://github.com/mooman219/fontdue).
 2. Matching points are not supported.
-3. When using from Rust, the library binary overhead depends on used methods
-   and can vary from 10KiB up to 100KiB.<br/>
-   When using from C, we have to include the Rust's std too, which blows up the size.
-4. Depends on build flags.
 
 ### Performance
 

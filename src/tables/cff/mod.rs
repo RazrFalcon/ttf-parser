@@ -1,5 +1,5 @@
 pub mod cff1;
-pub mod cff2;
+#[cfg(feature = "variable-fonts")] pub mod cff2;
 mod argstack;
 mod charset;
 mod charstring;
@@ -28,11 +28,11 @@ pub enum CFFError {
     BboxOverflow,
     MissingMoveTo,
     InvalidSubroutineIndex,
-    InvalidItemVariationDataIndex,
-    InvalidNumberOfBlendOperands,
-    BlendRegionsLimitReached,
     NoLocalSubroutines,
     InvalidSeacCode,
+    #[cfg(feature = "variable-fonts")] InvalidItemVariationDataIndex,
+    #[cfg(feature = "variable-fonts")] InvalidNumberOfBlendOperands,
+    #[cfg(feature = "variable-fonts")] BlendRegionsLimitReached,
 }
 
 

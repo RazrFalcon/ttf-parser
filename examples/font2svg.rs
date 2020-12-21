@@ -14,7 +14,7 @@ Usage:
 ";
 
 struct Args {
-    variations: Vec<ttf::Variation>,
+    #[allow(dead_code)] variations: Vec<ttf::Variation>,
     ttf_path: PathBuf,
     svg_path: PathBuf,
 }
@@ -79,11 +79,14 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Exclude IO operations.
     let now = std::time::Instant::now();
 
+    #[allow(unused_mut)]
     let mut face = ttf::Face::from_slice(&font_data, 0)?;
     if face.is_variable() {
-        for variation in args.variations {
-            face.set_variation(variation.axis, variation.value)
-                .ok_or("failed to create variation coordinates")?;
+        #[cfg(feature = "variable-fonts")] {
+            for variation in args.variations {
+                face.set_variation(variation.axis, variation.value)
+                    .ok_or("failed to create variation coordinates")?;
+            }
         }
     }
 

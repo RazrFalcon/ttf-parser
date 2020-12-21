@@ -181,6 +181,7 @@ typedef uint32_t ttfp_tag;
     (((uint32_t)(c3)&0xFF)<<8)| \
     ((uint32_t)(c4)&0xFF)))
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief A variation axis.
  */
@@ -193,6 +194,7 @@ typedef struct {
     uint16_t name_id;
     bool hidden;
 } ttfp_variation_axis;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -368,7 +370,7 @@ int16_t ttfp_get_line_gap(const ttfp_face *face);
 int16_t ttfp_get_typographic_ascender(const ttfp_face *face);
 
 /**
- * @brief Returns a horizontal typographic face ascender.
+ * @brief Returns a horizontal typographic face descender.
  *
  * Prefer `ttfp_get_descender` unless you explicitly want this. This is a more
  * low-level alternative.
@@ -442,6 +444,15 @@ uint16_t ttfp_get_units_per_em(const ttfp_face *face);
  * @return x height or 0 when OS/2 table is not present or when its version is < 2.
  */
 int16_t ttfp_get_x_height(const ttfp_face *face);
+
+/**
+ * @brief Returns face's capital height.
+ *
+ * This function is affected by variation axes.
+ *
+ * @return capital height or 0 when OS/2 table is not present or when its version is < 2.
+ */
+int16_t ttfp_get_capital_height(const ttfp_face *face);
 
 /**
  * @brief Returns face's underline metrics.
@@ -575,6 +586,7 @@ uint16_t ttfp_get_glyph_mark_attachment_class(const ttfp_face *face, uint16_t gl
  */
 bool ttfp_is_mark_glyph(const ttfp_face *face, uint16_t glyph_id);
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief Returns glyph's variation delta at a specified index according to
  * Item Variation Store Table.
@@ -582,6 +594,7 @@ bool ttfp_is_mark_glyph(const ttfp_face *face, uint16_t glyph_id);
  * @return Delta or `0.0` when there is no delta.
  */
 float ttfp_glyph_variation_delta(const ttfp_face *face, uint16_t outer_index, uint16_t inner_index);
+#endif
 
 /**
  * @brief Outlines a glyph and returns its tight bounding box.
@@ -664,21 +677,28 @@ bool ttfp_get_glyph_svg_image(const ttfp_face *face,
                               const char **svg,
                               uint32_t *len);
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief Returns the amount of variation axes.
  */
 uint16_t ttfp_get_variation_axes_count(const ttfp_face *face);
+#endif
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief Returns a variation axis by index.
  */
 bool ttfp_get_variation_axis(const ttfp_face *face, uint16_t index, ttfp_variation_axis *axis);
+#endif
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief Returns a variation axis by tag.
  */
 bool ttfp_get_variation_axis_by_tag(const ttfp_face *face, ttfp_tag tag, ttfp_variation_axis *axis);
+#endif
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief Sets a variation axis coordinate.
  *
@@ -693,18 +713,23 @@ bool ttfp_get_variation_axis_by_tag(const ttfp_face *face, ttfp_tag tag, ttfp_va
  * @return `false` when face is not variable or doesn't have such axis.
  */
 bool ttfp_set_variation(ttfp_face *face, ttfp_tag axis, float value);
+#endif
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief Returns the current normalized variation coordinates.
  *
  * Values represented as f2.16
  */
-const int16_t* ttfp_get_variation_coordinates(const ttfp_face *face);
+const int16_t *ttfp_get_variation_coordinates(const ttfp_face *face);
+#endif
 
+#if defined(TTFP_VARIABLE_FONTS)
 /**
  * @brief Checks that face has non-default variation coordinates.
  */
 bool ttfp_has_non_default_variation_coordinates(const ttfp_face *face);
+#endif
 
 #ifdef __cplusplus
 } // extern "C"

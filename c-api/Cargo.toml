@@ -11,8 +11,12 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-ttf-parser = { path = "../", default-features = false }
+ttf-parser = { path = "../", default-features = false, features = ["std"] }
+
+[features]
+default = ["variable-fonts"]
+# Enables variable fonts support. Adds about 50KiB.
+variable-fonts = ["ttf-parser/variable-fonts"]
 
 [profile.release]
-lto = "fat"
-codegen-units = 1
+lto = true

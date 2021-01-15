@@ -685,8 +685,8 @@ fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
 
     match charset {
         Charset::ISOAdobe => {
-            // Not sure why code should be less than 228/zcaron, but this is what harfbuzz does.
-            if code < 228 { Some(GlyphId(sid.0)) } else { None }
+            // ISO Adobe charset only defines string ids up to 228 (zcaron)
+            if code <= 228 { Some(GlyphId(sid.0)) } else { None }
         }
         Charset::Expert | Charset::ExpertSubset => None,
         _ => charset.sid_to_gid(sid),

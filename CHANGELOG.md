@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `variable-fonts` build feature. Enabled by default.
   By disabling it you can reduce `ttf-parser` binary size overhead almost twice.
 
+### Changed
+- (`gvar`) Increase the maximum number of variation tuples from 16 to 32.
+  Will increase stack usage.
+
+### Fixed
+- (`CFF`) Fix `seac` processing. Thanks to [wezm](https://github.com/wezm)
+
 ## [0.9.0] - 2020-12-05
 ### Removed
 - `kern` AAT subtable 1 aka `kern::state_machine`.

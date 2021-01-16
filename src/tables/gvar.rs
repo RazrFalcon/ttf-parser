@@ -300,7 +300,7 @@ struct VariationTuple<'a> {
 ///
 /// The TrueType spec allows up to 4095 tuples, which is way larger
 /// than we do. But in reality, an average font will have less than 10 tuples.
-const MAX_TUPLES_LEN: u16 = 16;
+const MAX_TUPLES_LEN: u16 = 32;
 
 /// A list of variation tuples.
 ///
@@ -309,7 +309,7 @@ const MAX_TUPLES_LEN: u16 = 16;
 /// This is probably unavoidable due to `gvar` structure,
 /// since we have to iterate all tuples in parallel.
 struct VariationTuples<'a> {
-    headers: [VariationTuple<'a>; MAX_TUPLES_LEN as usize], // 1280B
+    headers: [VariationTuple<'a>; MAX_TUPLES_LEN as usize], // 2560B
     len: u16,
 }
 

@@ -5,6 +5,7 @@
 
 #include <memory>
 
+#define TTFP_VARIABLE_FONTS
 #include <ttfparser.h>
 
 #include "glyph.h"

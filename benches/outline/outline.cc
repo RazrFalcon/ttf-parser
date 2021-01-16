@@ -8,6 +8,7 @@
 #include FT_OUTLINE_H
 #include FT_MULTIPLE_MASTERS_H
 
+#define TTFP_VARIABLE_FONTS
 #include <ttfparser.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION

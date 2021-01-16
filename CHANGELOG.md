@@ -5,13 +5,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.10.0] - 2021-01-16
 ### Added
 - `variable-fonts` build feature. Enabled by default.
   By disabling it you can reduce `ttf-parser` binary size overhead almost twice.
 
 ### Changed
 - (`gvar`) Increase the maximum number of variation tuples from 16 to 32.
-  Will increase stack usage.
+  Increases stack usage and makes `gvar` parsing 10% slower now.
 
 ### Fixed
 - (`CFF`) Fix `seac` processing. Thanks to [wezm](https://github.com/wezm)
@@ -208,7 +210,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.1...v0.8.2

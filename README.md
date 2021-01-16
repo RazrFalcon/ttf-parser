@@ -85,7 +85,7 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Tested version    | 0.9.0                  | 2.9.1               | 1.24                           |
+| Tested version    | 0.10.0                 | 2.10.4              | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
 Legend:
@@ -116,10 +116,10 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 
 | Table/Library | ttf-parser     | FreeType   | stb_truetype   |
 | ------------- | -------------: | ---------: | -------------: |
-| `glyf`        |   `0.835 ms`   | `1.194 ms` | **`0.695 ms`** |
-| `gvar`        | **`3.158 ms`** | `3.594 ms` |              - |
-| `CFF`         | **`1.114 ms`** | `5.946 ms` |   `2.862 ms`   |
-| `CFF2`        | **`1.763 ms`** | `7.001 ms` |              - |
+| `glyf`        |   `0.895 ms`   | `1.258 ms` | **`0.718 ms`** |
+| `gvar`        | **`3.504 ms`** | `4.369 ms` |              - |
+| `CFF`         | **`1.365 ms`** | `6.104 ms` |   `2.913 ms`   |
+| `CFF2`        | **`1.982 ms`** | `7.024 ms` |              - |
 
 **Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
 

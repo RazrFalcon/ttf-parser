@@ -1483,12 +1483,13 @@ impl<'a> Face<'a> {
     ///     }
     /// }
     ///
-    /// let data = std::fs::read("fonts/SourceSansPro-Regular-Tiny.ttf").unwrap();
+    /// let data = std::fs::read("tests/fonts/demo.ttf").unwrap();
     /// let face = ttf_parser::Face::from_slice(&data, 0).unwrap();
     /// let mut builder = Builder(String::new());
-    /// let bbox = face.outline_glyph(ttf_parser::GlyphId(13), &mut builder).unwrap();
-    /// assert_eq!(builder.0, "M 90 0 L 90 656 L 173 656 L 173 71 L 460 71 L 460 0 L 90 0 Z ");
-    /// assert_eq!(bbox, ttf_parser::Rect { x_min: 90, y_min: 0, x_max: 460, y_max: 656 });
+    /// let bbox = face.outline_glyph(ttf_parser::GlyphId(1), &mut builder).unwrap();
+    /// assert_eq!(builder.0, "M 173 267 L 369 267 L 270 587 L 173 267 Z M 6 0 L 224 656 \
+    ///                        L 320 656 L 541 0 L 452 0 L 390 200 L 151 200 L 85 0 L 6 0 Z ");
+    /// assert_eq!(bbox, ttf_parser::Rect { x_min: 6, y_min: 0, x_max: 541, y_max: 656 });
     /// ```
     #[inline]
     pub fn outline_glyph(

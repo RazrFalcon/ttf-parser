@@ -10,7 +10,7 @@ repository = "https://github.com/RazrFalcon/ttf-parser"
 documentation = "https://docs.rs/ttf-parser/"
 readme = "README.md"
 edition = "2018"
-exclude = ["benches/**"]
+exclude = ["benches/**", "fonts/**"]
 
 [features]
 default = ["std", "variable-fonts"]

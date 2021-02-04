@@ -607,8 +607,8 @@ impl<'a> DerefMut for Face<'a> {
 /// Parsed face tables.
 ///
 /// This struct adds the `from_table_provider()` method that is not
-/// available on the `Font` - you can create a `FaceTables` struct
-/// from your own, custom font provider - this is important if your font
+/// available on the `Font`. You can create a `FaceTables` struct
+/// from your own, custom font provider. This is important if your font
 /// provider does things that ttf-parser currently doesn't implement
 /// (for example zlib / brotli decoding)
 #[derive(Clone)]

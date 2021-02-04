@@ -584,11 +584,11 @@ impl std::error::Error for FaceParsingError {}
 pub struct Face<'a> {
     font_data: &'a [u8], // The input data. Used by Face::table_data.
     table_records: LazyArray16<'a, TableRecord>,
-    internal: ParsedFaceTables<'a>,
+    internal: FaceTables<'a>,
 }
 
 impl<'a> Deref for Face<'a> {
-    type Target = ParsedFaceTables<'a>;
+    type Target = FaceTables<'a>;
 
     fn deref(&self) -> &Self::Target {
         &self.internal
@@ -604,12 +604,12 @@ impl<'a> DerefMut for Face<'a> {
 /// Parsed face tables that are stored separately from the main font
 ///
 /// This struct adds the `from_table_provider()` method that is not
-/// available on the `Font` - you can create a `ParsedFaceTables` struct
+/// available on the `Font` - you can create a `FaceTables` struct
 /// from your own, custom font provider - this is important if your font
 /// provider does things that ttf-parser currently doesn't implement
 /// (for example zlib / brotli decoding)
 #[derive(Clone)]
-pub struct ParsedFaceTables<'a> {
+pub struct FaceTables<'a> {
 
     cbdt: Option<&'a [u8]>,
     cblc: Option<&'a [u8]>,
@@ -644,9 +644,9 @@ pub struct ParsedFaceTables<'a> {
     #[cfg(feature = "variable-fonts")] coordinates: VarCoords,
 }
 
-impl fmt::Debug for ParsedFaceTables<'_> {
+impl fmt::Debug for FaceTables<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ParsedFaceTables()")
+        write!(f, "FaceTables()")
     }
 }
 
@@ -721,7 +721,7 @@ impl<'a> Face<'a> {
             }
         }
 
-        let internal = ParsedFaceTables::from_table_provider(
+        let internal = FaceTables::from_table_provider(
             DefaultTableProvider {
                 tables: tables.into_iter(),
                 data
@@ -747,7 +747,7 @@ impl<'a> Face<'a> {
     }
 }
 
-impl<'a> ParsedFaceTables<'a> {
+impl<'a> FaceTables<'a> {
 
     /// Creates and parses face tables from an existing table provider
     ///
@@ -756,7 +756,7 @@ impl<'a> ParsedFaceTables<'a> {
     pub fn from_table_provider<T>(provider: T) -> Result<Self, FaceParsingError>
     where T: Iterator<Item=Result<(Tag, Option<&'a [u8]>), FaceParsingError>>
     {
-        let mut face = ParsedFaceTables {
+        let mut face = FaceTables {
             cbdt: None,
             cblc: None,
             cff1: None,

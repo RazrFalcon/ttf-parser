@@ -38,6 +38,8 @@ extern crate std;
 
 use core::fmt;
 use core::num::NonZeroU16;
+use core::ops::{Deref, DerefMut};
+use crate::parser::LazyArrayIter16;
 
 macro_rules! try_opt_or {
     ($value:expr, $ret:expr) => {
@@ -583,7 +585,34 @@ impl std::error::Error for FaceParsingError {}
 pub struct Face<'a> {
     font_data: &'a [u8], // The input data. Used by Face::table_data.
     table_records: LazyArray16<'a, TableRecord>,
+    internal: FaceTables<'a>,
+}
 
+impl<'a> Deref for Face<'a> {
+    type Target = FaceTables<'a>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.internal
+    }
+}
+
+impl<'a> DerefMut for Face<'a> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.internal
+    }
+}
+
+/// Parsed face tables.
+///
+/// This struct adds the `from_table_provider()` method that is not
+/// available on the `Font`. You can create a `FaceTables` struct
+/// from your own, custom font provider. This is important if your font
+/// provider does things that ttf-parser currently doesn't implement
+/// (for example zlib / brotli decoding)
+#[derive(Clone)]
+pub struct FaceTables<'a> {
     cbdt: Option<&'a [u8]>,
     cblc: Option<&'a [u8]>,
     cff1: Option<cff1::Metadata<'a>>,
@@ -617,7 +646,14 @@ pub struct Face<'a> {
     #[cfg(feature = "variable-fonts")] coordinates: VarCoords,
 }
 
+impl fmt::Debug for FaceTables<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FaceTables()")
+    }
+}
+
 impl<'a> Face<'a> {
+
     /// Creates a new `Face` object from a raw data.
     ///
     /// `index` indicates the specific font face in a font collection.
@@ -628,7 +664,7 @@ impl<'a> Face<'a> {
     ///
     /// Required tables: `head`, `hhea` and `maxp`.
     ///
-    /// If an optional table has an invalid data it will be skipped.
+    /// If an optional table has invalid data it will be skipped.
     pub fn from_slice(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
 
@@ -663,9 +699,41 @@ impl<'a> Face<'a> {
         let tables = s.read_array16::<TableRecord>(num_tables)
             .ok_or(FaceParsingError::MalformedFont)?;
 
-        let mut face = Face {
+        let internal = FaceTables::from_table_provider(
+            DefaultTableProvider {
+                tables: tables.into_iter(),
+                data
+            }
+        )?;
+
+        Ok(Face {
             font_data: data,
             table_records: tables,
+            internal,
+        })
+    }
+
+    /// Returns the raw data of a selected table.
+    ///
+    /// Useful if you want to parse the data manually.
+    pub fn table_data(&self, tag: Tag) -> Option<&'a [u8]> {
+        let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
+        let offset = usize::num_from(table.offset);
+        let length = usize::num_from(table.length);
+        let end = offset.checked_add(length)?;
+        self.font_data.get(offset..end)
+    }
+}
+
+impl<'a> FaceTables<'a> {
+    /// Creates and parses face tables from an existing table provider.
+    ///
+    /// This is useful for integrating `ttf-parser` with other font-parsing
+    /// libraries that already do table decoding
+    pub fn from_table_provider<T>(provider: T) -> Result<Self, FaceParsingError>
+    where T: Iterator<Item=Result<(Tag, Option<&'a [u8]>), FaceParsingError>>
+    {
+        let mut face = FaceTables {
             cbdt: None,
             cblc: None,
             cff1: None,
@@ -701,47 +769,45 @@ impl<'a> Face<'a> {
         let mut vmtx = None;
         let mut loca = None;
 
-        for table in tables {
-            let offset = usize::num_from(table.offset);
-            let length = usize::num_from(table.length);
-            let end = offset.checked_add(length).ok_or(FaceParsingError::MalformedFont)?;
-            let range = offset..end;
+        for table_tag_table_data in provider {
 
-            match &table.table_tag.to_bytes() {
-                b"CBDT" => face.cbdt = data.get(range),
-                b"CBLC" => face.cblc = data.get(range),
-                b"CFF " => face.cff1 = data.get(range).and_then(|data| cff1::parse_metadata(data)),
+            let (table_tag, table_data) = table_tag_table_data?;
+
+            match &table_tag.to_bytes() {
+                b"CBDT" => face.cbdt = table_data,
+                b"CBLC" => face.cblc = table_data,
+                b"CFF " => face.cff1 = table_data.and_then(|data| cff1::parse_metadata(data)),
                 #[cfg(feature = "variable-fonts")]
-                b"CFF2" => face.cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
-                b"GDEF" => face.gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
+                b"CFF2" => face.cff2 = table_data.and_then(|data| cff2::parse_metadata(data)),
+                b"GDEF" => face.gdef = table_data.and_then(|data| gdef::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
-                b"HVAR" => face.hvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
+                b"HVAR" => face.hvar = table_data.and_then(|data| hvar::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
-                b"MVAR" => face.mvar = data.get(range).and_then(|data| mvar::Table::parse(data)),
-                b"OS/2" => face.os_2 = data.get(range).and_then(|data| os2::Table::parse(data)),
-                b"SVG " => face.svg_ = data.get(range),
-                b"VORG" => face.vorg = data.get(range).and_then(|data| vorg::Table::parse(data)),
+                b"MVAR" => face.mvar = table_data.and_then(|data| mvar::Table::parse(data)),
+                b"OS/2" => face.os_2 = table_data.and_then(|data| os2::Table::parse(data)),
+                b"SVG " => face.svg_ = table_data,
+                b"VORG" => face.vorg = table_data.and_then(|data| vorg::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
-                b"VVAR" => face.vvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
+                b"VVAR" => face.vvar = table_data.and_then(|data| hvar::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
-                b"avar" => face.avar = data.get(range).and_then(|data| avar::Table::parse(data)),
-                b"cmap" => face.cmap = data.get(range).and_then(|data| cmap::parse(data)),
+                b"avar" => face.avar = table_data.and_then(|data| avar::Table::parse(data)),
+                b"cmap" => face.cmap = table_data.and_then(|data| cmap::parse(data)),
                 #[cfg(feature = "variable-fonts")]
-                b"fvar" => face.fvar = data.get(range).and_then(|data| fvar::Table::parse(data)),
-                b"glyf" => face.glyf = data.get(range),
+                b"fvar" => face.fvar = table_data.and_then(|data| fvar::Table::parse(data)),
+                b"glyf" => face.glyf = table_data,
                 #[cfg(feature = "variable-fonts")]
-                b"gvar" => face.gvar = data.get(range).and_then(|data| gvar::Table::parse(data)),
-                b"head" => face.head = data.get(range).and_then(|data| head::parse(data)).unwrap_or_default(),
-                b"hhea" => face.hhea = data.get(range).and_then(|data| hhea::parse(data)).unwrap_or_default(),
-                b"hmtx" => hmtx = data.get(range),
-                b"kern" => face.kern = data.get(range).and_then(|data| kern::parse(data)),
-                b"loca" => loca = data.get(range),
-                b"maxp" => number_of_glyphs = data.get(range).and_then(|data| maxp::parse(data)),
-                b"name" => face.name = data.get(range).and_then(|data| name::parse(data)),
-                b"post" => face.post = data.get(range).and_then(|data| post::Table::parse(data)),
-                b"sbix" => face.sbix = data.get(range),
-                b"vhea" => face.vhea = data.get(range).and_then(|data| vhea::parse(data)),
-                b"vmtx" => vmtx = data.get(range),
+                b"gvar" => face.gvar = table_data.and_then(|data| gvar::Table::parse(data)),
+                b"head" => face.head = table_data.and_then(|data| head::parse(data)).unwrap_or_default(),
+                b"hhea" => face.hhea = table_data.and_then(|data| hhea::parse(data)).unwrap_or_default(),
+                b"hmtx" => hmtx = table_data,
+                b"kern" => face.kern = table_data.and_then(|data| kern::parse(data)),
+                b"loca" => loca = table_data,
+                b"maxp" => number_of_glyphs = table_data.and_then(|data| maxp::parse(data)),
+                b"name" => face.name = table_data.and_then(|data| name::parse(data)),
+                b"post" => face.post = table_data.and_then(|data| post::Table::parse(data)),
+                b"sbix" => face.sbix = table_data,
+                b"vhea" => face.vhea = table_data.and_then(|data| vhea::parse(data)),
+                b"vmtx" => vmtx = table_data,
                 _ => {}
             }
         }
@@ -858,17 +924,6 @@ impl<'a> Face<'a> {
             TableName::VerticalOrigin               => self.vorg.is_some(),
             TableName::WindowsMetrics               => self.os_2.is_some(),
         }
-    }
-
-    /// Returns the raw data of a selected table.
-    ///
-    /// Useful if you want to parse the data manually.
-    pub fn table_data(&self, tag: Tag) -> Option<&'a [u8]> {
-        let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
-        let offset = usize::num_from(table.offset);
-        let length = usize::num_from(table.length);
-        let end = offset.checked_add(length)?;
-        self.font_data.get(offset..end)
     }
 
     /// Returns an iterator over [Name Records].
@@ -1700,6 +1755,28 @@ impl<'a> Face<'a> {
     #[inline]
     fn coords(&self) -> &[NormalizedCoordinate] {
         self.coordinates.as_slice()
+    }
+}
+
+struct DefaultTableProvider<'a> {
+    data: &'a [u8],
+    tables: LazyArrayIter16<'a, TableRecord>,
+}
+
+impl<'a> Iterator for DefaultTableProvider<'a> {
+    type Item = Result<(Tag, Option<&'a [u8]>), FaceParsingError>;
+
+    // next() is the only required method
+    fn next(&mut self) -> Option<Self::Item> {
+        self.tables.next().map(|table| {
+            Ok((table.table_tag, {
+                let offset = usize::num_from(table.offset);
+                let length = usize::num_from(table.length);
+                let end = offset.checked_add(length).ok_or(FaceParsingError::MalformedFont)?;
+                let range = offset..end;
+                self.data.get(range)
+            }))
+        })
     }
 }
 

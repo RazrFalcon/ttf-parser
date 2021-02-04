@@ -85,7 +85,7 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Tested version    | 0.10.0                 | 2.10.4              | 1.24                           |
+| Tested version    | 0.11.0                 | 2.10.4              | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
 Legend:
@@ -126,20 +126,20 @@ The [benchmark](./benches/outline/) tests how long it takes to outline all glyph
 And here are some methods benchmarks:
 
 ```text
-test outline_glyph_276_from_cff2 ... bench:         778 ns/iter (+/- 15)
-test from_data_otf_cff           ... bench:         760 ns/iter (+/- 13)
-test from_data_otf_cff2          ... bench:         709 ns/iter (+/- 25)
+test outline_glyph_276_from_cff2 ... bench:         867 ns/iter (+/- 15)
+test from_data_otf_cff           ... bench:         968 ns/iter (+/- 13)
+test from_data_otf_cff2          ... bench:         887 ns/iter (+/- 25)
 test outline_glyph_276_from_cff  ... bench:         678 ns/iter (+/- 41)
 test outline_glyph_276_from_glyf ... bench:         649 ns/iter (+/- 11)
-test outline_glyph_8_from_cff2   ... bench:         476 ns/iter (+/- 14)
-test from_data_ttf               ... bench:         352 ns/iter (+/- 11)
+test outline_glyph_8_from_cff2   ... bench:         534 ns/iter (+/- 14)
+test from_data_ttf               ... bench:         467 ns/iter (+/- 11)
 test glyph_name_post_276         ... bench:         223 ns/iter (+/- 5)
-test outline_glyph_8_from_cff    ... bench:         261 ns/iter (+/- 13)
-test outline_glyph_8_from_glyf   ... bench:         281 ns/iter (+/- 5)
+test outline_glyph_8_from_cff    ... bench:         315 ns/iter (+/- 13)
+test outline_glyph_8_from_glyf   ... bench:         291 ns/iter (+/- 5)
 test family_name                 ... bench:         183 ns/iter (+/- 102)
-test glyph_name_cff_276          ... bench:         109 ns/iter (+/- 1)
+test glyph_name_cff_276          ... bench:          62 ns/iter (+/- 1)
 test glyph_index_u41             ... bench:          16 ns/iter (+/- 0)
-test glyph_name_cff_8            ... bench:           7 ns/iter (+/- 0)
+test glyph_name_cff_8            ... bench:           5 ns/iter (+/- 0)
 test glyph_name_post_8           ... bench:           2 ns/iter (+/- 0)
 test subscript_metrics           ... bench:           2 ns/iter (+/- 0)
 test glyph_hor_advance           ... bench:           2 ns/iter (+/- 0)

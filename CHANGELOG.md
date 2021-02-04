@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2021-02-04
+### Added
+- `FaceTables`, which allowed to load `Face` not only from a single chunk of data,
+  but also in a per-table way. Which is useful for WOFF parsing.
+  No changes to the API.
+  Thanks to [fschutt](https://github.com/fschutt)
+
 ## [0.10.1] - 2021-01-21
 ### Changed
 - Update a font used for tests.
@@ -214,7 +221,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.8.3...v0.9.0

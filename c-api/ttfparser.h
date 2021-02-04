@@ -11,9 +11,9 @@
 #include <stdint.h>
 
 #define TTFP_MAJOR_VERSION 0
-#define TTFP_MINOR_VERSION 10
-#define TTFP_PATCH_VERSION 1
-#define TTFP_VERSION "0.10.1"
+#define TTFP_MINOR_VERSION 11
+#define TTFP_PATCH_VERSION 0
+#define TTFP_VERSION "0.11.0"
 
 /**
  * @brief A table name.

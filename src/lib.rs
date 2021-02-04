@@ -24,7 +24,7 @@ A high-level, safe, zero-allocation TrueType font parser.
 - Most of numeric casts are checked.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.10.1")]
+#![doc(html_root_url = "https://docs.rs/ttf-parser/0.11.0")]
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -39,7 +39,6 @@ extern crate std;
 use core::fmt;
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
-use crate::parser::LazyArrayIter16;
 
 macro_rules! try_opt_or {
     ($value:expr, $ret:expr) => {
@@ -59,7 +58,7 @@ mod tables;
 mod writer;
 
 use tables::*;
-use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, Offset32, Offset};
+use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, LazyArrayIter16, Offset32, Offset};
 use head::IndexToLocationFormat;
 
 #[cfg(feature = "variable-fonts")] pub use fvar::{VariationAxes, VariationAxis};
@@ -731,7 +730,7 @@ impl<'a> FaceTables<'a> {
     /// This is useful for integrating `ttf-parser` with other font-parsing
     /// libraries that already do table decoding
     pub fn from_table_provider<T>(provider: T) -> Result<Self, FaceParsingError>
-    where T: Iterator<Item=Result<(Tag, Option<&'a [u8]>), FaceParsingError>>
+        where T: Iterator<Item=Result<(Tag, Option<&'a [u8]>), FaceParsingError>>
     {
         let mut face = FaceTables {
             cbdt: None,
@@ -770,9 +769,7 @@ impl<'a> FaceTables<'a> {
         let mut loca = None;
 
         for table_tag_table_data in provider {
-
             let (table_tag, table_data) = table_tag_table_data?;
-
             match &table_tag.to_bytes() {
                 b"CBDT" => face.cbdt = table_data,
                 b"CBLC" => face.cblc = table_data,
@@ -1766,7 +1763,7 @@ struct DefaultTableProvider<'a> {
 impl<'a> Iterator for DefaultTableProvider<'a> {
     type Item = Result<(Tag, Option<&'a [u8]>), FaceParsingError>;
 
-    // next() is the only required method
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.tables.next().map(|table| {
             Ok((table.table_tag, {

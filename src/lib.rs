@@ -590,18 +590,20 @@ pub struct Face<'a> {
 impl<'a> Deref for Face<'a> {
     type Target = FaceTables<'a>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.internal
     }
 }
 
 impl<'a> DerefMut for Face<'a> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.internal
     }
 }
 
-/// Parsed face tables that are stored separately from the main font
+/// Parsed face tables.
 ///
 /// This struct adds the `from_table_provider()` method that is not
 /// available on the `Font` - you can create a `FaceTables` struct
@@ -610,7 +612,6 @@ impl<'a> DerefMut for Face<'a> {
 /// (for example zlib / brotli decoding)
 #[derive(Clone)]
 pub struct FaceTables<'a> {
-
     cbdt: Option<&'a [u8]>,
     cblc: Option<&'a [u8]>,
     cff1: Option<cff1::Metadata<'a>>,
@@ -748,8 +749,7 @@ impl<'a> Face<'a> {
 }
 
 impl<'a> FaceTables<'a> {
-
-    /// Creates and parses face tables from an existing table provider
+    /// Creates and parses face tables from an existing table provider.
     ///
     /// This is useful for integrating `ttf-parser` with other font-parsing
     /// libraries that already do table decoding
@@ -874,6 +874,7 @@ impl<'a> FaceTables<'a> {
 
         Ok(face)
     }
+
     /// Checks that face has a specified table.
     ///
     /// Will return `true` only for tables that were successfully parsed.

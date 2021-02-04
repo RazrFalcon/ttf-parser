@@ -39,6 +39,7 @@ extern crate std;
 use core::fmt;
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
+use crate::parser::LazyArrayIter16;
 
 macro_rules! try_opt_or {
     ($value:expr, $ret:expr) => {
@@ -697,30 +698,6 @@ impl<'a> Face<'a> {
         s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
         let tables = s.read_array16::<TableRecord>(num_tables)
             .ok_or(FaceParsingError::MalformedFont)?;
-
-        use crate::parser::LazyArrayIter16;
-
-        struct DefaultTableProvider<'a> {
-            data: &'a [u8],
-            tables: LazyArrayIter16<'a, TableRecord>,
-        }
-
-        impl<'a> Iterator for DefaultTableProvider<'a> {
-            type Item = Result<(Tag, Option<&'a [u8]>), FaceParsingError>;
-
-            // next() is the only required method
-            fn next(&mut self) -> Option<Self::Item> {
-                self.tables.next().map(|table| {
-                    Ok((table.table_tag, {
-                        let offset = usize::num_from(table.offset);
-                        let length = usize::num_from(table.length);
-                        let end = offset.checked_add(length).ok_or(FaceParsingError::MalformedFont)?;
-                        let range = offset..end;
-                        self.data.get(range)
-                    }))
-                })
-            }
-        }
 
         let internal = FaceTables::from_table_provider(
             DefaultTableProvider {
@@ -1778,6 +1755,28 @@ impl<'a> FaceTables<'a> {
     #[inline]
     fn coords(&self) -> &[NormalizedCoordinate] {
         self.coordinates.as_slice()
+    }
+}
+
+struct DefaultTableProvider<'a> {
+    data: &'a [u8],
+    tables: LazyArrayIter16<'a, TableRecord>,
+}
+
+impl<'a> Iterator for DefaultTableProvider<'a> {
+    type Item = Result<(Tag, Option<&'a [u8]>), FaceParsingError>;
+
+    // next() is the only required method
+    fn next(&mut self) -> Option<Self::Item> {
+        self.tables.next().map(|table| {
+            Ok((table.table_tag, {
+                let offset = usize::num_from(table.offset);
+                let length = usize::num_from(table.length);
+                let end = offset.checked_add(length).ok_or(FaceParsingError::MalformedFont)?;
+                let range = offset..end;
+                self.data.get(range)
+            }))
+        })
     }
 }
 

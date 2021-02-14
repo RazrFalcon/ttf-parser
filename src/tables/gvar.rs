@@ -119,14 +119,14 @@ pub(crate) fn outline(
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
-    let mut b = glyf::Builder::new(Transform::default(), Some(BBox::new()), builder);
+    let mut b = glyf::Builder::new(Transform::default(), BBox::new(), builder);
 
     let range = loca_table.glyph_range(glyph_id)?;
     let glyph_data = glyf_table.get(range)?;
 
     outline_var_impl(loca_table, glyf_table, gvar_table,
                      glyph_id, glyph_data, coordinates, 0, &mut b);
-    b.bbox.and_then(|bbox| bbox.to_rect())
+    b.bbox.to_rect()
 }
 
 fn outline_var_impl<'a>(

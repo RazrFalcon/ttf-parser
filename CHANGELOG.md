@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [hhea::ascender](https://docs.microsoft.com/en-us/typography/opentype/spec/hhea#ascender) and
   [hhea::descender](https://docs.microsoft.com/en-us/typography/opentype/spec/hhea#descender)
   were used. Now `hhea` table values will be used only when `OS/2` table is not present.
+- `Face::outline_glyph` and `Face::glyph_bounding_box` in case of a `glyf` table
+  can fallback to a calculated bbox when the embedded bbox is malformed now.
 
 ## [0.11.0] - 2021-02-04
 ### Added

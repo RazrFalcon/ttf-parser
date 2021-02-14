@@ -9,7 +9,9 @@ pub(crate) struct Builder<'a> {
     pub builder: &'a mut dyn OutlineBuilder,
     pub transform: Transform,
     is_default_ts: bool, // `bool` is faster than `Option` or `is_default`.
-    pub bbox: Option<BBox>, // Used only by `gvar`.
+    // We have to always calculate the bbox, because `gvar` doesn't store one
+    // and in case of a malformed bbox in `glyf`.
+    pub bbox: BBox,
     first_on_curve: Option<Point>,
     first_off_curve: Option<Point>,
     last_off_curve: Option<Point>,
@@ -19,7 +21,7 @@ impl<'a> Builder<'a> {
     #[inline]
     pub fn new(
         transform: Transform,
-        bbox: Option<BBox>,
+        bbox: BBox,
         builder: &'a mut dyn OutlineBuilder,
     ) -> Self {
         Builder {
@@ -39,9 +41,7 @@ impl<'a> Builder<'a> {
             self.transform.apply_to(&mut x, &mut y);
         }
 
-        if let Some(ref mut bbox) = self.bbox {
-            bbox.extend_by(x, y);
-        }
+        self.bbox.extend_by(x, y);
 
         self.builder.move_to(x, y);
     }
@@ -52,9 +52,7 @@ impl<'a> Builder<'a> {
             self.transform.apply_to(&mut x, &mut y);
         }
 
-        if let Some(ref mut bbox) = self.bbox {
-            bbox.extend_by(x, y);
-        }
+        self.bbox.extend_by(x, y);
 
         self.builder.line_to(x, y);
     }
@@ -66,10 +64,8 @@ impl<'a> Builder<'a> {
             self.transform.apply_to(&mut x, &mut y);
         }
 
-        if let Some(ref mut bbox) = self.bbox {
-            bbox.extend_by(x1, y1);
-            bbox.extend_by(x, y);
-        }
+        self.bbox.extend_by(x1, y1);
+        self.bbox.extend_by(x, y);
 
         self.builder.quad_to(x1, y1, x, y);
     }
@@ -503,7 +499,7 @@ pub(crate) fn outline(
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
-    let mut b = Builder::new(Transform::default(), None, builder);
+    let mut b = Builder::new(Transform::default(), BBox::new(), builder);
     let range = loca_table.glyph_range(glyph_id)?;
     let glyph_data = glyf_table.get(range)?;
     outline_impl(loca_table, glyf_table, glyph_data, 0, &mut b)
@@ -565,8 +561,11 @@ fn outline_impl(
             if let Some(range) = loca_table.glyph_range(comp.glyph_id) {
                 if let Some(glyph_data) = glyf_table.get(range) {
                     let transform = Transform::combine(builder.transform, comp.transform);
-                    let mut b = Builder::new(transform, None, builder.builder);
+                    let mut b = Builder::new(transform, builder.bbox, builder.builder);
                     outline_impl(loca_table, glyf_table, glyph_data, depth + 1, &mut b)?;
+
+                    // Take updated bbox.
+                    builder.bbox = b.bbox;
                 }
             }
         }
@@ -575,7 +574,12 @@ fn outline_impl(
         return None;
     }
 
-    Some(rect)
+    let rect_is_valid = rect.width() > 0 && rect.height() > 0;
+    if rect_is_valid {
+        Some(rect)
+    } else {
+        builder.bbox.to_rect()
+    }
 }
 
 #[inline]

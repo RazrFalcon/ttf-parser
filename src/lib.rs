@@ -1012,19 +1012,19 @@ impl<'a> FaceTables<'a> {
         self.post.map(|table| table.italic_angle())
     }
 
-    #[inline]
-    fn use_typo_metrics(&self) -> Option<os2::Table> {
-        self.os_2.filter(|table| table.is_use_typo_metrics())
-    }
-
     /// Returns a horizontal face ascender.
     ///
     /// This method is affected by variation axes.
     #[inline]
     pub fn ascender(&self) -> i16 {
-        if let Some(os_2) = self.use_typo_metrics() {
-            let v = os_2.typo_ascender();
-            self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
+        if let Some(os_2) = self.os_2 {
+            if os_2.is_use_typo_metrics() {
+                let v = os_2.typo_ascender();
+                self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
+            } else {
+                let v = os_2.windows_ascender();
+                self.apply_metrics_variation(Tag::from_bytes(b"hcla"), v)
+            }
         } else {
             hhea::ascender(self.hhea)
         }
@@ -1035,9 +1035,14 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn descender(&self) -> i16 {
-        if let Some(os_2) = self.use_typo_metrics() {
-            let v = os_2.typo_descender();
-            self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
+        if let Some(os_2) = self.os_2 {
+            if os_2.is_use_typo_metrics() {
+                let v = os_2.typo_descender();
+                self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
+            } else {
+                let v = os_2.windows_descender();
+                self.apply_metrics_variation(Tag::from_bytes(b"hcld"), v)
+            }
         } else {
             hhea::descender(self.hhea)
         }
@@ -1056,9 +1061,13 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn line_gap(&self) -> i16 {
-        if let Some(os_2) = self.use_typo_metrics() {
-            let v = os_2.typo_line_gap();
-            self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
+        if let Some(os_2) = self.os_2 {
+            if os_2.is_use_typo_metrics() {
+                let v = os_2.typo_line_gap();
+                self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
+            } else {
+                hhea::line_gap(self.hhea)
+            }
         } else {
             hhea::line_gap(self.hhea)
         }
@@ -1111,8 +1120,6 @@ impl<'a> FaceTables<'a> {
             self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
         })
     }
-
-    // TODO: does this affected by USE_TYPO_METRICS?
 
     /// Returns a vertical face ascender.
     ///

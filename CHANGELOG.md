@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- `Face::ascender` and `Face::descender` will use
+  [usWinAscent](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswinascent) and
+  [usWinDescent](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswindescent)
+  when `USE_TYPO_METRICS` flag is not set in `OS/2` table.
+  Previously, those values were ignored and
+  [hhea::ascender](https://docs.microsoft.com/en-us/typography/opentype/spec/hhea#ascender) and
+  [hhea::descender](https://docs.microsoft.com/en-us/typography/opentype/spec/hhea#descender)
+  were used. Now `hhea` table values will be used only when `OS/2` table is not present.
 
 ## [0.11.0] - 2021-02-04
 ### Added

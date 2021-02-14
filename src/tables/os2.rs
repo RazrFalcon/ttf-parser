@@ -14,6 +14,8 @@ const FS_SELECTION_OFFSET: usize = 62;
 const S_TYPO_ASCENDER_OFFSET: usize = 68;
 const S_TYPO_DESCENDER_OFFSET: usize = 70;
 const S_TYPO_LINE_GAP_OFFSET: usize = 72;
+const US_WIN_ASCENT: usize = 74;
+const US_WIN_DESCENT: usize = 76;
 const SX_HEIGHT_OFFSET: usize = 86;
 const S_CAP_HEIGHT_OFFSET: usize = 88;
 
@@ -237,11 +239,21 @@ impl<'a> Table<'a> {
     }
 
     #[inline]
+    pub fn windows_ascender(&self) -> i16 {
+        Stream::read_at::<i16>(self.data, US_WIN_ASCENT).unwrap_or(0)
+    }
+
+    #[inline]
+    pub fn windows_descender(&self) -> i16 {
+        // Should be negated.
+        -Stream::read_at::<i16>(self.data, US_WIN_DESCENT).unwrap_or(0)
+    }
+
+    #[inline]
     pub fn x_height(&self) -> Option<i16> {
         if self.version < 2 {
             None
         } else {
-            // We cannot use SafeStream here, because x height is an optional data.
             Stream::read_at::<i16>(self.data, SX_HEIGHT_OFFSET)
         }
     }

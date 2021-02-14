@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.0] - 2021-02-14
 ### Changed
 - `Face::ascender` and `Face::descender` will use
   [usWinAscent](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswinascent) and
@@ -232,7 +234,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.9.0...v0.10.0

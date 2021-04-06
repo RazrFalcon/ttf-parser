@@ -106,11 +106,16 @@ impl<'a> Subtable<'a> {
             PlatformId::Unicode => true,
             PlatformId::Windows if self.encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
             PlatformId::Windows => {
+                // "Note: Subtable format 13 has the same structure as format 12; it differs only
+                // in the interpretation of the startGlyphID/glyphID fields".
+                let is_format_12_compatible = self.format == Format::SegmentedCoverage ||
+                                              self.format == Format::ManyToOneRangeMappings;
+
                 // "Fonts that support Unicode supplementary-plane characters (U+10000 to U+10FFFF)
                 // on the Windows platform must have a format 12 subtable for platform ID 3,
                 // encoding ID 10."
                 self.encoding_id == WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID
-                && self.format == Format::SegmentedCoverage
+                && is_format_12_compatible
             }
             _ => false,
         }

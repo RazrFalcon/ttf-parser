@@ -21,7 +21,7 @@ const CAP_HEIGHT_OFFSET: usize = 88;
 
 
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 #[allow(missing_docs)]
 pub enum Weight {
     Thin,
@@ -82,7 +82,7 @@ impl Default for Weight {
 
 
 /// A font [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 #[allow(missing_docs)]
 pub enum Width {
     UltraCondensed,
@@ -124,7 +124,7 @@ impl Default for Width {
 
 /// A script metrics used by subscript and superscript.
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub struct ScriptMetrics {
     /// Horizontal font size.
     pub x_size: i16,

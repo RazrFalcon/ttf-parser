@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.1] - 2021-05-24
+### Added
+- Support Format 13 subtables in `cmap::Subtable::is_unicode`.
+  Thanks to [csmulhern](https://github.com/csmulhern)
+- Derive more traits by default. Thanks to [dhardy](https://github.com/dhardy)
+
 ## [0.12.0] - 2021-02-14
 ### Changed
 - `Face::ascender` and `Face::descender` will use
@@ -234,7 +240,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.10.0...v0.10.1

@@ -71,7 +71,7 @@ pub use tables::{cmap, kern};
 
 /// A type-safe wrapper for glyph ID.
 #[repr(transparent)]
-#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Default, Debug)]
+#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Default, Debug, Hash)]
 pub struct GlyphId(pub u16);
 
 impl FromData for GlyphId {

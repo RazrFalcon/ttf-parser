@@ -9,7 +9,7 @@ use crate::ggg::{Class, ClassDefinitionTable, CoverageTable};
 
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 #[allow(missing_docs)]
 pub enum GlyphClass {
     Base      = 1,

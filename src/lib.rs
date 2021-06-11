@@ -308,6 +308,8 @@ pub struct LineMetrics {
 
 
 /// A rectangle.
+///
+/// Doesn't guarantee that `x_min` <= `y_min` and `y_min` <= `y_min`.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
@@ -1588,6 +1590,10 @@ impl<'a> FaceTables<'a> {
     /// When a glyph is defined by a raster or a vector image,
     /// that can be obtained via `glyph_image()`,
     /// the bounding box must be calculated manually and this method will return `None`.
+    ///
+    /// Note: the returned bbox is not validated in any way. A font file can have a glyph bbox
+    /// set to zero/negative width and/or height and this is perfectly ok.
+    /// For calculated bboxes, zero width and/or height is also perfectly fine.
     ///
     /// This method is affected by variation axes.
     #[inline]

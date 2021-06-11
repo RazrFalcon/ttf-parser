@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- Fix `Face::glyph_bounding_box` for variable `glyf`.
 
 ## [0.12.1] - 2021-05-24
 ### Added

@@ -1598,17 +1598,7 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Option<Rect> {
-        #[cfg(feature = "variable-fonts")]
-        {
-            if !self.is_variable() {
-                if let Some(glyf_table) = self.glyf {
-                    return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
-                }
-            }
-        }
-
-        #[cfg(not(feature = "variable-fonts"))]
-        {
+        #[cfg(not(feature = "variable-fonts"))] {
             if let Some(glyf_table) = self.glyf {
                 return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
             }

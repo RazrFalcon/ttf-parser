@@ -575,7 +575,7 @@ fn outline_impl(
         return None;
     }
 
-    let rect_is_valid = rect.width() > 0 && rect.height() > 0;
+    let rect_is_valid = rect.width() >= 0 && rect.height() >= 0;
     if rect_is_valid {
         Some(rect)
     } else {

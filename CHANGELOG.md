@@ -6,7 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Fixed
-- Fix `Face::glyph_bounding_box` for variable `glyf`.
+- `Face::glyph_bounding_box` for variable `glyf`.
+- (`glyf`) Do not skip glyphs with zero-sized bbox.
 
 ## [0.12.1] - 2021-05-24
 ### Added

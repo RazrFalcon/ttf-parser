@@ -505,6 +505,7 @@ pub(crate) fn outline(
     outline_impl(loca_table, glyf_table, glyph_data, 0, &mut b)
 }
 
+#[cfg(not(feature = "variable-fonts"))]
 #[inline]
 pub(crate) fn glyph_bbox(
     loca_table: loca::Table,

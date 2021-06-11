@@ -17,7 +17,13 @@ qmake DEFINES+=WITH_FREETYPE
 make
 
 # or build with harfbuzz support
-# note that harfbuzz should be built via cmake
+# note that harfbuzz should be built from sources using meson,
+# because we're using an unstable API
+#
+# build harfbuzz first
+meson builddir -Dexperimental_api=true --buildtype release
+ninja -C builddir
+# build font-view
 qmake DEFINES+=WITH_HARFBUZZ HARFBUZZ_SRC=/path/to/harfbuzz-master/
 make
 

@@ -9,10 +9,10 @@ struct Tag
     QString toString() const
     {
         QString s;
-        s.append(value >> 24 & 0xff);
-        s.append(value >> 16 & 0xff);
-        s.append(value >> 8 & 0xff);
-        s.append(value >> 0 & 0xff);
+        s.append(QChar(value >> 24 & 0xff));
+        s.append(QChar(value >> 16 & 0xff));
+        s.append(QChar(value >> 8 & 0xff));
+        s.append(QChar(value >> 0 & 0xff));
         return s;
     }
 

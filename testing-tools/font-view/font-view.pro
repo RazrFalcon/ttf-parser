@@ -23,6 +23,11 @@ HEADERS += \
 FORMS += \
     mainwindow.ui
 
+macx {
+    QT_CONFIG -= no-pkg-config
+    PKG_CONFIG = /opt/homebrew/bin/pkg-config
+}
+
 # qmake DEFINES+=WITH_FREETYPE
 contains(DEFINES, WITH_FREETYPE) {
     SOURCES += freetypefont.cpp

@@ -255,7 +255,7 @@ void GlyphsView::wheelEvent(QWheelEvent *e)
 {
     e->accept();
 
-    if (e->delta() > 0) {
+    if (e->angleDelta().y() > 0) {
         m_scale += 0.01;
     } else {
         m_scale -= 0.01;

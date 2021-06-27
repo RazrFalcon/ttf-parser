@@ -1583,9 +1583,10 @@ impl<'a> FaceTables<'a> {
 
     /// Returns a tight glyph bounding box.
     ///
-    /// Unless the current face has a `glyf` table, this is just a shorthand for `outline_glyph()`
-    /// since only the `glyf` table stores a bounding box. In case of CFF and variable fonts
-    /// we have to actually outline a glyph to find it's bounding box.
+    /// This is just a shorthand for `outline_glyph()` since only the `glyf` table stores
+    /// a bounding box. We ignore `glyf` table bboxes because they can be malformed.
+    /// In case of CFF and variable fonts we have to actually outline
+    /// a glyph to find it's bounding box.
     ///
     /// When a glyph is defined by a raster or a vector image,
     /// that can be obtained via `glyph_image()`,
@@ -1598,12 +1599,6 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_bounding_box(&self, glyph_id: GlyphId) -> Option<Rect> {
-        #[cfg(not(feature = "variable-fonts"))] {
-            if let Some(glyf_table) = self.glyf {
-                return glyf::glyph_bbox(self.loca?, glyf_table, glyph_id);
-            }
-        }
-
         self.outline_glyph(glyph_id, &mut DummyOutline)
     }
 

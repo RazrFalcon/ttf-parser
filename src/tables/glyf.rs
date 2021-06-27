@@ -505,26 +505,6 @@ pub(crate) fn outline(
     outline_impl(loca_table, glyf_table, glyph_data, 0, &mut b)
 }
 
-#[cfg(not(feature = "variable-fonts"))]
-#[inline]
-pub(crate) fn glyph_bbox(
-    loca_table: loca::Table,
-    glyf_table: &[u8],
-    glyph_id: GlyphId,
-) -> Option<Rect> {
-    let range = loca_table.glyph_range(glyph_id)?;
-    let glyph_data = glyf_table.get(range)?;
-    let mut s = Stream::new(glyph_data);
-    s.skip::<i16>(); // number_of_contours
-    // It's faster to parse the rect directly, instead of using `FromData`.
-    Some(Rect {
-        x_min: s.read::<i16>()?,
-        y_min: s.read::<i16>()?,
-        x_max: s.read::<i16>()?,
-        y_max: s.read::<i16>()?,
-    })
-}
-
 #[inline]
 fn outline_impl(
     loca_table: loca::Table,
@@ -539,13 +519,7 @@ fn outline_impl(
 
     let mut s = Stream::new(data);
     let number_of_contours: i16 = s.read()?;
-    // It's faster to parse the rect directly, instead of using `FromData`.
-    let rect = Rect {
-        x_min: s.read::<i16>()?,
-        y_min: s.read::<i16>()?,
-        x_max: s.read::<i16>()?,
-        y_max: s.read::<i16>()?,
-    };
+    s.advance(8); // Skip bbox. We use calculated one.
 
     if number_of_contours > 0 {
         // Simple glyph.
@@ -563,24 +537,21 @@ fn outline_impl(
                 if let Some(glyph_data) = glyf_table.get(range) {
                     let transform = Transform::combine(builder.transform, comp.transform);
                     let mut b = Builder::new(transform, builder.bbox, builder.builder);
-                    outline_impl(loca_table, glyf_table, glyph_data, depth + 1, &mut b)?;
+                    // We don't care about errors here.
+                    let _ = outline_impl(loca_table, glyf_table, glyph_data, depth + 1, &mut b);
 
                     // Take updated bbox.
                     builder.bbox = b.bbox;
                 }
             }
         }
-    } else {
-        // An empty glyph.
+    }
+
+    if builder.bbox.is_default() {
         return None;
     }
 
-    let rect_is_valid = rect.width() >= 0 && rect.height() >= 0;
-    if rect_is_valid {
-        Some(rect)
-    } else {
-        builder.bbox.to_rect()
-    }
+    builder.bbox.to_rect()
 }
 
 #[inline]

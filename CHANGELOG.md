@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- (`glyf`) Always use a calculated bbox.
 
 ## [0.12.2] - 2021-06-11
 ### Fixed

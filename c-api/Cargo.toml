@@ -1,6 +1,6 @@
 [package]
 name = "ttf-parser-capi"
-version = "0.12.2"
+version = "0.12.3"
 authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
 license = "MIT"
 edition = "2018"

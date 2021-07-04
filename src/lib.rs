@@ -309,7 +309,7 @@ pub struct LineMetrics {
 
 /// A rectangle.
 ///
-/// Doesn't guarantee that `x_min` <= `y_min` and `y_min` <= `y_min`.
+/// Doesn't guarantee that `x_min` <= `x_max` and/or `y_min` <= `y_max`.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]

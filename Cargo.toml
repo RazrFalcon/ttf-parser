@@ -19,7 +19,7 @@ std = []
 variable-fonts = []
 
 [dev-dependencies]
-base64 = "0.12"
+base64 = "0.13"
 pico-args = "0.3.1"
-svgtypes = "0.5"
+svgtypes = "0.6"
 xmlwriter = "0.1"

@@ -125,6 +125,14 @@ fn glyph_index_u41(bencher: &mut bencher::Bencher) {
     })
 }
 
+fn glyph_index_not_found(bencher: &mut bencher::Bencher) {
+    let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
+    let face = ttf::Face::from_slice(&font_data, 0).unwrap();
+    bencher.iter(|| {
+        bencher::black_box(face.glyph_index('\u{f001}').is_none());
+    })
+}
+
 struct Builder(usize);
 
 impl ttf_parser::OutlineBuilder for Builder {
@@ -169,6 +177,7 @@ bencher::benchmark_group!(perf,
     glyph_name_cff_8,
     glyph_name_cff_276,
     family_name,
-    glyph_index_u41
+    glyph_index_u41,
+    glyph_index_not_found
 );
 bencher::benchmark_main!(perf);

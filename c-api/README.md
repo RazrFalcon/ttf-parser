@@ -1,4 +1,6 @@
-A mostly complete C bindings to the Rust's `ttf-parser` library.
+C bindings to the Rust's `ttf-parser` library.
+
+Provides access only to most common methods. See *Missing API*.
 
 ## Build
 
@@ -38,3 +40,4 @@ and then manually edited a bit.
 
 - `Face::character_mapping_subtables`
 - `Face::kerning_subtables`
+- `opentype_layout`

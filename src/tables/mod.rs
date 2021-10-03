@@ -2,7 +2,6 @@ pub mod cbdt;
 pub mod cblc;
 mod cff;
 pub mod cmap;
-pub mod gdef;
 pub mod glyf;
 pub mod head;
 pub mod hhea;
@@ -17,6 +16,10 @@ pub mod sbix;
 pub mod svg;
 pub mod vhea;
 pub mod vorg;
+
+#[cfg(feature = "opentype-layout")] pub mod gdef;
+#[cfg(feature = "opentype-layout")] pub mod gsub;
+#[cfg(feature = "opentype-layout")] pub mod gpos;
 
 #[cfg(feature = "variable-fonts")] pub mod avar;
 #[cfg(feature = "variable-fonts")] pub mod fvar;

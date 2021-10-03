@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- Complete GSUB and GPOS tables support. Available under the `opentype-layout` feature.
+- `Face::opentype_definition`
+- `Face::opentype_positioning`
+- `Face::opentype_substitution`
+
+### Changed
+- `Face` methods: `has_glyph_classes`, `glyph_class`, `glyph_mark_attachment_class`,
+  `is_mark_glyph` and `glyph_variation_delta` are moved to `DefinitionTable` struct.
+
+### Removed
+- (c-api) `ttfp_glyph_class`, `ttfp_get_glyph_class`, `ttfp_get_glyph_mark_attachment_class`,
+  `ttfp_is_mark_glyph` and `ttfp_glyph_variation_delta`.
 
 ## [0.12.3] - 2021-06-27
 ### Changed

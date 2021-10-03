@@ -3,8 +3,8 @@ A high-level, safe, zero-allocation TrueType font parser.
 
 ## Features
 
-- A high-level API, for people who doesn't know how TrueType works internally.
-  Basically, no direct access to font tables.
+- A high-level API for most common features, hiding all parsing and data resolving logic.
+- A low-level API for for some complex TrueType tables, still hiding raw data layout.
 - Zero heap allocations.
 - Zero unsafe.
 - Zero dependencies.
@@ -50,8 +50,8 @@ macro_rules! try_opt_or {
 }
 
 pub mod parser;
-mod ggg;
 mod tables;
+#[cfg(feature = "opentype-layout")] mod ggg;
 #[cfg(feature = "variable-fonts")] mod var_store;
 
 #[cfg(feature = "std")]
@@ -62,11 +62,25 @@ use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, LazyArrayIter16
 use head::IndexToLocationFormat;
 
 #[cfg(feature = "variable-fonts")] pub use fvar::{VariationAxes, VariationAxis};
-pub use gdef::GlyphClass;
-pub use ggg::*;
+
 pub use name::*;
 pub use os2::*;
 pub use tables::{cmap, kern};
+
+#[cfg(feature = "opentype-layout")]
+pub mod opentype_layout {
+    //! This module contains
+    //! [OpenType Layout](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#overview)
+    //! tables implementation.
+    //!
+    //! Unlike the main [`Face`](crate::Face) API, this module is very low-level
+    //! and contains only parsing abstraction without any logic on top of it.
+
+    pub use crate::gdef::*;
+    pub use crate::tables::gpos as positioning;
+    pub use crate::tables::gsub as substitution;
+    pub use crate::ggg::*;
+}
 
 
 /// A type-safe wrapper for glyph ID.
@@ -292,7 +306,6 @@ impl FromData for Tag {
 }
 
 
-
 /// A line metrics.
 ///
 /// Used for underline and strikeout.
@@ -311,8 +324,8 @@ pub struct LineMetrics {
 ///
 /// Doesn't guarantee that `x_min` <= `x_max` and/or `y_min` <= `y_max`.
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Rect {
     pub x_min: i16,
     pub y_min: i16,
@@ -457,8 +470,8 @@ pub struct RasterGlyphImage<'a> {
 
 /// A table name.
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum TableName {
     AxisVariations = 0,
     CharacterToGlyphIndexMapping,
@@ -469,6 +482,8 @@ pub enum TableName {
     FontVariations,
     GlyphData,
     GlyphDefinition,
+    GlyphPositioningTable,
+    GlyphSubstitutionTable,
     GlyphVariations,
     Header,
     HorizontalHeader,
@@ -618,7 +633,6 @@ pub struct FaceTables<'a> {
     cblc: Option<&'a [u8]>,
     cff1: Option<cff1::Metadata<'a>>,
     cmap: Option<cmap::Subtables<'a>>,
-    gdef: Option<gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
     head: &'a [u8],
     hhea: &'a [u8],
@@ -633,6 +647,10 @@ pub struct FaceTables<'a> {
     sbix: Option<&'a [u8]>,
     svg_: Option<&'a [u8]>,
     vorg: Option<vorg::Table<'a>>,
+
+    #[cfg(feature = "opentype-layout")] gdef: Option<gdef::DefinitionTable<'a>>,
+    #[cfg(feature = "opentype-layout")] gpos: Option<ggg::LayoutTable<'a>>,
+    #[cfg(feature = "opentype-layout")] gsub: Option<ggg::LayoutTable<'a>>,
 
     // Variable font tables.
     #[cfg(feature = "variable-fonts")] avar: Option<avar::Table<'a>>,
@@ -739,7 +757,9 @@ impl<'a> FaceTables<'a> {
             cblc: None,
             cff1: None,
             cmap: None,
-            gdef: None,
+            #[cfg(feature = "opentype-layout")] gdef: None,
+            #[cfg(feature = "opentype-layout")] gpos: None,
+            #[cfg(feature = "opentype-layout")] gsub: None,
             glyf: None,
             head: &[],
             hhea: &[],
@@ -778,7 +798,12 @@ impl<'a> FaceTables<'a> {
                 b"CFF " => face.cff1 = table_data.and_then(|data| cff1::parse_metadata(data)),
                 #[cfg(feature = "variable-fonts")]
                 b"CFF2" => face.cff2 = table_data.and_then(|data| cff2::parse_metadata(data)),
-                b"GDEF" => face.gdef = table_data.and_then(|data| gdef::Table::parse(data)),
+                #[cfg(feature = "opentype-layout")]
+                b"GDEF" => face.gdef = table_data.and_then(|data| gdef::DefinitionTable::parse(data)),
+                #[cfg(feature = "opentype-layout")]
+                b"GPOS" => face.gpos = table_data.and_then(|data| ggg::LayoutTable::parse(data)),
+                #[cfg(feature = "opentype-layout")]
+                b"GSUB" => face.gsub = table_data.and_then(|data| ggg::LayoutTable::parse(data)),
                 #[cfg(feature = "variable-fonts")]
                 b"HVAR" => face.hvar = table_data.and_then(|data| hvar::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
@@ -854,72 +879,66 @@ impl<'a> FaceTables<'a> {
     /// Checks that face has a specified table.
     ///
     /// Will return `true` only for tables that were successfully parsed.
-    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn has_table(&self, name: TableName) -> bool {
         match name {
             TableName::Header                       => true,
             TableName::HorizontalHeader             => true,
             TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => self.avar.is_some(),
+            TableName::AxisVariations               => {
+                #[cfg(feature = "variable-fonts")] { self.avar.is_some() }
+                #[cfg(not(feature = "variable-fonts"))] { false }
+            }
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
             TableName::ColorBitmapData              => self.cbdt.is_some(),
             TableName::ColorBitmapLocation          => self.cblc.is_some(),
             TableName::CompactFontFormat            => self.cff1.is_some(),
-            TableName::CompactFontFormat2           => self.cff2.is_some(),
-            TableName::FontVariations               => self.fvar.is_some(),
+            TableName::CompactFontFormat2           => {
+                #[cfg(feature = "variable-fonts")] { self.cff2.is_some() }
+                #[cfg(not(feature = "variable-fonts"))] { false }
+            }
+            TableName::FontVariations               => {
+                #[cfg(feature = "variable-fonts")] { self.fvar.is_some() }
+                #[cfg(not(feature = "variable-fonts"))] { false }
+            }
             TableName::GlyphData                    => self.glyf.is_some(),
-            TableName::GlyphDefinition              => self.gdef.is_some(),
-            TableName::GlyphVariations              => self.gvar.is_some(),
+            TableName::GlyphDefinition              => {
+                #[cfg(feature = "opentype-layout")] { self.gdef.is_some() }
+                #[cfg(not(feature = "opentype-layout"))] { false }
+            }
+            TableName::GlyphPositioningTable        => {
+                #[cfg(feature = "opentype-layout")] { self.gpos.is_some() }
+                #[cfg(not(feature = "opentype-layout"))] { false }
+            }
+            TableName::GlyphSubstitutionTable       => {
+                #[cfg(feature = "opentype-layout")] { self.gsub.is_some() }
+                #[cfg(not(feature = "opentype-layout"))] { false }
+            }
+            TableName::GlyphVariations              => {
+                #[cfg(feature = "variable-fonts")] { self.gvar.is_some() }
+                #[cfg(not(feature = "variable-fonts"))] { false }
+            }
             TableName::HorizontalMetrics            => self.hmtx.is_some(),
-            TableName::HorizontalMetricsVariations  => self.hvar.is_some(),
+            TableName::HorizontalMetricsVariations  => {
+                #[cfg(feature = "variable-fonts")] { self.hvar.is_some() }
+                #[cfg(not(feature = "variable-fonts"))] { false }
+            }
             TableName::IndexToLocation              => self.loca.is_some(),
             TableName::Kerning                      => self.kern.is_some(),
-            TableName::MetricsVariations            => self.mvar.is_some(),
+            TableName::MetricsVariations            => {
+                #[cfg(feature = "variable-fonts")] { self.mvar.is_some() }
+                #[cfg(not(feature = "variable-fonts"))] { false }
+            }
             TableName::Naming                       => self.name.is_some(),
             TableName::PostScript                   => self.post.is_some(),
             TableName::ScalableVectorGraphics       => self.svg_.is_some(),
             TableName::StandardBitmapGraphics       => self.sbix.is_some(),
             TableName::VerticalHeader               => self.vhea.is_some(),
             TableName::VerticalMetrics              => self.vmtx.is_some(),
-            TableName::VerticalMetricsVariations    => self.vvar.is_some(),
-            TableName::VerticalOrigin               => self.vorg.is_some(),
-            TableName::WindowsMetrics               => self.os_2.is_some(),
-        }
-    }
-
-    /// Checks that face has a specified table.
-    ///
-    /// Will return `true` only for tables that were successfully parsed.
-    #[cfg(not(feature = "variable-fonts"))]
-    #[inline]
-    pub fn has_table(&self, name: TableName) -> bool {
-        match name {
-            TableName::Header                       => true,
-            TableName::HorizontalHeader             => true,
-            TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => false,
-            TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
-            TableName::ColorBitmapData              => self.cbdt.is_some(),
-            TableName::ColorBitmapLocation          => self.cblc.is_some(),
-            TableName::CompactFontFormat            => self.cff1.is_some(),
-            TableName::CompactFontFormat2           => false,
-            TableName::FontVariations               => false,
-            TableName::GlyphData                    => self.glyf.is_some(),
-            TableName::GlyphDefinition              => self.gdef.is_some(),
-            TableName::GlyphVariations              => false,
-            TableName::HorizontalMetrics            => self.hmtx.is_some(),
-            TableName::HorizontalMetricsVariations  => false,
-            TableName::IndexToLocation              => self.loca.is_some(),
-            TableName::Kerning                      => self.kern.is_some(),
-            TableName::MetricsVariations            => false,
-            TableName::Naming                       => self.name.is_some(),
-            TableName::PostScript                   => self.post.is_some(),
-            TableName::ScalableVectorGraphics       => self.svg_.is_some(),
-            TableName::StandardBitmapGraphics       => self.sbix.is_some(),
-            TableName::VerticalHeader               => self.vhea.is_some(),
-            TableName::VerticalMetrics              => self.vmtx.is_some(),
-            TableName::VerticalMetricsVariations    => false,
+            TableName::VerticalMetricsVariations    => {
+                #[cfg(feature = "variable-fonts")] { self.vvar.is_some() }
+                #[cfg(not(feature = "variable-fonts"))] { false }
+            }
             TableName::VerticalOrigin               => self.vorg.is_some(),
             TableName::WindowsMetrics               => self.os_2.is_some(),
         }
@@ -1442,51 +1461,25 @@ impl<'a> FaceTables<'a> {
         None
     }
 
-    /// Checks that face has
-    /// [Glyph Class Definition Table](
-    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
-    pub fn has_glyph_classes(&self) -> bool {
-        try_opt_or!(self.gdef, false).has_glyph_classes()
-    }
-
-    /// Returns glyph's class according to
-    /// [Glyph Class Definition Table](
-    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
-    ///
-    /// Returns `None` when *Glyph Class Definition Table* is not set
-    /// or glyph class is not set or invalid.
-    pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
-        self.gdef.and_then(|gdef| gdef.glyph_class(glyph_id))
-    }
-
-    /// Returns glyph's mark attachment class according to
-    /// [Mark Attachment Class Definition Table](
-    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-attachment-class-definition-table).
-    ///
-    /// All glyphs not assigned to a class fall into Class 0.
-    pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Class {
-        try_opt_or!(self.gdef, Class(0)).glyph_mark_attachment_class(glyph_id)
-    }
-
-    /// Checks that glyph is a mark according to
-    /// [Mark Glyph Sets Table](
-    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-glyph-sets-table).
-    ///
-    /// `set_index` allows checking a specific glyph coverage set.
-    /// Otherwise all sets will be checked.
+    /// Returns a [Glyph Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef).
+    #[cfg(feature = "opentype-layout")]
     #[inline]
-    pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u16>) -> bool {
-        try_opt_or!(self.gdef, false).is_mark_glyph(glyph_id, set_index)
+    pub fn opentype_definition(&self) -> Option<opentype_layout::DefinitionTable<'a>> {
+        self.gdef
     }
 
-    /// Returns glyph's variation delta at a specified index according to
-    /// [Item Variation Store Table](
-    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#item-variation-store-table).
-    #[cfg(feature = "variable-fonts")]
+    /// Returns a [Glyph Positioning Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos).
+    #[cfg(feature = "opentype-layout")]
     #[inline]
-    pub fn glyph_variation_delta(&self, outer_index: u16, inner_index: u16) -> Option<f32> {
-        self.gdef.and_then(|gdef|
-            gdef.variation_delta(outer_index, inner_index, self.coordinates.as_slice()))
+    pub fn opentype_positioning(&self) -> Option<opentype_layout::LayoutTable<'a>> {
+        self.gpos
+    }
+
+    /// Returns a [Glyph Substitution Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gsub).
+    #[cfg(feature = "opentype-layout")]
+    #[inline]
+    pub fn opentype_substitution(&self) -> Option<opentype_layout::LayoutTable<'a>> {
+        self.gsub
     }
 
     /// Returns a iterator over kerning subtables.

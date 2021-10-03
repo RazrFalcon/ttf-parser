@@ -6,7 +6,7 @@
 use core::ops::Range;
 use core::convert::{TryFrom, TryInto};
 
-/// A trait for parsing raw binary data.
+/// A trait for parsing raw binary data of fixed size.
 ///
 /// This is a low-level, internal trait that should not be used directly.
 pub trait FromData: Sized {
@@ -17,6 +17,14 @@ pub trait FromData: Sized {
 
     /// Parses an object from a raw data.
     fn parse(data: &[u8]) -> Option<Self>;
+}
+
+/// A trait for parsing raw binary data of variable size.
+///
+/// This is a low-level, internal trait that should not be used directly.
+pub trait FromSlice<'a>: Sized {
+    /// Parses an object from a raw data.
+    fn parse(data: &'a [u8]) -> Option<Self>;
 }
 
 impl FromData for () {
@@ -86,7 +94,7 @@ impl FromData for i32 {
 ///
 /// Stored as u32, but encoded as 3 bytes in the font.
 ///
-/// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+/// <https://docs.microsoft.com/en-us/typography/opentype/spec/otff#data-types>
 #[derive(Clone, Copy, Debug)]
 pub struct U24(pub u32);
 
@@ -213,7 +221,7 @@ impl TryNumFrom<f32> for i32 {
 
 /// A slice-like container that converts internal binary data only on access.
 ///
-/// This is a low-level, internal structure that should not be used directly.
+/// Array values are stored in a continuous data chunk.
 #[derive(Clone, Copy)]
 pub struct LazyArray16<'a, T> {
     data: &'a [u8],
@@ -262,7 +270,7 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
         }
     }
 
-    /// Returns array's length.
+    /// Returns sub-array.
     #[inline]
     pub fn slice(&self, range: Range<u16>) -> Option<Self> {
         let start = usize::from(range.start) * T::SIZE;
@@ -370,6 +378,11 @@ impl<'a, T: FromData> Iterator for LazyArrayIter16<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         self.index += 1; // TODO: check
         self.data.get(self.index - 1)
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        usize::from(self.data.len().checked_sub(self.index).unwrap_or(0))
     }
 }
 
@@ -505,6 +518,99 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
 }
 
 
+/// A [`LazyArray16`]-like container, but data is accessed by offsets.
+///
+/// Unlike [`LazyArray16`], internal storage is not continuous.
+///
+/// Multiple offsets can point to the same data.
+#[derive(Clone, Copy)]
+pub struct LazyOffsetArray16<'a, T: FromSlice<'a>> {
+    data: &'a [u8],
+    // Zero offsets must be ignored, therefore we're using `Option<Offset16>`.
+    offsets: LazyArray16<'a, Option<Offset16>>,
+    data_type: core::marker::PhantomData<T>,
+}
+
+impl<'a, T: FromSlice<'a>> LazyOffsetArray16<'a, T> {
+    /// Creates a new `LazyOffsetArray16`.
+    pub fn new(data: &'a [u8], offsets: LazyArray16<'a, Option<Offset16>>) -> Self {
+        Self { data, offsets, data_type: core::marker::PhantomData }
+    }
+
+    /// Parses `LazyOffsetArray16` from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let count = s.read::<u16>()?;
+        let offsets = s.read_array16(count)?;
+        Some(Self { data, offsets, data_type: core::marker::PhantomData })
+    }
+
+    /// Returns a value at `index`.
+    #[inline]
+    pub fn get(&self, index: u16) -> Option<T> {
+        let offset = self.offsets.get(index)??.to_usize();
+        self.data.get(offset..).and_then(T::parse)
+    }
+
+    /// Returns array's length.
+    #[inline]
+    pub fn len(&self) -> u16 {
+        self.offsets.len()
+    }
+
+    /// Checks if array is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a, T: FromSlice<'a> + core::fmt::Debug + Copy> core::fmt::Debug for LazyOffsetArray16<'a, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_list().entries(self.into_iter()).finish()
+    }
+}
+
+/// An iterator over [`LazyOffsetArray16`] values.
+#[derive(Clone, Copy)]
+#[allow(missing_debug_implementations)]
+pub struct LazyOffsetArrayIter16<'a, T: FromSlice<'a>> {
+    array: LazyOffsetArray16<'a, T>,
+    index: u16,
+}
+
+impl<'a, T: FromSlice<'a>> IntoIterator for LazyOffsetArray16<'a, T> {
+    type Item = T;
+    type IntoIter = LazyOffsetArrayIter16<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        LazyOffsetArrayIter16 {
+            array: self,
+            index: 0,
+        }
+    }
+}
+
+impl<'a, T: FromSlice<'a>> Iterator for LazyOffsetArrayIter16<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.array.len() {
+            self.index += 1;
+            self.array.get(self.index - 1)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        usize::from(self.array.len() - self.index)
+    }
+}
+
+
 /// A streaming binary parser.
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Stream<'a> {
@@ -621,6 +727,13 @@ impl<'a> Stream<'a> {
     pub fn read_array32<T: FromData>(&mut self, count: u32) -> Option<LazyArray32<'a, T>> {
         let len = usize::num_from(count) * T::SIZE;
         self.read_bytes(len).map(LazyArray32::new)
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    pub(crate) fn read_at_offset16(&mut self, data: &'a [u8]) -> Option<&'a [u8]> {
+        let offset = self.read::<Offset16>()?.to_usize();
+        data.get(offset..)
     }
 }
 

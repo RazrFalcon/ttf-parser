@@ -45,8 +45,8 @@ pub mod name_id {
 
 
 /// A [platform ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids).
-#[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PlatformId {
     Unicode,
     Macintosh,

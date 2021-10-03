@@ -264,8 +264,8 @@ impl FromData for EncodingRecord {
 
 
 /// A character map encoding format.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 #[allow(missing_docs)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Format {
     ByteEncodingTable = 0,
     HighByteMappingThroughTable = 2,

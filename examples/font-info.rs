@@ -46,6 +46,16 @@ fn main() {
     println!("Superscript: {:?}", face.superscript_metrics());
     println!("Variable: {:?}", face.is_variable());
 
+    #[cfg(feature = "opentype-layout")] {
+        if let Some(ref table) = face.opentype_positioning() {
+            print_opentype_layout("positioning", table);
+        }
+
+        if let Some(ref table) = face.opentype_substitution() {
+            print_opentype_layout("substitution", table);
+        }
+    }
+
     #[cfg(feature = "variable-fonts")] {
         if face.is_variable() {
             println!("Variation axes:");
@@ -57,4 +67,29 @@ fn main() {
     }
 
     println!("Elapsed: {}us", now.elapsed().as_micros());
+}
+
+fn print_opentype_layout(name: &str, table: &ttf_parser::opentype_layout::LayoutTable) {
+    println!("OpenType {}:", name);
+    println!("  Scripts:");
+    for script in table.scripts {
+        println!("    {}", script.tag);
+
+        if script.languages.is_empty() {
+            println!("      No languages");
+            continue;
+        }
+
+        println!("      Languages:");
+        for lang in script.languages {
+            println!("        {}", lang.tag);
+        }
+    }
+
+    let mut features: Vec<_> = table.features.into_iter().map(|f| f.tag).collect();
+    features.dedup();
+    println!("  Features:");
+    for feature in features {
+        println!("    {}", feature);
+    }
 }

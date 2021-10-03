@@ -21,8 +21,8 @@ const CAP_HEIGHT_OFFSET: usize = 88;
 
 
 /// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
-#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 #[allow(missing_docs)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub enum Weight {
     Thin,
     ExtraLight,
@@ -82,8 +82,8 @@ impl Default for Weight {
 
 
 /// A font [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 #[allow(missing_docs)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Width {
     UltraCondensed,
     ExtraCondensed,

@@ -49,17 +49,6 @@ typedef enum {
 } ttfp_table_name;
 
 /**
- * @brief A list of glyph classes.
- */
-typedef enum {
-    TTFP_GLYPH_CLASS_UNKNOWN = 0,
-    TTFP_GLYPH_CLASS_BASE,
-    TTFP_GLYPH_CLASS_LIGATURE,
-    TTFP_GLYPH_CLASS_MARK,
-    TTFP_GLYPH_CLASS_COMPONENT,
-} ttfp_glyph_class;
-
-/**
  * @brief A glyph image format.
  */
 typedef enum {
@@ -566,35 +555,6 @@ int16_t ttfp_get_glyph_y_origin(const ttfp_face *face, uint16_t glyph_id);
  * @return `true` on success.
  */
 bool ttfp_get_glyph_name(const ttfp_face *face, uint16_t glyph_id, char *name);
-
-/**
- * @brief Returns glyph's class according to Glyph Class Definition Table.
- *
- * @return A glyph class or TTFP_GLYPH_CLASS_UNKNOWN otherwise.
- */
-ttfp_glyph_class ttfp_get_glyph_class(const ttfp_face *face, uint16_t glyph_id);
-
-/**
- * @brief Returns glyph's mark attachment class according to Mark Attachment Class Definition Table.
- *
- * @return All glyphs not assigned to a class fall into Class 0.
- */
-uint16_t ttfp_get_glyph_mark_attachment_class(const ttfp_face *face, uint16_t glyph_id);
-
-/**
- * @brief Checks that glyph is a mark according to Mark Glyph Sets Table.
- */
-bool ttfp_is_mark_glyph(const ttfp_face *face, uint16_t glyph_id);
-
-#if defined(TTFP_VARIABLE_FONTS)
-/**
- * @brief Returns glyph's variation delta at a specified index according to
- * Item Variation Store Table.
- *
- * @return Delta or `0.0` when there is no delta.
- */
-float ttfp_glyph_variation_delta(const ttfp_face *face, uint16_t outer_index, uint16_t inner_index);
-#endif
 
 /**
  * @brief Outlines a glyph and returns its tight bounding box.

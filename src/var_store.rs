@@ -1,6 +1,6 @@
 //! Implementation of Item Variation Store
 //!
-//! https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store
+//! <https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store>
 
 use crate::NormalizedCoordinate;
 use crate::parser::{Stream, FromData, LazyArray16, NumFrom};

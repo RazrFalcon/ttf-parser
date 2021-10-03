@@ -122,10 +122,6 @@ int main() {
     assert(script_metrics.x_offset == 0);
     assert(script_metrics.y_offset == 350);
 
-    assert(ttfp_get_glyph_class(face, a_gid) == 1);
-    assert(ttfp_get_glyph_mark_attachment_class(face, a_gid) == 0);
-    assert(ttfp_is_mark_glyph(face, a_gid) == false);
-
     ttfp_rect a_bbox = {0};
     assert(ttfp_get_glyph_bbox(face, a_gid, &a_bbox));
     assert(a_bbox.x_min == 3);

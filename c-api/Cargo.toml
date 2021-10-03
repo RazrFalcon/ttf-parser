@@ -17,6 +17,7 @@ ttf-parser = { path = "../", default-features = false, features = ["std"] }
 default = ["variable-fonts"]
 # Enables variable fonts support. Adds about 50KiB.
 variable-fonts = ["ttf-parser/variable-fonts"]
+# opentype-layout is not supported.
 
 [profile.release]
 lto = true

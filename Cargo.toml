@@ -13,10 +13,12 @@ edition = "2018"
 exclude = ["benches/**"]
 
 [features]
-default = ["std", "variable-fonts"]
+default = ["std", "opentype-layout", "variable-fonts"]
 std = []
 # Enables variable fonts support. Increases the binary size almost twice.
 variable-fonts = []
+# Enables GDEF/GPOS/GSUB tables.
+opentype-layout = []
 
 [dev-dependencies]
 base64 = "0.12"

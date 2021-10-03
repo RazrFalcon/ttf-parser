@@ -11,8 +11,8 @@ Can be used as Rust and as C library.
 
 ### Features
 
-- A high-level API, for people who doesn't know how TrueType works internally.
-  Basically, no direct access to font tables.
+- A high-level API for most common features, hiding all parsing and data resolving logic.
+- A low-level API for for some complex TrueType tables, still hiding raw data layout.
 - A [C API](./c-api).
 - Zero heap allocations.
 - Zero unsafe.
@@ -65,8 +65,8 @@ There are roughly three types of TrueType tables:
 | `gasp` table      |                        | ✓                   |                                |
 | `GDEF` table      | ~                      |                     |                                |
 | `glyf` table      | ~<sup>2</sup>          | ✓                   | ~<sup>2</sup>                  |
-| `GPOS` table      |                        |                     | ~ (only 2)                     |
-| `GSUB` table      |                        |                     |                                |
+| `GPOS` table      | ✓                      |                     | ~ (only 2)                     |
+| `GSUB` table      | ✓                      |                     |                                |
 | `gvar` table      | ✓                      | ✓                   |                                |
 | `head` table      | ✓                      | ✓                   | ✓                              |
 | `hhea` table      | ✓                      | ✓                   | ✓                              |

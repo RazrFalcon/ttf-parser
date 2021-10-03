@@ -7,8 +7,8 @@ use crate::parser::{Stream, FromData, Fixed, Offset16, Offset, LazyArray16, Lazy
 
 
 /// A [variation axis](https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord).
-#[allow(missing_docs)]
 #[repr(C)]
+#[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct VariationAxis {
     pub tag: Tag,

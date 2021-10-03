@@ -57,16 +57,6 @@ pub struct ttfp_name_record {
     pub name_size: u16,
 }
 
-/// @brief A list of glyph classes.
-#[repr(C)]
-pub enum ttfp_glyph_class {
-    Unknown = 0,
-    Base,
-    Ligature,
-    Mark,
-    Component,
-}
-
 /// @brief A glyph image format.
 #[repr(C)]
 pub enum ttfp_raster_image_format {
@@ -664,44 +654,6 @@ pub extern "C" fn ttfp_get_glyph_name(
         }
         None => false,
     }
-}
-
-/// @brief Returns glyph's class according to Glyph Class Definition Table.
-///
-/// @return A glyph class or TTFP_GLYPH_CLASS_UNKNOWN otherwise.
-#[no_mangle]
-pub extern "C" fn ttfp_get_glyph_class(face: *const ttfp_face, glyph_id: GlyphId) -> ttfp_glyph_class {
-    match face_from_ptr(face).glyph_class(glyph_id) {
-        None => ttfp_glyph_class::Unknown,
-        Some(ttf_parser::GlyphClass::Base) => ttfp_glyph_class::Base,
-        Some(ttf_parser::GlyphClass::Ligature) => ttfp_glyph_class::Ligature,
-        Some(ttf_parser::GlyphClass::Mark) => ttfp_glyph_class::Mark,
-        Some(ttf_parser::GlyphClass::Component) => ttfp_glyph_class::Component,
-    }
-}
-
-/// @brief Returns glyph's mark attachment class according to Mark Attachment Class Definition Table.
-///
-/// @return All glyphs not assigned to a class fall into Class 0.
-#[no_mangle]
-pub extern "C" fn ttfp_get_glyph_mark_attachment_class(face: *const ttfp_face, glyph_id: GlyphId) -> u16 {
-    face_from_ptr(face).glyph_mark_attachment_class(glyph_id).0
-}
-
-/// @brief Checks that glyph is a mark according to Mark Glyph Sets Table.
-#[no_mangle]
-pub extern "C" fn ttfp_is_mark_glyph(face: *const ttfp_face, glyph_id: GlyphId) -> bool {
-    face_from_ptr(face).is_mark_glyph(glyph_id, None)
-}
-
-/// @brief Returns glyph's variation delta at a specified index according to
-/// Item Variation Store Table.
-///
-/// @return Delta or `0.0` when there is no delta.
-#[cfg(feature = "variable-fonts")]
-#[no_mangle]
-pub extern "C" fn ttfp_glyph_variation_delta(face: *const ttfp_face, outer_index: u16, inner_index: u16) -> f32 {
-    face_from_ptr(face).glyph_variation_delta(outer_index, inner_index).unwrap_or(0.0)
 }
 
 /// @brief Outlines a glyph and returns its tight bounding box.

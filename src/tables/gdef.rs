@@ -1,16 +1,16 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
 
 use crate::GlyphId;
-use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16};
-use crate::ggg::{Class, ClassDefinitionTable, CoverageTable};
+use crate::opentype_layout::{Class, ClassDefinition, Coverage};
+use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream, FromSlice};
 
 #[cfg(feature = "variable-fonts")] use crate::NormalizedCoordinate;
 #[cfg(feature = "variable-fonts")] use crate::var_store::ItemVariationStore;
 
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 #[allow(missing_docs)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum GlyphClass {
     Base      = 1,
     Ligature  = 2,
@@ -19,16 +19,18 @@ pub enum GlyphClass {
 }
 
 
+/// A [Glyph Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef).
+#[allow(missing_debug_implementations)]
 #[derive(Clone, Copy, Default)]
-pub struct Table<'a> {
-    glyph_classes: Option<ClassDefinitionTable<'a>>,
-    mark_attach_classes: Option<ClassDefinitionTable<'a>>,
+pub struct DefinitionTable<'a> {
+    glyph_classes: Option<ClassDefinition<'a>>,
+    mark_attach_classes: Option<ClassDefinition<'a>>,
     mark_glyph_coverage_offsets: Option<(&'a [u8], LazyArray16<'a, Offset32>)>,
     #[cfg(feature = "variable-fonts")] variation_store: Option<ItemVariationStore<'a>>,
 }
 
-impl<'a> Table<'a> {
-    pub fn parse(data: &'a [u8]) -> Option<Self> {
+impl<'a> DefinitionTable<'a> {
+    pub(crate) fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let version: u32 = s.read()?;
         if !(version == 0x00010000 || version == 0x00010002 || version == 0x00010003) {
@@ -56,17 +58,18 @@ impl<'a> Table<'a> {
             }
         }
 
-        let mut table = Table::default();
+        let mut table = DefinitionTable::default();
 
         if let Some(offset) = glyph_class_def_offset {
+
             if let Some(subdata) = data.get(offset.to_usize()..) {
-                table.glyph_classes = Some(ClassDefinitionTable::new(subdata));
+                table.glyph_classes = ClassDefinition::parse(subdata);
             }
         }
 
         if let Some(offset) = mark_attach_class_def_offset {
             if let Some(subdata) = data.get(offset.to_usize()..) {
-                table.mark_attach_classes = Some(ClassDefinitionTable::new(subdata));
+                table.mark_attach_classes = ClassDefinition::parse(subdata);
             }
         }
 
@@ -97,14 +100,23 @@ impl<'a> Table<'a> {
         Some(table)
     }
 
+    /// Checks that face has
+    /// [Glyph Class Definition Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
     #[inline]
     pub fn has_glyph_classes(&self) -> bool {
         self.glyph_classes.is_some()
     }
 
+    /// Returns glyph's class according to
+    /// [Glyph Class Definition Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
+    ///
+    /// Returns `None` when *Glyph Class Definition Table* is not set
+    /// or glyph class is not set or invalid.
     #[inline]
     pub fn glyph_class(&self, glyph_id: GlyphId) -> Option<GlyphClass> {
-        match self.glyph_classes?.get(glyph_id).0 {
+        match self.glyph_classes?.get(glyph_id) {
             1 => Some(GlyphClass::Base),
             2 => Some(GlyphClass::Ligature),
             3 => Some(GlyphClass::Mark),
@@ -113,21 +125,35 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns glyph's mark attachment class according to
+    /// [Mark Attachment Class Definition Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-attachment-class-definition-table).
+    ///
+    /// All glyphs not assigned to a class fall into Class 0.
     #[inline]
     pub fn glyph_mark_attachment_class(&self, glyph_id: GlyphId) -> Class {
         self.mark_attach_classes
             .map(|def| def.get(glyph_id))
-            .unwrap_or(Class(0))
+            .unwrap_or(0)
     }
 
+    /// Checks that glyph is a mark according to
+    /// [Mark Glyph Sets Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#mark-glyph-sets-table).
+    ///
+    /// `set_index` allows checking a specific glyph coverage set.
+    /// Otherwise all sets will be checked.
     #[inline]
     pub fn is_mark_glyph(&self, glyph_id: GlyphId, set_index: Option<u16>) -> bool {
         is_mark_glyph_impl(self, glyph_id, set_index).is_some()
     }
 
+    /// Returns glyph's variation delta at a specified index according to
+    /// [Item Variation Store Table](
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#item-variation-store-table).
     #[cfg(feature = "variable-fonts")]
     #[inline]
-    pub fn variation_delta(
+    pub fn glyph_variation_delta(
         &self,
         outer_index: u16,
         inner_index: u16,
@@ -140,7 +166,7 @@ impl<'a> Table<'a> {
 
 #[inline(never)]
 fn is_mark_glyph_impl(
-    table: &Table,
+    table: &DefinitionTable,
     glyph_id: GlyphId,
     set_index: Option<u16>,
 ) -> Option<()> {
@@ -148,14 +174,14 @@ fn is_mark_glyph_impl(
 
     if let Some(set_index) = set_index {
         if let Some(offset) = offsets.get(set_index) {
-            let table = CoverageTable::new(data.get(offset.to_usize()..)?);
+            let table = Coverage::parse(data.get(offset.to_usize()..)?)?;
             if table.contains(glyph_id) {
                 return Some(());
             }
         }
     } else {
         for offset in offsets {
-            let table = CoverageTable::new(data.get(offset.to_usize()..)?);
+            let table = Coverage::parse(data.get(offset.to_usize()..)?)?;
             if table.contains(glyph_id) {
                 return Some(());
             }

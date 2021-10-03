@@ -262,8 +262,9 @@ impl<'a> Iterator for Names<'a> {
         }
     }
 
+    #[inline]
     fn count(self) -> usize {
-        usize::from(self.total)
+        usize::from(self.total.checked_sub(self.index).unwrap_or(0))
     }
 }
 

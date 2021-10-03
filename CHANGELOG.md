@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - (c-api) `ttfp_glyph_class`, `ttfp_get_glyph_class`, `ttfp_get_glyph_mark_attachment_class`,
   `ttfp_is_mark_glyph` and `ttfp_glyph_variation_delta`.
 
+### Fixed
+- `Iterator::count` implementation for `cmap::Subtables`, `name::Names` and `LazyArrayIter32`.
+
 ## [0.12.3] - 2021-06-27
 ### Changed
 - (`glyf`) Always use a calculated bbox.

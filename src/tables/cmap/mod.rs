@@ -10,8 +10,6 @@ This module provides a low-level alternative to
 methods.
 */
 
-use core::convert::TryFrom;
-
 use crate::{GlyphId, PlatformId};
 use crate::parser::{Stream, FromData, LazyArray16, NumFrom};
 
@@ -44,10 +42,8 @@ impl<'a> Iterator for Subtables<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.records.len() {
-            let index = u16::try_from(self.index).ok()?;
             self.index += 1;
-
-            let record = self.records.get(index)?;
+            let record = self.records.get(self.index - 1)?;
             let subtable_data = self.data.get(usize::num_from(record.offset)..)?;
             let format: Format = Stream::read_at(subtable_data, 0)?;
             Some(Subtable {
@@ -63,7 +59,7 @@ impl<'a> Iterator for Subtables<'a> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::from(self.records.len())
+        usize::from(self.records.len().checked_sub(self.index).unwrap_or(0))
     }
 }
 

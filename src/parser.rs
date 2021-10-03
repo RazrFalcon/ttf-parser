@@ -513,7 +513,7 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::num_from(self.data.len())
+        usize::num_from(self.data.len().checked_sub(self.index).unwrap_or(0))
     }
 }
 
@@ -606,7 +606,7 @@ impl<'a, T: FromSlice<'a>> Iterator for LazyOffsetArrayIter16<'a, T> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::from(self.array.len() - self.index)
+        usize::from(self.array.len().checked_sub(self.index).unwrap_or(0))
     }
 }
 

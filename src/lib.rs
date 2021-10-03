@@ -672,7 +672,6 @@ impl fmt::Debug for FaceTables<'_> {
 }
 
 impl<'a> Face<'a> {
-
     /// Creates a new `Face` object from a raw data.
     ///
     /// `index` indicates the specific font face in a font collection.

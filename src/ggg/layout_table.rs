@@ -1,7 +1,11 @@
+// Suppresses `minor_version` variable warning.
+#![allow(unused_variables)]
+
 use super::LookupList;
-use crate::parser::{FromData, LazyArray16, Offset, Offset16, Offset32, Stream};
+use crate::parser::{FromData, LazyArray16, Offset, Offset16, Stream};
 use crate::Tag;
 #[cfg(feature = "variable-fonts")] use super::FeatureVariations;
+#[cfg(feature = "variable-fonts")] use crate::parser::Offset32;
 
 /// A [Layout Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#table-organization).
 #[derive(Clone, Copy, Debug)]
@@ -32,14 +36,12 @@ impl<'a> LayoutTable<'a> {
         let features = FeatureList::parse(s.read_at_offset16(data)?)?;
         let lookups = LookupList::parse(s.read_at_offset16(data)?)?;
 
-        #[allow(unused_variables)]
-        let mut variations_offset = None;
-        #[allow(unused_assignments)]
-        if minor_version >= 1 {
-            variations_offset = s.read::<Option<Offset32>>()?;
-        }
-
         #[cfg(feature = "variable-fonts")] {
+            let mut variations_offset = None;
+            if minor_version >= 1 {
+                variations_offset = s.read::<Option<Offset32>>()?;
+            }
+
             let variations = match variations_offset {
                 Some(offset) => data.get(offset.to_usize()..).and_then(FeatureVariations::parse),
                 None => None,

@@ -2,7 +2,7 @@
 ![Build Status](https://github.com/RazrFalcon/ttf-parser/workflows/Rust/badge.svg)
 [![Crates.io](https://img.shields.io/crates/v/ttf-parser.svg)](https://crates.io/crates/ttf-parser)
 [![Documentation](https://docs.rs/ttf-parser/badge.svg)](https://docs.rs/ttf-parser)
-[![Rust 1.35+](https://img.shields.io/badge/rust-1.35+-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.42+](https://img.shields.io/badge/rust-1.42+-orange.svg)](https://www.rust-lang.org)
 ![](https://img.shields.io/badge/unsafe-forbidden-brightgreen.svg)
 
 A high-level, safe, zero-allocation TrueType font parser.

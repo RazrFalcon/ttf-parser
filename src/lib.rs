@@ -65,7 +65,7 @@ use head::IndexToLocationFormat;
 
 pub use name::*;
 pub use os2::*;
-pub use tables::{cmap, kern};
+pub use tables::{cmap, kern, sbix};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -644,7 +644,7 @@ pub struct FaceTables<'a> {
     post: Option<post::Table<'a>>,
     vhea: Option<&'a [u8]>,
     vmtx: Option<hmtx::Table<'a>>,
-    sbix: Option<&'a [u8]>,
+    sbix: Option<sbix::Table<'a>>,
     svg_: Option<&'a [u8]>,
     vorg: Option<vorg::Table<'a>>,
 
@@ -788,6 +788,7 @@ impl<'a> FaceTables<'a> {
         let mut hmtx = None;
         let mut vmtx = None;
         let mut loca = None;
+        let mut sbix = None;
 
         for table_tag_table_data in provider {
             let (table_tag, table_data) = table_tag_table_data?;
@@ -828,7 +829,7 @@ impl<'a> FaceTables<'a> {
                 b"maxp" => number_of_glyphs = table_data.and_then(|data| maxp::parse(data)),
                 b"name" => face.name = table_data.and_then(|data| name::parse(data)),
                 b"post" => face.post = table_data.and_then(|data| post::Table::parse(data)),
-                b"sbix" => face.sbix = table_data,
+                b"sbix" => sbix = table_data,
                 b"vhea" => face.vhea = table_data.and_then(|data| vhea::parse(data)),
                 b"vmtx" => vmtx = table_data,
                 _ => {}
@@ -870,6 +871,10 @@ impl<'a> FaceTables<'a> {
             if let Some(format) = head::index_to_loc_format(face.head) {
                 face.loca = loca::Table::parse(data, face.number_of_glyphs, format);
             }
+        }
+
+        if let Some(data) = sbix {
+            face.sbix = sbix::Table::parse(face.number_of_glyphs, data);
         }
 
         Ok(face)
@@ -1624,8 +1629,10 @@ impl<'a> FaceTables<'a> {
     /// Font's tables be accesses in this specific order.
     #[inline]
     pub fn glyph_raster_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<RasterGlyphImage> {
-        if let Some(sbix_data) = self.sbix {
-            return sbix::parse(sbix_data, self.number_of_glyphs, glyph_id, pixels_per_em, 0);
+        if let Some(table) = self.sbix {
+            if let Some(strike) = table.best_strike(pixels_per_em) {
+                return strike.get(glyph_id);
+            }
         }
 
         if let (Some(cblc_data), Some(cbdt_data)) = (self.cblc, self.cbdt) {

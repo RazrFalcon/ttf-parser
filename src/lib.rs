@@ -1042,13 +1042,28 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn ascender(&self) -> i16 {
+        // 1. If the OS/2 table exists and the fsSelection bit 7 is set
+        // (USE_TYPO_METRICS), trust the font and use the sTypo* metrics.
+        // 2. Otherwise, use the `hhea' table's metrics.
+        // 3. If they are zero and the OS/2 table exists,
+        //    1. use the OS/2 table's sTypo* metrics if they are non-zero.
+        //    2. Otherwise, use the OS/2 table's usWin* metrics.
         if let Some(os_2) = self.os_2 {
             if os_2.is_use_typo_metrics() {
                 let v = os_2.typo_ascender();
                 self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
             } else {
-                let v = os_2.windows_ascender();
-                self.apply_metrics_variation(Tag::from_bytes(b"hcla"), v)
+                if hhea::ascender(self.hhea) == 0 {
+                    let v = os_2.typo_ascender();
+                    if v != 0 {
+                        self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
+                    } else {
+                        let v = os_2.windows_ascender();
+                        self.apply_metrics_variation(Tag::from_bytes(b"hcla"), v)
+                    }
+                } else {
+                    hhea::ascender(self.hhea)
+                }
             }
         } else {
             hhea::ascender(self.hhea)
@@ -1065,8 +1080,17 @@ impl<'a> FaceTables<'a> {
                 let v = os_2.typo_descender();
                 self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
             } else {
-                let v = os_2.windows_descender();
-                self.apply_metrics_variation(Tag::from_bytes(b"hcld"), v)
+                if hhea::descender(self.hhea) == 0 {
+                    let v = os_2.typo_descender();
+                    if v == 0 {
+                        self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
+                    } else {
+                        let v = os_2.windows_descender();
+                        self.apply_metrics_variation(Tag::from_bytes(b"hcld"), v) 
+                    }
+                } else {
+                    hhea::descender(self.hhea)
+                }
             }
         } else {
             hhea::descender(self.hhea)
@@ -1091,7 +1115,12 @@ impl<'a> FaceTables<'a> {
                 let v = os_2.typo_line_gap();
                 self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
             } else {
-                hhea::line_gap(self.hhea)
+                if hhea::line_gap(self.hhea) == 0 {
+                    let v = os_2.typo_line_gap();
+                    self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
+                } else {
+                    hhea::line_gap(self.hhea)
+                }
             }
         } else {
             hhea::line_gap(self.hhea)

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Face::opentype_substitution`
 
 ### Changed
+- Improved ascender/descender/line_gap resolving logic.
 - `Face` methods: `has_glyph_classes`, `glyph_class`, `glyph_mark_attachment_class`,
   `is_mark_glyph` and `glyph_variation_delta` are moved to `DefinitionTable` struct.
 

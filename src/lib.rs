@@ -1037,6 +1037,9 @@ impl<'a> FaceTables<'a> {
         self.post.map(|table| table.italic_angle())
     }
 
+    // Read https://github.com/freetype/freetype/blob/49270c17011491227ec7bd3fb73ede4f674aa065/src/sfnt/sfobjs.c#L1279
+    // to learn more about the logic behind the following functions.
+
     /// Returns a horizontal face ascender.
     ///
     /// This method is affected by variation axes.
@@ -1044,15 +1047,25 @@ impl<'a> FaceTables<'a> {
     pub fn ascender(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
             if os_2.is_use_typo_metrics() {
-                let v = os_2.typo_ascender();
-                self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
-            } else {
-                let v = os_2.windows_ascender();
-                self.apply_metrics_variation(Tag::from_bytes(b"hcla"), v)
+                let value = os_2.typo_ascender();
+                return self.apply_metrics_variation(Tag::from_bytes(b"hasc"), value);
             }
-        } else {
-            hhea::ascender(self.hhea)
         }
+
+        let mut value = hhea::ascender(self.hhea);
+        if value == 0 {
+            if let Some(os_2) = self.os_2 {
+                value = os_2.typo_ascender();
+                if value == 0 {
+                    value = os_2.windows_ascender();
+                    value = self.apply_metrics_variation(Tag::from_bytes(b"hcla"), value);
+                } else {
+                    value = self.apply_metrics_variation(Tag::from_bytes(b"hasc"), value);
+                }
+            }
+        }
+
+        value
     }
 
     /// Returns a horizontal face descender.
@@ -1062,15 +1075,25 @@ impl<'a> FaceTables<'a> {
     pub fn descender(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
             if os_2.is_use_typo_metrics() {
-                let v = os_2.typo_descender();
-                self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
-            } else {
-                let v = os_2.windows_descender();
-                self.apply_metrics_variation(Tag::from_bytes(b"hcld"), v)
+                let value = os_2.typo_descender();
+                return self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), value);
             }
-        } else {
-            hhea::descender(self.hhea)
         }
+
+        let mut value = hhea::descender(self.hhea);
+        if value == 0 {
+            if let Some(os_2) = self.os_2 {
+                value = os_2.typo_descender();
+                if value == 0 {
+                    value = os_2.windows_descender();
+                    value = self.apply_metrics_variation(Tag::from_bytes(b"hcld"), value);
+                } else {
+                    value = self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), value);
+                }
+            }
+        }
+
+        value
     }
 
     /// Returns face's height.
@@ -1088,14 +1111,20 @@ impl<'a> FaceTables<'a> {
     pub fn line_gap(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
             if os_2.is_use_typo_metrics() {
-                let v = os_2.typo_line_gap();
-                self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
-            } else {
-                hhea::line_gap(self.hhea)
+                let value = os_2.typo_line_gap();
+                return self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
             }
-        } else {
-            hhea::line_gap(self.hhea)
         }
+
+        let mut value = hhea::line_gap(self.hhea);
+        if value == 0 {
+            if let Some(os_2) = self.os_2 {
+                value = os_2.typo_line_gap();
+                value = self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
+            }
+        }
+
+        value
     }
 
     /// Returns a horizontal typographic face ascender.

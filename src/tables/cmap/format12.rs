@@ -1,5 +1,6 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
 
+use core::cmp::Ordering;
 use core::convert::TryFrom;
 
 use crate::parser::{Stream, FromData};
@@ -33,15 +34,19 @@ pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
     s.skip::<u32>(); // language
     let count: u32 = s.read()?;
     let groups = s.read_array32::<SequentialMapGroup>(count)?;
-    for group in groups {
-        let start_char_code = group.start_char_code;
-        if code_point >= start_char_code && code_point <= group.end_char_code {
-            let id = group.start_glyph_id.checked_add(code_point)?.checked_sub(start_char_code)?;
-            return u16::try_from(id).ok();
-        }
-    }
 
-    None
+    let (_, group) = groups.binary_search_by(|range| {
+        if code_point < range.start_char_code {
+            Ordering::Less
+        } else if range.end_char_code < code_point {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    })?;
+
+    let id = group.start_glyph_id.checked_add(code_point)?.checked_sub(group.start_char_code)?;
+    return u16::try_from(id).ok();
 }
 
 pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {

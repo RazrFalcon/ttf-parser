@@ -64,7 +64,7 @@ use head::IndexToLocationFormat;
 
 pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
-pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -634,7 +634,7 @@ pub struct FaceTables<'a> {
     cblc: Option<&'a [u8]>,
     cff1: Option<cff1::Metadata<'a>>,
     cmap: Option<cmap::Subtables<'a>>,
-    glyf: Option<&'a [u8]>,
+    glyf: Option<glyf::Table<'a>>,
     head: head::Table,
     hhea: hhea::Table,
     hmtx: Option<hmtx::Table<'a>>,
@@ -790,6 +790,7 @@ impl<'a> FaceTables<'a> {
         let mut hmtx = None;
         let mut vmtx = None;
         let mut loca = None;
+        let mut glyf = None;
         let mut sbix = None;
 
         for table_tag_table_data in provider {
@@ -820,7 +821,7 @@ impl<'a> FaceTables<'a> {
                 b"cmap" => face.cmap = table_data.and_then(|data| cmap::parse(data)),
                 #[cfg(feature = "variable-fonts")]
                 b"fvar" => face.fvar = table_data.and_then(|data| fvar::Table::parse(data)),
-                b"glyf" => face.glyf = table_data,
+                b"glyf" => glyf = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"gvar" => face.gvar = table_data.and_then(|data| gvar::Table::parse(data)),
                 b"head" => face.head = table_data.and_then(|data| head::Table::parse(data)).unwrap_or_default(),
@@ -875,6 +876,12 @@ impl<'a> FaceTables<'a> {
                 face.maxp.number_of_glyphs,
                 face.head.index_to_location_format,
             );
+
+            if let Some(loca_table) = face.loca {
+                if let Some(glyf) = glyf {
+                    face.glyf = Some(glyf::Table::parse(loca_table, glyf));
+                }
+            }
         }
 
         if let Some(data) = sbix {
@@ -1596,12 +1603,12 @@ impl<'a> FaceTables<'a> {
     ) -> Option<Rect> {
         #[cfg(feature = "variable-fonts")] {
             if let Some(ref gvar_table) = self.gvar {
-                return gvar::outline(self.loca?, self.glyf?, gvar_table, self.coords(), glyph_id, builder);
+                return gvar::outline(self.glyf?, gvar_table, self.coords(), glyph_id, builder);
             }
         }
 
-        if let Some(glyf_table) = self.glyf {
-            return glyf::outline(self.loca?, glyf_table, glyph_id, builder);
+        if let Some(table) = self.glyf {
+            return table.outline(glyph_id, builder);
         }
 
         if let Some(ref metadata) = self.cff1 {

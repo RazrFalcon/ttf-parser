@@ -5,7 +5,7 @@ use core::cmp;
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
-use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoordinate};
+use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoordinate};
 use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16, F2DOT14};
 use crate::glyf::{self, Transform};
 
@@ -112,26 +112,20 @@ impl<'a> Table<'a> {
 
 
 pub(crate) fn outline(
-    loca_table: loca::Table,
-    glyf_table: &[u8],
+    glyf_table: glyf::Table,
     gvar_table: &Table,
     coordinates: &[NormalizedCoordinate],
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Option<Rect> {
     let mut b = glyf::Builder::new(Transform::default(), BBox::new(), builder);
-
-    let range = loca_table.glyph_range(glyph_id)?;
-    let glyph_data = glyf_table.get(range)?;
-
-    outline_var_impl(loca_table, glyf_table, gvar_table,
-                     glyph_id, glyph_data, coordinates, 0, &mut b);
+    let glyph_data = glyf_table.get(glyph_id)?;
+    outline_var_impl(glyf_table, gvar_table, glyph_id, glyph_data, coordinates, 0, &mut b);
     b.bbox.to_rect()
 }
 
 fn outline_var_impl<'a>(
-    loca_table: loca::Table,
-    glyf_table: &[u8],
+    glyf_table: glyf::Table,
     gvar_table: &Table,
     glyph_id: GlyphId,
     data: &[u8],
@@ -204,10 +198,9 @@ fn outline_var_impl<'a>(
             transform = Transform::combine(transform, component.transform);
 
             let mut b = glyf::Builder::new(transform, builder.bbox, builder.builder);
-            let range = loca_table.glyph_range(component.glyph_id)?;
-            let glyph_data = glyf_table.get(range)?;
+            let glyph_data = glyf_table.get(component.glyph_id)?;
             outline_var_impl(
-                loca_table, glyf_table, gvar_table, component.glyph_id,
+                glyf_table, gvar_table, component.glyph_id,
                 glyph_data, coordinates, depth + 1, &mut b,
             )?;
 

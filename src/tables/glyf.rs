@@ -1,9 +1,51 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf
+//! A [Glyph Data Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/glyf) implementation.
 
 use core::num::NonZeroU16;
 
 use crate::parser::{Stream, F2DOT14, LazyArray16, NumFrom};
 use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox};
+
+/// A [Glyph Data Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf).
+#[derive(Clone, Copy)]
+pub struct Table<'a> {
+    pub(crate) data: &'a [u8],
+    loca_table: loca::Table<'a>,
+}
+
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
+    }
+}
+
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    #[inline]
+    pub fn parse(loca_table: loca::Table<'a>, data: &'a [u8]) -> Self {
+        Table { loca_table, data }
+    }
+
+    /// Outlines a glyph.
+    #[inline]
+    pub fn outline(
+        &self,
+        glyph_id: GlyphId,
+        builder: &mut dyn OutlineBuilder,
+    ) -> Option<Rect> {
+        let mut b = Builder::new(Transform::default(), BBox::new(), builder);
+        let glyph_data = self.get(glyph_id)?;
+        outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)
+    }
+
+    #[inline]
+    pub(crate) fn get(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
+        let range = self.loca_table.glyph_range(glyph_id)?;
+        self.data.get(range)
+    }
+}
+
 
 pub(crate) struct Builder<'a> {
     pub builder: &'a mut dyn OutlineBuilder,
@@ -142,7 +184,7 @@ impl<'a> Builder<'a> {
 
 
 #[derive(Clone, Copy)]
-pub struct Transform {
+pub(crate) struct Transform {
     pub a: f32, pub b: f32, pub c: f32,
     pub d: f32, pub e: f32, pub f: f32,
 }
@@ -273,7 +315,7 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
 // I guess it's due to the fact that with i16 the struct
 // fits into the machine word.
 #[derive(Clone, Copy, Debug)]
-pub struct GlyphPoint {
+pub(crate) struct GlyphPoint {
     pub x: i16,
     pub y: i16,
     /// Indicates that a point is a point on curve
@@ -284,7 +326,7 @@ pub struct GlyphPoint {
 
 
 #[derive(Clone, Default)]
-pub struct GlyphPointsIter<'a> {
+pub(crate) struct GlyphPointsIter<'a> {
     endpoints: EndpointsIter<'a>,
     flags: FlagsIter<'a>,
     x_coords: CoordsIter<'a>,
@@ -490,20 +532,7 @@ impl CompositeGlyphFlags {
 
 
 // It's not defined in the spec, so we are using our own value.
-pub const MAX_COMPONENTS: u8 = 32;
-
-#[inline]
-pub(crate) fn outline(
-    loca_table: loca::Table,
-    glyf_table: &[u8],
-    glyph_id: GlyphId,
-    builder: &mut dyn OutlineBuilder,
-) -> Option<Rect> {
-    let mut b = Builder::new(Transform::default(), BBox::new(), builder);
-    let range = loca_table.glyph_range(glyph_id)?;
-    let glyph_data = glyf_table.get(range)?;
-    outline_impl(loca_table, glyf_table, glyph_data, 0, &mut b)
-}
+pub(crate) const MAX_COMPONENTS: u8 = 32;
 
 #[inline]
 fn outline_impl(
@@ -555,7 +584,7 @@ fn outline_impl(
 }
 
 #[inline]
-pub fn parse_simple_outline(
+pub(crate) fn parse_simple_outline(
     glyph_data: &[u8],
     number_of_contours: NonZeroU16,
 ) -> Option<GlyphPointsIter> {

@@ -1,4 +1,6 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/cff2
+//! A [Compact Font Format 2 Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/cff2) implementation.
+
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cff2charstr
 
 use core::convert::TryFrom;
@@ -74,84 +76,95 @@ mod private_dict_operator {
 }
 
 
+/// A [Compact Font Format 2 Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/cff2).
 #[derive(Clone, Copy, Default)]
-pub struct Metadata<'a> {
+pub struct Table<'a> {
     global_subrs: Index<'a>,
     local_subrs: Index<'a>,
     char_strings: Index<'a>,
     item_variation_store: ItemVariationStore<'a>,
 }
 
-pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
-    let mut s = Stream::new(data);
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
 
-    // Parse Header.
-    let major: u8 = s.read()?;
-    s.skip::<u8>(); // minor
-    let header_size: u8 = s.read()?;
-    let top_dict_length: u16 = s.read()?;
+        // Parse Header.
+        let major: u8 = s.read()?;
+        s.skip::<u8>(); // minor
+        let header_size: u8 = s.read()?;
+        let top_dict_length: u16 = s.read()?;
 
-    if major != 2 {
-        return None;
-    }
+        if major != 2 {
+            return None;
+        }
 
-    // Jump to Top DICT. It's not necessarily right after the header.
-    if header_size > 5 {
-        s.advance(usize::from(header_size) - 5);
-    }
+        // Jump to Top DICT. It's not necessarily right after the header.
+        if header_size > 5 {
+            s.advance(usize::from(header_size) - 5);
+        }
 
-    let top_dict_data = s.read_bytes(usize::from(top_dict_length))?;
-    let top_dict = parse_top_dict(top_dict_data)?;
+        let top_dict_data = s.read_bytes(usize::from(top_dict_length))?;
+        let top_dict = parse_top_dict(top_dict_data)?;
 
-    let mut metadata = Metadata::default();
+        let mut metadata = Self::default();
 
-    // Parse Global Subroutines INDEX.
-    metadata.global_subrs = parse_index::<u32>(&mut s)?;
+        // Parse Global Subroutines INDEX.
+        metadata.global_subrs = parse_index::<u32>(&mut s)?;
 
-    metadata.char_strings = {
-        let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
-        parse_index::<u32>(&mut s)?
-    };
+        metadata.char_strings = {
+            let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
+            parse_index::<u32>(&mut s)?
+        };
 
-    if let Some(offset) = top_dict.variation_store_offset {
-        let mut s = Stream::new_at(data, offset)?;
-        s.skip::<u16>(); // length
-        metadata.item_variation_store = ItemVariationStore::parse(s)?;
-    }
+        if let Some(offset) = top_dict.variation_store_offset {
+            let mut s = Stream::new_at(data, offset)?;
+            s.skip::<u16>(); // length
+            metadata.item_variation_store = ItemVariationStore::parse(s)?;
+        }
 
-    // TODO: simplify
-    if let Some(offset) = top_dict.font_dict_index_offset {
-        let mut s = Stream::new_at(data, offset)?;
-        'outer: for font_dict_data in parse_index::<u32>(&mut s)? {
-            if let Some(private_dict_range) = parse_font_dict(font_dict_data) {
-                // 'Private DICT size and offset, from start of the CFF2 table.'
-                let private_dict_data = data.get(private_dict_range.clone())?;
-                if let Some(subroutines_offset) = parse_private_dict(private_dict_data) {
-                    // 'The local subroutines offset is relative to the beginning
-                    // of the Private DICT data.'
-                    if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
-                        let data = data.get(start..data.len())?;
-                        let mut s = Stream::new(data);
-                        metadata.local_subrs = parse_index::<u32>(&mut s)?;
-                        break 'outer;
+        // TODO: simplify
+        if let Some(offset) = top_dict.font_dict_index_offset {
+            let mut s = Stream::new_at(data, offset)?;
+            'outer: for font_dict_data in parse_index::<u32>(&mut s)? {
+                if let Some(private_dict_range) = parse_font_dict(font_dict_data) {
+                    // 'Private DICT size and offset, from start of the CFF2 table.'
+                    let private_dict_data = data.get(private_dict_range.clone())?;
+                    if let Some(subroutines_offset) = parse_private_dict(private_dict_data) {
+                        // 'The local subroutines offset is relative to the beginning
+                        // of the Private DICT data.'
+                        if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
+                            let data = data.get(start..data.len())?;
+                            let mut s = Stream::new(data);
+                            metadata.local_subrs = parse_index::<u32>(&mut s)?;
+                            break 'outer;
+                        }
                     }
                 }
             }
         }
+
+        Some(metadata)
     }
 
-    Some(metadata)
+    /// Outlines a glyph.
+    pub fn outline(
+        &self,
+        coordinates: &[NormalizedCoordinate],
+        glyph_id: GlyphId,
+        builder: &mut dyn OutlineBuilder,
+    ) -> Result<Rect, CFFError> {
+        let data = self.char_strings.get(u32::from(glyph_id.0)).ok_or(CFFError::NoGlyph)?;
+        parse_char_string(data, self, coordinates, builder)
+    }
 }
 
-
-pub(crate) fn outline(
-    metadata: &Metadata,
-    coordinates: &[NormalizedCoordinate],
-    glyph_id: GlyphId,
-    builder: &mut dyn OutlineBuilder,
-) -> Option<Rect> {
-    let data = metadata.char_strings.get(u32::from(glyph_id.0))?;
-    parse_char_string(data, metadata, coordinates, builder).ok()
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
+    }
 }
 
 #[derive(Clone, Copy, Default)]
@@ -233,7 +246,7 @@ fn parse_private_dict(data: &[u8]) -> Option<usize> {
 const SCALARS_MAX: u8 = 64;
 
 #[derive(Clone, Copy)]
-pub struct Scalars {
+pub(crate) struct Scalars {
     d: [f32; SCALARS_MAX as usize], // 256B
     len: u8,
 }
@@ -276,7 +289,7 @@ impl Scalars {
 }
 
 struct CharStringParserContext<'a> {
-    metadata: &'a Metadata<'a>,
+    metadata: &'a Table<'a>,
     coordinates: &'a [NormalizedCoordinate],
     scalars: Scalars,
     had_vsindex: bool,
@@ -303,7 +316,7 @@ impl CharStringParserContext<'_> {
 
 fn parse_char_string(
     data: &[u8],
-    metadata: &Metadata,
+    metadata: &Table,
     coordinates: &[NormalizedCoordinate],
     builder: &mut dyn OutlineBuilder,
 ) -> Result<Rect, CFFError> {

@@ -53,9 +53,6 @@ mod tables;
 #[cfg(feature = "opentype-layout")] mod ggg;
 #[cfg(feature = "variable-fonts")] mod var_store;
 
-#[cfg(feature = "std")]
-mod writer;
-
 use tables::*;
 use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, LazyArrayIter16, Offset32, Offset};
 use head::IndexToLocationFormat;
@@ -64,7 +61,9 @@ use head::IndexToLocationFormat;
 
 pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
+pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
+pub use tables::{cff1 as cff, cff2};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -632,7 +631,7 @@ impl<'a> DerefMut for Face<'a> {
 pub struct FaceTables<'a> {
     cbdt: Option<&'a [u8]>,
     cblc: Option<&'a [u8]>,
-    cff1: Option<cff1::Metadata<'a>>,
+    cff: Option<cff1::Table<'a>>,
     cmap: Option<cmap::Table<'a>>,
     glyf: Option<glyf::Table<'a>>,
     head: head::Table,
@@ -656,7 +655,7 @@ pub struct FaceTables<'a> {
 
     // Variable font tables.
     #[cfg(feature = "variable-fonts")] avar: Option<avar::Table<'a>>,
-    #[cfg(feature = "variable-fonts")] cff2: Option<cff2::Metadata<'a>>,
+    #[cfg(feature = "variable-fonts")] cff2: Option<cff2::Table<'a>>,
     #[cfg(feature = "variable-fonts")] fvar: Option<fvar::Table<'a>>,
     #[cfg(feature = "variable-fonts")] gvar: Option<gvar::Table<'a>>,
     #[cfg(feature = "variable-fonts")] hvar: Option<hvar::Table<'a>>,
@@ -755,7 +754,7 @@ impl<'a> FaceTables<'a> {
         let mut face = FaceTables {
             cbdt: None,
             cblc: None,
-            cff1: None,
+            cff: None,
             cmap: None,
             #[cfg(feature = "opentype-layout")] gdef: None,
             #[cfg(feature = "opentype-layout")] gpos: None,
@@ -798,9 +797,9 @@ impl<'a> FaceTables<'a> {
             match &table_tag.to_bytes() {
                 b"CBDT" => face.cbdt = table_data,
                 b"CBLC" => face.cblc = table_data,
-                b"CFF " => face.cff1 = table_data.and_then(|data| cff1::parse_metadata(data)),
+                b"CFF " => face.cff = table_data.and_then(|data| cff::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
-                b"CFF2" => face.cff2 = table_data.and_then(|data| cff2::parse_metadata(data)),
+                b"CFF2" => face.cff2 = table_data.and_then(|data| cff2::Table::parse(data)),
                 #[cfg(feature = "opentype-layout")]
                 b"GDEF" => face.gdef = table_data.and_then(|data| gdef::DefinitionTable::parse(data)),
                 #[cfg(feature = "opentype-layout")]
@@ -907,7 +906,7 @@ impl<'a> FaceTables<'a> {
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
             TableName::ColorBitmapData              => self.cbdt.is_some(),
             TableName::ColorBitmapLocation          => self.cblc.is_some(),
-            TableName::CompactFontFormat            => self.cff1.is_some(),
+            TableName::CompactFontFormat            => self.cff.is_some(),
             TableName::CompactFontFormat2           => {
                 #[cfg(feature = "variable-fonts")] { self.cff2.is_some() }
                 #[cfg(not(feature = "variable-fonts"))] { false }
@@ -1342,7 +1341,7 @@ impl<'a> FaceTables<'a> {
     /// Returns a list of
     /// [character to glyph index mappings](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap).
     ///
-    /// This is a more low-level alternative to [`Face::glyph_index()`].
+    /// This is a more low-level alternative to [`Face::glyph_index()`](struct.Face.html#method.glyph_index).
     #[inline]
     pub fn character_mapping_subtables(&self) -> cmap::Subtables {
         self.cmap.map(|cmap| cmap.subtables).unwrap_or_default()
@@ -1504,7 +1503,7 @@ impl<'a> FaceTables<'a> {
             return Some(name);
         }
 
-        if let Some(name) = self.cff1.as_ref().and_then(|cff1| cff1::glyph_name(cff1, glyph_id)) {
+        if let Some(name) = self.cff.as_ref().and_then(|cff1| cff1.glyph_name(glyph_id)) {
             return Some(name);
         }
 
@@ -1611,13 +1610,13 @@ impl<'a> FaceTables<'a> {
             return table.outline(glyph_id, builder);
         }
 
-        if let Some(ref metadata) = self.cff1 {
-            return cff1::outline(metadata, glyph_id, builder);
+        if let Some(ref cff) = self.cff {
+            return cff.outline(glyph_id, builder).ok();
         }
 
         #[cfg(feature = "variable-fonts")] {
-            if let Some(ref metadata) = self.cff2 {
-                return cff2::outline(metadata, self.coords(), glyph_id, builder);
+            if let Some(ref cff2) = self.cff2 {
+                return cff2.outline(self.coords(), glyph_id, builder).ok();
             }
         }
 
@@ -1837,87 +1836,4 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
 
     s.skip::<u32>(); // version
     s.read::<u32>()
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn empty_font() {
-        assert_eq!(Face::from_slice(&[], 0).unwrap_err(),
-                   FaceParsingError::UnknownMagic);
-    }
-
-    #[test]
-    fn zero_tables() {
-        let data = &[
-            0x00, 0x01, 0x00, 0x00, // magic
-            0x00, 0x00, // numTables: 0
-            0x00, 0x00, // searchRange: 0
-            0x00, 0x00, // entrySelector: 0
-            0x00, 0x00, // rangeShift: 0
-        ];
-
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::NoHeadTable);
-    }
-
-    #[test]
-    fn tables_count_overflow() {
-        let data = &[
-            0x00, 0x01, 0x00, 0x00, // magic
-            0xFF, 0xFF, // numTables: u16::MAX
-            0x00, 0x00, // searchRange: 0
-            0x00, 0x00, // entrySelector: 0
-            0x00, 0x00, // rangeShift: 0
-        ];
-
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::MalformedFont);
-    }
-
-    #[test]
-    fn empty_font_collection() {
-        let data = &[
-            0x74, 0x74, 0x63, 0x66, // magic
-            0x00, 0x00, // majorVersion: 0
-            0x00, 0x00, // minorVersion: 0
-            0x00, 0x00, 0x00, 0x00, // numFonts: 0
-        ];
-
-        assert_eq!(fonts_in_collection(data), Some(0));
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::FaceIndexOutOfBounds);
-    }
-
-    #[test]
-    fn font_collection_num_fonts_overflow() {
-        let data = &[
-            0x74, 0x74, 0x63, 0x66, // magic
-            0x00, 0x00, // majorVersion: 0
-            0x00, 0x00, // minorVersion: 0
-            0xFF, 0xFF, 0xFF, 0xFF, // numFonts: u32::MAX
-        ];
-
-        assert_eq!(fonts_in_collection(data), Some(std::u32::MAX));
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::MalformedFont);
-    }
-
-    #[test]
-    fn font_index_overflow() {
-        let data = &[
-            0x74, 0x74, 0x63, 0x66, // magic
-            0x00, 0x00, // majorVersion: 0
-            0x00, 0x00, // minorVersion: 0
-            0x00, 0x00, 0x00, 0x01, // numFonts: 1
-            0x00, 0x00, 0x00, 0x0C, // offset [0]: 12
-        ];
-
-        assert_eq!(fonts_in_collection(data), Some(1));
-        assert_eq!(Face::from_slice(data, std::u32::MAX).unwrap_err(),
-                   FaceParsingError::FaceIndexOutOfBounds);
-    }
 }

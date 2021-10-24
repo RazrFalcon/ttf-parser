@@ -15,9 +15,10 @@ exclude = ["benches/**"]
 [features]
 default = ["std", "opentype-layout", "variable-fonts"]
 std = []
-# Enables variable fonts support. Increases the binary size almost twice.
+# Enables variable fonts support. Increases binary size almost twice.
+# Includes avar, CFF2, fvar, gvar, HVAR, MVAR and VVAR tables.
 variable-fonts = []
-# Enables GDEF/GPOS/GSUB tables.
+# Enables GDEF, GPOS and GSUB tables.
 opentype-layout = []
 
 [dev-dependencies]

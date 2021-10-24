@@ -1,3 +1,6 @@
+//! A [Compact Font Format Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/cff) implementation.
+
 // Useful links:
 // http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf
 // http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5177.Type2.pdf
@@ -82,9 +85,27 @@ mod charset_id {
     pub const EXPERT_SUBSET: usize = 2;
 }
 
-
 #[derive(Clone, Copy, Debug)]
-pub struct Metadata<'a> {
+pub(crate) enum FontKind<'a> {
+    SID(SIDMetadata<'a>),
+    CID(CIDMetadata<'a>),
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub(crate) struct SIDMetadata<'a> {
+    local_subrs: Index<'a>,
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub(crate) struct CIDMetadata<'a> {
+    fd_array: Index<'a>,
+    fd_select: FDSelect<'a>,
+}
+
+/// A [Compact Font Format Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/cff).
+#[derive(Clone, Copy)]
+pub struct Table<'a> {
     // The whole CFF table.
     // Used to resolve a local subroutine in a CID font.
     table_data: &'a [u8],
@@ -96,91 +117,112 @@ pub struct Metadata<'a> {
     kind: FontKind<'a>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum FontKind<'a> {
-    SID(SIDMetadata<'a>),
-    CID(CIDMetadata<'a>),
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+
+        // Parse Header.
+        let major: u8 = s.read()?;
+        s.skip::<u8>(); // minor
+        let header_size: u8 = s.read()?;
+        s.skip::<u8>(); // Absolute offset
+
+        if major != 1 {
+            return None;
+        }
+
+        // Jump to Name INDEX. It's not necessarily right after the header.
+        if header_size > 4 {
+            s.advance(usize::from(header_size) - 4);
+        }
+
+        // Skip Name INDEX.
+        skip_index::<u16>(&mut s)?;
+
+        let top_dict = parse_top_dict(&mut s)?;
+
+        // Must be set, otherwise there are nothing to parse.
+        if top_dict.char_strings_offset == 0 {
+            return None;
+        }
+
+        // String INDEX.
+        let strings = parse_index::<u16>(&mut s)?;
+
+        // Parse Global Subroutines INDEX.
+        let global_subrs = parse_index::<u16>(&mut s)?;
+
+        let char_strings = {
+            let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
+            parse_index::<u16>(&mut s)?
+        };
+
+        if char_strings.len() == 0 {
+            return None;
+        }
+
+        // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
+        let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
+
+        let charset = match top_dict.charset_offset {
+            Some(charset_id::ISO_ADOBE) => Charset::ISOAdobe,
+            Some(charset_id::EXPERT) => Charset::Expert,
+            Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
+            Some(offset) => parse_charset(number_of_glyphs, &mut Stream::new_at(data, offset)?)?,
+            None => Charset::ISOAdobe, // default
+        };
+
+        let kind = if top_dict.has_ros {
+            parse_cid_metadata(data, top_dict, number_of_glyphs)?
+        } else {
+            parse_sid_metadata(data, top_dict)?
+        };
+
+        Some(Self {
+            table_data: data,
+            strings,
+            global_subrs,
+            charset,
+            char_strings,
+            kind,
+        })
+    }
+
+    /// Outlines a glyph.
+    pub fn outline(
+        &self,
+        glyph_id: GlyphId,
+        builder: &mut dyn OutlineBuilder,
+    ) -> Result<Rect, CFFError> {
+        let data = self.char_strings.get(u32::from(glyph_id.0)).ok_or(CFFError::NoGlyph)?;
+        parse_char_string(data, self, glyph_id, builder)
+    }
+
+    /// Returns a glyph name.
+    pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
+        match self.kind {
+            FontKind::SID(_) => {
+                let sid = self.charset.gid_to_sid(glyph_id)?;
+                let sid = usize::from(sid.0);
+                match STANDARD_NAMES.get(sid) {
+                    Some(name) => Some(name),
+                    None => {
+                        let idx = u32::try_from(sid - STANDARD_NAMES.len()).ok()?;
+                        let name = self.strings.get(idx)?;
+                        core::str::from_utf8(name).ok()
+                    }
+                }
+            }
+            FontKind::CID(_) => None,
+        }
+    }
 }
 
-#[derive(Clone, Copy, Default, Debug)]
-pub struct SIDMetadata<'a> {
-    local_subrs: Index<'a>,
-}
-
-#[derive(Clone, Copy, Default, Debug)]
-pub struct CIDMetadata<'a> {
-    fd_array: Index<'a>,
-    fd_select: FDSelect<'a>,
-}
-
-pub(crate) fn parse_metadata(data: &[u8]) -> Option<Metadata> {
-    let mut s = Stream::new(data);
-
-    // Parse Header.
-    let major: u8 = s.read()?;
-    s.skip::<u8>(); // minor
-    let header_size: u8 = s.read()?;
-    s.skip::<u8>(); // Absolute offset
-
-    if major != 1 {
-        return None;
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
     }
-
-    // Jump to Name INDEX. It's not necessarily right after the header.
-    if header_size > 4 {
-        s.advance(usize::from(header_size) - 4);
-    }
-
-    // Skip Name INDEX.
-    skip_index::<u16>(&mut s)?;
-
-    let top_dict = parse_top_dict(&mut s)?;
-
-    // Must be set, otherwise there are nothing to parse.
-    if top_dict.char_strings_offset == 0 {
-        return None;
-    }
-
-    // String INDEX.
-    let strings = parse_index::<u16>(&mut s)?;
-
-    // Parse Global Subroutines INDEX.
-    let global_subrs = parse_index::<u16>(&mut s)?;
-
-    let char_strings = {
-        let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
-        parse_index::<u16>(&mut s)?
-    };
-
-    if char_strings.len() == 0 {
-        return None;
-    }
-
-    // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
-    let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
-
-    let charset = match top_dict.charset_offset {
-        Some(charset_id::ISO_ADOBE) => Charset::ISOAdobe,
-        Some(charset_id::EXPERT) => Charset::Expert,
-        Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
-        Some(offset) => parse_charset(number_of_glyphs, &mut Stream::new_at(data, offset)?)?,
-        None => Charset::ISOAdobe, // default
-    };
-
-    let kind = if top_dict.has_ros {
-        parse_cid_metadata(data, top_dict, number_of_glyphs)?
-    } else {
-        parse_sid_metadata(data, top_dict)?
-    };
-
-    Some(Metadata {
-        table_data: data,
-        strings,
-        global_subrs,
-        charset,
-        char_strings,
-        kind,
-    })
 }
 
 fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
@@ -333,35 +375,8 @@ fn parse_cid_local_subrs<'a>(
     parse_index::<u16>(&mut s)
 }
 
-pub fn glyph_name<'a>(metadata: &'a Metadata, glyph_id: GlyphId) -> Option<&'a str> {
-    match metadata.kind {
-        FontKind::SID(_) => {
-            let sid = metadata.charset.gid_to_sid(glyph_id)?;
-            let sid = usize::from(sid.0);
-            match STANDARD_NAMES.get(sid) {
-                Some(name) => Some(name),
-                None => {
-                    let idx = u32::try_from(sid - STANDARD_NAMES.len()).ok()?;
-                    let name = metadata.strings.get(idx)?;
-                    core::str::from_utf8(name).ok()
-                }
-            }
-        }
-        FontKind::CID(_) => None,
-    }
-}
-
-pub fn outline(
-    metadata: &Metadata,
-    glyph_id: GlyphId,
-    builder: &mut dyn OutlineBuilder,
-) -> Option<Rect> {
-    let data = metadata.char_strings.get(u32::from(glyph_id.0))?;
-    parse_char_string(data, metadata, glyph_id, builder).ok()
-}
-
 struct CharStringParserContext<'a> {
-    metadata: &'a Metadata<'a>,
+    metadata: &'a Table<'a>,
     width_parsed: bool,
     stems_len: u32,
     has_endchar: bool,
@@ -372,7 +387,7 @@ struct CharStringParserContext<'a> {
 
 fn parse_char_string(
     data: &[u8],
-    metadata: &Metadata,
+    metadata: &Table,
     glyph_id: GlyphId,
     builder: &mut dyn OutlineBuilder,
 ) -> Result<Rect, CFFError> {
@@ -751,857 +766,10 @@ fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSe
     }
 }
 
-
+// TODO: move to integration
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::vec::Vec;
-    use std::string::String;
-    use std::fmt::Write;
-    use crate::writer;
-    use writer::TtfType::*;
-
-    struct Builder(String);
-    impl OutlineBuilder for Builder {
-        fn move_to(&mut self, x: f32, y: f32) {
-            write!(&mut self.0, "M {} {} ", x, y).unwrap();
-        }
-
-        fn line_to(&mut self, x: f32, y: f32) {
-            write!(&mut self.0, "L {} {} ", x, y).unwrap();
-        }
-
-        fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-            write!(&mut self.0, "Q {} {} {} {} ", x1, y1, x, y).unwrap();
-        }
-
-        fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-            write!(&mut self.0, "C {} {} {} {} {} {} ", x1, y1, x2, y2, x, y).unwrap();
-        }
-
-        fn close(&mut self) {
-            write!(&mut self.0, "Z ").unwrap();
-        }
-    }
-
-    fn gen_cff(
-        global_subrs: &[&[writer::TtfType]],
-        local_subrs: &[&[writer::TtfType]],
-        chars: &[writer::TtfType],
-    ) -> Vec<u8> {
-        fn gen_global_subrs(subrs: &[&[writer::TtfType]]) -> Vec<u8> {
-            let mut w = writer::Writer::new();
-            for v1 in subrs {
-                for v2 in v1.iter() {
-                    w.write(*v2);
-                }
-            }
-            w.data
-        }
-
-        fn gen_local_subrs(subrs: &[&[writer::TtfType]]) -> Vec<u8> {
-            let mut w = writer::Writer::new();
-            for v1 in subrs {
-                for v2 in v1.iter() {
-                    w.write(*v2);
-                }
-            }
-            w.data
-        }
-
-        const EMPTY_INDEX_SIZE: usize = 2;
-        const INDEX_HEADER_SIZE: usize = 5;
-
-        // TODO: support multiple subrs
-        assert!(global_subrs.len() <= 1);
-        assert!(local_subrs.len() <= 1);
-
-        let global_subrs_data = gen_global_subrs(global_subrs);
-        let local_subrs_data = gen_local_subrs(local_subrs);
-        let chars_data = writer::convert(chars);
-
-        assert!(global_subrs_data.len() < 255);
-        assert!(local_subrs_data.len() < 255);
-        assert!(chars_data.len() < 255);
-
-        let mut w = writer::Writer::new();
-        // Header
-        w.write(UInt8(1)); // major version
-        w.write(UInt8(0)); // minor version
-        w.write(UInt8(4)); // header size
-        w.write(UInt8(0)); // absolute offset
-
-        // Name INDEX
-        w.write(UInt16(0)); // count
-
-        // Top DICT
-        // INDEX
-        w.write(UInt16(1)); // count
-        w.write(UInt8(1)); // offset size
-        w.write(UInt8(1)); // index[0]
-
-        let top_dict_idx2 = if local_subrs.is_empty() { 3 } else { 6 };
-        w.write(UInt8(top_dict_idx2)); // index[1]
-        // Item 0
-        let mut charstr_offset = w.offset() + 2;
-        charstr_offset += EMPTY_INDEX_SIZE; // String INDEX
-
-        // Global Subroutines INDEX
-        if !global_subrs_data.is_empty() {
-            charstr_offset += INDEX_HEADER_SIZE + global_subrs_data.len();
-        } else {
-            charstr_offset += EMPTY_INDEX_SIZE;
-        }
-
-        if !local_subrs_data.is_empty() {
-            charstr_offset += 3;
-        }
-
-        w.write(CFFInt(charstr_offset as i32));
-        w.write(UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8));
-
-        if !local_subrs_data.is_empty() {
-            // Item 1
-            w.write(CFFInt(2)); // length
-            w.write(CFFInt((charstr_offset + INDEX_HEADER_SIZE + chars_data.len()) as i32)); // offset
-            w.write(UInt8(top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET as u8));
-        }
-
-        // String INDEX
-        w.write(UInt16(0)); // count
-
-        // Global Subroutines INDEX
-        if global_subrs_data.is_empty() {
-            w.write(UInt16(0)); // count
-        } else {
-            w.write(UInt16(1)); // count
-            w.write(UInt8(1)); // offset size
-            w.write(UInt8(1)); // index[0]
-            w.write(UInt8(global_subrs_data.len() as u8 + 1)); // index[1]
-            w.data.extend_from_slice(&global_subrs_data);
-        }
-
-        // CharString INDEX
-        w.write(UInt16(1)); // count
-        w.write(UInt8(1)); // offset size
-        w.write(UInt8(1)); // index[0]
-        w.write(UInt8(chars_data.len() as u8 + 1)); // index[1]
-        w.data.extend_from_slice(&chars_data);
-
-        if !local_subrs_data.is_empty() {
-            // The local subroutines offset is relative to the beginning of the Private DICT data.
-
-            // Private DICT
-            w.write(CFFInt(2));
-            w.write(UInt8(private_dict_operator::LOCAL_SUBROUTINES_OFFSET as u8));
-
-            // Local Subroutines INDEX
-            w.write(UInt16(1)); // count
-            w.write(UInt8(1)); // offset size
-            w.write(UInt8(1)); // index[0]
-            w.write(UInt8(local_subrs_data.len() as u8 + 1)); // index[1]
-            w.data.extend_from_slice(&local_subrs_data);
-        }
-
-        w.data
-    }
-
-    #[test]
-    fn unsupported_version() {
-        let data = writer::convert(&[
-            UInt8(10), // major version, only 1 is supported
-            UInt8(0), // minor version
-            UInt8(4), // header size
-            UInt8(0), // absolute offset
-        ]);
-
-        assert!(parse_metadata(&data).is_none());
-    }
-
-    #[test]
-    fn non_default_header_size() {
-        let data = writer::convert(&[
-            // Header
-            UInt8(1), // major version
-            UInt8(0), // minor version
-            UInt8(8), // header size
-            UInt8(0), // absolute offset
-
-            // no-op, should be skipped
-            UInt8(0),
-            UInt8(0),
-            UInt8(0),
-            UInt8(0),
-
-            // Name INDEX
-            UInt16(0), // count
-
-            // Top DICT
-            // INDEX
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(3), // index[1]
-            // Data
-            CFFInt(21),
-            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
-
-            // String INDEX
-            UInt16(0), // count
-
-            // Global Subroutines INDEX
-            UInt16(0), // count
-
-            // CharString INDEX
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(4), // index[1]
-            // Data
-            CFFInt(10),
-            UInt8(operator::HORIZONTAL_MOVE_TO),
-            UInt8(operator::ENDCHAR),
-        ]);
-
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        let rect = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder).unwrap();
-
-        assert_eq!(builder.0, "M 10 0 Z ");
-        assert_eq!(rect, Rect { x_min: 10, y_min: 0, x_max: 10, y_max: 0 });
-    }
-
-    fn rect(x_min: i16, y_min: i16, x_max: i16, y_max: i16) -> Rect {
-        Rect { x_min, y_min, x_max, y_max }
-    }
-
-    macro_rules! test_cs_with_subrs {
-        ($name:ident, $glob:expr, $loc:expr, $values:expr, $path:expr, $rect_res:expr) => {
-            #[test]
-            fn $name() {
-                let data = gen_cff($glob, $loc, $values);
-                let metadata = parse_metadata(&data).unwrap();
-                let mut builder = Builder(String::new());
-                let char_str = metadata.char_strings.get(0).unwrap();
-                let rect = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder).unwrap();
-
-                assert_eq!(builder.0, $path);
-                assert_eq!(rect, $rect_res);
-            }
-        };
-    }
-
-    macro_rules! test_cs {
-        ($name:ident, $values:expr, $path:expr, $rect_res:expr) => {
-            test_cs_with_subrs!($name, &[], &[], $values, $path, $rect_res);
-        };
-    }
-
-    macro_rules! test_cs_err {
-        ($name:ident, $values:expr, $err:expr) => {
-            #[test]
-            fn $name() {
-                let data = gen_cff(&[], &[], $values);
-                let metadata = parse_metadata(&data).unwrap();
-                let mut builder = Builder(String::new());
-                let char_str = metadata.char_strings.get(0).unwrap();
-                let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-
-                assert_eq!(res.unwrap_err(), $err);
-            }
-        };
-    }
-
-    test_cs!(move_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 Z ",
-        rect(10, 20, 10, 20)
-    );
-
-    test_cs!(move_to_with_width, &[
-        CFFInt(5), CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 Z ",
-        rect(10, 20, 10, 20)
-    );
-
-    test_cs!(hmove_to, &[
-        CFFInt(10), UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 0 Z ",
-        rect(10, 0, 10, 0)
-    );
-
-    test_cs!(hmove_to_with_width, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 20 0 Z ",
-        rect(20, 0, 20, 0)
-    );
-
-    test_cs!(vmove_to, &[
-        CFFInt(10), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 0 10 Z ",
-        rect(0, 10, 0, 10)
-    );
-
-    test_cs!(vmove_to_with_width, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 0 20 Z ",
-        rect(0, 20, 0, 20)
-    );
-
-    test_cs!(line_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 60 Z ",
-        rect(10, 20, 40, 60)
-    );
-
-    test_cs!(line_to_with_multiple_pairs, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 60 L 90 120 Z ",
-        rect(10, 20, 90, 120)
-    );
-
-    test_cs!(hline_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 20 Z ",
-        rect(10, 20, 40, 20)
-    );
-
-    test_cs!(hline_to_with_two_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 20 L 40 60 Z ",
-        rect(10, 20, 40, 60)
-    );
-
-    test_cs!(hline_to_with_three_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 40 20 L 40 60 L 90 60 Z ",
-        rect(10, 20, 90, 60)
-    );
-
-    test_cs!(vline_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 10 50 Z ",
-        rect(10, 20, 10, 50)
-    );
-
-    test_cs!(vline_to_with_two_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 10 50 L 50 50 Z ",
-        rect(10, 20, 50, 50)
-    );
-
-    test_cs!(vline_to_with_three_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 L 10 50 L 50 50 L 50 100 Z ",
-        rect(10, 20, 50, 100)
-    );
-
-    test_cs!(curve_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80),
-        UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 60 90 120 160 200 Z ",
-        rect(10, 20, 160, 200)
-    );
-
-    test_cs!(curve_to_with_two_sets_of_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80),
-        CFFInt(90), CFFInt(100), CFFInt(110), CFFInt(120), CFFInt(130), CFFInt(140),
-        UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 60 90 120 160 200 C 250 300 360 420 490 560 Z ",
-        rect(10, 20, 490, 560)
-    );
-
-    test_cs!(hh_curve_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 20 80 70 140 70 Z ",
-        rect(10, 20, 140, 70)
-    );
-
-    test_cs!(hh_curve_to_with_y, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 50 50 100 110 170 110 Z ",
-        rect(10, 20, 170, 110)
-    );
-
-    test_cs!(vv_curve_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 10 50 50 100 50 160 Z ",
-        rect(10, 20, 50, 160)
-    );
-
-    test_cs!(vv_curve_to_with_x, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], "M 10 20 C 40 60 90 120 90 190 Z ",
-        rect(10, 20, 90, 190)
-    );
-
-    #[test]
-    fn only_endchar() {
-        let data = gen_cff(&[], &[], &[UInt8(operator::ENDCHAR)]);
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        assert!(parse_char_string(char_str, &metadata, GlyphId(0), &mut builder).is_err());
-    }
-
-    test_cs_with_subrs!(local_subr,
-        &[],
-        &[&[
-            CFFInt(30),
-            CFFInt(40),
-            UInt8(operator::LINE_TO),
-            UInt8(operator::RETURN),
-        ]],
-        &[
-            CFFInt(10),
-            UInt8(operator::HORIZONTAL_MOVE_TO),
-            CFFInt(0 - 107), // subr index - subr bias
-            UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            UInt8(operator::ENDCHAR),
-        ],
-        "M 10 0 L 40 40 Z ",
-        rect(10, 0, 40, 40)
-    );
-
-    test_cs_with_subrs!(endchar_in_subr,
-        &[],
-        &[&[
-            CFFInt(30),
-            CFFInt(40),
-            UInt8(operator::LINE_TO),
-            UInt8(operator::ENDCHAR),
-        ]],
-        &[
-            CFFInt(10),
-            UInt8(operator::HORIZONTAL_MOVE_TO),
-            CFFInt(0 - 107), // subr index - subr bias
-            UInt8(operator::CALL_LOCAL_SUBROUTINE),
-        ],
-        "M 10 0 L 40 40 Z ",
-        rect(10, 0, 40, 40)
-    );
-
-    test_cs_with_subrs!(global_subr,
-        &[&[
-            CFFInt(30),
-            CFFInt(40),
-            UInt8(operator::LINE_TO),
-            UInt8(operator::RETURN),
-        ]],
-        &[],
-        &[
-            CFFInt(10),
-            UInt8(operator::HORIZONTAL_MOVE_TO),
-            CFFInt(0 - 107), // subr index - subr bias
-            UInt8(operator::CALL_GLOBAL_SUBROUTINE),
-            UInt8(operator::ENDCHAR),
-        ],
-        "M 10 0 L 40 40 Z ",
-        rect(10, 0, 40, 40)
-    );
-
-    test_cs_err!(reserved_operator, &[
-        CFFInt(10), UInt8(2),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidOperator);
-
-    test_cs_err!(line_to_without_move_to, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::MissingMoveTo);
-
-    // Width must be set only once.
-    test_cs_err!(two_vmove_to_with_width, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-        CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(move_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(10), CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(move_to_with_not_enought_coords, &[
-        CFFInt(10), UInt8(operator::MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(hmove_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(hmove_to_with_not_enought_coords, &[
-        UInt8(operator::HORIZONTAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(vmove_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(10), CFFInt(10), UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(vmove_to_with_not_enought_coords, &[
-        UInt8(operator::VERTICAL_MOVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(line_to_with_single_coord, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(line_to_with_odd_number_of_coord, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(hline_to_without_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(vline_to_without_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        UInt8(operator::VERTICAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(curve_to_with_invalid_num_of_coords_1, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(curve_to_with_invalid_num_of_coords_2, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(60), CFFInt(70), CFFInt(80), CFFInt(90),
-        UInt8(operator::CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(hh_curve_to_with_not_enought_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(hh_curve_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
-        UInt8(operator::HH_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(vv_curve_to_with_not_enought_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(vv_curve_to_with_too_many_coords, &[
-        CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
-        CFFInt(30), CFFInt(40), CFFInt(50), CFFInt(30), CFFInt(40), CFFInt(50),
-        UInt8(operator::VV_CURVE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::InvalidArgumentsStackLength);
-
-    test_cs_err!(multiple_endchar, &[
-        UInt8(operator::ENDCHAR),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::DataAfterEndChar);
-
-    test_cs_err!(operands_overflow, &[
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-        CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
-    ], CFFError::ArgumentsStackLimitReached);
-
-    test_cs_err!(operands_overflow_with_4_byte_ints, &[
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-        CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000), CFFInt(30000),
-    ], CFFError::ArgumentsStackLimitReached);
-
-    test_cs_err!(bbox_overflow, &[
-        CFFInt(32767), UInt8(operator::HORIZONTAL_MOVE_TO),
-        CFFInt(32767), UInt8(operator::HORIZONTAL_LINE_TO),
-        UInt8(operator::ENDCHAR),
-    ], CFFError::BboxOverflow);
-
-    #[test]
-    fn endchar_in_subr_with_extra_data_1() {
-        let data = gen_cff(
-            &[],
-            &[&[
-                CFFInt(30),
-                CFFInt(40),
-                UInt8(operator::LINE_TO),
-                UInt8(operator::ENDCHAR),
-            ]],
-            &[
-                CFFInt(10),
-                UInt8(operator::HORIZONTAL_MOVE_TO),
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_LOCAL_SUBROUTINE),
-                CFFInt(30),
-                CFFInt(40),
-                UInt8(operator::LINE_TO),
-            ]
-        );
-
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err(), CFFError::DataAfterEndChar);
-    }
-
-    #[test]
-    fn endchar_in_subr_with_extra_data_2() {
-        let data = gen_cff(
-            &[],
-            &[&[
-                CFFInt(30),
-                CFFInt(40),
-                UInt8(operator::LINE_TO),
-                UInt8(operator::ENDCHAR),
-                CFFInt(30),
-                CFFInt(40),
-                UInt8(operator::LINE_TO),
-            ]],
-            &[
-                CFFInt(10),
-                UInt8(operator::HORIZONTAL_MOVE_TO),
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]
-        );
-
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err(), CFFError::DataAfterEndChar);
-    }
-
-    #[test]
-    fn subr_without_return() {
-        let data = gen_cff(
-            &[],
-            &[&[
-                CFFInt(30),
-                CFFInt(40),
-                UInt8(operator::LINE_TO),
-                UInt8(operator::ENDCHAR),
-                CFFInt(30),
-                CFFInt(40),
-                UInt8(operator::LINE_TO),
-            ]],
-            &[
-                CFFInt(10),
-                UInt8(operator::HORIZONTAL_MOVE_TO),
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]
-        );
-
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err(), CFFError::DataAfterEndChar);
-    }
-
-    #[test]
-    fn recursive_local_subr() {
-        let data = gen_cff(
-            &[],
-            &[&[
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]],
-            &[
-                CFFInt(10),
-                UInt8(operator::HORIZONTAL_MOVE_TO),
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]
-        );
-
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err(), CFFError::NestingLimitReached);
-    }
-
-    #[test]
-    fn recursive_global_subr() {
-        let data = gen_cff(
-            &[&[
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_GLOBAL_SUBROUTINE),
-            ]],
-            &[],
-            &[
-                CFFInt(10),
-                UInt8(operator::HORIZONTAL_MOVE_TO),
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_GLOBAL_SUBROUTINE),
-            ]
-        );
-
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err(), CFFError::NestingLimitReached);
-    }
-
-    #[test]
-    fn recursive_mixed_subr() {
-        let data = gen_cff(
-            &[&[
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_LOCAL_SUBROUTINE),
-            ]],
-            &[&[
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_GLOBAL_SUBROUTINE),
-            ]],
-            &[
-                CFFInt(10),
-                UInt8(operator::HORIZONTAL_MOVE_TO),
-                CFFInt(0 - 107), // subr index - subr bias
-                UInt8(operator::CALL_GLOBAL_SUBROUTINE),
-            ]
-        );
-
-        let metadata = parse_metadata(&data).unwrap();
-        let mut builder = Builder(String::new());
-        let char_str = metadata.char_strings.get(0).unwrap();
-        let res = parse_char_string(char_str, &metadata, GlyphId(0), &mut builder);
-        assert_eq!(res.unwrap_err(), CFFError::NestingLimitReached);
-    }
-
-    #[test]
-    fn zero_char_string_offset() {
-        let data = writer::convert(&[
-            // Header
-            UInt8(1), // major version
-            UInt8(0), // minor version
-            UInt8(4), // header size
-            UInt8(0), // absolute offset
-
-            // Name INDEX
-            UInt16(0), // count
-
-            // Top DICT
-            // INDEX
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(3), // index[1]
-            // Data
-            CFFInt(0), // zero offset!
-            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
-        ]);
-
-        assert!(parse_metadata(&data).is_none());
-    }
-
-    #[test]
-    fn invalid_char_string_offset() {
-        let data = writer::convert(&[
-            // Header
-            UInt8(1), // major version
-            UInt8(0), // minor version
-            UInt8(4), // header size
-            UInt8(0), // absolute offset
-
-            // Name INDEX
-            UInt16(0), // count
-
-            // Top DICT
-            // INDEX
-            UInt16(1), // count
-            UInt8(1), // offset size
-            UInt8(1), // index[0]
-            UInt8(3), // index[1]
-            // Data
-            CFFInt(2), // invalid offset!
-            UInt8(top_dict_operator::CHAR_STRINGS_OFFSET as u8),
-        ]);
-
-        assert!(parse_metadata(&data).is_none());
-    }
-
-    // TODO: return from main
-    // TODO: return without endchar
-    // TODO: data after return
-    // TODO: recursive subr
-    // TODO: HORIZONTAL_STEM
-    // TODO: VERTICAL_STEM
-    // TODO: HORIZONTAL_STEM_HINT_MASK
-    // TODO: HINT_MASK
-    // TODO: COUNTER_MASK
-    // TODO: VERTICAL_STEM_HINT_MASK
-    // TODO: CURVE_LINE
-    // TODO: LINE_CURVE
-    // TODO: VH_CURVE_TO
-    // TODO: HFLEX
-    // TODO: FLEX
-    // TODO: HFLEX1
-    // TODO: FLEX1
 
     #[test]
     fn private_dict_size_overflow() {

@@ -13,9 +13,11 @@ use crate::{OutlineBuilder, BBox};
 use crate::parser::{FromData, TryNumFrom};
 
 
-/// A list of errors that can occur during a CFF table parsing.
+/// A list of errors that can occur during a CFF glyph outlining.
+#[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum CFFError {
+    NoGlyph,
     ReadOutOfBounds,
     ZeroBBox,
     InvalidOperator,

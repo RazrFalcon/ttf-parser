@@ -28,4 +28,5 @@ pub mod vorg;
 #[cfg(feature = "variable-fonts")] pub mod mvar;
 
 pub use cff::cff1;
+pub use cff::CFFError;
 #[cfg(feature = "variable-fonts")] pub use cff::cff2;

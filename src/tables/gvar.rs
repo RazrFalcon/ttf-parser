@@ -1,4 +1,6 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gvar
+//! A [Glyph Variations Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/gvar) implementation.
+
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuple-variation-store
 
 use core::cmp;
@@ -22,6 +24,8 @@ enum GlyphVariationDataOffsets<'a> {
     Long(LazyArray16<'a, Offset32>),
 }
 
+/// A [Glyph Variations Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/gvar).
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
     axis_count: NonZeroU16,
@@ -31,7 +35,7 @@ pub struct Table<'a> {
 }
 
 impl<'a> Table<'a> {
-    // https://docs.microsoft.com/en-us/typography/opentype/spec/gvar#gvar-header
+    /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let version: u32 = s.read()?;
@@ -108,20 +112,26 @@ impl<'a> Table<'a> {
         let data = self.glyphs_variation_data.get(start..end)?;
         parse_variation_data(coordinates, &self.shared_tuple_records, points_len, data, tuples)
     }
+
+    /// Outlines a glyph.
+    pub fn outline(
+        &self,
+        glyf_table: glyf::Table,
+        coordinates: &[NormalizedCoordinate],
+        glyph_id: GlyphId,
+        builder: &mut dyn OutlineBuilder,
+    ) -> Option<Rect> {
+        let mut b = glyf::Builder::new(Transform::default(), BBox::new(), builder);
+        let glyph_data = glyf_table.get(glyph_id)?;
+        outline_var_impl(glyf_table, self, glyph_id, glyph_data, coordinates, 0, &mut b);
+        b.bbox.to_rect()
+    }
 }
 
-
-pub(crate) fn outline(
-    glyf_table: glyf::Table,
-    gvar_table: &Table,
-    coordinates: &[NormalizedCoordinate],
-    glyph_id: GlyphId,
-    builder: &mut dyn OutlineBuilder,
-) -> Option<Rect> {
-    let mut b = glyf::Builder::new(Transform::default(), BBox::new(), builder);
-    let glyph_data = glyf_table.get(glyph_id)?;
-    outline_var_impl(glyf_table, gvar_table, glyph_id, glyph_data, coordinates, 0, &mut b);
-    b.bbox.to_rect()
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
+    }
 }
 
 fn outline_var_impl<'a>(

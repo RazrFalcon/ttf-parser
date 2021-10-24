@@ -65,7 +65,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar};
+#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -611,7 +611,7 @@ pub struct FaceTables<'a> {
     kern: Option<kern::Table<'a>>,
     maxp: maxp::Table,
     name: Option<name::Table<'a>>,
-    os_2: Option<os2::Table<'a>>,
+    os2: Option<os2::Table<'a>>,
     post: Option<post::Table<'a>>,
     vhea: Option<vhea::Table>,
     vmtx: Option<hmtx::Table<'a>>,
@@ -736,7 +736,7 @@ impl<'a> FaceTables<'a> {
             kern: None,
             maxp: maxp::Table { number_of_glyphs: NonZeroU16::new(1).unwrap() }, // temporary
             name: None,
-            os_2: None,
+            os2: None,
             post: None,
             vhea: None,
             vmtx: None,
@@ -779,7 +779,7 @@ impl<'a> FaceTables<'a> {
                 b"HVAR" => face.hvar = table_data.and_then(|data| hvar::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
                 b"MVAR" => face.mvar = table_data.and_then(|data| mvar::Table::parse(data)),
-                b"OS/2" => face.os_2 = table_data.and_then(|data| os2::Table::parse(data)),
+                b"OS/2" => face.os2 = table_data.and_then(|data| os2::Table::parse(data)),
                 b"SVG " => face.svg = table_data.and_then(|data| svg::Table::parse(data)),
                 b"VORG" => face.vorg = table_data.and_then(|data| vorg::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
@@ -921,7 +921,7 @@ impl<'a> FaceTables<'a> {
                 #[cfg(not(feature = "variable-fonts"))] { false }
             }
             TableName::VerticalOrigin               => self.vorg.is_some(),
-            TableName::WindowsMetrics               => self.os_2.is_some(),
+            TableName::WindowsMetrics               => self.os2.is_some(),
         }
     }
 
@@ -940,7 +940,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_regular(&self) -> bool {
-        self.os_2.map(|s| s.style() == Style::Normal).unwrap_or(false)
+        self.os2.map(|s| s.style() == Style::Normal).unwrap_or(false)
     }
 
     /// Checks that face is marked as *Italic*.
@@ -948,7 +948,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_italic(&self) -> bool {
-        self.os_2.map(|s| s.style() == Style::Italic).unwrap_or(false)
+        self.os2.map(|s| s.style() == Style::Italic).unwrap_or(false)
     }
 
     /// Checks that face is marked as *Bold*.
@@ -956,7 +956,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_bold(&self) -> bool {
-        try_opt_or!(self.os_2, false).is_bold()
+        try_opt_or!(self.os2, false).is_bold()
     }
 
     /// Checks that face is marked as *Oblique*.
@@ -964,13 +964,13 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when OS/2 table is not present or when its version is < 4.
     #[inline]
     pub fn is_oblique(&self) -> bool {
-        self.os_2.map(|s| s.style() == Style::Oblique).unwrap_or(false)
+        self.os2.map(|s| s.style() == Style::Oblique).unwrap_or(false)
     }
 
     /// Returns face style.
     #[inline]
     pub fn style(&self) -> Style {
-        try_opt_or!(self.os_2, Style::Normal).style()
+        try_opt_or!(self.os2, Style::Normal).style()
     }
 
     /// Checks that face is marked as *Monospaced*.
@@ -1001,7 +1001,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `Weight::Normal` when OS/2 table is not present.
     #[inline]
     pub fn weight(&self) -> Weight {
-        try_opt_or!(self.os_2, Weight::default()).weight()
+        try_opt_or!(self.os2, Weight::default()).weight()
     }
 
     /// Returns face's width.
@@ -1009,7 +1009,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
     #[inline]
     pub fn width(&self) -> Width {
-        try_opt_or!(self.os_2, Width::default()).width()
+        try_opt_or!(self.os2, Width::default()).width()
     }
 
     /// Returns face's italic angle.
@@ -1028,7 +1028,7 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn ascender(&self) -> i16 {
-        if let Some(os_2) = self.os_2 {
+        if let Some(os_2) = self.os2 {
             if os_2.use_typographic_metrics() {
                 let value = os_2.typographic_ascender();
                 return self.apply_metrics_variation(Tag::from_bytes(b"hasc"), value);
@@ -1037,7 +1037,7 @@ impl<'a> FaceTables<'a> {
 
         let mut value = self.hhea.ascender;
         if value == 0 {
-            if let Some(os_2) = self.os_2 {
+            if let Some(os_2) = self.os2 {
                 value = os_2.typographic_ascender();
                 if value == 0 {
                     value = os_2.windows_ascender();
@@ -1056,7 +1056,7 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn descender(&self) -> i16 {
-        if let Some(os_2) = self.os_2 {
+        if let Some(os_2) = self.os2 {
             if os_2.use_typographic_metrics() {
                 let value = os_2.typographic_descender();
                 return self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), value);
@@ -1065,7 +1065,7 @@ impl<'a> FaceTables<'a> {
 
         let mut value = self.hhea.descender;
         if value == 0 {
-            if let Some(os_2) = self.os_2 {
+            if let Some(os_2) = self.os2 {
                 value = os_2.typographic_descender();
                 if value == 0 {
                     value = os_2.windows_descender();
@@ -1092,7 +1092,7 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn line_gap(&self) -> i16 {
-        if let Some(os_2) = self.os_2 {
+        if let Some(os_2) = self.os2 {
             if os_2.use_typographic_metrics() {
                 let value = os_2.typographic_line_gap();
                 return self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
@@ -1101,7 +1101,7 @@ impl<'a> FaceTables<'a> {
 
         let mut value = self.hhea.line_gap;
         if value == 0 {
-            if let Some(os_2) = self.os_2 {
+            if let Some(os_2) = self.os2 {
                 value = os_2.typographic_line_gap();
                 value = self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
             }
@@ -1120,7 +1120,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn typographic_ascender(&self) -> Option<i16> {
-        self.os_2.map(|table| {
+        self.os2.map(|table| {
             let v = table.typographic_ascender();
             self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
         })
@@ -1136,7 +1136,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn typographic_descender(&self) -> Option<i16> {
-        self.os_2.map(|table| {
+        self.os2.map(|table| {
             let v = table.typographic_descender();
             self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
         })
@@ -1152,7 +1152,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn typographic_line_gap(&self) -> Option<i16> {
-        self.os_2.map(|table| {
+        self.os2.map(|table| {
             let v = table.typographic_line_gap();
             self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
         })
@@ -1208,7 +1208,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
-        self.os_2.and_then(|os_2| os_2.x_height())
+        self.os2.and_then(|os_2| os_2.x_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"xhgt"), v))
     }
 
@@ -1219,7 +1219,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn capital_height(&self) -> Option<i16> {
-        self.os_2.and_then(|os_2| os_2.capital_height())
+        self.os2.and_then(|os_2| os_2.capital_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"cpht"), v))
     }
 
@@ -1247,7 +1247,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn strikeout_metrics(&self) -> Option<LineMetrics> {
-        let mut metrics = self.os_2?.strikeout_metrics();
+        let mut metrics = self.os2?.strikeout_metrics();
 
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"stro"), &mut metrics.position);
@@ -1264,7 +1264,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn subscript_metrics(&self) -> Option<ScriptMetrics> {
-        let mut metrics = self.os_2?.subscript_metrics();
+        let mut metrics = self.os2?.subscript_metrics();
 
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"sbxs"), &mut metrics.x_size);
@@ -1283,7 +1283,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present.
     #[inline]
     pub fn superscript_metrics(&self) -> Option<ScriptMetrics> {
-        let mut metrics = self.os_2?.superscript_metrics();
+        let mut metrics = self.os2?.superscript_metrics();
 
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"spxs"), &mut metrics.x_size);
@@ -1568,8 +1568,8 @@ impl<'a> FaceTables<'a> {
         builder: &mut dyn OutlineBuilder,
     ) -> Option<Rect> {
         #[cfg(feature = "variable-fonts")] {
-            if let Some(ref gvar_table) = self.gvar {
-                return gvar::outline(self.glyf?, gvar_table, self.coords(), glyph_id, builder);
+            if let Some(ref gvar) = self.gvar {
+                return gvar.outline(self.glyf?, self.coords(), glyph_id, builder);
             }
         }
 

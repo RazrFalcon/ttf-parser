@@ -688,6 +688,7 @@ impl<'a> Face<'a> {
 
         let raw_tables = Self::collect_tables(data, table_records);
 
+        #[allow(unused_mut)]
         let mut face = Face {
             font_data: data,
             table_records: table_records,
@@ -767,6 +768,7 @@ impl<'a> Face<'a> {
 
     /// Creates a new [`Face`] from provided [`RawFaceTables`].
     pub fn from_raw_tables(raw_tables: RawFaceTables<'a>) -> Result<Self, FaceParsingError> {
+        #[allow(unused_mut)]
         let mut face = Face {
             font_data: &[],
             table_records: LazyArray16::default(),
@@ -1310,7 +1312,7 @@ impl<'a> Face<'a> {
         }
 
         #[cfg(not(feature = "variable-fonts"))] {
-            self.hmtx?.advance(glyph_id)
+            self.tables.hmtx?.advance(glyph_id)
         }
     }
 
@@ -1334,7 +1336,7 @@ impl<'a> Face<'a> {
         }
 
         #[cfg(not(feature = "variable-fonts"))] {
-            self.vmtx?.advance(glyph_id)
+            self.tables.vmtx?.advance(glyph_id)
         }
     }
 
@@ -1358,7 +1360,7 @@ impl<'a> Face<'a> {
         }
 
         #[cfg(not(feature = "variable-fonts"))] {
-            self.hmtx?.side_bearing(glyph_id)
+            self.tables.hmtx?.side_bearing(glyph_id)
         }
     }
 
@@ -1382,7 +1384,7 @@ impl<'a> Face<'a> {
         }
 
         #[cfg(not(feature = "variable-fonts"))] {
-            self.vmtx?.side_bearing(glyph_id)
+            self.tables.vmtx?.side_bearing(glyph_id)
         }
     }
 

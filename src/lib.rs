@@ -65,7 +65,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar};
+#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar, mvar};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -1729,7 +1729,7 @@ impl<'a> FaceTables<'a> {
     #[cfg(feature = "variable-fonts")]
     #[inline]
     fn metrics_var_offset(&self, tag: Tag) -> f32 {
-        self.mvar.and_then(|table| table.metrics_offset(tag, self.coords())).unwrap_or(0.0)
+        self.mvar.and_then(|table| table.metric_offset(tag, self.coords())).unwrap_or(0.0)
     }
 
     #[inline]

@@ -1,4 +1,5 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/mvar
+//! A [Metrics Variations Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/mvar) implementation.
 
 use crate::{Tag, NormalizedCoordinate};
 use crate::parser::{Stream, FromData, Offset, Offset16, LazyArray16};
@@ -27,13 +28,16 @@ impl FromData for ValueRecord {
 }
 
 
+/// A [Metrics Variations Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/mvar).
 #[derive(Clone, Copy)]
-pub(crate) struct Table<'a> {
+pub struct Table<'a> {
     variation_store: ItemVariationStore<'a>,
     records: LazyArray16<'a, ValueRecord>,
 }
 
 impl<'a> Table<'a> {
+    /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
@@ -64,12 +68,19 @@ impl<'a> Table<'a> {
         })
     }
 
-    pub fn metrics_offset(&self, tag: Tag, coordinates: &[NormalizedCoordinate]) -> Option<f32> {
+    /// Returns a metric offset by tag.
+    pub fn metric_offset(&self, tag: Tag, coordinates: &[NormalizedCoordinate]) -> Option<f32> {
         let (_, record) = self.records.binary_search_by(|r| r.value_tag.cmp(&tag))?;
         self.variation_store.parse_delta(
             record.delta_set_outer_index,
             record.delta_set_inner_index,
             coordinates
         )
+    }
+}
+
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
     }
 }

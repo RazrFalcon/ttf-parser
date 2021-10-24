@@ -65,7 +65,7 @@ use head::IndexToLocationFormat;
 
 pub use name::*;
 pub use os2::*;
-pub use tables::{cmap, kern, sbix, maxp};
+pub use tables::{cmap, kern, sbix, maxp, hmtx};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -597,6 +597,8 @@ impl std::error::Error for FaceParsingError {}
 
 
 /// A font face handle.
+///
+/// While `Face` is technically copyable, we disallow it because it's almost 2KB big.
 #[derive(Clone)]
 pub struct Face<'a> {
     font_data: &'a [u8], // The input data. Used by Face::table_data.

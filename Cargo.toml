@@ -13,13 +13,18 @@ edition = "2018"
 exclude = ["benches/**"]
 
 [features]
-default = ["std", "opentype-layout", "variable-fonts"]
+default = ["std", "opentype-layout", "variable-fonts", "glyph-names"]
 std = []
 # Enables variable fonts support. Increases binary size almost twice.
 # Includes avar, CFF2, fvar, gvar, HVAR, MVAR and VVAR tables.
 variable-fonts = []
 # Enables GDEF, GPOS and GSUB tables.
 opentype-layout = []
+# Enables glyph name query via `Face::glyph_name`.
+# TrueType fonts do not store default glyph names, to reduce file size,
+# which means we have to store them in ttf-parser. And there are almost 500 of them.
+# By disabling this feature a user can reduce binary size a bit.
+glyph-names = []
 
 [dev-dependencies]
 base64 = "0.12"

@@ -5,7 +5,7 @@ mod charset;
 mod charstring;
 mod dict;
 mod index;
-mod std_names;
+#[cfg(feature = "glyph-names")] mod std_names;
 
 use core::convert::TryFrom;
 

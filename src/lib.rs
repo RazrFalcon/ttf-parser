@@ -1399,6 +1399,7 @@ impl<'a> Face<'a> {
     /// Uses the `post` and `CFF` tables as sources.
     ///
     /// Returns `None` when no name is associated with a `glyph`.
+    #[cfg(feature = "glyph-names")]
     #[inline]
     pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&str> {
         if let Some(name) = self.tables.post.and_then(|post| post.names.get(glyph_id)) {

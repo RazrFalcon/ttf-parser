@@ -23,6 +23,7 @@ pub const STANDARD_ENCODING: [u8;256] = [
 ];
 
 /// The Expert Encoding conversion as defined in the Adobe Technical Note #5176 Appendix C.
+#[cfg(feature = "glyph-names")]
 const EXPERT_ENCODING: &[u16] = &[
       0,    1,  229,  230,  231,  232,  233,  234,  235,  236,  237,  238,   13,   14,   15,   99,
     239,  240,  241,  242,  243,  244,  245,  246,  247,  248,   27,   28,  249,  250,  251,  252,
@@ -38,6 +39,7 @@ const EXPERT_ENCODING: &[u16] = &[
 ];
 
 /// The Expert Subset Encoding conversion as defined in the Adobe Technical Note #5176 Appendix C.
+#[cfg(feature = "glyph-names")]
 const EXPERT_SUBSET_ENCODING: &[u16] = &[
       0,    1,  231,  232,  235,  236,  237,  238,   13,   14,   15,   99,  239,  240,  241,  242,
     243,  244,  245,  246,  247,  248,   27,   28,  249,  250,  251,  253,  254,  255,  256,  257,
@@ -142,6 +144,7 @@ impl Charset<'_> {
         }
     }
 
+    #[cfg(feature = "glyph-names")]
     pub fn gid_to_sid(&self, gid: GlyphId) -> Option<StringId> {
         match self {
             Charset::ISOAdobe => {

@@ -11,7 +11,7 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-ttf-parser = { path = "../", default-features = false, features = ["std"] }
+ttf-parser = { path = "../", default-features = false, features = ["std", "glyph-names"] }
 
 [features]
 default = ["variable-fonts"]

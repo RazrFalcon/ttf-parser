@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Public access to all supported TrueType tables. This allows a low-level, but still safe,
   access to internal data layout, which can be used for performance optimization, like caching.
 - `Style` enum and `Face::style` method.
+- `Face::glyph_name` can be disabled via the `glyph-names` feature to reduce binary size.
 
 ### Changed
 - Improved ascender/descender/line_gap resolving logic.
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   You have to call `into_iter()` manually.
 - Most of the `Name` struct methods become public fields.
 - `Face::units_per_em` no longer returns `Option`.
+- (`cmap`) Improved subtable 12 performance. Thanks to [xnuk](https://github.com/xnuk)
 
 ### Removed
 - (c-api) `ttfp_glyph_class`, `ttfp_get_glyph_class`, `ttfp_get_glyph_mark_attachment_class`,

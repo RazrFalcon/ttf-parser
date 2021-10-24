@@ -1,8 +1,9 @@
 //! A [PostScript Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/post) implementation.
 
-use crate::{LineMetrics, GlyphId};
+use crate::LineMetrics;
 use crate::parser::{Stream, Fixed, LazyArray16};
+#[cfg(feature = "glyph-names")] use crate::GlyphId;
 
 
 const TABLE_SIZE: usize = 32;
@@ -13,6 +14,7 @@ const IS_FIXED_PITCH_OFFSET: usize = 12;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
 /// A list of Macintosh glyph names.
+#[cfg(feature = "glyph-names")]
 const MACINTOSH_NAMES: &[&str] = &[
     ".notdef",
     ".null",
@@ -285,6 +287,7 @@ pub struct Names<'a> {
 // TODO: add low-level iterator
 impl<'a> Names<'a> {
     /// Returns a glyph name by ID.
+    #[cfg(feature = "glyph-names")]
     pub fn get(&self, glyph_id: GlyphId) -> Option<&'a str> {
         let mut index = self.indexes.get(glyph_id.0)?;
 

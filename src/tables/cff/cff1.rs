@@ -17,7 +17,7 @@ use super::charset::{STANDARD_ENCODING, Charset, parse_charset};
 use super::charstring::CharStringParser;
 use super::dict::DictionaryParser;
 use super::index::{Index, parse_index, skip_index};
-use super::std_names::STANDARD_NAMES;
+#[cfg(feature = "glyph-names")] use super::std_names::STANDARD_NAMES;
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: usize = 48;
@@ -110,7 +110,7 @@ pub struct Table<'a> {
     // Used to resolve a local subroutine in a CID font.
     table_data: &'a [u8],
 
-    strings: Index<'a>,
+    #[allow(dead_code)] strings: Index<'a>,
     global_subrs: Index<'a>,
     charset: Charset<'a>,
     char_strings: Index<'a>,
@@ -200,6 +200,7 @@ impl<'a> Table<'a> {
     }
 
     /// Returns a glyph name.
+    #[cfg(feature = "glyph-names")]
     pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
         match self.kind {
             FontKind::SID(_) => {

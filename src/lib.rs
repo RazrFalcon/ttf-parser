@@ -65,7 +65,7 @@ use head::IndexToLocationFormat;
 
 pub use name::*;
 pub use os2::*;
-pub use tables::{cmap, kern, sbix};
+pub use tables::{cmap, kern, sbix, maxp};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -639,6 +639,7 @@ pub struct FaceTables<'a> {
     hmtx: Option<hmtx::Table<'a>>,
     kern: Option<kern::Subtables<'a>>,
     loca: Option<loca::Table<'a>>,
+    maxp: maxp::Table,
     name: Option<name::Names<'a>>,
     os_2: Option<os2::Table<'a>>,
     post: Option<post::Table<'a>>,
@@ -661,7 +662,6 @@ pub struct FaceTables<'a> {
     #[cfg(feature = "variable-fonts")] mvar: Option<mvar::Table<'a>>,
     #[cfg(feature = "variable-fonts")] vvar: Option<hvar::Table<'a>>,
 
-    number_of_glyphs: NonZeroU16,
     #[cfg(feature = "variable-fonts")] coordinates: VarCoords,
 }
 
@@ -765,6 +765,7 @@ impl<'a> FaceTables<'a> {
             hmtx: None,
             kern: None,
             loca: None,
+            maxp: maxp::Table { number_of_glyphs: NonZeroU16::new(1).unwrap() }, // temporary
             name: None,
             os_2: None,
             post: None,
@@ -780,11 +781,10 @@ impl<'a> FaceTables<'a> {
             #[cfg(feature = "variable-fonts")] hvar: None,
             #[cfg(feature = "variable-fonts")] mvar: None,
             #[cfg(feature = "variable-fonts")] vvar: None,
-            number_of_glyphs: NonZeroU16::new(1).unwrap(), // dummy
             #[cfg(feature = "variable-fonts")] coordinates: VarCoords::default(),
         };
 
-        let mut number_of_glyphs = None;
+        let mut maxp = None;
         let mut hmtx = None;
         let mut vmtx = None;
         let mut loca = None;
@@ -826,7 +826,7 @@ impl<'a> FaceTables<'a> {
                 b"hmtx" => hmtx = table_data,
                 b"kern" => face.kern = table_data.and_then(|data| kern::parse(data)),
                 b"loca" => loca = table_data,
-                b"maxp" => number_of_glyphs = table_data.and_then(|data| maxp::parse(data)),
+                b"maxp" => maxp = table_data.and_then(|data| maxp::Table::parse(data)),
                 b"name" => face.name = table_data.and_then(|data| name::parse(data)),
                 b"post" => face.post = table_data.and_then(|data| post::Table::parse(data)),
                 b"sbix" => sbix = table_data,
@@ -844,7 +844,7 @@ impl<'a> FaceTables<'a> {
             return Err(FaceParsingError::NoHheaTable);
         }
 
-        face.number_of_glyphs = match number_of_glyphs {
+        face.maxp = match maxp {
             Some(n) => n,
             None => return Err(FaceParsingError::NoMaxpTable),
         };
@@ -857,24 +857,24 @@ impl<'a> FaceTables<'a> {
 
         if let Some(data) = hmtx {
             if let Some(number_of_h_metrics) = hhea::number_of_h_metrics(face.hhea) {
-                face.hmtx = hmtx::Table::parse(data, number_of_h_metrics, face.number_of_glyphs);
+                face.hmtx = hmtx::Table::parse(data, number_of_h_metrics, face.maxp.number_of_glyphs);
             }
         }
 
         if let (Some(vhea), Some(data)) = (face.vhea, vmtx) {
             if let Some(number_of_v_metrics) = vhea::num_of_long_ver_metrics(vhea) {
-                face.vmtx = hmtx::Table::parse(data, number_of_v_metrics, face.number_of_glyphs);
+                face.vmtx = hmtx::Table::parse(data, number_of_v_metrics, face.maxp.number_of_glyphs);
             }
         }
 
         if let Some(data) = loca {
             if let Some(format) = head::index_to_loc_format(face.head) {
-                face.loca = loca::Table::parse(data, face.number_of_glyphs, format);
+                face.loca = loca::Table::parse(data, face.maxp.number_of_glyphs, format);
             }
         }
 
         if let Some(data) = sbix {
-            face.sbix = sbix::Table::parse(face.number_of_glyphs, data);
+            face.sbix = sbix::Table::parse(face.maxp.number_of_glyphs, data);
         }
 
         Ok(face)
@@ -1319,7 +1319,7 @@ impl<'a> FaceTables<'a> {
     /// The value was already parsed, so this function doesn't involve any parsing.
     #[inline]
     pub fn number_of_glyphs(&self) -> u16 {
-        self.number_of_glyphs.get()
+        self.maxp.number_of_glyphs.get()
     }
 
     /// Returns an iterator over

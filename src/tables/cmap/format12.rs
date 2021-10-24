@@ -48,15 +48,21 @@ impl<'a> Subtable12<'a> {
     /// Returns a glyph index for a code point.
     pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
         let code_point = u32::from(code_point);
-        for group in self.groups {
-            let start_char_code = group.start_char_code;
-            if code_point >= start_char_code && code_point <= group.end_char_code {
-                let id = group.start_glyph_id.checked_add(code_point)?.checked_sub(start_char_code)?;
-                return u16::try_from(id).ok().map(GlyphId);
-            }
-        }
 
-        None
+        let (_, group) = self.groups.binary_search_by(|range| {
+            use core::cmp::Ordering;
+
+            if range.start_char_code > code_point {
+                Ordering::Greater
+            } else if range.end_char_code < code_point {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        })?;
+
+        let id = group.start_glyph_id.checked_add(code_point)?.checked_sub(group.start_char_code)?;
+        return u16::try_from(id).ok().map(GlyphId);
     }
 
     /// Calls `f` for each codepoint defined in this table.

@@ -247,30 +247,6 @@ impl Tag {
     pub const fn as_u32(&self) -> u32 {
         self.0
     }
-
-    /// Converts tag to lowercase.
-    #[inline]
-    pub fn to_lowercase(&self) -> Self {
-        let b = self.to_bytes();
-        Tag::from_bytes(&[
-            b[0].to_ascii_lowercase(),
-            b[1].to_ascii_lowercase(),
-            b[2].to_ascii_lowercase(),
-            b[3].to_ascii_lowercase(),
-        ])
-    }
-
-    /// Converts tag to uppercase.
-    #[inline]
-    pub fn to_uppercase(&self) -> Self {
-        let b = self.to_bytes();
-        Tag::from_bytes(&[
-            b[0].to_ascii_uppercase(),
-            b[1].to_ascii_uppercase(),
-            b[2].to_ascii_uppercase(),
-            b[3].to_ascii_uppercase(),
-        ])
-    }
 }
 
 impl core::fmt::Debug for Tag {

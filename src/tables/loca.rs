@@ -1,4 +1,5 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/loca
+//! An [Index to Location Table](https://docs.microsoft.com/en-us/typography/opentype/spec/loca)
+//! implementation.
 
 use core::num::NonZeroU16;
 use core::ops::Range;
@@ -6,13 +7,20 @@ use core::ops::Range;
 use crate::{GlyphId, IndexToLocationFormat};
 use crate::parser::{Stream, LazyArray16, NumFrom};
 
-#[derive(Clone, Copy)]
-pub(crate) enum Table<'a> {
+/// An [Index to Location Table](https://docs.microsoft.com/en-us/typography/opentype/spec/loca).
+#[derive(Clone, Copy, Debug)]
+pub enum Table<'a> {
+    /// Short offsets.
     Short(LazyArray16<'a, u16>),
+    /// Long offsets.
     Long(LazyArray16<'a, u32>),
 }
 
 impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    ///
+    /// - `number_of_glyphs` is from the `maxp` table.
+    /// - `format` is from the `head` table.
     pub fn parse(
         data: &'a [u8],
         number_of_glyphs: NonZeroU16,
@@ -38,14 +46,16 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns offsets length.
     #[inline]
-    fn len(&self) -> u16 {
+    pub fn len(&self) -> u16 {
         match self {
             Table::Short(ref array) => array.len(),
             Table::Long(ref array) => array.len(),
         }
     }
 
+    /// Returns glyph's range in the `glyf` table.
     #[inline]
     pub fn glyph_range(&self, glyph_id: GlyphId) -> Option<Range<usize>> {
         let glyph_id = glyph_id.0;

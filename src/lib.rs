@@ -65,7 +65,7 @@ use head::IndexToLocationFormat;
 
 pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
-pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {

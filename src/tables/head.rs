@@ -11,7 +11,7 @@ const INDEX_TO_LOC_FORMAT_OFFSET: usize = 50;
 
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub(crate) enum IndexToLocationFormat {
+pub enum IndexToLocationFormat {
     Short,
     Long,
 }

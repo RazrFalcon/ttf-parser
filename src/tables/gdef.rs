@@ -1,4 +1,5 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
+//! An [Glyph Definition Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/gdef) implementation.
 
 use crate::GlyphId;
 use crate::opentype_layout::{Class, ClassDefinition, Coverage};
@@ -22,15 +23,16 @@ pub enum GlyphClass {
 /// A [Glyph Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef).
 #[allow(missing_debug_implementations)]
 #[derive(Clone, Copy, Default)]
-pub struct DefinitionTable<'a> {
+pub struct Table<'a> {
     glyph_classes: Option<ClassDefinition<'a>>,
     mark_attach_classes: Option<ClassDefinition<'a>>,
     mark_glyph_coverage_offsets: Option<(&'a [u8], LazyArray16<'a, Offset32>)>,
     #[cfg(feature = "variable-fonts")] variation_store: Option<ItemVariationStore<'a>>,
 }
 
-impl<'a> DefinitionTable<'a> {
-    pub(crate) fn parse(data: &'a [u8]) -> Option<Self> {
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let version: u32 = s.read()?;
         if !(version == 0x00010000 || version == 0x00010002 || version == 0x00010003) {
@@ -58,7 +60,7 @@ impl<'a> DefinitionTable<'a> {
             }
         }
 
-        let mut table = DefinitionTable::default();
+        let mut table = Table::default();
 
         if let Some(offset) = glyph_class_def_offset {
 
@@ -166,7 +168,7 @@ impl<'a> DefinitionTable<'a> {
 
 #[inline(never)]
 fn is_mark_glyph_impl(
-    table: &DefinitionTable,
+    table: &Table,
     glyph_id: GlyphId,
     set_index: Option<u16>,
 ) -> Option<()> {

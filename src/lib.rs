@@ -64,6 +64,7 @@ pub use os2::{Weight, Width, ScriptMetrics, Style};
 pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea};
+#[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar};
 
 #[cfg(feature = "opentype-layout")]
@@ -71,13 +72,6 @@ pub mod opentype_layout {
     //! This module contains
     //! [OpenType Layout](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#overview)
     //! tables implementation.
-    //!
-    //! Unlike the main [`Face`](crate::Face) API, this module is very low-level
-    //! and contains only parsing abstraction without any logic on top of it.
-
-    pub use crate::gdef::*;
-    pub use crate::tables::gpos as positioning;
-    pub use crate::tables::gsub as substitution;
     pub use crate::ggg::*;
 }
 
@@ -625,7 +619,7 @@ pub struct FaceTables<'a> {
     svg: Option<svg::Table<'a>>,
     vorg: Option<vorg::Table<'a>>,
 
-    #[cfg(feature = "opentype-layout")] gdef: Option<gdef::DefinitionTable<'a>>,
+    #[cfg(feature = "opentype-layout")] gdef: Option<gdef::Table<'a>>,
     #[cfg(feature = "opentype-layout")] gpos: Option<ggg::LayoutTable<'a>>,
     #[cfg(feature = "opentype-layout")] gsub: Option<ggg::LayoutTable<'a>>,
 
@@ -776,7 +770,7 @@ impl<'a> FaceTables<'a> {
                 #[cfg(feature = "variable-fonts")]
                 b"CFF2" => face.cff2 = table_data.and_then(|data| cff2::Table::parse(data)),
                 #[cfg(feature = "opentype-layout")]
-                b"GDEF" => face.gdef = table_data.and_then(|data| gdef::DefinitionTable::parse(data)),
+                b"GDEF" => face.gdef = table_data.and_then(|data| gdef::Table::parse(data)),
                 #[cfg(feature = "opentype-layout")]
                 b"GPOS" => face.gpos = table_data.and_then(|data| ggg::LayoutTable::parse(data)),
                 #[cfg(feature = "opentype-layout")]
@@ -1486,7 +1480,7 @@ impl<'a> FaceTables<'a> {
     /// Returns a [Glyph Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef).
     #[cfg(feature = "opentype-layout")]
     #[inline]
-    pub fn opentype_definition(&self) -> Option<opentype_layout::DefinitionTable<'a>> {
+    pub fn opentype_definition(&self) -> Option<gdef::Table<'a>> {
         self.gdef
     }
 

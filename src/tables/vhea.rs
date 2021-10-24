@@ -1,7 +1,5 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vhea
 
-use core::num::NonZeroU16;
-
 use crate::parser::Stream;
 
 
@@ -37,6 +35,6 @@ pub fn line_gap(data: &[u8]) -> i16 {
 }
 
 #[inline]
-pub fn num_of_long_ver_metrics(data: &[u8]) -> Option<NonZeroU16> {
-    Stream::read_at::<u16>(data, NUM_OF_LONG_VER_METRICS_OFFSET).and_then(NonZeroU16::new)
+pub fn num_of_long_ver_metrics(data: &[u8]) -> Option<u16> {
+    Stream::read_at::<u16>(data, NUM_OF_LONG_VER_METRICS_OFFSET)
 }

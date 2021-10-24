@@ -51,11 +51,14 @@ impl<'a> Table<'a> {
     /// - `number_of_glyphs` is from the `maxp` table.
     pub fn parse(
         data: &'a [u8],
-        number_of_metrics: NonZeroU16,
+        mut number_of_metrics: u16,
         number_of_glyphs: NonZeroU16,
     ) -> Option<Self> {
+        if number_of_metrics == 0 {
+            return None;
+        }
+
         let mut s = Stream::new(data);
-        let mut number_of_metrics = number_of_metrics.get();
         let metrics = s.read_array16::<Metrics>(number_of_metrics)?;
 
         // 'If the number_of_metrics is less than the total number of glyphs,

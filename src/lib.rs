@@ -64,7 +64,7 @@ use head::IndexToLocationFormat;
 
 pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
-pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -636,7 +636,7 @@ pub struct FaceTables<'a> {
     cmap: Option<cmap::Subtables<'a>>,
     glyf: Option<&'a [u8]>,
     head: head::Table,
-    hhea: &'a [u8],
+    hhea: hhea::Table,
     hmtx: Option<hmtx::Table<'a>>,
     kern: Option<kern::Subtables<'a>>,
     loca: Option<loca::Table<'a>>,
@@ -762,7 +762,7 @@ impl<'a> FaceTables<'a> {
             #[cfg(feature = "opentype-layout")] gsub: None,
             glyf: None,
             head: head::Table::default(), // temporary
-            hhea: &[],
+            hhea: hhea::Table::default(), // temporary
             hmtx: None,
             kern: None,
             loca: None,
@@ -785,6 +785,7 @@ impl<'a> FaceTables<'a> {
             #[cfg(feature = "variable-fonts")] coordinates: VarCoords::default(),
         };
 
+        let mut hhea: &[u8] = &[];
         let mut maxp = None;
         let mut hmtx = None;
         let mut vmtx = None;
@@ -823,7 +824,7 @@ impl<'a> FaceTables<'a> {
                 #[cfg(feature = "variable-fonts")]
                 b"gvar" => face.gvar = table_data.and_then(|data| gvar::Table::parse(data)),
                 b"head" => face.head = table_data.and_then(|data| head::Table::parse(data)).unwrap_or_default(),
-                b"hhea" => face.hhea = table_data.and_then(|data| hhea::parse(data)).unwrap_or_default(),
+                b"hhea" => hhea = table_data.unwrap_or_default(),
                 b"hmtx" => hmtx = table_data,
                 b"kern" => face.kern = table_data.and_then(|data| kern::parse(data)),
                 b"loca" => loca = table_data,
@@ -841,9 +842,7 @@ impl<'a> FaceTables<'a> {
             return Err(FaceParsingError::NoHeadTable);
         }
 
-        if face.hhea.is_empty() {
-            return Err(FaceParsingError::NoHheaTable);
-        }
+        face.hhea = hhea::Table::parse(hhea).ok_or(FaceParsingError::NoHheaTable)?;
 
         face.maxp = match maxp {
             Some(n) => n,
@@ -857,14 +856,16 @@ impl<'a> FaceTables<'a> {
         }
 
         if let Some(data) = hmtx {
-            if let Some(number_of_h_metrics) = hhea::number_of_h_metrics(face.hhea) {
-                face.hmtx = hmtx::Table::parse(data, number_of_h_metrics, face.maxp.number_of_glyphs);
-            }
+            face.hmtx = hmtx::Table::parse(
+                data,
+                face.hhea.number_of_metrics,
+                face.maxp.number_of_glyphs,
+            );
         }
 
         if let (Some(vhea), Some(data)) = (face.vhea, vmtx) {
-            if let Some(number_of_v_metrics) = vhea::num_of_long_ver_metrics(vhea) {
-                face.vmtx = hmtx::Table::parse(data, number_of_v_metrics, face.maxp.number_of_glyphs);
+            if let Some(number_of_metrics) = vhea::num_of_long_ver_metrics(vhea) {
+                face.vmtx = hmtx::Table::parse(data, number_of_metrics, face.maxp.number_of_glyphs);
             }
         }
 
@@ -1061,7 +1062,7 @@ impl<'a> FaceTables<'a> {
             }
         }
 
-        let mut value = hhea::ascender(self.hhea);
+        let mut value = self.hhea.ascender;
         if value == 0 {
             if let Some(os_2) = self.os_2 {
                 value = os_2.typographic_ascender();
@@ -1089,7 +1090,7 @@ impl<'a> FaceTables<'a> {
             }
         }
 
-        let mut value = hhea::descender(self.hhea);
+        let mut value = self.hhea.descender;
         if value == 0 {
             if let Some(os_2) = self.os_2 {
                 value = os_2.typographic_descender();
@@ -1125,7 +1126,7 @@ impl<'a> FaceTables<'a> {
             }
         }
 
-        let mut value = hhea::line_gap(self.hhea);
+        let mut value = self.hhea.line_gap;
         if value == 0 {
             if let Some(os_2) = self.os_2 {
                 value = os_2.typographic_line_gap();

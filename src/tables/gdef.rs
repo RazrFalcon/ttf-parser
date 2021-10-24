@@ -1,4 +1,4 @@
-//! An [Glyph Definition Table](
+//! A [Glyph Definition Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/gdef) implementation.
 
 use crate::GlyphId;

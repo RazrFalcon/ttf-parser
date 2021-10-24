@@ -63,7 +63,7 @@ pub use name::{name_id, PlatformId};
 pub use os2::{Weight, Width, ScriptMetrics, Style};
 pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
-pub use tables::{cff1 as cff, vhea};
+pub use tables::{cff1 as cff, vhea, cbdt, cblc};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar, mvar};
 
@@ -600,8 +600,7 @@ impl<'a> DerefMut for Face<'a> {
 /// (for example zlib / brotli decoding)
 #[derive(Clone)]
 pub struct FaceTables<'a> {
-    cbdt: Option<&'a [u8]>,
-    cblc: Option<&'a [u8]>,
+    cbdt: Option<cbdt::Table<'a>>,
     cff: Option<cff1::Table<'a>>,
     cmap: Option<cmap::Table<'a>>,
     glyf: Option<glyf::Table<'a>>,
@@ -723,7 +722,6 @@ impl<'a> FaceTables<'a> {
     {
         let mut face = FaceTables {
             cbdt: None,
-            cblc: None,
             cff: None,
             cmap: None,
             #[cfg(feature = "opentype-layout")] gdef: None,
@@ -760,12 +758,14 @@ impl<'a> FaceTables<'a> {
         let mut loca = None;
         let mut glyf = None;
         let mut sbix = None;
+        let mut cbdt = None;
+        let mut cblc = None;
 
         for table_tag_table_data in provider {
             let (table_tag, table_data) = table_tag_table_data?;
             match &table_tag.to_bytes() {
-                b"CBDT" => face.cbdt = table_data,
-                b"CBLC" => face.cblc = table_data,
+                b"CBDT" => cbdt = table_data,
+                b"CBLC" => cblc = table_data,
                 b"CFF " => face.cff = table_data.and_then(|data| cff::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
                 b"CFF2" => face.cff2 = table_data.and_then(|data| cff2::Table::parse(data)),
@@ -854,6 +854,10 @@ impl<'a> FaceTables<'a> {
             face.sbix = sbix::Table::parse(face.maxp.number_of_glyphs, data);
         }
 
+        if let Some(cblc) = cblc.and_then(cblc::Table::parse) {
+            face.cbdt = cbdt.and_then(|cbdt| cbdt::Table::parse(cblc, cbdt));
+        }
+
         Ok(face)
     }
 
@@ -872,7 +876,7 @@ impl<'a> FaceTables<'a> {
             }
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
             TableName::ColorBitmapData              => self.cbdt.is_some(),
-            TableName::ColorBitmapLocation          => self.cblc.is_some(),
+            TableName::ColorBitmapLocation          => self.cbdt.is_some(),
             TableName::CompactFontFormat            => self.cff.is_some(),
             TableName::CompactFontFormat2           => {
                 #[cfg(feature = "variable-fonts")] { self.cff2.is_some() }
@@ -1646,9 +1650,8 @@ impl<'a> FaceTables<'a> {
             }
         }
 
-        if let (Some(cblc_data), Some(cbdt_data)) = (self.cblc, self.cbdt) {
-            let location = cblc::find_location(cblc_data, glyph_id, pixels_per_em)?;
-            return cbdt::parse(cbdt_data, location);
+        if let Some(cbdt) = self.cbdt {
+            return cbdt.get(glyph_id, pixels_per_em);
         }
 
         None

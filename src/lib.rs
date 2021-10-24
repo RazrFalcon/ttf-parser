@@ -615,7 +615,6 @@ pub struct FaceTables<'a> {
     hhea: hhea::Table,
     hmtx: Option<hmtx::Table<'a>>,
     kern: Option<kern::Table<'a>>,
-    loca: Option<loca::Table<'a>>,
     maxp: maxp::Table,
     name: Option<name::Table<'a>>,
     os_2: Option<os2::Table<'a>>,
@@ -741,7 +740,6 @@ impl<'a> FaceTables<'a> {
             hhea: hhea::Table::default(), // temporary
             hmtx: None,
             kern: None,
-            loca: None,
             maxp: maxp::Table { number_of_glyphs: NonZeroU16::new(1).unwrap() }, // temporary
             name: None,
             os_2: None,
@@ -845,13 +843,13 @@ impl<'a> FaceTables<'a> {
         }
 
         if let Some(data) = loca {
-            face.loca = loca::Table::parse(
+            let loca = loca::Table::parse(
                 data,
                 face.maxp.number_of_glyphs,
                 face.head.index_to_location_format,
             );
 
-            if let Some(loca_table) = face.loca {
+            if let Some(loca_table) = loca {
                 if let Some(glyf) = glyf {
                     face.glyf = Some(glyf::Table::parse(loca_table, glyf));
                 }
@@ -912,7 +910,7 @@ impl<'a> FaceTables<'a> {
                 #[cfg(feature = "variable-fonts")] { self.hvar.is_some() }
                 #[cfg(not(feature = "variable-fonts"))] { false }
             }
-            TableName::IndexToLocation              => self.loca.is_some(),
+            TableName::IndexToLocation              => self.glyf.is_some(),
             TableName::Kerning                      => self.kern.is_some(),
             TableName::MetricsVariations            => {
                 #[cfg(feature = "variable-fonts")] { self.mvar.is_some() }

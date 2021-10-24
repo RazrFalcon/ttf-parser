@@ -64,7 +64,7 @@ use head::IndexToLocationFormat;
 
 pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
-pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -635,7 +635,7 @@ pub struct FaceTables<'a> {
     cff1: Option<cff1::Metadata<'a>>,
     cmap: Option<cmap::Subtables<'a>>,
     glyf: Option<&'a [u8]>,
-    head: &'a [u8],
+    head: head::Table,
     hhea: &'a [u8],
     hmtx: Option<hmtx::Table<'a>>,
     kern: Option<kern::Subtables<'a>>,
@@ -761,7 +761,7 @@ impl<'a> FaceTables<'a> {
             #[cfg(feature = "opentype-layout")] gpos: None,
             #[cfg(feature = "opentype-layout")] gsub: None,
             glyf: None,
-            head: &[],
+            head: head::Table::default(), // temporary
             hhea: &[],
             hmtx: None,
             kern: None,
@@ -822,7 +822,7 @@ impl<'a> FaceTables<'a> {
                 b"glyf" => face.glyf = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"gvar" => face.gvar = table_data.and_then(|data| gvar::Table::parse(data)),
-                b"head" => face.head = table_data.and_then(|data| head::parse(data)).unwrap_or_default(),
+                b"head" => face.head = table_data.and_then(|data| head::Table::parse(data)).unwrap_or_default(),
                 b"hhea" => face.hhea = table_data.and_then(|data| hhea::parse(data)).unwrap_or_default(),
                 b"hmtx" => hmtx = table_data,
                 b"kern" => face.kern = table_data.and_then(|data| kern::parse(data)),
@@ -837,7 +837,7 @@ impl<'a> FaceTables<'a> {
             }
         }
 
-        if face.head.is_empty() {
+        if face.head.units_per_em == 0 {
             return Err(FaceParsingError::NoHeadTable);
         }
 
@@ -869,9 +869,11 @@ impl<'a> FaceTables<'a> {
         }
 
         if let Some(data) = loca {
-            if let Some(format) = head::index_to_loc_format(face.head) {
-                face.loca = loca::Table::parse(data, face.maxp.number_of_glyphs, format);
-            }
+            face.loca = loca::Table::parse(
+                data,
+                face.maxp.number_of_glyphs,
+                face.head.index_to_location_format,
+            );
         }
 
         if let Some(data) = sbix {
@@ -1219,10 +1221,10 @@ impl<'a> FaceTables<'a> {
 
     /// Returns face's units per EM.
     ///
-    /// Returns `None` when value is not in a 16..=16384 range.
+    /// Guarantee to be in a 16..=16384 range.
     #[inline]
-    pub fn units_per_em(&self) -> Option<u16> {
-        head::units_per_em(self.head)
+    pub fn units_per_em(&self) -> u16 {
+        self.head.units_per_em
     }
 
     /// Returns face's x height.
@@ -1638,8 +1640,7 @@ impl<'a> FaceTables<'a> {
     /// Returns a bounding box that large enough to enclose any glyph from the face.
     #[inline]
     pub fn global_bounding_box(&self) -> Rect {
-        // unwrap is safe, because this method cannot fail.
-        head::global_bbox(self.head).unwrap()
+        self.head.global_bbox
     }
 
     /// Returns a reference to a glyph's raster image.

@@ -90,6 +90,15 @@ impl FromData for i32 {
     }
 }
 
+impl FromData for u64 {
+    const SIZE: usize = 8;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        data.try_into().ok().map(u64::from_be_bytes)
+    }
+}
+
 /// A u24 number.
 ///
 /// Stored as u32, but encoded as 3 bytes in the font.

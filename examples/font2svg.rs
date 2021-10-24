@@ -90,7 +90,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let units_per_em = face.units_per_em().ok_or("invalid units per em")?;
+    let units_per_em = face.units_per_em();
     let scale = FONT_SIZE / units_per_em as f64;
 
     let cell_size = face.height() as f64 * FONT_SIZE / units_per_em as f64;

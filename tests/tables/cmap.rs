@@ -296,11 +296,11 @@ mod format4 {
         let subtable = cmap::Subtable4::parse(data).unwrap();
         assert_eq!(subtable.glyph_index(0x40 as char),  None);
         assert_eq!(subtable.glyph_index(0x50 as char),  Some(GlyphId(1)));
-        assert_eq!(subtable.glyph_index(char::from_u32(0x100).unwrap()), Some(GlyphId(10)));
-        assert_eq!(subtable.glyph_index(char::from_u32(0x150).unwrap()), Some(GlyphId(100)));
-        assert_eq!(subtable.glyph_index(char::from_u32(0x200).unwrap()), Some(GlyphId(1000)));
-        assert_eq!(subtable.glyph_index(char::from_u32(0x250).unwrap()), Some(GlyphId(10000)));
-        assert_eq!(subtable.glyph_index(char::from_u32(0x300).unwrap()), None);
+        assert_eq!(subtable.glyph_index(std::char::from_u32(0x100).unwrap()), Some(GlyphId(10)));
+        assert_eq!(subtable.glyph_index(std::char::from_u32(0x150).unwrap()), Some(GlyphId(100)));
+        assert_eq!(subtable.glyph_index(std::char::from_u32(0x200).unwrap()), Some(GlyphId(1000)));
+        assert_eq!(subtable.glyph_index(std::char::from_u32(0x250).unwrap()), Some(GlyphId(10000)));
+        assert_eq!(subtable.glyph_index(std::char::from_u32(0x300).unwrap()), None);
     }
 
     #[test]
@@ -444,7 +444,7 @@ mod format4 {
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
         // Format 4 support only u16 codepoints, so we have to bail immediately otherwise.
-        assert_eq!(subtable.glyph_index(char::from_u32(0x1FFFF).unwrap()), None);
+        assert_eq!(subtable.glyph_index(std::char::from_u32(0x1FFFF).unwrap()), None);
     }
 
     #[test]

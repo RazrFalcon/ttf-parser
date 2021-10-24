@@ -66,8 +66,8 @@ impl<'a> LookupSubtables<'a> {
     /// Parses a subtable at index.
     ///
     /// Accepts either
-    /// [`PositioningSubtable`](crate::opentype_layout::positioning::PositioningSubtable)
-    /// or [`SubstitutionSubtable`](crate::opentype_layout::substitution::SubstitutionSubtable).
+    /// [`PositioningSubtable`](crate::gpos::PositioningSubtable)
+    /// or [`SubstitutionSubtable`](crate::gsub::SubstitutionSubtable).
     ///
     /// Technically, we can enforce it at compile time, but it makes code too convoluted.
     pub fn get<T: LookupSubtable<'a>>(&self, index: u16) -> Option<T> {

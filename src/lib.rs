@@ -57,7 +57,7 @@ use tables::*;
 use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, LazyArrayIter16, Offset32, Offset};
 use head::IndexToLocationFormat;
 
-#[cfg(feature = "variable-fonts")] pub use fvar::{VariationAxes, VariationAxis};
+#[cfg(feature = "variable-fonts")] pub use fvar::VariationAxis;
 
 pub use name::{name_id, PlatformId};
 pub use os2::{Weight, Width, ScriptMetrics, Style};
@@ -65,7 +65,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar};
+#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -820,7 +820,7 @@ impl<'a> FaceTables<'a> {
 
         #[cfg(feature = "variable-fonts")] {
             if let Some(ref fvar) = face.fvar {
-                face.coordinates.len = fvar.axes().count().min(MAX_VAR_COORDS) as u8;
+                face.coordinates.len = fvar.axes.len().min(MAX_VAR_COORDS as u16) as u8;
             }
         }
 
@@ -1673,8 +1673,8 @@ impl<'a> FaceTables<'a> {
     /// Returns an iterator over variation axes.
     #[cfg(feature = "variable-fonts")]
     #[inline]
-    pub fn variation_axes(&self) -> VariationAxes {
-        self.fvar.map(|fvar| fvar.axes()).unwrap_or_default()
+    pub fn variation_axes(&self) -> LazyArray16<'a, VariationAxis> {
+        self.fvar.map(|fvar| fvar.axes).unwrap_or_default()
     }
 
     /// Sets a variation axis coordinate.
@@ -1692,7 +1692,7 @@ impl<'a> FaceTables<'a> {
             return None;
         }
 
-        let v = self.variation_axes().enumerate().find(|(_, a)| a.tag == axis);
+        let v = self.variation_axes().into_iter().enumerate().find(|(_, a)| a.tag == axis);
         if let Some((idx, a)) = v {
             if idx >= MAX_VAR_COORDS {
                 return None;

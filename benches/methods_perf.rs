@@ -75,7 +75,7 @@ fn family_name(bencher: &mut bencher::Bencher) {
     let face = ttf::Face::from_slice(&font_data, 0).unwrap();
     bencher.iter(|| {
         bencher::black_box(
-            face.names().find(|name| name.name_id() == ttf::name_id::FULL_NAME)
+            face.names().into_iter().find(|name| name.name_id == ttf::name_id::FULL_NAME)
                 .and_then(|name| name.to_string())
         );
     })

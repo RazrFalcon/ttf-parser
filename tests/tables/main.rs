@@ -1,3 +1,4 @@
-mod sbix;
-mod maxp;
+mod cmap;
 mod hmtx;
+mod maxp;
+mod sbix;

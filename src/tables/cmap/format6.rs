@@ -1,37 +1,47 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-6-trimmed-table-mapping
-
 use core::convert::TryFrom;
 
-use crate::parser::Stream;
+use crate::parser::{LazyArray16, Stream};
+use crate::GlyphId;
 
-pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
-    // This subtable supports code points only in a u16 range.
-    let code_point = u16::try_from(code_point).ok()?;
-
-    let mut s = Stream::new(data);
-    s.skip::<u16>(); // format
-    s.skip::<u16>(); // length
-    s.skip::<u16>(); // language
-    let first_code_point: u16 = s.read()?;
-    let count: u16 = s.read()?;
-    let glyphs = s.read_array16::<u16>(count)?;
-
-    let idx = code_point.checked_sub(first_code_point)?;
-    glyphs.get(idx)
+/// A [format 6](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-6-trimmed-table-mapping)
+/// subtable.
+#[derive(Clone, Copy, Debug)]
+pub struct Subtable6<'a> {
+    /// First character code of subrange.
+    pub first_code_point: u16,
+    /// Array of glyph indexes for character codes in the range.
+    pub glyphs: LazyArray16<'a, GlyphId>,
 }
 
-pub fn codepoints(data: &[u8], mut f: impl FnMut(u32)) -> Option<()> {
-    let mut s = Stream::new(data);
-    s.skip::<u16>(); // format
-    s.skip::<u16>(); // length
-    s.skip::<u16>(); // language
-    let first_code_point: u16 = s.read()?;
-    let count: u16 = s.read()?;
-
-    for i in 0..count {
-        let code_point = first_code_point.checked_add(i)?;
-        f(u32::from(code_point));
+impl<'a> Subtable6<'a> {
+    /// Parses a subtable from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        s.skip::<u16>(); // format
+        s.skip::<u16>(); // length
+        s.skip::<u16>(); // language
+        let first_code_point: u16 = s.read()?;
+        let count: u16 = s.read()?;
+        let glyphs = s.read_array16::<GlyphId>(count)?;
+        Some(Self { first_code_point, glyphs })
     }
 
-    Some(())
+    /// Returns a glyph index for a code point.
+    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
+        // This subtable supports code points only in a u16 range.
+        let code_point = u16::try_from(code_point as u32).ok()?;
+        let idx = code_point.checked_sub(self.first_code_point)?;
+        self.glyphs.get(idx)
+    }
+
+    /// Calls `f` for each codepoint defined in this table.
+    pub fn codepoints(&self, mut f: impl FnMut(u32)) {
+        for i in 0..self.glyphs.len() {
+            if let Some(code_point) = self.first_code_point.checked_add(i) {
+                if let Ok(c) = u32::try_from(code_point) {
+                    f(c);
+                }
+            }
+        }
+    }
 }

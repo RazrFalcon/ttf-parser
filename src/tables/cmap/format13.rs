@@ -2,28 +2,55 @@
 
 use core::convert::TryFrom;
 
-use crate::parser::Stream;
+use crate::parser::{LazyArray32, Stream};
+use super::format12::SequentialMapGroup;
+use crate::GlyphId;
 
-pub fn parse(data: &[u8], code_point: u32) -> Option<u16> {
-    let mut s = Stream::new(data);
-    s.skip::<u16>(); // format
-    s.skip::<u16>(); // reserved
-    s.skip::<u32>(); // length
-    s.skip::<u32>(); // language
-    let count: u32 = s.read()?;
-    let groups = s.read_array32::<super::format12::SequentialMapGroup>(count)?;
-    for group in groups {
-        let start_char_code = group.start_char_code;
-        if code_point >= start_char_code && code_point <= group.end_char_code {
-            return u16::try_from(group.start_glyph_id).ok();
-        }
-    }
-
-    None
+/// A [format 13](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-13-segmented-coverage)
+/// subtable.
+#[derive(Clone, Copy)]
+pub struct Subtable13<'a> {
+    groups: LazyArray32<'a, SequentialMapGroup>,
 }
 
-pub fn codepoints(data: &[u8], f: impl FnMut(u32)) -> Option<()> {
-    // Only the glyph id mapping differs for this table. The code points are the
-    // same as for format 12.
-    super::format12::codepoints(data, f)
+impl<'a> Subtable13<'a> {
+    /// Parses a subtable from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        s.skip::<u16>(); // format
+        s.skip::<u16>(); // reserved
+        s.skip::<u32>(); // length
+        s.skip::<u32>(); // language
+        let count: u32 = s.read()?;
+        let groups = s.read_array32::<super::format12::SequentialMapGroup>(count)?;
+        Some(Self { groups })
+    }
+
+    /// Returns a glyph index for a code point.
+    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
+        let code_point = u32::from(code_point);
+        for group in self.groups {
+            let start_char_code = group.start_char_code;
+            if code_point >= start_char_code && code_point <= group.end_char_code {
+                return u16::try_from(group.start_glyph_id).ok().map(GlyphId);
+            }
+        }
+
+        None
+    }
+
+    /// Calls `f` for each codepoint defined in this table.
+    pub fn codepoints(&self, mut f: impl FnMut(u32)) {
+        for group in self.groups {
+            for code_point in group.start_char_code..=group.end_char_code {
+                f(code_point);
+            }
+        }
+    }
+}
+
+impl core::fmt::Debug for Subtable13<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Subtable13 {{ ... }}")
+    }
 }

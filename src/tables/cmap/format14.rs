@@ -1,7 +1,5 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences
-
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, Offset, Offset32, U24};
+use crate::parser::{FromData, LazyArray32, Offset, Offset32, Stream, U24};
 
 #[derive(Clone, Copy)]
 struct VariationSelectorRecord {
@@ -86,35 +84,59 @@ pub enum GlyphVariationResult {
 }
 
 
-pub fn parse(data: &[u8], c: u32, variation: u32) -> Option<GlyphVariationResult> {
-    let mut s = Stream::new(data);
-    s.skip::<u16>(); // format
-    s.skip::<u32>(); // length
-    let count: u32 = s.read()?;
-    let records = s.read_array32::<VariationSelectorRecord>(count)?;
+/// A [format 14](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences)
+/// subtable.
+#[derive(Clone, Copy)]
+pub struct Subtable14<'a> {
+    records: LazyArray32<'a, VariationSelectorRecord>,
+    // The whole subtable data.
+    data: &'a [u8],
+}
 
-    let (_, record) = records.binary_search_by(|v| v.var_selector.cmp(&variation))?;
-
-    if let Some(offset) = record.default_uvs_offset {
-        let data = data.get(offset.to_usize()..)?;
+impl<'a> Subtable14<'a> {
+    /// Parses a subtable from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
+        s.skip::<u16>(); // format
+        s.skip::<u32>(); // length
         let count: u32 = s.read()?;
-        let ranges = s.read_array32::<UnicodeRangeRecord>(count)?;
-        for range in ranges {
-            if range.contains(c) {
-                return Some(GlyphVariationResult::UseDefault);
+        let records = s.read_array32::<VariationSelectorRecord>(count)?;
+        Some(Self { records, data })
+    }
+
+    /// Returns a glyph index for a code point.
+    pub fn glyph_index(&self, code_point: char, variation: char) -> Option<GlyphVariationResult> {
+        let code_point = u32::from(code_point);
+        let variation = u32::from(variation);
+        let (_, record) = self.records.binary_search_by(|v| v.var_selector.cmp(&variation))?;
+
+        if let Some(offset) = record.default_uvs_offset {
+            let data = self.data.get(offset.to_usize()..)?;
+            let mut s = Stream::new(data);
+            let count: u32 = s.read()?;
+            let ranges = s.read_array32::<UnicodeRangeRecord>(count)?;
+            for range in ranges {
+                if range.contains(code_point) {
+                    return Some(GlyphVariationResult::UseDefault);
+                }
             }
         }
-    }
 
-    if let Some(offset) = record.non_default_uvs_offset {
-        let data = data.get(offset.to_usize()..)?;
-        let mut s = Stream::new(data);
-        let count: u32 = s.read()?;
-        let uvs_mappings = s.read_array32::<UVSMappingRecord>(count)?;
-        let (_, mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&c))?;
-        return Some(GlyphVariationResult::Found(mapping.glyph_id));
-    }
+        if let Some(offset) = record.non_default_uvs_offset {
+            let data = self.data.get(offset.to_usize()..)?;
+            let mut s = Stream::new(data);
+            let count: u32 = s.read()?;
+            let uvs_mappings = s.read_array32::<UVSMappingRecord>(count)?;
+            let (_, mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&code_point))?;
+            return Some(GlyphVariationResult::Found(mapping.glyph_id));
+        }
 
-    None
+        None
+    }
+}
+
+impl core::fmt::Debug for Subtable14<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Subtable14 {{ ... }}")
+    }
 }

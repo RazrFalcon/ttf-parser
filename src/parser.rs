@@ -177,6 +177,18 @@ impl NumFrom<u32> for usize {
     }
 }
 
+impl NumFrom<char> for usize {
+    #[inline]
+    fn num_from(v: char) -> Self {
+        #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+        {
+            v as usize
+        }
+
+        // compilation error on 16 bit targets
+    }
+}
+
 
 /// Just like TryFrom<N>, but for numeric types not supported by the Rust's std.
 pub trait TryNumFrom<T>: Sized {

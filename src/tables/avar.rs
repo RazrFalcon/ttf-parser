@@ -1,19 +1,99 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/avar
+//! An [Axis Variations Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/avar) implementation.
 
 use core::convert::TryFrom;
-use core::num::NonZeroU16;
 
 use crate::NormalizedCoordinate;
 use crate::parser::{Stream, FromData, LazyArray16};
 
 
+/// An axis value map.
+#[derive(Clone, Copy, Debug)]
+pub struct AxisValueMap {
+    /// A normalized coordinate value obtained using default normalization.
+    pub from_coordinate: i16,
+    /// The modified, normalized coordinate value.
+    pub to_coordinate: i16,
+}
+
+impl FromData for AxisValueMap {
+    const SIZE: usize = 4;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(AxisValueMap {
+            from_coordinate: s.read::<i16>()?,
+            to_coordinate: s.read::<i16>()?,
+        })
+    }
+}
+
+
+/// A list of segment maps.
+///
+/// Can be empty.
+///
+/// The internal data layout is not designed for random access,
+/// therefore we're not providing the `get()` method and only an iterator.
 #[derive(Clone, Copy)]
-pub(crate) struct Table<'a> {
-    axis_count: NonZeroU16,
+pub struct SegmentMaps<'a> {
+    count: u16,
     data: &'a [u8],
 }
 
+impl<'a> SegmentMaps<'a> {
+    /// Returns the number of segments.
+    pub fn len(&self) -> u16 {
+        self.count
+    }
+}
+
+impl core::fmt::Debug for SegmentMaps<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "SegmentMaps {{ ... }}")
+    }
+}
+
+impl<'a> IntoIterator for SegmentMaps<'a> {
+    type Item = LazyArray16<'a, AxisValueMap>;
+    type IntoIter = SegmentMapsIter<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        SegmentMapsIter {
+            stream: Stream::new(self.data),
+        }
+    }
+}
+
+/// An iterator over [`Strikes`].
+#[allow(missing_debug_implementations)]
+pub struct SegmentMapsIter<'a> {
+    stream: Stream<'a>,
+}
+
+impl<'a> Iterator for SegmentMapsIter<'a> {
+    type Item = LazyArray16<'a, AxisValueMap>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let count: u16 = self.stream.read()?;
+        return self.stream.read_array16::<AxisValueMap>(count);
+    }
+}
+
+
+/// An [Axis Variations Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/avar).
+#[derive(Clone, Copy, Debug)]
+pub struct Table<'a> {
+    /// The segment maps array — one segment map for each axis
+    /// in the order of axes specified in the `fvar` table.
+    pub segment_maps: SegmentMaps<'a>,
+}
+
 impl<'a> Table<'a> {
+    /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
@@ -23,33 +103,22 @@ impl<'a> Table<'a> {
         }
 
         s.skip::<u16>(); // reserved
-        // TODO: check that `axisCount` is the same as in `fvar`?
-        let axis_count: u16 = s.read()?;
-        let axis_count = NonZeroU16::new(axis_count)?;
-
-        let data = s.tail()?;
-
-        // Sanitize records.
-        for _ in 0..axis_count.get() {
-            let count: u16 = s.read()?;
-            s.advance_checked(AxisValueMapRecord::SIZE * usize::from(count))?;
-        }
-
-        Some(Table {
-            axis_count,
-            data,
+        Some(Self {
+            segment_maps: SegmentMaps {
+                // TODO: check that `axisCount` is the same as in `fvar`?
+                count: s.read::<u16>()?,
+                data: s.tail()?,
+            },
         })
     }
 
+    /// Maps coordinates.
     pub fn map_coordinates(&self, coordinates: &mut [NormalizedCoordinate]) -> Option<()> {
-        if usize::from(self.axis_count.get()) != coordinates.len() {
+        if usize::from(self.segment_maps.count) != coordinates.len() {
             return None;
         }
 
-        let mut s = Stream::new(self.data);
-        for coord in coordinates {
-            let count: u16 = s.read()?;
-            let map = s.read_array16::<AxisValueMapRecord>(count)?;
+        for (map, coord) in self.segment_maps.into_iter().zip(coordinates) {
             *coord = NormalizedCoordinate::from(map_value(&map, coord.0)?);
         }
 
@@ -57,7 +126,7 @@ impl<'a> Table<'a> {
     }
 }
 
-fn map_value(map: &LazyArray16<AxisValueMapRecord>, value: i16) -> Option<i16> {
+fn map_value(map: &LazyArray16<AxisValueMap>, value: i16) -> Option<i16> {
     // This code is based on harfbuzz implementation.
 
     if map.len() == 0 {
@@ -104,24 +173,4 @@ fn map_value(map: &LazyArray16<AxisValueMapRecord>, value: i16) -> Option<i16> {
     let k = (curr_to - prev_to) * (i32::from(value) - prev_from) + denom / 2;
     let value = prev_to + k / denom;
     i16::try_from(value).ok()
-}
-
-
-#[derive(Clone, Copy)]
-struct AxisValueMapRecord {
-    from_coordinate: i16,
-    to_coordinate: i16,
-}
-
-impl FromData for AxisValueMapRecord {
-    const SIZE: usize = 4;
-
-    #[inline]
-    fn parse(data: &[u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        Some(AxisValueMapRecord {
-            from_coordinate: s.read::<i16>()?,
-            to_coordinate: s.read::<i16>()?,
-        })
-    }
 }

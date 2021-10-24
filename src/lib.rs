@@ -65,7 +65,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar};
+#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -1367,9 +1367,9 @@ impl<'a> FaceTables<'a> {
 
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
-                if let Some(hvar_data) = self.hvar {
+                if let Some(hvar) = self.hvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    advance += hvar::glyph_advance_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+                    advance += hvar.advance_offset(glyph_id, self.coords())? + 0.5;
                 }
             }
 
@@ -1391,9 +1391,9 @@ impl<'a> FaceTables<'a> {
 
             if self.is_variable() {
                 // Ignore variation offset when `vvar` is not set.
-                if let Some(vvar_data) = self.vvar {
+                if let Some(vvar) = self.vvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    advance += hvar::glyph_advance_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+                    advance += vvar.advance_offset(glyph_id, self.coords())? + 0.5;
                 }
             }
 
@@ -1415,9 +1415,9 @@ impl<'a> FaceTables<'a> {
 
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
-                if let Some(hvar_data) = self.hvar {
+                if let Some(hvar) = self.hvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    bearing += hvar::glyph_side_bearing_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+                    bearing += hvar.side_bearing_offset(glyph_id, self.coords())? + 0.5;
                 }
             }
 
@@ -1439,9 +1439,9 @@ impl<'a> FaceTables<'a> {
 
             if self.is_variable() {
                 // Ignore variation offset when `vvar` is not set.
-                if let Some(vvar_data) = self.vvar {
+                if let Some(vvar) = self.vvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    bearing += hvar::glyph_side_bearing_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+                    bearing += vvar.side_bearing_offset(glyph_id, self.coords())? + 0.5;
                 }
             }
 

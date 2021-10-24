@@ -65,7 +65,7 @@ use head::IndexToLocationFormat;
 
 pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
-pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -648,7 +648,7 @@ pub struct FaceTables<'a> {
     vhea: Option<&'a [u8]>,
     vmtx: Option<hmtx::Table<'a>>,
     sbix: Option<sbix::Table<'a>>,
-    svg_: Option<&'a [u8]>,
+    svg: Option<svg::Table<'a>>,
     vorg: Option<vorg::Table<'a>>,
 
     #[cfg(feature = "opentype-layout")] gdef: Option<gdef::DefinitionTable<'a>>,
@@ -774,7 +774,7 @@ impl<'a> FaceTables<'a> {
             vhea: None,
             vmtx: None,
             sbix: None,
-            svg_: None,
+            svg: None,
             vorg: None,
             #[cfg(feature = "variable-fonts")] avar: None,
             #[cfg(feature = "variable-fonts")] cff2: None,
@@ -811,7 +811,7 @@ impl<'a> FaceTables<'a> {
                 #[cfg(feature = "variable-fonts")]
                 b"MVAR" => face.mvar = table_data.and_then(|data| mvar::Table::parse(data)),
                 b"OS/2" => face.os_2 = table_data.and_then(|data| os2::Table::parse(data)),
-                b"SVG " => face.svg_ = table_data,
+                b"SVG " => face.svg = table_data.and_then(|data| svg::Table::parse(data)),
                 b"VORG" => face.vorg = table_data.and_then(|data| vorg::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
                 b"VVAR" => face.vvar = table_data.and_then(|data| hvar::Table::parse(data)),
@@ -937,7 +937,7 @@ impl<'a> FaceTables<'a> {
             }
             TableName::Naming                       => self.name.is_some(),
             TableName::PostScript                   => self.post.is_some(),
-            TableName::ScalableVectorGraphics       => self.svg_.is_some(),
+            TableName::ScalableVectorGraphics       => self.svg.is_some(),
             TableName::StandardBitmapGraphics       => self.sbix.is_some(),
             TableName::VerticalHeader               => self.vhea.is_some(),
             TableName::VerticalMetrics              => self.vmtx.is_some(),
@@ -1693,7 +1693,7 @@ impl<'a> FaceTables<'a> {
     /// you should also try `outline_glyph()` afterwards.
     #[inline]
     pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
-        self.svg_.and_then(|svg_data| svg::parse(svg_data, glyph_id))
+        self.svg.and_then(|svg| svg.documents.find(glyph_id))
     }
 
     /// Returns an iterator over variation axes.

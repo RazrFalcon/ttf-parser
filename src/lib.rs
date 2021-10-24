@@ -36,7 +36,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 #[macro_use]
 extern crate std;
 
-use core::fmt;
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 
@@ -603,7 +602,7 @@ impl std::error::Error for FaceParsingError {}
 pub struct Face<'a> {
     font_data: &'a [u8], // The input data. Used by Face::table_data.
     table_records: LazyArray16<'a, TableRecord>,
-    internal: FaceTables<'a>,
+    tables: FaceTables<'a>,
 }
 
 impl<'a> Deref for Face<'a> {
@@ -611,14 +610,14 @@ impl<'a> Deref for Face<'a> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.internal
+        &self.tables
     }
 }
 
 impl<'a> DerefMut for Face<'a> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.internal
+        &mut self.tables
     }
 }
 
@@ -667,8 +666,8 @@ pub struct FaceTables<'a> {
     #[cfg(feature = "variable-fonts")] coordinates: VarCoords,
 }
 
-impl fmt::Debug for FaceTables<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Debug for FaceTables<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "FaceTables()")
     }
 }
@@ -716,20 +715,20 @@ impl<'a> Face<'a> {
 
         let num_tables: u16 = s.read().ok_or(FaceParsingError::MalformedFont)?;
         s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
-        let tables = s.read_array16::<TableRecord>(num_tables)
+        let table_records = s.read_array16::<TableRecord>(num_tables)
             .ok_or(FaceParsingError::MalformedFont)?;
 
-        let internal = FaceTables::from_table_provider(
+        let tables = FaceTables::from_table_provider(
             DefaultTableProvider {
-                tables: tables.into_iter(),
+                tables: table_records.into_iter(),
                 data
             }
         )?;
 
         Ok(Face {
             font_data: data,
-            table_records: tables,
-            internal,
+            table_records: table_records,
+            tables,
         })
     }
 
@@ -1811,8 +1810,8 @@ impl<'a> Iterator for DefaultTableProvider<'a> {
     }
 }
 
-impl fmt::Debug for Face<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Debug for Face<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "Face()")
     }
 }

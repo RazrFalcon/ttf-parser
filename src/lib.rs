@@ -63,7 +63,7 @@ pub use name::{name_id, PlatformId};
 pub use os2::{Weight, Width, ScriptMetrics, Style};
 pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
-pub use tables::{cff1 as cff};
+pub use tables::{cff1 as cff, vhea};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar};
 
 #[cfg(feature = "opentype-layout")]
@@ -644,7 +644,7 @@ pub struct FaceTables<'a> {
     name: Option<name::Table<'a>>,
     os_2: Option<os2::Table<'a>>,
     post: Option<post::Table<'a>>,
-    vhea: Option<&'a [u8]>,
+    vhea: Option<vhea::Table>,
     vmtx: Option<hmtx::Table<'a>>,
     sbix: Option<sbix::Table<'a>>,
     svg: Option<svg::Table<'a>>,
@@ -833,7 +833,7 @@ impl<'a> FaceTables<'a> {
                 b"name" => face.name = table_data.and_then(|data| name::Table::parse(data)),
                 b"post" => face.post = table_data.and_then(|data| post::Table::parse(data)),
                 b"sbix" => sbix = table_data,
-                b"vhea" => face.vhea = table_data.and_then(|data| vhea::parse(data)),
+                b"vhea" => face.vhea = table_data.and_then(|data| vhea::Table::parse(data)),
                 b"vmtx" => vmtx = table_data,
                 _ => {}
             }
@@ -865,9 +865,7 @@ impl<'a> FaceTables<'a> {
         }
 
         if let (Some(vhea), Some(data)) = (face.vhea, vmtx) {
-            if let Some(number_of_metrics) = vhea::num_of_long_ver_metrics(vhea) {
-                face.vmtx = hmtx::Table::parse(data, number_of_metrics, face.maxp.number_of_glyphs);
-            }
+            face.vmtx = hmtx::Table::parse(data, vhea.number_of_metrics, face.maxp.number_of_glyphs);
         }
 
         if let Some(data) = loca {
@@ -1197,7 +1195,7 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_ascender(&self) -> Option<i16> {
-        self.vhea.map(vhea::ascender)
+        self.vhea.map(|vhea| vhea.ascender)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vasc"), v))
     }
 
@@ -1206,7 +1204,7 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_descender(&self) -> Option<i16> {
-        self.vhea.map(vhea::descender)
+        self.vhea.map(|vhea| vhea.descender)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vdsc"), v))
     }
 
@@ -1223,7 +1221,7 @@ impl<'a> FaceTables<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_line_gap(&self) -> Option<i16> {
-        self.vhea.map(vhea::line_gap)
+        self.vhea.map(|vhea| vhea.line_gap)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vlgp"), v))
     }
 

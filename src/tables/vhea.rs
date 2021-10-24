@@ -1,40 +1,41 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/vhea
+//! A [Vertical Header Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/vhea) implementation.
 
 use crate::parser::Stream;
 
+/// A [Vertical Header Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vhea).
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Table {
+    /// Face ascender.
+    pub ascender: i16,
+    /// Face descender.
+    pub descender: i16,
+    /// Face line gap.
+    pub line_gap: i16,
+    /// Number of metrics in the `vmtx` table.
+    pub number_of_metrics: u16,
+}
 
-const TABLE_SIZE: usize = 36;
-const ASCENDER_OFFSET: usize = 4;
-const DESCENDER_OFFSET: usize = 6;
-const LINE_GAP_OFFSET: usize = 8;
-const NUM_OF_LONG_VER_METRICS_OFFSET: usize = 34;
+impl Table {
+    /// Parses a table from raw data.
+    pub fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != 36 {
+            return None
+        }
 
+        let mut s = Stream::new(data);
+        s.skip::<u32>(); // version
+        let ascender: i16 = s.read()?;
+        let descender: i16 = s.read()?;
+        let line_gap: i16 = s.read()?;
+        s.advance(24);
+        let number_of_metrics: u16 = s.read()?;
 
-#[inline]
-pub fn parse(data: &[u8]) -> Option<&[u8]> {
-    if data.len() == TABLE_SIZE {
-        Some(data)
-    } else {
-        None
+        Some(Table {
+            ascender,
+            descender,
+            line_gap,
+            number_of_metrics,
+        })
     }
-}
-
-#[inline]
-pub fn ascender(data: &[u8]) -> i16 {
-    Stream::read_at::<i16>(data, ASCENDER_OFFSET).unwrap_or(0)
-}
-
-#[inline]
-pub fn descender(data: &[u8]) -> i16 {
-    Stream::read_at::<i16>(data, DESCENDER_OFFSET).unwrap_or(0)
-}
-
-#[inline]
-pub fn line_gap(data: &[u8]) -> i16 {
-    Stream::read_at::<i16>(data, LINE_GAP_OFFSET).unwrap_or(0)
-}
-
-#[inline]
-pub fn num_of_long_ver_metrics(data: &[u8]) -> Option<u16> {
-    Stream::read_at::<u16>(data, NUM_OF_LONG_VER_METRICS_OFFSET)
 }

@@ -1,4 +1,5 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/os2
+//! A [OS/2 and Windows Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/os2)
+//! implementation.
 
 use crate::LineMetrics;
 use crate::parser::Stream;
@@ -20,7 +21,7 @@ const X_HEIGHT_OFFSET: usize = 86;
 const CAP_HEIGHT_OFFSET: usize = 88;
 
 
-/// A font [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
+/// A face [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub enum Weight {
@@ -81,7 +82,7 @@ impl Default for Weight {
 }
 
 
-/// A font [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
+/// A face [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Width {
@@ -122,14 +123,33 @@ impl Default for Width {
 }
 
 
+/// A face style.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum Style {
+    /// A face that is neither italic not obliqued.
+    Normal,
+    /// A form that is generally cursive in nature.
+    Italic,
+    /// A typically-sloped version of the regular face.
+    Oblique,
+}
+
+impl Default for Style {
+    #[inline]
+    fn default() -> Style {
+        Style::Normal
+    }
+}
+
+
 /// A script metrics used by subscript and superscript.
 #[repr(C)]
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub struct ScriptMetrics {
-    /// Horizontal font size.
+    /// Horizontal face size.
     pub x_size: i16,
 
-    /// Vertical font size.
+    /// Vertical face size.
     pub y_size: i16,
 
     /// X offset.
@@ -147,19 +167,22 @@ struct SelectionFlags(u16);
 impl SelectionFlags {
     #[inline] fn italic(self) -> bool { self.0 & (1 << 0) != 0 }
     #[inline] fn bold(self) -> bool { self.0 & (1 << 5) != 0 }
-    #[inline] fn regular(self) -> bool { self.0 & (1 << 6) != 0 }
+    // #[inline] fn regular(self) -> bool { self.0 & (1 << 6) != 0 }
     #[inline] fn use_typo_metrics(self) -> bool { self.0 & (1 << 7) != 0 }
     #[inline] fn oblique(self) -> bool { self.0 & (1 << 9) != 0 }
 }
 
 
+/// A [OS/2 and Windows Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/os2).
 #[derive(Clone, Copy)]
-pub(crate) struct Table<'a> {
-    version: u8,
+pub struct Table<'a> {
+    /// Table version.
+    pub version: u8,
     data: &'a [u8],
 }
 
 impl<'a> Table<'a> {
+    /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let version: u16 = s.read()?;
@@ -184,11 +207,13 @@ impl<'a> Table<'a> {
         })
     }
 
+    /// Returns weight class.
     #[inline]
     pub fn weight(&self) -> Weight {
         Weight::from(Stream::read_at::<u16>(self.data, WEIGHT_CLASS_OFFSET).unwrap_or(0))
     }
 
+    /// Returns face width.
     #[inline]
     pub fn width(&self) -> Width {
         match Stream::read_at::<u16>(self.data, WIDTH_CLASS_OFFSET).unwrap_or(0) {
@@ -205,6 +230,7 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns subscript metrics.
     #[inline]
     pub fn subscript_metrics(&self) -> ScriptMetrics {
         let mut s = Stream::new_at(self.data, Y_SUBSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
@@ -216,6 +242,7 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns superscript metrics.
     #[inline]
     pub fn superscript_metrics(&self) -> ScriptMetrics {
         let mut s = Stream::new_at(self.data, Y_SUPERSCRIPT_X_SIZE_OFFSET).unwrap_or_default();
@@ -227,6 +254,7 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns strikeout metrics.
     #[inline]
     pub fn strikeout_metrics(&self) -> LineMetrics {
         LineMetrics {
@@ -240,32 +268,29 @@ impl<'a> Table<'a> {
         Stream::read_at::<u16>(self.data, FS_SELECTION_OFFSET).unwrap_or(0)
     }
 
-    #[inline]
-    pub fn is_regular(&self) -> bool {
-        SelectionFlags(self.fs_selection()).regular()
+    /// Returns style.
+    pub fn style(&self) -> Style {
+        let flags = SelectionFlags(self.fs_selection());
+        if flags.italic() {
+            Style::Italic
+        } else if self.version >= 4 && flags.oblique() {
+            Style::Oblique
+        } else {
+            Style::Normal
+        }
     }
 
-    #[inline]
-    pub fn is_italic(&self) -> bool {
-        SelectionFlags(self.fs_selection()).italic()
-    }
-
+    /// Checks if face is bold.
+    ///
+    /// Do not confuse with [`Weight::Bold`].
     #[inline]
     pub fn is_bold(&self) -> bool {
         SelectionFlags(self.fs_selection()).bold()
     }
 
+    /// Checks if typographic metrics should be used.
     #[inline]
-    pub fn is_oblique(&self) -> bool {
-        if self.version < 4 {
-            false
-        } else {
-            SelectionFlags(self.fs_selection()).oblique()
-        }
-    }
-
-    #[inline]
-    pub fn is_use_typo_metrics(&self) -> bool {
+    pub fn use_typographic_metrics(&self) -> bool {
         if self.version < 4 {
             false
         } else {
@@ -273,32 +298,40 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns typographic ascender.
     #[inline]
-    pub fn typo_ascender(&self) -> i16 {
+    pub fn typographic_ascender(&self) -> i16 {
         Stream::read_at::<i16>(self.data, TYPO_ASCENDER_OFFSET).unwrap_or(0)
     }
 
+    /// Returns typographic descender.
     #[inline]
-    pub fn typo_descender(&self) -> i16 {
+    pub fn typographic_descender(&self) -> i16 {
         Stream::read_at::<i16>(self.data, TYPO_DESCENDER_OFFSET).unwrap_or(0)
     }
 
+    /// Returns typographic line gap.
     #[inline]
-    pub fn typo_line_gap(&self) -> i16 {
+    pub fn typographic_line_gap(&self) -> i16 {
         Stream::read_at::<i16>(self.data, TYPO_LINE_GAP_OFFSET).unwrap_or(0)
     }
 
+    /// Returns Windows ascender.
     #[inline]
     pub fn windows_ascender(&self) -> i16 {
         Stream::read_at::<i16>(self.data, WIN_ASCENT).unwrap_or(0)
     }
 
+    /// Returns Windows descender.
     #[inline]
     pub fn windows_descender(&self) -> i16 {
         // Should be negated.
         -Stream::read_at::<i16>(self.data, WIN_DESCENT).unwrap_or(0)
     }
 
+    /// Returns x height.
+    ///
+    /// Returns `None` version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
         if self.version < 2 {
@@ -308,12 +341,21 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns capital height.
+    ///
+    /// Returns `None` version is < 2.
     #[inline]
-    pub fn cap_height(&self) -> Option<i16> {
+    pub fn capital_height(&self) -> Option<i16> {
         if self.version < 2 {
             None
         } else {
             Stream::read_at::<i16>(self.data, CAP_HEIGHT_OFFSET)
         }
+    }
+}
+
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
     }
 }

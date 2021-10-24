@@ -10,7 +10,7 @@ This module provides a low-level alternative to
 methods.
 */
 
-use crate::{GlyphId, PlatformId};
+use crate::{GlyphId, name::PlatformId};
 use crate::parser::{Stream, FromData, LazyArray16, NumFrom};
 
 mod format0;

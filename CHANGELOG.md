@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Face::opentype_definition`
 - `Face::opentype_positioning`
 - `Face::opentype_substitution`
+- `Style` enum and `Face::style` method.
 
 ### Changed
 - Improved ascender/descender/line_gap resolving logic.

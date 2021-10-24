@@ -63,9 +63,9 @@ use head::IndexToLocationFormat;
 
 #[cfg(feature = "variable-fonts")] pub use fvar::{VariationAxes, VariationAxis};
 
-pub use name::*;
-pub use os2::*;
-pub use tables::{cmap, kern, sbix, maxp, hmtx, name};
+pub use name::name_id;
+pub use os2::{Weight, Width, ScriptMetrics, Style};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -956,7 +956,7 @@ impl<'a> FaceTables<'a> {
     ///
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
     #[inline]
-    pub fn names(&self) -> Names<'a> {
+    pub fn names(&self) -> name::Names<'a> {
         self.name.unwrap_or_default().names
     }
 
@@ -965,7 +965,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_regular(&self) -> bool {
-        try_opt_or!(self.os_2, false).is_regular()
+        self.os_2.map(|s| s.style() == Style::Normal).unwrap_or(false)
     }
 
     /// Checks that face is marked as *Italic*.
@@ -973,7 +973,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_italic(&self) -> bool {
-        try_opt_or!(self.os_2, false).is_italic()
+        self.os_2.map(|s| s.style() == Style::Italic).unwrap_or(false)
     }
 
     /// Checks that face is marked as *Bold*.
@@ -989,7 +989,13 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when OS/2 table is not present or when its version is < 4.
     #[inline]
     pub fn is_oblique(&self) -> bool {
-        try_opt_or!(self.os_2, false).is_oblique()
+        self.os_2.map(|s| s.style() == Style::Oblique).unwrap_or(false)
+    }
+
+    /// Returns face style.
+    #[inline]
+    pub fn style(&self) -> Style {
+        try_opt_or!(self.os_2, Style::Normal).style()
     }
 
     /// Checks that face is marked as *Monospaced*.
@@ -1048,8 +1054,8 @@ impl<'a> FaceTables<'a> {
     #[inline]
     pub fn ascender(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
-            if os_2.is_use_typo_metrics() {
-                let value = os_2.typo_ascender();
+            if os_2.use_typographic_metrics() {
+                let value = os_2.typographic_ascender();
                 return self.apply_metrics_variation(Tag::from_bytes(b"hasc"), value);
             }
         }
@@ -1057,7 +1063,7 @@ impl<'a> FaceTables<'a> {
         let mut value = hhea::ascender(self.hhea);
         if value == 0 {
             if let Some(os_2) = self.os_2 {
-                value = os_2.typo_ascender();
+                value = os_2.typographic_ascender();
                 if value == 0 {
                     value = os_2.windows_ascender();
                     value = self.apply_metrics_variation(Tag::from_bytes(b"hcla"), value);
@@ -1076,8 +1082,8 @@ impl<'a> FaceTables<'a> {
     #[inline]
     pub fn descender(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
-            if os_2.is_use_typo_metrics() {
-                let value = os_2.typo_descender();
+            if os_2.use_typographic_metrics() {
+                let value = os_2.typographic_descender();
                 return self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), value);
             }
         }
@@ -1085,7 +1091,7 @@ impl<'a> FaceTables<'a> {
         let mut value = hhea::descender(self.hhea);
         if value == 0 {
             if let Some(os_2) = self.os_2 {
-                value = os_2.typo_descender();
+                value = os_2.typographic_descender();
                 if value == 0 {
                     value = os_2.windows_descender();
                     value = self.apply_metrics_variation(Tag::from_bytes(b"hcld"), value);
@@ -1112,8 +1118,8 @@ impl<'a> FaceTables<'a> {
     #[inline]
     pub fn line_gap(&self) -> i16 {
         if let Some(os_2) = self.os_2 {
-            if os_2.is_use_typo_metrics() {
-                let value = os_2.typo_line_gap();
+            if os_2.use_typographic_metrics() {
+                let value = os_2.typographic_line_gap();
                 return self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
             }
         }
@@ -1121,7 +1127,7 @@ impl<'a> FaceTables<'a> {
         let mut value = hhea::line_gap(self.hhea);
         if value == 0 {
             if let Some(os_2) = self.os_2 {
-                value = os_2.typo_line_gap();
+                value = os_2.typographic_line_gap();
                 value = self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
             }
         }
@@ -1140,7 +1146,7 @@ impl<'a> FaceTables<'a> {
     #[inline]
     pub fn typographic_ascender(&self) -> Option<i16> {
         self.os_2.map(|table| {
-            let v = table.typo_ascender();
+            let v = table.typographic_ascender();
             self.apply_metrics_variation(Tag::from_bytes(b"hasc"), v)
         })
     }
@@ -1156,7 +1162,7 @@ impl<'a> FaceTables<'a> {
     #[inline]
     pub fn typographic_descender(&self) -> Option<i16> {
         self.os_2.map(|table| {
-            let v = table.typo_descender();
+            let v = table.typographic_descender();
             self.apply_metrics_variation(Tag::from_bytes(b"hdsc"), v)
         })
     }
@@ -1172,7 +1178,7 @@ impl<'a> FaceTables<'a> {
     #[inline]
     pub fn typographic_line_gap(&self) -> Option<i16> {
         self.os_2.map(|table| {
-            let v = table.typo_line_gap();
+            let v = table.typographic_line_gap();
             self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), v)
         })
     }
@@ -1238,7 +1244,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn capital_height(&self) -> Option<i16> {
-        self.os_2.and_then(|os_2| os_2.cap_height())
+        self.os_2.and_then(|os_2| os_2.capital_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"cpht"), v))
     }
 

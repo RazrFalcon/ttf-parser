@@ -173,7 +173,7 @@ pub extern "C" fn ttfp_has_table(face: *const ttfp_face, name: ttf_parser::Table
 /// @brief Returns the number of name records in the face.
 #[no_mangle]
 pub extern "C" fn ttfp_get_name_records_count(face: *const ttfp_face) -> u16 {
-    face_from_ptr(face).names().count() as u16
+    face_from_ptr(face).names().len()
 }
 
 /// @brief Returns a name record.
@@ -186,10 +186,10 @@ pub extern "C" fn ttfp_get_name_record(
     index: u16,
     record: *mut ttfp_name_record,
 ) -> bool {
-    match face_from_ptr(face).names().nth(index as usize) {
+    match face_from_ptr(face).names().get(index) {
         Some(rec) => {
             unsafe {
-                (*record).platform_id = match rec.platform_id() {
+                (*record).platform_id = match rec.platform_id {
                     ttf_parser::PlatformId::Unicode => 0,
                     ttf_parser::PlatformId::Macintosh => 1,
                     ttf_parser::PlatformId::Iso => 2,
@@ -197,10 +197,10 @@ pub extern "C" fn ttfp_get_name_record(
                     ttf_parser::PlatformId::Custom => 4,
                 };
 
-                (*record).encoding_id = rec.encoding_id();
-                (*record).language_id = rec.language_id();
-                (*record).name_id = rec.name_id();
-                (*record).name_size = rec.name().len() as u16;
+                (*record).encoding_id = rec.encoding_id;
+                (*record).language_id = rec.language_id;
+                (*record).name_id = rec.name_id;
+                (*record).name_size = rec.name.len() as u16;
             }
 
             true
@@ -225,9 +225,9 @@ pub extern "C" fn ttfp_get_name_record_string(
     name: *mut c_char,
     len: usize,
 ) -> bool {
-    match face_from_ptr(face).names().nth(index as usize) {
+    match face_from_ptr(face).names().get(index) {
         Some(r) => {
-            let r_name = r.name();
+            let r_name = r.name;
             if r_name.len() != len {
                 return false;
             }
@@ -433,7 +433,7 @@ pub extern "C" fn ttfp_get_vertical_line_gap(face: *const ttfp_face) -> i16 {
 /// @return Units in a 16..16384 range or `0` otherwise.
 #[no_mangle]
 pub extern "C" fn ttfp_get_units_per_em(face: *const ttfp_face) -> u16 {
-    face_from_ptr(face).units_per_em().unwrap_or(0)
+    face_from_ptr(face).units_per_em()
 }
 
 /// @brief Returns face's x height.

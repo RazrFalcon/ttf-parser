@@ -59,7 +59,7 @@ use head::IndexToLocationFormat;
 
 #[cfg(feature = "variable-fonts")] pub use fvar::{VariationAxes, VariationAxis};
 
-pub use name::name_id;
+pub use name::{name_id, PlatformId};
 pub use os2::{Weight, Width, ScriptMetrics, Style};
 pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};

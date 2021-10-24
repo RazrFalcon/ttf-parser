@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Improved ascender/descender/line_gap resolving logic.
 - `Face` methods: `has_glyph_classes`, `glyph_class`, `glyph_mark_attachment_class`,
   `is_mark_glyph` and `glyph_variation_delta` are moved to `DefinitionTable` struct.
+- The `Names` struct is no longer an iterator, but a container.
+  You have to call `into_iter()` manually.
+- Most of the `Name` struct methods become public fields.
 
 ### Removed
 - (c-api) `ttfp_glyph_class`, `ttfp_get_glyph_class`, `ttfp_get_glyph_mark_attachment_class`,

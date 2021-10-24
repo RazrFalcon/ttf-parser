@@ -17,12 +17,12 @@ fn main() {
         },
     };
 
-    let family_name = face.names()
-        .find(|name| name.name_id() == ttf_parser::name_id::FULL_NAME)
+    let family_name = face.names().into_iter()
+        .find(|name| name.name_id == ttf_parser::name_id::FULL_NAME)
         .and_then(|name| name.to_string());
 
-    let post_script_name = face.names()
-        .find(|name| name.name_id() == ttf_parser::name_id::POST_SCRIPT_NAME)
+    let post_script_name = face.names().into_iter()
+        .find(|name| name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME)
         .and_then(|name| name.to_string());
 
     println!("Family name: {:?}", family_name);

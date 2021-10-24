@@ -1,4 +1,5 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/name
+//! A [Naming Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/name) implementation.
 
 #[cfg(feature = "std")]
 use std::vec::Vec;
@@ -8,7 +9,7 @@ use std::string::String;
 #[cfg(feature = "std")]
 use crate::parser::LazyArray16;
 
-use crate::parser::{Stream, FromData};
+use crate::parser::{FromData, Offset, Offset16, Stream};
 
 
 /// A list of [name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids)'s.
@@ -97,7 +98,7 @@ struct NameRecord {
     language_id: u16,
     name_id: u16,
     length: u16,
-    offset: u16,
+    offset: Offset16,
 }
 
 impl FromData for NameRecord {
@@ -112,7 +113,7 @@ impl FromData for NameRecord {
             language_id: s.read::<u16>()?,
             name_id: s.read::<u16>()?,
             length: s.read::<u16>()?,
-            offset: s.read::<u16>()?,
+            offset: s.read::<Offset16>()?,
         })
     }
 }
@@ -121,42 +122,23 @@ impl FromData for NameRecord {
 /// A [Name Record](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records).
 #[derive(Clone, Copy)]
 pub struct Name<'a> {
-    data: NameRecord,
-    strings: &'a [u8],
+    /// A platform ID.
+    pub platform_id: PlatformId,
+    /// A platform-specific encoding ID.
+    pub encoding_id: u16,
+    /// A language ID.
+    pub language_id: u16,
+    /// A [Name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids).
+    ///
+    /// A predefined list of ID's can be found in the [`name_id`](name_id/index.html) module.
+    pub name_id: u16,
+    /// A raw name data.
+    ///
+    /// Can be in any encoding. Can be empty.
+    pub name: &'a [u8],
 }
 
 impl<'a> Name<'a> {
-    /// Returns the platform ID.
-    pub fn platform_id(&self) -> PlatformId {
-        self.data.platform_id
-    }
-
-    /// Returns the platform-specific encoding ID.
-    pub fn encoding_id(&self) -> u16 {
-        self.data.encoding_id
-    }
-
-    /// Returns the language ID.
-    pub fn language_id(&self) -> u16 {
-        self.data.language_id
-    }
-
-    /// Returns the [Name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids).
-    ///
-    /// A predefined list of ID's can be found in the [`name_id`](name_id/index.html) module.
-    pub fn name_id(&self) -> u16 {
-        self.data.name_id
-    }
-
-    /// Returns the Name's data as bytes.
-    ///
-    /// Can be empty.
-    pub fn name(&self) -> &'a [u8] {
-        let start = usize::from(self.data.offset);
-        let end = start + usize::from(self.data.length);
-        self.strings.get(start..end).unwrap_or(&[])
-    }
-
     /// Returns the Name's data as a UTF-8 string.
     ///
     /// Only Unicode names are supported. And since they are stored as UTF-16BE,
@@ -179,14 +161,14 @@ impl<'a> Name<'a> {
     /// Checks that the current Name data has a Unicode encoding.
     #[inline]
     pub fn is_unicode(&self) -> bool {
-        is_unicode_encoding(self.platform_id(), self.encoding_id())
+        is_unicode_encoding(self.platform_id, self.encoding_id)
     }
 
     #[cfg(feature = "std")]
     #[inline(never)]
     fn name_from_utf16_be(&self) -> Option<String> {
         let mut name: Vec<u16> = Vec::new();
-        for c in LazyArray16::<u16>::new(self.name()) {
+        for c in LazyArray16::<u16>::new(self.name) {
             name.push(c);
         }
 
@@ -203,10 +185,10 @@ impl<'a> core::fmt::Debug for Name<'a> {
         f.debug_struct("Name")
             .field("name", &name.as_ref().map(core::ops::Deref::deref)
                                 .unwrap_or("unsupported encoding"))
-            .field("platform_id", &self.platform_id())
-            .field("encoding_id", &self.encoding_id())
-            .field("language_id", &self.language_id())
-            .field("name_id", &self.name_id())
+            .field("platform_id", &self.platform_id)
+            .field("encoding_id", &self.encoding_id)
+            .field("language_id", &self.language_id)
+            .field("name_id", &self.name_id)
             .finish()
     }
 }
@@ -215,48 +197,79 @@ impl<'a> core::fmt::Debug for Name<'a> {
 impl<'a> core::fmt::Debug for Name<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.debug_struct("Name")
-            .field("name", &self.name())
-            .field("platform_id", &self.platform_id())
-            .field("encoding_id", &self.encoding_id())
-            .field("language_id", &self.language_id())
-            .field("name_id", &self.name_id())
+            .field("name", &self.name)
+            .field("platform_id", &self.platform_id)
+            .field("encoding_id", &self.encoding_id)
+            .field("language_id", &self.language_id)
+            .field("name_id", &self.name_id)
             .finish()
     }
 }
 
 
-/// An iterator over font's names.
+/// A list of face names.
 #[derive(Clone, Copy, Default)]
-#[allow(missing_debug_implementations)]
 pub struct Names<'a> {
-    names: &'a [u8],
+    records: LazyArray16<'a, NameRecord>,
     storage: &'a [u8],
-    index: u16,
-    total: u16,
 }
 
 impl<'a> Names<'a> {
-    fn new(names: &'a [u8], storage: &'a [u8], total: u16) -> Self {
-        Names {
-            names,
-            storage,
+    /// Returns a name at index.
+    pub fn get(&self, index: u16) -> Option<Name<'a>> {
+        let record = self.records.get(index)?;
+        let name_start = record.offset.to_usize();
+        let name_end = name_start + usize::from(record.length);
+        let name = self.storage.get(name_start..name_end)?;
+        Some(Name {
+            platform_id: record.platform_id,
+            encoding_id: record.encoding_id,
+            language_id: record.language_id,
+            name_id: record.name_id,
+            name,
+        })
+    }
+
+    /// Returns a number of name records.
+    pub fn len(&self) -> u16 {
+        self.records.len()
+    }
+}
+
+impl core::fmt::Debug for Names<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Names {{ ... }}")
+    }
+}
+
+impl<'a> IntoIterator for Names<'a> {
+    type Item = Name<'a>;
+    type IntoIter = NamesIter<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        NamesIter {
+            names: self,
             index: 0,
-            total,
         }
     }
 }
 
-impl<'a> Iterator for Names<'a> {
+/// An iterator over face names.
+#[derive(Clone, Copy)]
+#[allow(missing_debug_implementations)]
+pub struct NamesIter<'a> {
+    names: Names<'a>,
+    index: u16,
+}
+
+impl<'a> Iterator for NamesIter<'a> {
     type Item = Name<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.total {
-            let index = usize::from(self.index);
+        if self.index < self.names.len() {
             self.index += 1;
-            Some(Name {
-                data: Stream::read_at::<NameRecord>(self.names, NameRecord::SIZE * index)?,
-                strings: self.storage,
-            })
+            self.names.get(self.index - 1)
         } else {
             None
         }
@@ -264,32 +277,48 @@ impl<'a> Iterator for Names<'a> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::from(self.total.checked_sub(self.index).unwrap_or(0))
+        usize::from(self.names.len().checked_sub(self.index).unwrap_or(0))
     }
 }
 
+/// A [Naming Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/name).
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Table<'a> {
+    /// A list of names.
+    pub names: Names<'a>,
+}
 
-#[inline(never)]
-pub(crate) fn parse(data: &[u8]) -> Option<Names> {
-    // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
-    const LANG_TAG_RECORD_SIZE: u16 = 4;
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#naming-table-format-1
+        const LANG_TAG_RECORD_SIZE: u16 = 4;
 
-    let mut s = Stream::new(data);
-    let format: u16 = s.read()?;
-    let count: u16 = s.read()?;
-    s.skip::<u16>(); // offset
+        let mut s = Stream::new(data);
+        let version: u16 = s.read()?;
+        let count: u16 = s.read()?;
+        let storage_offset = s.read::<Offset16>()?.to_usize();
 
-    if format == 0 {
-        let names_data = s.read_bytes(NameRecord::SIZE * usize::from(count))?;
-        Some(Names::new(names_data, s.tail()?, count))
-    } else if format == 1 {
-        let lang_tag_count: u16 = s.read()?;
-        let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
+        if version == 0 {
+            // Do nothing.
+        } else if version == 1 {
+            let lang_tag_count: u16 = s.read()?;
+            let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
+            s.advance(usize::from(lang_tag_len)); // langTagRecords
+        } else {
+            // Unsupported version.
+            return None;
+        }
 
-        s.advance(usize::from(lang_tag_len)); // langTagRecords
-        let names_data = s.read_bytes(NameRecord::SIZE * usize::from(count))?;
-        Some(Names::new(names_data, s.tail()?, count))
-    } else {
-        None
+        let records = s.read_array16::<NameRecord>(count)?;
+
+        if s.offset() < storage_offset {
+            s.advance(storage_offset - s.offset());
+        }
+
+        let storage = s.tail()?;
+
+        Some(Table { names: Names { records, storage } })
     }
 }

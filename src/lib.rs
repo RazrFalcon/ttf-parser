@@ -65,7 +65,7 @@ use head::IndexToLocationFormat;
 
 pub use name::*;
 pub use os2::*;
-pub use tables::{cmap, kern, sbix, maxp, hmtx};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -642,7 +642,7 @@ pub struct FaceTables<'a> {
     kern: Option<kern::Subtables<'a>>,
     loca: Option<loca::Table<'a>>,
     maxp: maxp::Table,
-    name: Option<name::Names<'a>>,
+    name: Option<name::Table<'a>>,
     os_2: Option<os2::Table<'a>>,
     post: Option<post::Table<'a>>,
     vhea: Option<&'a [u8]>,
@@ -829,7 +829,7 @@ impl<'a> FaceTables<'a> {
                 b"kern" => face.kern = table_data.and_then(|data| kern::parse(data)),
                 b"loca" => loca = table_data,
                 b"maxp" => maxp = table_data.and_then(|data| maxp::Table::parse(data)),
-                b"name" => face.name = table_data.and_then(|data| name::parse(data)),
+                b"name" => face.name = table_data.and_then(|data| name::Table::parse(data)),
                 b"post" => face.post = table_data.and_then(|data| post::Table::parse(data)),
                 b"sbix" => sbix = table_data,
                 b"vhea" => face.vhea = table_data.and_then(|data| vhea::parse(data)),
@@ -956,8 +956,8 @@ impl<'a> FaceTables<'a> {
     ///
     /// [Name Records]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records
     #[inline]
-    pub fn names(&self) -> Names {
-        self.name.unwrap_or_default()
+    pub fn names(&self) -> Names<'a> {
+        self.name.unwrap_or_default().names
     }
 
     /// Checks that face is marked as *Regular*.

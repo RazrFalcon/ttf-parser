@@ -1,4 +1,5 @@
-// https://docs.microsoft.com/en-us/typography/opentype/spec/post
+//! A [PostScript Table](
+//! https://docs.microsoft.com/en-us/typography/opentype/spec/post) implementation.
 
 use crate::{LineMetrics, GlyphId};
 use crate::parser::{Stream, Fixed, LazyArray16};
@@ -11,6 +12,7 @@ const UNDERLINE_THICKNESS_OFFSET: usize = 10;
 const IS_FIXED_PITCH_OFFSET: usize = 12;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
+/// A list of Macintosh glyph names.
 const MACINTOSH_NAMES: &[&str] = &[
     ".notdef",
     ".null",
@@ -273,76 +275,18 @@ const MACINTOSH_NAMES: &[&str] = &[
 ];
 
 
-#[derive(Clone, Copy)]
-pub struct Table<'a> {
-    italic_angle: f32,
-    underline: LineMetrics,
-    is_monospaced: bool,
-    name_indexes: LazyArray16<'a, u16>,
-    names: &'a [u8],
+/// A list of glyph names.
+#[derive(Clone, Copy, Default)]
+pub struct Names<'a> {
+    indexes: LazyArray16<'a, u16>,
+    data: &'a [u8],
 }
 
-impl<'a> Table<'a> {
-    pub fn parse(data: &'a [u8]) -> Option<Self> {
-        if data.len() < TABLE_SIZE {
-            return None;
-        }
-
-        let version: u32 = Stream::new(data).read()?;
-        if !(version == 0x00010000 || version == 0x00020000 ||
-             version == 0x00025000 || version == 0x00030000 ||
-             version == 0x00040000)
-        {
-            return None;
-        }
-
-        let italic_angle = Stream::read_at::<Fixed>(data, ITALIC_ANGLE_OFFSET)?.0;
-
-        let underline = LineMetrics {
-            position: Stream::read_at::<i16>(data, UNDERLINE_POSITION_OFFSET)?,
-            thickness: Stream::read_at::<i16>(data, UNDERLINE_THICKNESS_OFFSET)?,
-        };
-
-        let is_monospaced = Stream::read_at::<u32>(data, IS_FIXED_PITCH_OFFSET)? != 0;
-
-        let mut name_indexes = LazyArray16::default();
-        let mut names: &[u8] = &[];
-
-        // Only version 2.0 of the table has data at the end.
-        if version == 0x00020000 {
-            let mut s = Stream::new_at(data, TABLE_SIZE)?;
-            let count: u16 = s.read()?;
-            name_indexes = s.read_array16::<u16>(count)?;
-            names = s.tail()?;
-        }
-
-        Some(Table {
-            italic_angle,
-            underline,
-            is_monospaced,
-            name_indexes,
-            names,
-        })
-    }
-
-    #[inline]
-    pub fn italic_angle(&self) -> f32 {
-        self.italic_angle
-    }
-
-    #[inline]
-    pub fn underline_metrics(&self) -> LineMetrics {
-        self.underline
-    }
-
-    #[inline]
-    pub fn is_monospaced(&self) -> bool {
-        self.is_monospaced
-    }
-
-    #[inline]
-    pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
-        let mut index = self.name_indexes.get(glyph_id.0)?;
+// TODO: add low-level iterator
+impl<'a> Names<'a> {
+    /// Returns a glyph name by ID.
+    pub fn get(&self, glyph_id: GlyphId) -> Option<&'a str> {
+        let mut index = self.indexes.get(glyph_id.0)?;
 
         // 'If the name index is between 0 and 257, treat the name index
         // as a glyph index in the Macintosh standard order.'
@@ -353,7 +297,7 @@ impl<'a> Table<'a> {
             // to index into the list of Pascal strings at the end of the table.'
             index -= MACINTOSH_NAMES.len() as u16;
 
-            let mut s = Stream::new(self.names);
+            let mut s = Stream::new(self.data);
             let mut i = 0;
             while !s.at_end() && i < core::u16::MAX {
                 let len: u8 = s.read()?;
@@ -375,5 +319,74 @@ impl<'a> Table<'a> {
 
             None
         }
+    }
+
+    /// Returns names count.
+    #[inline]
+    pub fn len(&self) -> u16 {
+        self.indexes.len()
+    }
+}
+
+impl core::fmt::Debug for Names<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Names {{ ... }}")
+    }
+}
+
+
+/// A [PostScript Table](https://docs.microsoft.com/en-us/typography/opentype/spec/post).
+#[derive(Clone, Copy, Debug)]
+pub struct Table<'a> {
+    /// Italic angle in counter-clockwise degrees from the vertical.
+    pub italic_angle: f32,
+    /// Underline metrics.
+    pub underline_metrics: LineMetrics,
+    /// Flag that indicates that the font is monospaced.
+    pub is_monospaced: bool,
+    /// A list of glyph names.
+    pub names: Names<'a>,
+}
+
+
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        if data.len() < TABLE_SIZE {
+            return None;
+        }
+
+        let version: u32 = Stream::new(data).read()?;
+        if !(version == 0x00010000 || version == 0x00020000 ||
+             version == 0x00025000 || version == 0x00030000 ||
+             version == 0x00040000)
+        {
+            return None;
+        }
+
+        let italic_angle = Stream::read_at::<Fixed>(data, ITALIC_ANGLE_OFFSET)?.0;
+
+        let underline_metrics = LineMetrics {
+            position: Stream::read_at::<i16>(data, UNDERLINE_POSITION_OFFSET)?,
+            thickness: Stream::read_at::<i16>(data, UNDERLINE_THICKNESS_OFFSET)?,
+        };
+
+        let is_monospaced = Stream::read_at::<u32>(data, IS_FIXED_PITCH_OFFSET)? != 0;
+
+        let mut names = Names::default();
+        // Only version 2.0 of the table has data at the end.
+        if version == 0x00020000 {
+            let mut s = Stream::new_at(data, TABLE_SIZE)?;
+            let count: u16 = s.read()?;
+            names.indexes = s.read_array16::<u16>(count)?;
+            names.data = s.tail()?;
+        }
+
+        Some(Table {
+            italic_angle,
+            underline_metrics,
+            is_monospaced,
+            names,
+        })
     }
 }

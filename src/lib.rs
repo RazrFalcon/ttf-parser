@@ -65,7 +65,7 @@ use head::IndexToLocationFormat;
 
 pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
-pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg};
+pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
@@ -625,7 +625,7 @@ impl<'a> DerefMut for Face<'a> {
 /// Parsed face tables.
 ///
 /// This struct adds the `from_table_provider()` method that is not
-/// available on the `Font`. You can create a `FaceTables` struct
+/// available on the `Face`. You can create a `FaceTables` struct
 /// from your own, custom font provider. This is important if your font
 /// provider does things that ttf-parser currently doesn't implement
 /// (for example zlib / brotli decoding)
@@ -1003,7 +1003,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `false` when `post` table is not present.
     #[inline]
     pub fn is_monospaced(&self) -> bool {
-        try_opt_or!(self.post, false).is_monospaced()
+        try_opt_or!(self.post, false).is_monospaced
     }
 
     /// Checks that face is variable.
@@ -1042,7 +1042,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when `post` table is not present.
     #[inline]
     pub fn italic_angle(&self) -> Option<f32> {
-        self.post.map(|table| table.italic_angle())
+        self.post.map(|table| table.italic_angle)
     }
 
     // Read https://github.com/freetype/freetype/blob/49270c17011491227ec7bd3fb73ede4f674aa065/src/sfnt/sfobjs.c#L1279
@@ -1255,7 +1255,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when `post` table is not present.
     #[inline]
     pub fn underline_metrics(&self) -> Option<LineMetrics> {
-        let mut metrics = self.post?.underline_metrics();
+        let mut metrics = self.post?.underline_metrics;
 
         if self.is_variable() {
             self.apply_metrics_variation_to(Tag::from_bytes(b"undo"), &mut metrics.position);
@@ -1491,7 +1491,7 @@ impl<'a> FaceTables<'a> {
     /// Returns `None` when no name is associated with a `glyph`.
     #[inline]
     pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&str> {
-        if let Some(name) = self.post.and_then(|post| post.glyph_name(glyph_id)) {
+        if let Some(name) = self.post.and_then(|post| post.names.get(glyph_id)) {
             return Some(name);
         }
 

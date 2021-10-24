@@ -63,7 +63,8 @@ pub use name::name_id;
 pub use os2::{Weight, Width, ScriptMetrics, Style};
 pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
-pub use tables::{cff1 as cff, cff2, avar};
+pub use tables::{cff1 as cff};
+#[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {

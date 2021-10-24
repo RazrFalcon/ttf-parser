@@ -6,10 +6,7 @@ use std::vec::Vec;
 #[cfg(feature = "std")]
 use std::string::String;
 
-#[cfg(feature = "std")]
-use crate::parser::LazyArray16;
-
-use crate::parser::{FromData, Offset, Offset16, Stream};
+use crate::parser::{LazyArray16, FromData, Offset, Offset16, Stream};
 
 
 /// A list of [name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids)'s.

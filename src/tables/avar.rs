@@ -67,7 +67,7 @@ impl<'a> IntoIterator for SegmentMaps<'a> {
     }
 }
 
-/// An iterator over [`Strikes`].
+/// An iterator over maps.
 #[allow(missing_debug_implementations)]
 pub struct SegmentMapsIter<'a> {
     stream: Stream<'a>,

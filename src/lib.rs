@@ -638,7 +638,7 @@ pub struct FaceTables<'a> {
     head: head::Table,
     hhea: hhea::Table,
     hmtx: Option<hmtx::Table<'a>>,
-    kern: Option<kern::Subtables<'a>>,
+    kern: Option<kern::Table<'a>>,
     loca: Option<loca::Table<'a>>,
     maxp: maxp::Table,
     name: Option<name::Table<'a>>,
@@ -827,7 +827,7 @@ impl<'a> FaceTables<'a> {
                 b"head" => face.head = table_data.and_then(|data| head::Table::parse(data)).unwrap_or_default(),
                 b"hhea" => hhea = table_data.unwrap_or_default(),
                 b"hmtx" => hmtx = table_data,
-                b"kern" => face.kern = table_data.and_then(|data| kern::parse(data)),
+                b"kern" => face.kern = table_data.and_then(|data| kern::Table::parse(data)),
                 b"loca" => loca = table_data,
                 b"maxp" => maxp = table_data.and_then(|data| maxp::Table::parse(data)),
                 b"name" => face.name = table_data.and_then(|data| name::Table::parse(data)),
@@ -1537,8 +1537,8 @@ impl<'a> FaceTables<'a> {
     /// and
     /// [Apple Advanced Typography](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6kern.html)
     /// variants.
-    pub fn kerning_subtables(&self) -> kern::Subtables {
-        self.kern.unwrap_or_default()
+    pub fn kerning_subtables(&self) -> kern::SubtablesIter {
+        self.kern.map(|kern| kern.subtables.into_iter()).unwrap_or_default()
     }
 
     /// Outlines a glyph and returns its tight bounding box.

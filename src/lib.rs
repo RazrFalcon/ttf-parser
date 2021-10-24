@@ -26,8 +26,6 @@ Font parsing starts with a [`Face`].
 - Most of numeric casts are checked.
 */
 
-#![doc(html_root_url = "https://docs.rs/ttf-parser/0.12.3")]
-
 #![no_std]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

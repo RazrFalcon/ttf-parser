@@ -23,8 +23,8 @@ impl core::fmt::Debug for Table<'_> {
 impl<'a> Table<'a> {
     /// Parses a table from raw data.
     #[inline]
-    pub fn parse(loca_table: loca::Table<'a>, data: &'a [u8]) -> Self {
-        Table { loca_table, data }
+    pub fn parse(loca_table: loca::Table<'a>, data: &'a [u8]) -> Option<Self> {
+        Some(Table { loca_table, data })
     }
 
     /// Outlines a glyph.

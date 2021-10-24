@@ -50,9 +50,9 @@ impl<'a> Table<'a> {
     /// - `number_of_metrics` is from the `hhea`/`vhea` table.
     /// - `number_of_glyphs` is from the `maxp` table.
     pub fn parse(
-        data: &'a [u8],
         mut number_of_metrics: u16,
         number_of_glyphs: NonZeroU16,
+        data: &'a [u8],
     ) -> Option<Self> {
         if number_of_metrics == 0 {
             return None;

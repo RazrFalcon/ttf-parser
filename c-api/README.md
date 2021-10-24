@@ -1,6 +1,6 @@
 C bindings to the Rust's `ttf-parser` library.
 
-Provides access only to most common methods. See *Missing API*.
+Provides access only to most common methods.
 
 ## Build
 
@@ -35,9 +35,3 @@ env LD_LIBRARY_PATH=./target/debug/ ./test
 
 The `ttfparser.h` is generated via [cbindgen](https://github.com/eqrion/cbindgen)
 and then manually edited a bit.
-
-## Missing API
-
-- `Face::character_mapping_subtables`
-- `Face::kerning_subtables`
-- `opentype_layout`

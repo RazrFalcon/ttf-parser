@@ -22,9 +22,9 @@ impl<'a> Table<'a> {
     /// - `number_of_glyphs` is from the `maxp` table.
     /// - `format` is from the `head` table.
     pub fn parse(
-        data: &'a [u8],
         number_of_glyphs: NonZeroU16,
         format: IndexToLocationFormat,
+        data: &'a [u8],
     ) -> Option<Self> {
         // The number of ranges is `maxp.numGlyphs + 1`.
         //

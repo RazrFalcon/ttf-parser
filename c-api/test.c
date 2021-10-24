@@ -57,9 +57,6 @@ int main() {
     ttfp_face *face = (ttfp_face*)alloca(ttfp_face_size_of());
     assert(ttfp_face_init(font_data, fsize, 0, face));
 
-    assert(ttfp_has_table(face, TTFP_TABLE_NAME_HEADER));
-    assert(!ttfp_has_table(face, TTFP_TABLE_NAME_VERTICAL_ORIGIN));
-
     uint16_t a_gid = ttfp_get_glyph_index(face, 0x0041); // A
     assert(a_gid == 2);
     assert(ttfp_get_glyph_index(face, 0xFFFFFFFF) == 0);

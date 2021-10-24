@@ -13,14 +13,14 @@ fn simple_case() {
         0x00, 0x02, // side bearing [0]: 2
     ];
 
-    let table = Table::parse(data, 1, nzu16!(1)).unwrap();
+    let table = Table::parse(1, nzu16!(1), data).unwrap();
     assert_eq!(table.advance(GlyphId(0)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
 }
 
 #[test]
 fn empty() {
-    assert!(Table::parse(&[], 1, nzu16!(1)).is_none());
+    assert!(Table::parse(1, nzu16!(1), &[]).is_none());
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn zero_metrics() {
         0x00, 0x02, // side bearing [0]: 2
     ];
 
-    assert!(Table::parse(data, 0, nzu16!(1)).is_none());
+    assert!(Table::parse(0, nzu16!(1), data).is_none());
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn smaller_than_glyphs_count() {
         0x00, 0x03, // side bearing [1]: 3
     ];
 
-    let table = Table::parse(data, 1, nzu16!(2)).unwrap();
+    let table = Table::parse(1, nzu16!(2), data).unwrap();
     assert_eq!(table.advance(GlyphId(0)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
     assert_eq!(table.advance(GlyphId(1)), Some(1));
@@ -61,7 +61,7 @@ fn less_metrics_than_glyphs() {
         0x00, 0x05, // side bearing [2]: 5
     ];
 
-    let table = Table::parse(data, 2, nzu16!(1)).unwrap();
+    let table = Table::parse(2, nzu16!(1), data).unwrap();
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
     assert_eq!(table.side_bearing(GlyphId(1)), Some(4));
     assert_eq!(table.side_bearing(GlyphId(2)), None);
@@ -74,7 +74,7 @@ fn glyph_out_of_bounds_0() {
         0x00, 0x02, // side bearing [0]: 2
     ];
 
-    let table = Table::parse(data, 1, nzu16!(1)).unwrap();
+    let table = Table::parse(1, nzu16!(1), data).unwrap();
     assert_eq!(table.advance(GlyphId(0)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
     assert_eq!(table.advance(GlyphId(1)), None);
@@ -90,7 +90,7 @@ fn glyph_out_of_bounds_1() {
         0x00, 0x03, // side bearing [1]: 3
     ];
 
-    let table = Table::parse(data, 1, nzu16!(2)).unwrap();
+    let table = Table::parse(1, nzu16!(2), data).unwrap();
     assert_eq!(table.advance(GlyphId(1)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(1)), Some(3));
     assert_eq!(table.advance(GlyphId(2)), None);

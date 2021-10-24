@@ -47,11 +47,11 @@ fn main() {
     println!("Variable: {:?}", face.is_variable());
 
     #[cfg(feature = "opentype-layout")] {
-        if let Some(ref table) = face.opentype_positioning() {
+        if let Some(ref table) = face.tables().gpos {
             print_opentype_layout("positioning", table);
         }
 
-        if let Some(ref table) = face.opentype_substitution() {
+        if let Some(ref table) = face.tables().gsub {
             print_opentype_layout("substitution", table);
         }
     }

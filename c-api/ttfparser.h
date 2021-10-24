@@ -16,41 +16,6 @@
 #define TTFP_VERSION "0.12.3"
 
 /**
- * @brief A table name.
- */
-typedef enum {
-    TTFP_TABLE_NAME_AXIS_VARIATIONS = 0,
-    TTFP_TABLE_NAME_CHARACTER_TO_GLYPH_INDEX_MAPPING,
-    TTFP_TABLE_NAME_COLOR_BITMAP_DATA,
-    TTFP_TABLE_NAME_COLOR_BITMAP_LOCATION,
-    TTFP_TABLE_NAME_COMPACT_FONT_FORMAT,
-    TTFP_TABLE_NAME_COMPACT_FONT_FORMAT2,
-    TTFP_TABLE_NAME_FONT_VARIATIONS,
-    TTFP_TABLE_NAME_GLYPH_DATA,
-    TTFP_TABLE_NAME_GLYPH_DEFINITION,
-    TTFP_TABLE_NAME_GLYPH_POSITIONING_TABLE,
-    TTFP_TABLE_NAME_GLYPH_SUBSTITUTION_TABLE,
-    TTFP_TABLE_NAME_GLYPH_VARIATIONS,
-    TTFP_TABLE_NAME_HEADER,
-    TTFP_TABLE_NAME_HORIZONTAL_HEADER,
-    TTFP_TABLE_NAME_HORIZONTAL_METRICS,
-    TTFP_TABLE_NAME_HORIZONTAL_METRICS_VARIATIONS,
-    TTFP_TABLE_NAME_INDEX_TO_LOCATION,
-    TTFP_TABLE_NAME_KERNING,
-    TTFP_TABLE_NAME_MAXIMUM_PROFILE,
-    TTFP_TABLE_NAME_METRICS_VARIATIONS,
-    TTFP_TABLE_NAME_NAMING,
-    TTFP_TABLE_NAME_POST_SCRIPT,
-    TTFP_TABLE_NAME_SCALABLE_VECTOR_GRAPHICS,
-    TTFP_TABLE_NAME_STANDARD_BITMAP_GRAPHICS,
-    TTFP_TABLE_NAME_VERTICAL_HEADER,
-    TTFP_TABLE_NAME_VERTICAL_METRICS,
-    TTFP_TABLE_NAME_VERTICAL_METRICS_VARIATIONS,
-    TTFP_TABLE_NAME_VERTICAL_ORIGIN,
-    TTFP_TABLE_NAME_WINDOWS_METRICS,
-} ttfp_table_name;
-
-/**
  * @brief A glyph image format.
  */
 typedef enum {
@@ -222,13 +187,6 @@ bool ttfp_face_init(const char *data, uintptr_t len, uint32_t index, void *face)
  * @brief Returns the size of `ttfp_face`.
  */
 uintptr_t ttfp_face_size_of(void);
-
-/**
- * @brief Checks that face has a specified table.
- *
- * @return `true` only for tables that were successfully parsed.
- */
-bool ttfp_has_table(const ttfp_face *face, ttfp_table_name name);
 
 /**
  * @brief Returns the number of name records in the face.

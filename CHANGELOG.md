@@ -7,23 +7,27 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 - Complete GSUB and GPOS tables support. Available under the `opentype-layout` feature.
-- `Face::opentype_definition`
-- `Face::opentype_positioning`
-- `Face::opentype_substitution`
+- Public access to all supported TrueType tables. This allows a low-level, but still safe,
+  access to internal data layout, which can be used for performance optimization, like caching.
 - `Style` enum and `Face::style` method.
 
 ### Changed
 - Improved ascender/descender/line_gap resolving logic.
 - `Face` methods: `has_glyph_classes`, `glyph_class`, `glyph_mark_attachment_class`,
-  `is_mark_glyph` and `glyph_variation_delta` are moved to `DefinitionTable` struct.
+  `is_mark_glyph` and `glyph_variation_delta` are moved to `gdef::Table`.
 - The `Names` struct is no longer an iterator, but a container.
+  You have to call `into_iter()` manually.
+- The `VariationAxes` struct is no longer an iterator, but a container.
   You have to call `into_iter()` manually.
 - Most of the `Name` struct methods become public fields.
 - `Face::units_per_em` no longer returns `Option`.
 
 ### Removed
 - (c-api) `ttfp_glyph_class`, `ttfp_get_glyph_class`, `ttfp_get_glyph_mark_attachment_class`,
-  `ttfp_is_mark_glyph` and `ttfp_glyph_variation_delta`.
+  `ttfp_is_mark_glyph`, `ttfp_glyph_variation_delta` and `ttfp_has_table`.
+- `TableName` enum and `Face::has_table`. Tables can be access directly now.
+- `Face::character_mapping_subtables`. Use `Face::tables().cmap` instead.
+- `Face::kerning_subtables`. Use `Face::tables().kern` instead.
 
 ### Fixed
 - `Iterator::count` implementation for `cmap::Subtables`, `name::Names` and `LazyArrayIter32`.

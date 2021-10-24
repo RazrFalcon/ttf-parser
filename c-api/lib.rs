@@ -162,14 +162,6 @@ pub extern "C" fn ttfp_face_size_of() -> usize {
     std::mem::size_of::<ttf_parser::Face>()
 }
 
-/// @brief Checks that face has a specified table.
-///
-/// @return `true` only for tables that were successfully parsed.
-#[no_mangle]
-pub extern "C" fn ttfp_has_table(face: *const ttfp_face, name: ttf_parser::TableName) -> bool {
-    face_from_ptr(face).has_table(name)
-}
-
 /// @brief Returns the number of name records in the face.
 #[no_mangle]
 pub extern "C" fn ttfp_get_name_records_count(face: *const ttfp_face) -> u16 {
@@ -807,7 +799,7 @@ pub extern "C" fn ttfp_get_glyph_svg_image(
 #[cfg(feature = "variable-fonts")]
 #[no_mangle]
 pub extern "C" fn ttfp_get_variation_axes_count(face: *const ttfp_face) -> u16 {
-    face_from_ptr(face).variation_axes().count() as u16
+    face_from_ptr(face).variation_axes().len()
 }
 
 /// @brief Returns a variation axis by index.
@@ -818,7 +810,7 @@ pub extern "C" fn ttfp_get_variation_axis(
     index: u16,
     axis: *mut ttf_parser::VariationAxis,
 ) -> bool {
-    match face_from_ptr(face).variation_axes().nth(index as usize) {
+    match face_from_ptr(face).variation_axes().get(index) {
         Some(a) => {
             unsafe { *axis = a };
             true
@@ -835,7 +827,7 @@ pub extern "C" fn ttfp_get_variation_axis_by_tag(
     tag: ttf_parser::Tag,
     axis: *mut ttf_parser::VariationAxis,
 ) -> bool {
-    match face_from_ptr(face).variation_axes().find(|axis| axis.tag == tag) {
+    match face_from_ptr(face).variation_axes().into_iter().find(|axis| axis.tag == tag) {
         Some(a) => {
             unsafe { *axis = a };
             true
@@ -881,13 +873,8 @@ pub extern "C" fn ttfp_has_non_default_variation_coordinates(face: *const ttfp_f
 mod tests {
     #[test]
     fn sizes() {
-        assert_eq!(std::mem::size_of::<ttf_parser::TableName>(),
-                   std::mem::size_of::<i32>());
-
         assert_eq!(std::mem::size_of::<ttf_parser::Rect>(), 8);
-
         assert_eq!(std::mem::size_of::<ttf_parser::LineMetrics>(), 4);
-
         assert_eq!(std::mem::size_of::<ttf_parser::ScriptMetrics>(), 8);
     }
 }

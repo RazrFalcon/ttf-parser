@@ -190,7 +190,7 @@ impl core::fmt::Debug for Subtables<'_> {
 
 impl<'a> Subtables<'a> {
     /// Returns a subtable at an index.
-    fn get(&self, index: u16) -> Option<Subtable<'a>> {
+    pub fn get(&self, index: u16) -> Option<Subtable<'a>> {
         let record = self.records.get(index)?;
         let data = self.data.get(record.offset.to_usize()..)?;
         let format = match Stream::read_at::<u16>(data, 0)? {

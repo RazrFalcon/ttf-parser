@@ -102,184 +102,6 @@ pub(crate) struct CIDMetadata<'a> {
     fd_select: FDSelect<'a>,
 }
 
-/// A [Compact Font Format Table](
-/// https://docs.microsoft.com/en-us/typography/opentype/spec/cff).
-#[derive(Clone, Copy)]
-pub struct Table<'a> {
-    // The whole CFF table.
-    // Used to resolve a local subroutine in a CID font.
-    table_data: &'a [u8],
-
-    #[allow(dead_code)] strings: Index<'a>,
-    global_subrs: Index<'a>,
-    charset: Charset<'a>,
-    char_strings: Index<'a>,
-    kind: FontKind<'a>,
-}
-
-impl<'a> Table<'a> {
-    /// Parses a table from raw data.
-    pub fn parse(data: &'a [u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-
-        // Parse Header.
-        let major: u8 = s.read()?;
-        s.skip::<u8>(); // minor
-        let header_size: u8 = s.read()?;
-        s.skip::<u8>(); // Absolute offset
-
-        if major != 1 {
-            return None;
-        }
-
-        // Jump to Name INDEX. It's not necessarily right after the header.
-        if header_size > 4 {
-            s.advance(usize::from(header_size) - 4);
-        }
-
-        // Skip Name INDEX.
-        skip_index::<u16>(&mut s)?;
-
-        let top_dict = parse_top_dict(&mut s)?;
-
-        // Must be set, otherwise there are nothing to parse.
-        if top_dict.char_strings_offset == 0 {
-            return None;
-        }
-
-        // String INDEX.
-        let strings = parse_index::<u16>(&mut s)?;
-
-        // Parse Global Subroutines INDEX.
-        let global_subrs = parse_index::<u16>(&mut s)?;
-
-        let char_strings = {
-            let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
-            parse_index::<u16>(&mut s)?
-        };
-
-        if char_strings.len() == 0 {
-            return None;
-        }
-
-        // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
-        let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
-
-        let charset = match top_dict.charset_offset {
-            Some(charset_id::ISO_ADOBE) => Charset::ISOAdobe,
-            Some(charset_id::EXPERT) => Charset::Expert,
-            Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
-            Some(offset) => parse_charset(number_of_glyphs, &mut Stream::new_at(data, offset)?)?,
-            None => Charset::ISOAdobe, // default
-        };
-
-        let kind = if top_dict.has_ros {
-            parse_cid_metadata(data, top_dict, number_of_glyphs)?
-        } else {
-            parse_sid_metadata(data, top_dict)?
-        };
-
-        Some(Self {
-            table_data: data,
-            strings,
-            global_subrs,
-            charset,
-            char_strings,
-            kind,
-        })
-    }
-
-    /// Outlines a glyph.
-    pub fn outline(
-        &self,
-        glyph_id: GlyphId,
-        builder: &mut dyn OutlineBuilder,
-    ) -> Result<Rect, CFFError> {
-        let data = self.char_strings.get(u32::from(glyph_id.0)).ok_or(CFFError::NoGlyph)?;
-        parse_char_string(data, self, glyph_id, builder)
-    }
-
-    /// Returns a glyph name.
-    #[cfg(feature = "glyph-names")]
-    pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
-        match self.kind {
-            FontKind::SID(_) => {
-                let sid = self.charset.gid_to_sid(glyph_id)?;
-                let sid = usize::from(sid.0);
-                match STANDARD_NAMES.get(sid) {
-                    Some(name) => Some(name),
-                    None => {
-                        let idx = u32::try_from(sid - STANDARD_NAMES.len()).ok()?;
-                        let name = self.strings.get(idx)?;
-                        core::str::from_utf8(name).ok()
-                    }
-                }
-            }
-            FontKind::CID(_) => None,
-        }
-    }
-}
-
-impl core::fmt::Debug for Table<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "Table {{ ... }}")
-    }
-}
-
-fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
-    let subroutines_offset = if let Some(range) = top_dict.private_dict_range.clone() {
-        parse_private_dict(data.get(range)?)
-    } else {
-        None
-    };
-
-    // Parse Global Subroutines INDEX.
-    let mut metadata = SIDMetadata::default();
-
-    match (top_dict.private_dict_range, subroutines_offset) {
-        (Some(private_dict_range), Some(subroutines_offset)) => {
-            // 'The local subroutines offset is relative to the beginning
-            // of the Private DICT data.'
-            if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
-                let data = data.get(start..data.len())?;
-                let mut s = Stream::new(data);
-                metadata.local_subrs = parse_index::<u16>(&mut s)?;
-            }
-        }
-        _ => {}
-    }
-
-    Some(FontKind::SID(metadata))
-}
-
-fn parse_cid_metadata(data: &[u8], top_dict: TopDict, number_of_glyphs: u16) -> Option<FontKind> {
-    let (charset_offset, fd_array_offset, fd_select_offset) =
-        match (top_dict.charset_offset, top_dict.fd_array_offset, top_dict.fd_select_offset) {
-            (Some(a), Some(b), Some(c)) => (a, b, c),
-            _ => return None, // charset, FDArray and FDSelect must be set.
-        };
-
-    if charset_offset <= charset_id::EXPERT_SUBSET {
-        // 'There are no predefined charsets for CID fonts.'
-        // Adobe Technical Note #5176, chapter 18 CID-keyed Fonts
-        return None;
-    }
-
-    let mut metadata = CIDMetadata::default();
-
-    metadata.fd_array = {
-        let mut s = Stream::new_at(data, fd_array_offset)?;
-        parse_index::<u16>(&mut s)?
-    };
-
-    metadata.fd_select = {
-        let mut s = Stream::new_at(data, fd_select_offset)?;
-        parse_fd_select(number_of_glyphs, &mut s)?
-    };
-
-    Some(FontKind::CID(metadata))
-}
-
 #[derive(Default)]
 struct TopDict {
     charset_offset: Option<usize>,
@@ -325,6 +147,75 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
     }
 
     Some(top_dict)
+}
+
+// TODO: move to integration
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn private_dict_size_overflow() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x0C, // index [1]: 14
+            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // length: i32::MAX
+            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // offset: i32::MAX
+            0x12 // operator: 18 (private)
+        ];
+
+        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
+        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
+    }
+
+    #[test]
+    fn private_dict_negative_char_strings_offset() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x03, // index [1]: 3
+            // Item 0
+            0x8A, // offset: -1
+            0x11, // operator: 17 (char_string)
+        ];
+
+        assert!(parse_top_dict(&mut Stream::new(data)).is_none());
+    }
+
+    #[test]
+    fn private_dict_no_char_strings_offset_operand() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x02, // index [1]: 2
+            // Item 0
+            // <-- No number here.
+            0x11, // operator: 17 (char_string)
+        ];
+
+        assert!(parse_top_dict(&mut Stream::new(data)).is_none());
+    }
+
+    #[test]
+    fn negative_private_dict_offset_and_size() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x04, // index [1]: 4
+            // Item 0
+            0x8A, // length: -1
+            0x8A, // offset: -1
+            0x12, // operator: 18 (private)
+        ];
+
+        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
+        assert!(top_dict.private_dict_range.is_none());
+    }
 }
 
 fn parse_private_dict(data: &[u8]) -> Option<usize> {
@@ -767,71 +658,181 @@ fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSe
     }
 }
 
-// TODO: move to integration
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
+    let subroutines_offset = if let Some(range) = top_dict.private_dict_range.clone() {
+        parse_private_dict(data.get(range)?)
+    } else {
+        None
+    };
 
-    #[test]
-    fn private_dict_size_overflow() {
-        let data = &[
-            0x00, 0x01, // count: 1
-            0x01, // offset size: 1
-            0x01, // index [0]: 1
-            0x0C, // index [1]: 14
-            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // length: i32::MAX
-            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // offset: i32::MAX
-            0x12 // operator: 18 (private)
-        ];
+    // Parse Global Subroutines INDEX.
+    let mut metadata = SIDMetadata::default();
 
-        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
-        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
+    match (top_dict.private_dict_range, subroutines_offset) {
+        (Some(private_dict_range), Some(subroutines_offset)) => {
+            // 'The local subroutines offset is relative to the beginning
+            // of the Private DICT data.'
+            if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
+                let data = data.get(start..data.len())?;
+                let mut s = Stream::new(data);
+                metadata.local_subrs = parse_index::<u16>(&mut s)?;
+            }
+        }
+        _ => {}
     }
 
-    #[test]
-    fn private_dict_negative_char_strings_offset() {
-        let data = &[
-            0x00, 0x01, // count: 1
-            0x01, // offset size: 1
-            0x01, // index [0]: 1
-            0x03, // index [1]: 3
-            // Item 0
-            0x8A, // offset: -1
-            0x11, // operator: 17 (char_string)
-        ];
+    Some(FontKind::SID(metadata))
+}
 
-        assert!(parse_top_dict(&mut Stream::new(data)).is_none());
+fn parse_cid_metadata(data: &[u8], top_dict: TopDict, number_of_glyphs: u16) -> Option<FontKind> {
+    let (charset_offset, fd_array_offset, fd_select_offset) =
+        match (top_dict.charset_offset, top_dict.fd_array_offset, top_dict.fd_select_offset) {
+            (Some(a), Some(b), Some(c)) => (a, b, c),
+            _ => return None, // charset, FDArray and FDSelect must be set.
+        };
+
+    if charset_offset <= charset_id::EXPERT_SUBSET {
+        // 'There are no predefined charsets for CID fonts.'
+        // Adobe Technical Note #5176, chapter 18 CID-keyed Fonts
+        return None;
     }
 
-    #[test]
-    fn private_dict_no_char_strings_offset_operand() {
-        let data = &[
-            0x00, 0x01, // count: 1
-            0x01, // offset size: 1
-            0x01, // index [0]: 1
-            0x02, // index [1]: 2
-            // Item 0
-            // <-- No number here.
-            0x11, // operator: 17 (char_string)
-        ];
+    let mut metadata = CIDMetadata::default();
 
-        assert!(parse_top_dict(&mut Stream::new(data)).is_none());
+    metadata.fd_array = {
+        let mut s = Stream::new_at(data, fd_array_offset)?;
+        parse_index::<u16>(&mut s)?
+    };
+
+    metadata.fd_select = {
+        let mut s = Stream::new_at(data, fd_select_offset)?;
+        parse_fd_select(number_of_glyphs, &mut s)?
+    };
+
+    Some(FontKind::CID(metadata))
+}
+
+
+/// A [Compact Font Format Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/cff).
+#[derive(Clone, Copy)]
+pub struct Table<'a> {
+    // The whole CFF table.
+    // Used to resolve a local subroutine in a CID font.
+    table_data: &'a [u8],
+
+    #[allow(dead_code)] strings: Index<'a>,
+    global_subrs: Index<'a>,
+    charset: Charset<'a>,
+    char_strings: Index<'a>,
+    kind: FontKind<'a>,
+}
+
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+
+        // Parse Header.
+        let major: u8 = s.read()?;
+        s.skip::<u8>(); // minor
+        let header_size: u8 = s.read()?;
+        s.skip::<u8>(); // Absolute offset
+
+        if major != 1 {
+            return None;
+        }
+
+        // Jump to Name INDEX. It's not necessarily right after the header.
+        if header_size > 4 {
+            s.advance(usize::from(header_size) - 4);
+        }
+
+        // Skip Name INDEX.
+        skip_index::<u16>(&mut s)?;
+
+        let top_dict = parse_top_dict(&mut s)?;
+
+        // Must be set, otherwise there are nothing to parse.
+        if top_dict.char_strings_offset == 0 {
+            return None;
+        }
+
+        // String INDEX.
+        let strings = parse_index::<u16>(&mut s)?;
+
+        // Parse Global Subroutines INDEX.
+        let global_subrs = parse_index::<u16>(&mut s)?;
+
+        let char_strings = {
+            let mut s = Stream::new_at(data, top_dict.char_strings_offset)?;
+            parse_index::<u16>(&mut s)?
+        };
+
+        if char_strings.len() == 0 {
+            return None;
+        }
+
+        // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
+        let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
+
+        let charset = match top_dict.charset_offset {
+            Some(charset_id::ISO_ADOBE) => Charset::ISOAdobe,
+            Some(charset_id::EXPERT) => Charset::Expert,
+            Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
+            Some(offset) => parse_charset(number_of_glyphs, &mut Stream::new_at(data, offset)?)?,
+            None => Charset::ISOAdobe, // default
+        };
+
+        let kind = if top_dict.has_ros {
+            parse_cid_metadata(data, top_dict, number_of_glyphs)?
+        } else {
+            parse_sid_metadata(data, top_dict)?
+        };
+
+        Some(Self {
+            table_data: data,
+            strings,
+            global_subrs,
+            charset,
+            char_strings,
+            kind,
+        })
     }
 
-    #[test]
-    fn negative_private_dict_offset_and_size() {
-        let data = &[
-            0x00, 0x01, // count: 1
-            0x01, // offset size: 1
-            0x01, // index [0]: 1
-            0x04, // index [1]: 4
-            // Item 0
-            0x8A, // length: -1
-            0x8A, // offset: -1
-            0x12, // operator: 18 (private)
-        ];
+    /// Outlines a glyph.
+    pub fn outline(
+        &self,
+        glyph_id: GlyphId,
+        builder: &mut dyn OutlineBuilder,
+    ) -> Result<Rect, CFFError> {
+        let data = self.char_strings.get(u32::from(glyph_id.0)).ok_or(CFFError::NoGlyph)?;
+        parse_char_string(data, self, glyph_id, builder)
+    }
 
-        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
-        assert!(top_dict.private_dict_range.is_none());
+    /// Returns a glyph name.
+    #[cfg(feature = "glyph-names")]
+    pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
+        match self.kind {
+            FontKind::SID(_) => {
+                let sid = self.charset.gid_to_sid(glyph_id)?;
+                let sid = usize::from(sid.0);
+                match STANDARD_NAMES.get(sid) {
+                    Some(name) => Some(name),
+                    None => {
+                        let idx = u32::try_from(sid - STANDARD_NAMES.len()).ok()?;
+                        let name = self.strings.get(idx)?;
+                        core::str::from_utf8(name).ok()
+                    }
+                }
+            }
+            FontKind::CID(_) => None,
+        }
+    }
+}
+
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
     }
 }

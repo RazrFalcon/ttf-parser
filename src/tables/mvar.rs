@@ -5,7 +5,6 @@ use crate::{Tag, NormalizedCoordinate};
 use crate::parser::{Stream, FromData, Offset, Offset16, LazyArray16};
 use crate::var_store::ItemVariationStore;
 
-
 #[derive(Clone, Copy)]
 struct ValueRecord {
     value_tag: Tag,

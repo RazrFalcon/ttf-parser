@@ -4,7 +4,6 @@
 use crate::Rect;
 use crate::parser::{Stream, Fixed};
 
-
 /// An index format used by the [Index to Location Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/loca).
 #[allow(missing_docs)]
@@ -13,6 +12,7 @@ pub enum IndexToLocationFormat {
     Short,
     Long,
 }
+
 
 /// A [Font Header Table](https://docs.microsoft.com/en-us/typography/opentype/spec/head).
 #[derive(Clone, Copy, Debug)]
@@ -26,16 +26,6 @@ pub struct Table {
     /// An index format used by the [Index to Location Table](
     /// https://docs.microsoft.com/en-us/typography/opentype/spec/loca).
     pub index_to_location_format: IndexToLocationFormat,
-}
-
-impl Default for Table {
-    fn default() -> Self {
-        Table {
-            units_per_em: 0,
-            global_bbox: Rect { x_min: 0, y_min: 0, x_max: 0, y_max: 0 },
-            index_to_location_format: IndexToLocationFormat::Short,
-        }
-    }
 }
 
 impl Table {

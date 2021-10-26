@@ -1,13 +1,10 @@
 //! A [Naming Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/name) implementation.
 
-#[cfg(feature = "std")]
-use std::vec::Vec;
-#[cfg(feature = "std")]
-use std::string::String;
+#[cfg(feature = "std")] use std::vec::Vec;
+#[cfg(feature = "std")] use std::string::String;
 
 use crate::parser::{LazyArray16, FromData, Offset, Offset16, Stream};
-
 
 /// A list of [name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids)'s.
 pub mod name_id {
@@ -277,6 +274,7 @@ impl<'a> Iterator for NamesIter<'a> {
         usize::from(self.names.len().checked_sub(self.index).unwrap_or(0))
     }
 }
+
 
 /// A [Naming Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/name).

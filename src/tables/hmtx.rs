@@ -6,7 +6,6 @@ use core::num::NonZeroU16;
 use crate::GlyphId;
 use crate::parser::{Stream, FromData, LazyArray16};
 
-
 /// Horizontal/Vertical Metrics.
 #[derive(Clone, Copy, Debug)]
 pub struct Metrics {

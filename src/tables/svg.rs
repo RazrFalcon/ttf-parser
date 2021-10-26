@@ -26,18 +26,13 @@ impl FromData for SvgDocumentRecord {
     }
 }
 
+
 /// A list of [SVG documents](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/svg#svg-document-list).
 #[derive(Clone, Copy)]
 pub struct SvgDocumentsList<'a> {
     data: &'a [u8],
     records: LazyArray16<'a, SvgDocumentRecord>,
-}
-
-impl core::fmt::Debug for SvgDocumentsList<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "SvgDocumentsList {{ ... }}")
-    }
 }
 
 impl<'a> SvgDocumentsList<'a> {
@@ -62,6 +57,12 @@ impl<'a> SvgDocumentsList<'a> {
     /// Returns the number of SVG documents in the list.
     pub fn len(&self) -> u16 {
         self.records.len()
+    }
+}
+
+impl core::fmt::Debug for SvgDocumentsList<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "SvgDocumentsList {{ ... }}")
     }
 }
 
@@ -105,6 +106,7 @@ impl<'a> Iterator for SvgDocumentsListIter<'a> {
         usize::from(self.list.len().checked_sub(self.index).unwrap_or(0))
     }
 }
+
 
 /// An [SVG Table](https://docs.microsoft.com/en-us/typography/opentype/spec/svg).
 #[derive(Clone, Copy, Debug)]

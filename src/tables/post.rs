@@ -5,7 +5,6 @@ use crate::LineMetrics;
 use crate::parser::{Stream, Fixed, LazyArray16};
 #[cfg(feature = "glyph-names")] use crate::GlyphId;
 
-
 const TABLE_SIZE: usize = 32;
 const ITALIC_ANGLE_OFFSET: usize = 4;
 const UNDERLINE_POSITION_OFFSET: usize = 8;

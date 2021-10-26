@@ -6,7 +6,6 @@ use core::convert::TryFrom;
 use crate::NormalizedCoordinate;
 use crate::parser::{Stream, FromData, LazyArray16};
 
-
 /// An axis value map.
 #[derive(Clone, Copy, Debug)]
 pub struct AxisValueMap {

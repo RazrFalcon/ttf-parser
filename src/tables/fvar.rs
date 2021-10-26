@@ -6,7 +6,6 @@ use core::num::NonZeroU16;
 use crate::{Tag, NormalizedCoordinate};
 use crate::parser::{Stream, FromData, Fixed, Offset16, Offset, LazyArray16, f32_bound};
 
-
 /// A [variation axis](https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord).
 #[repr(C)]
 #[allow(missing_docs)]

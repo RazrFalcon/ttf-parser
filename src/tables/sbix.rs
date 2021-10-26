@@ -7,128 +7,6 @@ use core::num::NonZeroU16;
 use crate::{GlyphId, RasterGlyphImage, RasterImageFormat, Tag};
 use crate::parser::{Stream, FromData, Offset, Offset32, LazyArray16, LazyArray32};
 
-/// A [Standard Bitmap Graphics Table](
-/// https://docs.microsoft.com/en-us/typography/opentype/spec/sbix).
-#[derive(Clone, Copy, Debug)]
-pub struct Table<'a> {
-    /// A list of [`Strike`]s.
-    pub strikes: Strikes<'a>,
-}
-
-impl<'a> Table<'a> {
-    /// Parses a table from raw data.
-    ///
-    /// - `number_of_glyphs` is from the `maxp` table.
-    pub fn parse(number_of_glyphs: NonZeroU16, data: &'a [u8]) -> Option<Self> {
-        let number_of_glyphs = number_of_glyphs.get().checked_add(1)?;
-
-        let mut s = Stream::new(data);
-
-        let version: u16 = s.read()?;
-        if version != 1 {
-            return None;
-        }
-
-        s.skip::<u16>(); // flags
-
-        let strikes_count: u32 = s.read()?;
-        if strikes_count == 0 {
-            return None;
-        }
-
-        let offsets = s.read_array32::<Offset32>(strikes_count)?;
-
-        Some(Table {
-            strikes: Strikes {
-                data,
-                offsets,
-                number_of_glyphs,
-            },
-        })
-    }
-
-    /// Selects the best matching [`Strike`] based on `pixels_per_em`.
-    pub fn best_strike(&self, pixels_per_em: u16) -> Option<Strike<'a>> {
-        let mut idx = 0;
-        let mut max_ppem = 0;
-        for (i, strike) in self.strikes.into_iter().enumerate() {
-            if (pixels_per_em <= strike.pixels_per_em && strike.pixels_per_em < max_ppem) ||
-                (pixels_per_em > max_ppem && strike.pixels_per_em > max_ppem)
-            {
-                idx = i as u32;
-                max_ppem = strike.pixels_per_em;
-            }
-        }
-
-        self.strikes.get(idx)
-    }
-}
-
-/// A list of [`Strike`]s.
-#[derive(Clone, Copy)]
-pub struct Strikes<'a> {
-    /// `sbix` table data.
-    data: &'a [u8],
-    // Offsets from the beginning of the `sbix` table.
-    offsets: LazyArray32<'a, Offset32>,
-    // The total number of glyphs in the face + 1. From the `maxp` table.
-    number_of_glyphs: u16,
-}
-
-impl<'a> Strikes<'a> {
-    /// Returns a strike at the index.
-    pub fn get(&self, index: u32) -> Option<Strike<'a>> {
-        let offset = self.offsets.get(index)?.to_usize();
-        let data = self.data.get(offset..)?;
-        Strike::parse(self.number_of_glyphs, data)
-    }
-
-    /// Returns the number of strikes.
-    #[inline]
-    pub fn len(&self) -> u32 {
-        self.offsets.len()
-    }
-}
-
-impl core::fmt::Debug for Strikes<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "Strikes {{ ... }}")
-    }
-}
-
-impl<'a> IntoIterator for Strikes<'a> {
-    type Item = Strike<'a>;
-    type IntoIter = StrikesIter<'a>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        StrikesIter {
-            strikes: self,
-            index: 0,
-        }
-    }
-}
-
-/// An iterator over [`Strikes`].
-#[allow(missing_debug_implementations)]
-pub struct StrikesIter<'a> {
-    strikes: Strikes<'a>,
-    index: u32,
-}
-
-impl<'a> Iterator for StrikesIter<'a> {
-    type Item = Strike<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.strikes.len() {
-            self.index += 1;
-            self.strikes.get(self.index - 1)
-        } else {
-            None
-        }
-    }
-}
-
 /// A strike of glyphs.
 #[derive(Clone, Copy)]
 pub struct Strike<'a> {
@@ -225,6 +103,130 @@ impl<'a> Strike<'a> {
 impl core::fmt::Debug for Strike<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "Strike {{ ... }}")
+    }
+}
+
+
+/// A list of [`Strike`]s.
+#[derive(Clone, Copy)]
+pub struct Strikes<'a> {
+    /// `sbix` table data.
+    data: &'a [u8],
+    // Offsets from the beginning of the `sbix` table.
+    offsets: LazyArray32<'a, Offset32>,
+    // The total number of glyphs in the face + 1. From the `maxp` table.
+    number_of_glyphs: u16,
+}
+
+impl<'a> Strikes<'a> {
+    /// Returns a strike at the index.
+    pub fn get(&self, index: u32) -> Option<Strike<'a>> {
+        let offset = self.offsets.get(index)?.to_usize();
+        let data = self.data.get(offset..)?;
+        Strike::parse(self.number_of_glyphs, data)
+    }
+
+    /// Returns the number of strikes.
+    #[inline]
+    pub fn len(&self) -> u32 {
+        self.offsets.len()
+    }
+}
+
+impl core::fmt::Debug for Strikes<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Strikes {{ ... }}")
+    }
+}
+
+impl<'a> IntoIterator for Strikes<'a> {
+    type Item = Strike<'a>;
+    type IntoIter = StrikesIter<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        StrikesIter {
+            strikes: self,
+            index: 0,
+        }
+    }
+}
+
+/// An iterator over [`Strikes`].
+#[allow(missing_debug_implementations)]
+pub struct StrikesIter<'a> {
+    strikes: Strikes<'a>,
+    index: u32,
+}
+
+impl<'a> Iterator for StrikesIter<'a> {
+    type Item = Strike<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.strikes.len() {
+            self.index += 1;
+            self.strikes.get(self.index - 1)
+        } else {
+            None
+        }
+    }
+}
+
+
+/// A [Standard Bitmap Graphics Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/sbix).
+#[derive(Clone, Copy, Debug)]
+pub struct Table<'a> {
+    /// A list of [`Strike`]s.
+    pub strikes: Strikes<'a>,
+}
+
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    ///
+    /// - `number_of_glyphs` is from the `maxp` table.
+    pub fn parse(number_of_glyphs: NonZeroU16, data: &'a [u8]) -> Option<Self> {
+        let number_of_glyphs = number_of_glyphs.get().checked_add(1)?;
+
+        let mut s = Stream::new(data);
+
+        let version: u16 = s.read()?;
+        if version != 1 {
+            return None;
+        }
+
+        s.skip::<u16>(); // flags
+
+        let strikes_count: u32 = s.read()?;
+        if strikes_count == 0 {
+            return None;
+        }
+
+        let offsets = s.read_array32::<Offset32>(strikes_count)?;
+
+        Some(Table {
+            strikes: Strikes {
+                data,
+                offsets,
+                number_of_glyphs,
+            },
+        })
+    }
+
+    /// Selects the best matching [`Strike`] based on `pixels_per_em`.
+    pub fn best_strike(&self, pixels_per_em: u16) -> Option<Strike<'a>> {
+        let mut idx = 0;
+        let mut max_ppem = 0;
+        for (i, strike) in self.strikes.into_iter().enumerate() {
+            if (pixels_per_em <= strike.pixels_per_em && strike.pixels_per_em < max_ppem) ||
+                (pixels_per_em > max_ppem && strike.pixels_per_em > max_ppem)
+            {
+                idx = i as u32;
+                max_ppem = strike.pixels_per_em;
+            }
+        }
+
+        self.strikes.get(idx)
     }
 }
 

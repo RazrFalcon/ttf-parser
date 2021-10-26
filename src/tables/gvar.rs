@@ -24,261 +24,6 @@ enum GlyphVariationDataOffsets<'a> {
     Long(LazyArray16<'a, Offset32>),
 }
 
-/// A [Glyph Variations Table](
-/// https://docs.microsoft.com/en-us/typography/opentype/spec/gvar).
-#[derive(Clone, Copy)]
-pub struct Table<'a> {
-    axis_count: NonZeroU16,
-    shared_tuple_records: LazyArray16<'a, F2DOT14>,
-    offsets: GlyphVariationDataOffsets<'a>,
-    glyphs_variation_data: &'a [u8],
-}
-
-impl<'a> Table<'a> {
-    /// Parses a table from raw data.
-    pub fn parse(data: &'a [u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        let version: u32 = s.read()?;
-        if version != 0x00010000 {
-            return None;
-        }
-
-        let axis_count: u16 = s.read()?;
-        let shared_tuple_count: u16 = s.read()?;
-        let shared_tuples_offset: Offset32 = s.read()?;
-        let glyph_count: u16 = s.read()?;
-        let flags: u16 = s.read()?;
-        let glyph_variation_data_array_offset: Offset32 = s.read()?;
-
-        // The axis count cannot be zero.
-        let axis_count = NonZeroU16::new(axis_count)?;
-
-        let shared_tuple_records = {
-            let mut sub_s = Stream::new_at(data, shared_tuples_offset.to_usize())?;
-            sub_s.read_array16::<F2DOT14>(shared_tuple_count.checked_mul(axis_count.get())?)?
-        };
-
-        let glyphs_variation_data = data.get(glyph_variation_data_array_offset.to_usize()..)?;
-        let offsets = {
-            let offsets_count = glyph_count.checked_add(1)?;
-            let is_long_format = flags & 1 == 1; // The first bit indicates a long format.
-            if is_long_format {
-                GlyphVariationDataOffsets::Long(s.read_array16::<Offset32>(offsets_count)?)
-            } else {
-                GlyphVariationDataOffsets::Short(s.read_array16::<Offset16>(offsets_count)?)
-            }
-        };
-
-        Some(Table {
-            axis_count,
-            shared_tuple_records,
-            offsets,
-            glyphs_variation_data,
-        })
-    }
-
-    #[inline]
-    fn parse_variation_data(
-        &self,
-        glyph_id: GlyphId,
-        coordinates: &[NormalizedCoordinate],
-        points_len: u16,
-        tuples: &mut VariationTuples<'a>,
-    ) -> Option<()> {
-        tuples.len = 0;
-
-        if coordinates.len() != usize::from(self.axis_count.get()) {
-            return None;
-        }
-
-        let next_glyph_id = glyph_id.0.checked_add(1)?;
-
-        let (start, end) = match self.offsets {
-            GlyphVariationDataOffsets::Short(ref array) => {
-                // 'If the short format (Offset16) is used for offsets,
-                // the value stored is the offset divided by 2.'
-                (array.get(glyph_id.0)?.to_usize() * 2, array.get(next_glyph_id)?.to_usize() * 2)
-            }
-            GlyphVariationDataOffsets::Long(ref array) => {
-                (array.get(glyph_id.0)?.to_usize(), array.get(next_glyph_id)?.to_usize())
-            }
-        };
-
-        // Ignore empty data.
-        if start == end {
-            return Some(());
-        }
-
-        let data = self.glyphs_variation_data.get(start..end)?;
-        parse_variation_data(coordinates, &self.shared_tuple_records, points_len, data, tuples)
-    }
-
-    /// Outlines a glyph.
-    pub fn outline(
-        &self,
-        glyf_table: glyf::Table,
-        coordinates: &[NormalizedCoordinate],
-        glyph_id: GlyphId,
-        builder: &mut dyn OutlineBuilder,
-    ) -> Option<Rect> {
-        let mut b = glyf::Builder::new(Transform::default(), BBox::new(), builder);
-        let glyph_data = glyf_table.get(glyph_id)?;
-        outline_var_impl(glyf_table, self, glyph_id, glyph_data, coordinates, 0, &mut b);
-        b.bbox.to_rect()
-    }
-}
-
-impl core::fmt::Debug for Table<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "Table {{ ... }}")
-    }
-}
-
-fn outline_var_impl<'a>(
-    glyf_table: glyf::Table,
-    gvar_table: &Table,
-    glyph_id: GlyphId,
-    data: &[u8],
-    coordinates: &[NormalizedCoordinate],
-    depth: u8,
-    builder: &mut glyf::Builder,
-) -> Option<()> {
-    if depth >= glyf::MAX_COMPONENTS {
-        return None;
-    }
-
-    let mut s = Stream::new(data);
-    let number_of_contours: i16 = s.read()?;
-
-    // Skip bbox.
-    //
-    // In case of a variable font, a bounding box defined in the `glyf` data
-    // refers to the default variation values. Which is not what we want.
-    // Instead, we have to manually calculate outline's bbox.
-    s.advance(8);
-
-    // TODO: This is the most expensive part. Find a way to allocate it only once.
-    // `VariationTuples` is a very large struct, so allocate it once.
-    let mut tuples = VariationTuples {
-        headers: [VariationTuple::default(); MAX_TUPLES_LEN as usize],
-        len: 0,
-    };
-
-    if number_of_contours > 0 {
-        // Simple glyph.
-
-        let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
-        let mut glyph_points = glyf::parse_simple_outline(s.tail()?, number_of_contours)?;
-        let all_glyph_points = glyph_points.clone();
-        let points_len = glyph_points.points_left;
-        gvar_table.parse_variation_data(glyph_id, coordinates, points_len, &mut tuples)?;
-
-        while let Some(point) = glyph_points.next() {
-            let (x, y) = tuples.apply(all_glyph_points.clone(), glyph_points.clone(), point)?;
-            builder.push_point(x, y, point.on_curve_point, point.last_point);
-        }
-
-        Some(())
-    } else if number_of_contours < 0 {
-        // Composite glyph.
-
-        // In case of a composite glyph, `gvar` data contains position adjustments
-        // for each component.
-        // Basically, an additional translation used during transformation.
-        // So we have to push zero points manually, instead of parsing the `glyf` data.
-        //
-        // Details:
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/gvar#point-numbers-and-processing-for-composite-glyphs
-
-        let mut components = glyf::CompositeGlyphIter::new(s.tail()?);
-        let components_count = components.clone().count() as u16;
-        gvar_table.parse_variation_data(glyph_id, coordinates, components_count, &mut tuples)?;
-
-        while let Some(component) = components.next() {
-            let (tx, ty) = tuples.apply_null()?;
-
-            let mut transform = builder.transform;
-
-            // Variation component offset should be applied only when
-            // the ARGS_ARE_XY_VALUES flag is set.
-            if component.flags.args_are_xy_values() {
-                transform = Transform::combine(transform, Transform::new_translate(tx, ty));
-            }
-
-            transform = Transform::combine(transform, component.transform);
-
-            let mut b = glyf::Builder::new(transform, builder.bbox, builder.builder);
-            let glyph_data = glyf_table.get(component.glyph_id)?;
-            outline_var_impl(
-                glyf_table, gvar_table, component.glyph_id,
-                glyph_data, coordinates, depth + 1, &mut b,
-            )?;
-
-            // Take updated bbox.
-            builder.bbox = b.bbox;
-        }
-
-        Some(())
-    } else {
-        // An empty glyph.
-        None
-    }
-}
-
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuple-variation-store-header
-fn parse_variation_data<'a>(
-    coordinates: &[NormalizedCoordinate],
-    shared_tuple_records: &LazyArray16<F2DOT14>,
-    points_len: u16,
-    data: &'a [u8],
-    tuples: &mut VariationTuples<'a>,
-) -> Option<()> {
-    const SHARED_POINT_NUMBERS_FLAG: u16 = 0x8000;
-    const COUNT_MASK: u16 = 0x0FFF;
-
-    let mut main_stream = Stream::new(data);
-    let tuple_variation_count: u16 = main_stream.read()?;
-    let data_offset: Offset16 = main_stream.read()?;
-
-    // 'The high 4 bits are flags, and the low 12 bits
-    // are the number of tuple variation tables for this glyph.'
-    let has_shared_point_numbers = tuple_variation_count & SHARED_POINT_NUMBERS_FLAG != 0;
-    let tuple_variation_count = tuple_variation_count & COUNT_MASK;
-
-    // 'The number of tuple variation tables can be any number between 1 and 4095.'
-    // No need to check for 4095, because this is 0x0FFF that we masked before.
-    if tuple_variation_count == 0 {
-        return None;
-    }
-
-    if tuple_variation_count >= MAX_TUPLES_LEN {
-        return None;
-    }
-
-    // A glyph variation data consists of three parts: header + variation tuples + serialized data.
-    // Each tuple has it's own chunk in the serialized data.
-    // Because of that, we are using two parsing streams: one for tuples and one for serialized data.
-    // So we can parse them in parallel and avoid needless allocations.
-    let mut serialized_stream = Stream::new_at(data, data_offset.to_usize())?;
-
-    // All tuples in the variation data can reference the same point numbers,
-    // which are defined at the start of the serialized data.
-    let mut shared_point_numbers = None;
-    if has_shared_point_numbers {
-        shared_point_numbers = PackedPointsIter::new(&mut serialized_stream)?;
-    }
-
-    parse_variation_tuples(
-        tuple_variation_count,
-        coordinates,
-        shared_tuple_records,
-        shared_point_numbers,
-        points_len.checked_add(PHANTOM_POINTS_LEN as u16)?,
-        main_stream,
-        serialized_stream,
-        tuples,
-    )
-}
 
 #[derive(Clone, Copy, Default, Debug)]
 struct PointAndDelta {
@@ -287,6 +32,7 @@ struct PointAndDelta {
     x_delta: f32,
     y_delta: f32,
 }
+
 
 // This structure will be used by the `VariationTuples` stack buffer,
 // so it has to be as small as possible.
@@ -298,6 +44,7 @@ struct VariationTuple<'a> {
     /// Used during delta resolving.
     prev_point: Option<PointAndDelta>,
 }
+
 
 /// The maximum number of variation tuples.
 ///
@@ -411,6 +158,7 @@ struct TupleVariationHeaderData {
     has_private_point_numbers: bool,
     serialized_data_len: u16,
 }
+
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuplevariationheader
 fn parse_variation_tuples<'a>(
@@ -1568,4 +1316,261 @@ fn infer_delta(
                 / f32::from(try_opt_or!(next_point.checked_sub(prev_point), 0.0));
         (1.0 - d) * prev_delta + d * next_delta
     }
+}
+
+
+/// A [Glyph Variations Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/gvar).
+#[derive(Clone, Copy)]
+pub struct Table<'a> {
+    axis_count: NonZeroU16,
+    shared_tuple_records: LazyArray16<'a, F2DOT14>,
+    offsets: GlyphVariationDataOffsets<'a>,
+    glyphs_variation_data: &'a [u8],
+}
+
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let version: u32 = s.read()?;
+        if version != 0x00010000 {
+            return None;
+        }
+
+        let axis_count: u16 = s.read()?;
+        let shared_tuple_count: u16 = s.read()?;
+        let shared_tuples_offset: Offset32 = s.read()?;
+        let glyph_count: u16 = s.read()?;
+        let flags: u16 = s.read()?;
+        let glyph_variation_data_array_offset: Offset32 = s.read()?;
+
+        // The axis count cannot be zero.
+        let axis_count = NonZeroU16::new(axis_count)?;
+
+        let shared_tuple_records = {
+            let mut sub_s = Stream::new_at(data, shared_tuples_offset.to_usize())?;
+            sub_s.read_array16::<F2DOT14>(shared_tuple_count.checked_mul(axis_count.get())?)?
+        };
+
+        let glyphs_variation_data = data.get(glyph_variation_data_array_offset.to_usize()..)?;
+        let offsets = {
+            let offsets_count = glyph_count.checked_add(1)?;
+            let is_long_format = flags & 1 == 1; // The first bit indicates a long format.
+            if is_long_format {
+                GlyphVariationDataOffsets::Long(s.read_array16::<Offset32>(offsets_count)?)
+            } else {
+                GlyphVariationDataOffsets::Short(s.read_array16::<Offset16>(offsets_count)?)
+            }
+        };
+
+        Some(Table {
+            axis_count,
+            shared_tuple_records,
+            offsets,
+            glyphs_variation_data,
+        })
+    }
+
+    #[inline]
+    fn parse_variation_data(
+        &self,
+        glyph_id: GlyphId,
+        coordinates: &[NormalizedCoordinate],
+        points_len: u16,
+        tuples: &mut VariationTuples<'a>,
+    ) -> Option<()> {
+        tuples.len = 0;
+
+        if coordinates.len() != usize::from(self.axis_count.get()) {
+            return None;
+        }
+
+        let next_glyph_id = glyph_id.0.checked_add(1)?;
+
+        let (start, end) = match self.offsets {
+            GlyphVariationDataOffsets::Short(ref array) => {
+                // 'If the short format (Offset16) is used for offsets,
+                // the value stored is the offset divided by 2.'
+                (array.get(glyph_id.0)?.to_usize() * 2, array.get(next_glyph_id)?.to_usize() * 2)
+            }
+            GlyphVariationDataOffsets::Long(ref array) => {
+                (array.get(glyph_id.0)?.to_usize(), array.get(next_glyph_id)?.to_usize())
+            }
+        };
+
+        // Ignore empty data.
+        if start == end {
+            return Some(());
+        }
+
+        let data = self.glyphs_variation_data.get(start..end)?;
+        parse_variation_data(coordinates, &self.shared_tuple_records, points_len, data, tuples)
+    }
+
+    /// Outlines a glyph.
+    pub fn outline(
+        &self,
+        glyf_table: glyf::Table,
+        coordinates: &[NormalizedCoordinate],
+        glyph_id: GlyphId,
+        builder: &mut dyn OutlineBuilder,
+    ) -> Option<Rect> {
+        let mut b = glyf::Builder::new(Transform::default(), BBox::new(), builder);
+        let glyph_data = glyf_table.get(glyph_id)?;
+        outline_var_impl(glyf_table, self, glyph_id, glyph_data, coordinates, 0, &mut b);
+        b.bbox.to_rect()
+    }
+}
+
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
+    }
+}
+
+fn outline_var_impl<'a>(
+    glyf_table: glyf::Table,
+    gvar_table: &Table,
+    glyph_id: GlyphId,
+    data: &[u8],
+    coordinates: &[NormalizedCoordinate],
+    depth: u8,
+    builder: &mut glyf::Builder,
+) -> Option<()> {
+    if depth >= glyf::MAX_COMPONENTS {
+        return None;
+    }
+
+    let mut s = Stream::new(data);
+    let number_of_contours: i16 = s.read()?;
+
+    // Skip bbox.
+    //
+    // In case of a variable font, a bounding box defined in the `glyf` data
+    // refers to the default variation values. Which is not what we want.
+    // Instead, we have to manually calculate outline's bbox.
+    s.advance(8);
+
+    // TODO: This is the most expensive part. Find a way to allocate it only once.
+    // `VariationTuples` is a very large struct, so allocate it once.
+    let mut tuples = VariationTuples {
+        headers: [VariationTuple::default(); MAX_TUPLES_LEN as usize],
+        len: 0,
+    };
+
+    if number_of_contours > 0 {
+        // Simple glyph.
+
+        let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
+        let mut glyph_points = glyf::parse_simple_outline(s.tail()?, number_of_contours)?;
+        let all_glyph_points = glyph_points.clone();
+        let points_len = glyph_points.points_left;
+        gvar_table.parse_variation_data(glyph_id, coordinates, points_len, &mut tuples)?;
+
+        while let Some(point) = glyph_points.next() {
+            let (x, y) = tuples.apply(all_glyph_points.clone(), glyph_points.clone(), point)?;
+            builder.push_point(x, y, point.on_curve_point, point.last_point);
+        }
+
+        Some(())
+    } else if number_of_contours < 0 {
+        // Composite glyph.
+
+        // In case of a composite glyph, `gvar` data contains position adjustments
+        // for each component.
+        // Basically, an additional translation used during transformation.
+        // So we have to push zero points manually, instead of parsing the `glyf` data.
+        //
+        // Details:
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/gvar#point-numbers-and-processing-for-composite-glyphs
+
+        let mut components = glyf::CompositeGlyphIter::new(s.tail()?);
+        let components_count = components.clone().count() as u16;
+        gvar_table.parse_variation_data(glyph_id, coordinates, components_count, &mut tuples)?;
+
+        while let Some(component) = components.next() {
+            let (tx, ty) = tuples.apply_null()?;
+
+            let mut transform = builder.transform;
+
+            // Variation component offset should be applied only when
+            // the ARGS_ARE_XY_VALUES flag is set.
+            if component.flags.args_are_xy_values() {
+                transform = Transform::combine(transform, Transform::new_translate(tx, ty));
+            }
+
+            transform = Transform::combine(transform, component.transform);
+
+            let mut b = glyf::Builder::new(transform, builder.bbox, builder.builder);
+            let glyph_data = glyf_table.get(component.glyph_id)?;
+            outline_var_impl(
+                glyf_table, gvar_table, component.glyph_id,
+                glyph_data, coordinates, depth + 1, &mut b,
+            )?;
+
+            // Take updated bbox.
+            builder.bbox = b.bbox;
+        }
+
+        Some(())
+    } else {
+        // An empty glyph.
+        None
+    }
+}
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuple-variation-store-header
+fn parse_variation_data<'a>(
+    coordinates: &[NormalizedCoordinate],
+    shared_tuple_records: &LazyArray16<F2DOT14>,
+    points_len: u16,
+    data: &'a [u8],
+    tuples: &mut VariationTuples<'a>,
+) -> Option<()> {
+    const SHARED_POINT_NUMBERS_FLAG: u16 = 0x8000;
+    const COUNT_MASK: u16 = 0x0FFF;
+
+    let mut main_stream = Stream::new(data);
+    let tuple_variation_count: u16 = main_stream.read()?;
+    let data_offset: Offset16 = main_stream.read()?;
+
+    // 'The high 4 bits are flags, and the low 12 bits
+    // are the number of tuple variation tables for this glyph.'
+    let has_shared_point_numbers = tuple_variation_count & SHARED_POINT_NUMBERS_FLAG != 0;
+    let tuple_variation_count = tuple_variation_count & COUNT_MASK;
+
+    // 'The number of tuple variation tables can be any number between 1 and 4095.'
+    // No need to check for 4095, because this is 0x0FFF that we masked before.
+    if tuple_variation_count == 0 {
+        return None;
+    }
+
+    if tuple_variation_count >= MAX_TUPLES_LEN {
+        return None;
+    }
+
+    // A glyph variation data consists of three parts: header + variation tuples + serialized data.
+    // Each tuple has it's own chunk in the serialized data.
+    // Because of that, we are using two parsing streams: one for tuples and one for serialized data.
+    // So we can parse them in parallel and avoid needless allocations.
+    let mut serialized_stream = Stream::new_at(data, data_offset.to_usize())?;
+
+    // All tuples in the variation data can reference the same point numbers,
+    // which are defined at the start of the serialized data.
+    let mut shared_point_numbers = None;
+    if has_shared_point_numbers {
+        shared_point_numbers = PackedPointsIter::new(&mut serialized_stream)?;
+    }
+
+    parse_variation_tuples(
+        tuple_variation_count,
+        coordinates,
+        shared_tuple_records,
+        shared_point_numbers,
+        points_len.checked_add(PHANTOM_POINTS_LEN as u16)?,
+        main_stream,
+        serialized_stream,
+        tuples,
+    )
 }

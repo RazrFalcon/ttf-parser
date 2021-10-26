@@ -4,7 +4,6 @@
 use crate::LineMetrics;
 use crate::parser::Stream;
 
-
 const WEIGHT_CLASS_OFFSET: usize = 4;
 const WIDTH_CLASS_OFFSET: usize = 6;
 const Y_SUBSCRIPT_X_SIZE_OFFSET: usize = 10;
@@ -19,7 +18,6 @@ const WIN_ASCENT: usize = 74;
 const WIN_DESCENT: usize = 76;
 const X_HEIGHT_OFFSET: usize = 86;
 const CAP_HEIGHT_OFFSET: usize = 88;
-
 
 /// A face [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
 #[allow(missing_docs)]

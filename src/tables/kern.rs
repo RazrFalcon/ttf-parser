@@ -17,7 +17,6 @@ But we still try to keep the API as high-level as possible.
 use crate::GlyphId;
 use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset16, Stream};
 
-
 #[derive(Clone, Copy, Debug)]
 struct OTCoverage(u8);
 
@@ -181,6 +180,7 @@ impl<'a> IntoIterator for Subtables<'a> {
     }
 }
 
+
 /// An iterator over kerning subtables.
 #[allow(missing_debug_implementations)]
 #[derive(Clone, Copy, Default)]
@@ -283,6 +283,7 @@ impl<'a> Iterator for SubtablesIter<'a> {
     }
 }
 
+
 /// A format 0 subtable.
 ///
 /// Ordered List of Kerning Pairs.
@@ -309,6 +310,7 @@ impl<'a> Subtable0<'a> {
         self.pairs.binary_search_by(|v| v.pair.cmp(&needle)).map(|(_, v)| v.value)
     }
 }
+
 
 /// A format 2 subtable.
 ///
@@ -367,6 +369,7 @@ fn get_format2_class(glyph_id: u16, offset: usize, data: &[u8]) -> Option<u16> {
     classes.get(index)
 }
 
+
 /// A format 3 subtable.
 ///
 /// Simple n x m Array of Kerning Indices.
@@ -410,6 +413,7 @@ impl<'a> Subtable3<'a> {
         kerning_values.get(u16::from(index))
     }
 }
+
 
 /// A [Kerning Table](https://docs.microsoft.com/en-us/typography/opentype/spec/kern).
 #[derive(Clone, Copy, Debug)]

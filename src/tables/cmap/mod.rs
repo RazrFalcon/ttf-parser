@@ -29,18 +29,6 @@ pub use format12::Subtable12;
 pub use format13::Subtable13;
 pub use format14::{Subtable14, GlyphVariationResult};
 
-
-/// A character encoding subtable.
-#[derive(Clone, Copy, Debug)]
-pub struct Subtable<'a> {
-    /// Subtable platform.
-    pub platform_id: PlatformId,
-    /// Subtable encoding.
-    pub encoding_id: u16,
-    /// A subtable format.
-    pub format: Format<'a>,
-}
-
 /// A character encoding subtable variant.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug)]
@@ -54,6 +42,18 @@ pub enum Format<'a> {
     SegmentedCoverage(Subtable12<'a>),
     ManyToOneRangeMappings(Subtable13<'a>),
     UnicodeVariationSequences(Subtable14<'a>),
+}
+
+
+/// A character encoding subtable.
+#[derive(Clone, Copy, Debug)]
+pub struct Subtable<'a> {
+    /// Subtable platform.
+    pub platform_id: PlatformId,
+    /// Subtable encoding.
+    pub encoding_id: u16,
+    /// A subtable format.
+    pub format: Format<'a>,
 }
 
 impl<'a> Subtable<'a> {

@@ -6,47 +6,6 @@ use core::num::NonZeroU16;
 use crate::parser::{Stream, F2DOT14, LazyArray16, NumFrom};
 use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox};
 
-/// A [Glyph Data Table](
-/// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf).
-#[derive(Clone, Copy)]
-pub struct Table<'a> {
-    pub(crate) data: &'a [u8],
-    loca_table: loca::Table<'a>,
-}
-
-impl core::fmt::Debug for Table<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "Table {{ ... }}")
-    }
-}
-
-impl<'a> Table<'a> {
-    /// Parses a table from raw data.
-    #[inline]
-    pub fn parse(loca_table: loca::Table<'a>, data: &'a [u8]) -> Option<Self> {
-        Some(Table { loca_table, data })
-    }
-
-    /// Outlines a glyph.
-    #[inline]
-    pub fn outline(
-        &self,
-        glyph_id: GlyphId,
-        builder: &mut dyn OutlineBuilder,
-    ) -> Option<Rect> {
-        let mut b = Builder::new(Transform::default(), BBox::new(), builder);
-        let glyph_data = self.get(glyph_id)?;
-        outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)
-    }
-
-    #[inline]
-    pub(crate) fn get(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
-        let range = self.loca_table.glyph_range(glyph_id)?;
-        self.data.get(range)
-    }
-}
-
-
 pub(crate) struct Builder<'a> {
     pub builder: &'a mut dyn OutlineBuilder,
     pub transform: Transform,
@@ -666,4 +625,45 @@ fn resolve_coords_len(
     }
 
     Some((x_coords_len, y_coords_len))
+}
+
+
+/// A [Glyph Data Table](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf).
+#[derive(Clone, Copy)]
+pub struct Table<'a> {
+    pub(crate) data: &'a [u8],
+    loca_table: loca::Table<'a>,
+}
+
+impl core::fmt::Debug for Table<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
+    }
+}
+
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    #[inline]
+    pub fn parse(loca_table: loca::Table<'a>, data: &'a [u8]) -> Option<Self> {
+        Some(Table { loca_table, data })
+    }
+
+    /// Outlines a glyph.
+    #[inline]
+    pub fn outline(
+        &self,
+        glyph_id: GlyphId,
+        builder: &mut dyn OutlineBuilder,
+    ) -> Option<Rect> {
+        let mut b = Builder::new(Transform::default(), BBox::new(), builder);
+        let glyph_data = self.get(glyph_id)?;
+        outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)
+    }
+
+    #[inline]
+    pub(crate) fn get(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
+        let range = self.loca_table.glyph_range(glyph_id)?;
+        self.data.get(range)
+    }
 }

@@ -4,7 +4,7 @@
 use crate::parser::Stream;
 
 /// A [Horizontal Header Table](https://docs.microsoft.com/en-us/typography/opentype/spec/hhea).
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Table {
     /// Face ascender.
     pub ascender: i16,

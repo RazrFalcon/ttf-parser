@@ -7,6 +7,53 @@ use crate::{GlyphId, NormalizedCoordinate};
 use crate::parser::{Stream, Offset, Offset32};
 use crate::var_store::ItemVariationStore;
 
+struct DeltaSetIndexMap<'a> {
+    data: &'a [u8],
+}
+
+impl<'a> DeltaSetIndexMap<'a> {
+    #[inline]
+    fn new(data: &'a [u8]) -> Self {
+        DeltaSetIndexMap { data }
+    }
+
+    #[inline]
+    fn map(&self, glyph_id: GlyphId) -> Option<(u16, u16)> {
+        let mut idx = glyph_id.0;
+
+        let mut s = Stream::new(self.data);
+        let entry_format: u16 = s.read()?;
+        let map_count: u16 = s.read()?;
+
+        if map_count == 0 {
+            return None;
+        }
+
+        // 'If a given glyph ID is greater than mapCount-1, then the last entry is used.'
+        if idx >= map_count {
+            idx = map_count - 1;
+        }
+
+        let entry_size = ((entry_format >> 4) & 3) + 1;
+        let inner_index_bit_count = u32::from((entry_format & 0xF) + 1);
+
+        s.advance(usize::from(entry_size) * usize::from(idx));
+
+        let mut n = 0u32;
+        for b in s.read_bytes(usize::from(entry_size))? {
+            n = (n << 8) + u32::from(*b);
+        }
+
+        let outer_index = n >> inner_index_bit_count;
+        let inner_index = n & ((1 << inner_index_bit_count) - 1);
+        Some((
+            u16::try_from(outer_index).ok()?,
+            u16::try_from(inner_index).ok()?
+        ))
+    }
+}
+
+
 /// A [Horizontal/Vertical Metrics Variations Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/hvar).
 #[derive(Clone, Copy)]
@@ -75,52 +122,5 @@ impl<'a> Table<'a> {
 impl core::fmt::Debug for Table<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "Table {{ ... }}")
-    }
-}
-
-
-struct DeltaSetIndexMap<'a> {
-    data: &'a [u8],
-}
-
-impl<'a> DeltaSetIndexMap<'a> {
-    #[inline]
-    fn new(data: &'a [u8]) -> Self {
-        DeltaSetIndexMap { data }
-    }
-
-    #[inline]
-    fn map(&self, glyph_id: GlyphId) -> Option<(u16, u16)> {
-        let mut idx = glyph_id.0;
-
-        let mut s = Stream::new(self.data);
-        let entry_format: u16 = s.read()?;
-        let map_count: u16 = s.read()?;
-
-        if map_count == 0 {
-            return None;
-        }
-
-        // 'If a given glyph ID is greater than mapCount-1, then the last entry is used.'
-        if idx >= map_count {
-            idx = map_count - 1;
-        }
-
-        let entry_size = ((entry_format >> 4) & 3) + 1;
-        let inner_index_bit_count = u32::from((entry_format & 0xF) + 1);
-
-        s.advance(usize::from(entry_size) * usize::from(idx));
-
-        let mut n = 0u32;
-        for b in s.read_bytes(usize::from(entry_size))? {
-            n = (n << 8) + u32::from(*b);
-        }
-
-        let outer_index = n >> inner_index_bit_count;
-        let inner_index = n & ((1 << inner_index_bit_count) - 1);
-        Some((
-            u16::try_from(outer_index).ok()?,
-            u16::try_from(inner_index).ok()?
-        ))
     }
 }

@@ -7,25 +7,32 @@
 
 A high-level, safe, zero-allocation TrueType font parser.
 
+Supports [TrueType](https://docs.microsoft.com/en-us/typography/truetype/),
+[OpenType](https://docs.microsoft.com/en-us/typography/opentype/spec/)
+and [AAT](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6AATIntro.html)
+fonts.
+
 Can be used as Rust and as C library.
 
 ### Features
 
-- A high-level API for most common features, hiding all parsing and data resolving logic.
-- A low-level API for for some complex TrueType tables, still hiding raw data layout.
-- A [C API](./c-api).
+- A high-level API for most common properties, hiding all parsing and data resolving logic.
+- A low-level, but safe API to access TrueType tables data.
+- Highly configurable. You can disable most of the features, reducing binary size.
+  You can also parse TrueType tables separately, without loading the whole font/face.
 - Zero heap allocations.
 - Zero unsafe.
 - Zero dependencies.
 - `no_std`/WASM compatible.
-- Fast. See the *Performance* section.
-- Stateless. No mutable parsing methods.
+- A basic [C API](./c-api).
+- Fast.
+- Stateless. All parsing methods are immutable.
 - Simple and maintainable code (no magic numbers).
 
 ### Safety
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library forbids the unsafe code.
+- The library forbids unsafe code.
 - No heap allocations, so crash due to OOM is not possible.
 - All recursive methods have a depth limit.
 - Technically, should use less than 64KiB of stack in the worst case scenario.
@@ -97,7 +104,7 @@ Legend:
 Notes:
 
 1. While `ttf-parser` doesn't support rendering by itself,
-   there are mutliple rendering libraries on top of it:
+   there are multiple rendering libraries on top of it:
    [rusttype](https://gitlab.redox-os.org/redox-os/rusttype),
    [ab-glyph](https://github.com/alexheretic/ab-glyph)
    and [fontdue](https://github.com/mooman219/fontdue).
@@ -107,7 +114,7 @@ Notes:
 
 TrueType fonts designed for fast querying, so most of the methods are very fast.
 The main exception is glyph outlining. Glyphs can be stored using two different methods:
-using [Glyph Data](https://docs.microsoft.com/en-us/typography/opentype/spec/glyf) format
+using [Glyph Data Format](https://docs.microsoft.com/en-us/typography/opentype/spec/glyf)
 and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet/font/pdfs/5176.CFF.pdf) (pdf).
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.

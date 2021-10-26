@@ -1,24 +1,31 @@
 /*!
 A high-level, safe, zero-allocation TrueType font parser.
 
+Supports [TrueType](https://docs.microsoft.com/en-us/typography/truetype/),
+[OpenType](https://docs.microsoft.com/en-us/typography/opentype/spec/)
+and [AAT](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6AATIntro.html)
+fonts.
+
 Font parsing starts with a [`Face`].
 
 ## Features
 
-- A high-level API for most common features, hiding all parsing and data resolving logic.
-- A low-level API for for some complex TrueType tables, still hiding raw data layout.
+- A high-level API for most common properties, hiding all parsing and data resolving logic.
+- A low-level, but safe API to access TrueType tables data.
+- Highly configurable. You can disable most of the features, reducing binary size.
+  You can also parse TrueType tables separately, without loading the whole font/face.
 - Zero heap allocations.
 - Zero unsafe.
 - Zero dependencies.
 - `no_std`/WASM compatible.
 - Fast.
-- Stateless. All parsing methods are immutable methods.
+- Stateless. All parsing methods are immutable.
 - Simple and maintainable code (no magic numbers).
 
 ## Safety
 
 - The library must not panic. Any panic considered as a critical bug and should be reported.
-- The library forbids the unsafe code.
+- The library forbids unsafe code.
 - No heap allocations, so crash due to OOM is not possible.
 - All recursive methods have a depth limit.
 - Technically, should use less than 64KiB of stack in worst case scenario.

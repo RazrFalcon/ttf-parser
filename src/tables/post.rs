@@ -302,7 +302,7 @@ impl<'a> Names<'a> {
             let mut s = Stream::new(self.data);
             let mut i = 0;
             while !s.at_end() && i < core::u16::MAX {
-                let len: u8 = s.read()?;
+                let len = s.read::<u8>()?;
 
                 if i == index {
                     if len == 0 {
@@ -358,7 +358,7 @@ impl<'a> Table<'a> {
             return None;
         }
 
-        let version: u32 = Stream::new(data).read()?;
+        let version = Stream::new(data).read::<u32>()?;
         if !(version == 0x00010000 || version == 0x00020000 ||
              version == 0x00025000 || version == 0x00030000 ||
              version == 0x00040000)
@@ -379,7 +379,7 @@ impl<'a> Table<'a> {
         // Only version 2.0 of the table has data at the end.
         if version == 0x00020000 {
             let mut s = Stream::new_at(data, TABLE_SIZE)?;
-            let count: u16 = s.read()?;
+            let count = s.read::<u16>()?;
             names.indexes = s.read_array16::<u16>(count)?;
             names.data = s.tail()?;
         }

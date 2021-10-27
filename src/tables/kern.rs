@@ -210,9 +210,9 @@ impl<'a> Iterator for SubtablesIter<'a> {
         if self.is_aat {
             const HEADER_SIZE: u8 = 8;
 
-            let table_len: u32 = self.stream.read()?;
-            let coverage: AATCoverage = self.stream.read()?;
-            let format_id: u8 = self.stream.read()?;
+            let table_len = self.stream.read::<u32>()?;
+            let coverage = self.stream.read::<AATCoverage>()?;
+            let format_id = self.stream.read::<u8>()?;
             self.stream.skip::<u16>(); // variation tuple index
 
             if format_id > 3 {
@@ -243,10 +243,10 @@ impl<'a> Iterator for SubtablesIter<'a> {
             const HEADER_SIZE: u8 = 6;
 
             self.stream.skip::<u16>(); // version
-            let table_len: u16 = self.stream.read()?;
+            let table_len = self.stream.read::<u16>()?;
             // In the OpenType variant, `format` comes first.
-            let format_id: u8 = self.stream.read()?;
-            let coverage: OTCoverage = self.stream.read()?;
+            let format_id = self.stream.read::<u8>()?;
+            let coverage = self.stream.read::<OTCoverage>()?;
 
             if format_id != 0 && format_id != 2 {
                 // Unknown format.
@@ -297,7 +297,7 @@ impl<'a> Subtable0<'a> {
     /// Parses a subtable from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let number_of_pairs: u16 = s.read()?;
+        let number_of_pairs = s.read::<u16>()?;
         s.advance(6); // search_range (u16) + entry_selector (u16) + range_shift (u16)
         let pairs = s.read_array16::<KerningPair>(number_of_pairs)?;
         Some(Self { pairs })
@@ -361,10 +361,10 @@ impl<'a> Subtable2<'a> {
 
 fn get_format2_class(glyph_id: u16, offset: usize, data: &[u8]) -> Option<u16> {
     let mut s = Stream::new_at(data, offset)?;
-    let first_glyph: u16 = s.read()?;
+    let first_glyph = s.read::<u16>()?;
     let index = glyph_id.checked_sub(first_glyph)?;
 
-    let number_of_classes: u16 = s.read()?;
+    let number_of_classes = s.read::<u16>()?;
     let classes = s.read_array16::<u16>(number_of_classes)?;
     classes.get(index)
 }
@@ -389,10 +389,10 @@ impl<'a> Subtable3<'a> {
     #[inline]
     pub fn glyphs_kerning(&self, left: GlyphId, right: GlyphId) -> Option<i16> {
         let mut s = Stream::new(self.data);
-        let glyph_count: u16 = s.read()?;
-        let kerning_values_count: u8 = s.read()?;
-        let left_hand_classes_count: u8 = s.read()?;
-        let right_hand_classes_count: u8 = s.read()?;
+        let glyph_count = s.read::<u16>()?;
+        let kerning_values_count = s.read::<u8>()?;
+        let left_hand_classes_count = s.read::<u8>()?;
+        let right_hand_classes_count = s.read::<u8>()?;
         s.skip::<u8>(); // reserved
         let indices_count = u16::from(left_hand_classes_count) * u16::from(right_hand_classes_count);
 
@@ -434,9 +434,9 @@ impl<'a> Table<'a> {
         // So the first two bytes in case of an OpenType format will be 0x0000
         // and 0x0001 in case of an Apple format.
         let mut s = Stream::new(data);
-        let version: u16 = s.read()?;
+        let version = s.read::<u16>()?;
         let subtables = if version == 0 {
-            let count: u16 = s.read()?;
+            let count = s.read::<u16>()?;
             Subtables {
                 is_aat: false,
                 count: u32::from(count),
@@ -445,7 +445,7 @@ impl<'a> Table<'a> {
         } else {
             s.skip::<u16>(); // Skip the second part of u32 version.
             // Note that AAT stores the number of tables as u32 and not as u16.
-            let count: u32 = s.read()?;
+            let count = s.read::<u32>()?;
             Subtables {
                 is_aat: true,
                 count,

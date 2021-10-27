@@ -25,12 +25,12 @@ impl<'a> Table<'a> {
         let mut s = Stream::new_at(self.data, location.offset)?;
         match location.format {
             BitmapFormat::Format17 => {
-                let height: u8 = s.read()?;
-                let width: u8 = s.read()?;
-                let bearing_x: i8 = s.read()?;
-                let bearing_y: i8 = s.read()?;
+                let height = s.read::<u8>()?;
+                let width = s.read::<u8>()?;
+                let bearing_x = s.read::<i8>()?;
+                let bearing_y = s.read::<i8>()?;
                 s.skip::<u8>(); // advance
-                let data_len: u32 = s.read()?;
+                let data_len = s.read::<u32>()?;
                 let data = s.read_bytes(usize::num_from(data_len))?;
                 Some(RasterGlyphImage {
                     x: i16::from(bearing_x),
@@ -44,15 +44,15 @@ impl<'a> Table<'a> {
                 })
             }
             BitmapFormat::Format18 => {
-                let height: u8 = s.read()?;
-                let width: u8 = s.read()?;
-                let hor_bearing_x: i8 = s.read()?;
-                let hor_bearing_y: i8 = s.read()?;
+                let height = s.read::<u8>()?;
+                let width = s.read::<u8>()?;
+                let hor_bearing_x = s.read::<i8>()?;
+                let hor_bearing_y = s.read::<i8>()?;
                 s.skip::<u8>(); // hor_advance
                 s.skip::<i8>(); // ver_bearing_x
                 s.skip::<i8>(); // ver_bearing_y
                 s.skip::<u8>(); // ver_advance
-                let data_len: u32 = s.read()?;
+                let data_len = s.read::<u32>()?;
                 let data = s.read_bytes(usize::num_from(data_len))?;
                 Some(RasterGlyphImage {
                     x: i16::from(hor_bearing_x),
@@ -66,7 +66,7 @@ impl<'a> Table<'a> {
                 })
             }
             BitmapFormat::Format19 => {
-                let data_len: u32 = s.read()?;
+                let data_len = s.read::<u32>()?;
                 let data = s.read_bytes(usize::num_from(data_len))?;
                 Some(RasterGlyphImage {
                     x: i16::from(location.metrics.x),

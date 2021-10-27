@@ -22,8 +22,8 @@ impl<'a> DeltaSetIndexMap<'a> {
         let mut idx = glyph_id.0;
 
         let mut s = Stream::new(self.data);
-        let entry_format: u16 = s.read()?;
-        let map_count: u16 = s.read()?;
+        let entry_format = s.read::<u16>()?;
+        let map_count = s.read::<u16>()?;
 
         if map_count == 0 {
             return None;
@@ -69,12 +69,12 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
-        let version: u32 = s.read()?;
+        let version = s.read::<u32>()?;
         if version != 0x00010000 {
             return None;
         }
 
-        let variation_store_offset: Offset32 = s.read()?;
+        let variation_store_offset = s.read::<Offset32>()?;
         let var_store_s = Stream::new_at(data, variation_store_offset.to_usize())?;
         let variation_store = ItemVariationStore::parse(var_store_s)?;
 

@@ -62,8 +62,8 @@ impl FromData for FeatureVariationRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(Self {
-            conditions: s.read()?,
-            substitutions: s.read()?,
+            conditions: s.read::<Offset32>()?,
+            substitutions: s.read::<Offset32>()?,
         })
     }
 }
@@ -103,7 +103,7 @@ enum Condition {
 impl Condition {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let format: u16 = s.read()?;
+        let format = s.read::<u16>()?;
         match format {
             1 => {
                 let axis_index = s.read::<u16>()?;
@@ -167,8 +167,8 @@ impl FromData for FeatureTableSubstitutionRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(Self {
-            feature_index: s.read()?,
-            feature: s.read()?,
+            feature_index: s.read::<FeatureIndex>()?,
+            feature: s.read::<Offset32>()?,
         })
     }
 }

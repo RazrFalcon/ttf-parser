@@ -25,12 +25,12 @@ impl FromData for VariationAxis {
 
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let tag: Tag = s.read()?;
-        let min_value: Fixed = s.read()?;
-        let def_value: Fixed = s.read()?;
-        let max_value: Fixed = s.read()?;
-        let flags: u16 = s.read()?;
-        let name_id: u16 = s.read()?;
+        let tag = s.read::<Tag>()?;
+        let min_value = s.read::<Fixed>()?;
+        let def_value = s.read::<Fixed>()?;
+        let max_value = s.read::<Fixed>()?;
+        let flags = s.read::<u16>()?;
+        let name_id = s.read::<u16>()?;
 
         Some(VariationAxis {
             tag,
@@ -75,14 +75,14 @@ impl<'a> Table<'a> {
     /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let version: u32 = s.read()?;
+        let version = s.read::<u32>()?;
         if version != 0x00010000 {
             return None;
         }
 
-        let axes_array_offset: Offset16 = s.read()?;
+        let axes_array_offset = s.read::<Offset16>()?;
         s.skip::<u16>(); // reserved
-        let axis_count: u16 = s.read()?;
+        let axis_count = s.read::<u16>()?;
 
         // 'If axisCount is zero, then the font is not functional as a variable font,
         // and must be treated as a non-variable font;

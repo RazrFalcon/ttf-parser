@@ -17,7 +17,7 @@ impl IndexSize for u32 {
 
 #[inline]
 pub fn parse_index<'a, T: IndexSize>(s: &mut Stream<'a>) -> Option<Index<'a>> {
-    let count: T = s.read()?;
+    let count = s.read::<T>()?;
     parse_index_impl(count.to_u32(), s)
 }
 
@@ -27,7 +27,7 @@ fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<Index<'a>> {
         return Some(Index::default());
     }
 
-    let offset_size: OffsetSize = s.read()?;
+    let offset_size = s.read::<OffsetSize>()?;
     let offsets_len = (count + 1).checked_mul(offset_size.to_u32())?;
     let offsets = VarOffsets {
         data: &s.read_bytes(usize::num_from(offsets_len))?,
@@ -48,7 +48,7 @@ fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<Index<'a>> {
 
 #[inline]
 pub fn skip_index<T: IndexSize>(s: &mut Stream) -> Option<()> {
-    let count: T = s.read()?;
+    let count = s.read::<T>()?;
     skip_index_impl(count.to_u32(), s)
 }
 
@@ -58,7 +58,7 @@ fn skip_index_impl(count: u32, s: &mut Stream) -> Option<()> {
         return Some(());
     }
 
-    let offset_size: OffsetSize = s.read()?;
+    let offset_size = s.read::<OffsetSize>()?;
     let offsets_len = (count + 1).checked_mul(offset_size.to_u32())?;
     let offsets = VarOffsets {
         data: &s.read_bytes(usize::num_from(offsets_len))?,

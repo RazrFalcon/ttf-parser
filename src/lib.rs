@@ -663,10 +663,10 @@ impl<'a> Face<'a> {
         let mut s = Stream::new(data);
 
         // Read **font** magic.
-        let magic: Magic = s.read().ok_or(FaceParsingError::UnknownMagic)?;
+        let magic = s.read::<Magic>().ok_or(FaceParsingError::UnknownMagic)?;
         if magic == Magic::FontCollection {
             s.skip::<u32>(); // version
-            let number_of_faces: u32 = s.read().ok_or(FaceParsingError::MalformedFont)?;
+            let number_of_faces = s.read::<u32>().ok_or(FaceParsingError::MalformedFont)?;
             let offsets = s.read_array32::<Offset32>(number_of_faces)
                 .ok_or(FaceParsingError::MalformedFont)?;
 
@@ -679,14 +679,14 @@ impl<'a> Face<'a> {
 
             // Read **face** magic.
             // Each face in a font collection also starts with a magic.
-            let magic: Magic = s.read().ok_or(FaceParsingError::UnknownMagic)?;
+            let magic = s.read::<Magic>().ok_or(FaceParsingError::UnknownMagic)?;
             // And face in a font collection can't be another collection.
             if magic == Magic::FontCollection {
                 return Err(FaceParsingError::UnknownMagic);
             }
         }
 
-        let num_tables: u16 = s.read().ok_or(FaceParsingError::MalformedFont)?;
+        let num_tables = s.read::<u16>().ok_or(FaceParsingError::MalformedFont)?;
         s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
         let table_records = s.read_array16::<TableRecord>(num_tables)
             .ok_or(FaceParsingError::MalformedFont)?;

@@ -571,8 +571,8 @@ impl FromData for EntryExitRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(Self {
-            entry_anchor_offset: s.read()?,
-            exit_anchor_offset: s.read()?,
+            entry_anchor_offset: s.read::<Option<Offset16>>()?,
+            exit_anchor_offset: s.read::<Option<Offset16>>()?,
         })
     }
 }
@@ -747,8 +747,8 @@ impl FromData for MarkRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(Self {
-            class: s.read()?,
-            mark_anchor: s.read()?,
+            class: s.read::<Class>()?,
+            mark_anchor: s.read::<Offset16>()?,
         })
     }
 }
@@ -807,7 +807,7 @@ pub struct Anchor<'a> {
 impl<'a> Anchor<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let format: u16 = s.read()?;
+        let format = s.read::<u16>()?;
         if !matches!(format, 1..=3) {
             return None;
         }

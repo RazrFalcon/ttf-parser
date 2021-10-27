@@ -20,8 +20,8 @@ impl<'a> Subtable6<'a> {
         s.skip::<u16>(); // format
         s.skip::<u16>(); // length
         s.skip::<u16>(); // language
-        let first_code_point: u16 = s.read()?;
-        let count: u16 = s.read()?;
+        let first_code_point = s.read::<u16>()?;
+        let count = s.read::<u16>()?;
         let glyphs = s.read_array16::<GlyphId>(count)?;
         Some(Self { first_code_point, glyphs })
     }

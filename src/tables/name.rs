@@ -291,14 +291,14 @@ impl<'a> Table<'a> {
         const LANG_TAG_RECORD_SIZE: u16 = 4;
 
         let mut s = Stream::new(data);
-        let version: u16 = s.read()?;
-        let count: u16 = s.read()?;
+        let version = s.read::<u16>()?;
+        let count = s.read::<u16>()?;
         let storage_offset = s.read::<Offset16>()?.to_usize();
 
         if version == 0 {
             // Do nothing.
         } else if version == 1 {
-            let lang_tag_count: u16 = s.read()?;
+            let lang_tag_count = s.read::<u16>()?;
             let lang_tag_len = lang_tag_count.checked_mul(LANG_TAG_RECORD_SIZE)?;
             s.advance(usize::from(lang_tag_len)); // langTagRecords
         } else {

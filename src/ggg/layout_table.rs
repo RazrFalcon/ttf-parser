@@ -173,8 +173,8 @@ impl FromData for TagRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(Self {
-            tag: s.read()?,
-            offset: s.read()?,
+            tag: s.read::<Tag>()?,
+            offset: s.read::<Offset16>()?,
         })
     }
 }

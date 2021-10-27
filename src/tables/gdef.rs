@@ -34,19 +34,19 @@ impl<'a> Table<'a> {
     /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let version: u32 = s.read()?;
+        let version = s.read::<u32>()?;
         if !(version == 0x00010000 || version == 0x00010002 || version == 0x00010003) {
             return None;
         }
 
-        let glyph_class_def_offset: Option<Offset16> = s.read()?;
+        let glyph_class_def_offset = s.read::<Option<Offset16>>()?;
         s.skip::<Offset16>(); // attachListOffset
         s.skip::<Offset16>(); // ligCaretListOffset
-        let mark_attach_class_def_offset: Option<Offset16> = s.read()?;
+        let mark_attach_class_def_offset = s.read::<Option<Offset16>>()?;
 
         let mut mark_glyph_sets_def_offset: Option<Offset16> = None;
         if version > 0x00010000 {
-            mark_glyph_sets_def_offset = s.read()?;
+            mark_glyph_sets_def_offset = s.read::<Option<Offset16>>()?;
         }
 
         #[allow(unused_mut)]
@@ -56,7 +56,7 @@ impl<'a> Table<'a> {
         #[cfg(feature = "variable-fonts")]
         {
             if version > 0x00010002 {
-                var_store_offset = s.read();
+                var_store_offset = s.read::<Option<Offset32>>()?;
             }
         }
 
@@ -78,7 +78,7 @@ impl<'a> Table<'a> {
         if let Some(offset) = mark_glyph_sets_def_offset {
             if let Some(subdata) = data.get(offset.to_usize()..) {
                 let mut s = Stream::new(subdata);
-                let format: u16 = s.read()?;
+                let format = s.read::<u16>()?;
                 if format == 1 {
                     if let Some(count) = s.read::<u16>() {
                         if let Some(array) = s.read_array16::<Offset32>(count) {

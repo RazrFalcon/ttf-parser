@@ -40,7 +40,7 @@ fn select_bitmap_size_table(
     pixels_per_em: u16,
     mut s: Stream,
 ) -> Option<BitmapSizeTable> {
-    let subtable_count: u32 = s.read()?;
+    let subtable_count = s.read::<u32>()?;
     let orig_s = s.clone();
 
     let mut idx = None;
@@ -48,8 +48,8 @@ fn select_bitmap_size_table(
     for i in 0..subtable_count {
         // Check that the current subtable contains a provided glyph id.
         s.advance(40); // Jump to `start_glyph_index`.
-        let start_glyph_id: GlyphId = s.read()?;
-        let end_glyph_id: GlyphId = s.read()?;
+        let start_glyph_id = s.read::<GlyphId>()?;
+        let end_glyph_id = s.read::<GlyphId>()?;
         let ppem = u16::from(s.read::<u8>()?);
 
         if !(start_glyph_id..=end_glyph_id).contains(&glyph_id) {
@@ -67,9 +67,9 @@ fn select_bitmap_size_table(
     let mut s = orig_s;
     s.advance(idx? * 48); // 48 is BitmapSize Table size
 
-    let subtable_array_offset: Offset32 = s.read()?;
+    let subtable_array_offset = s.read::<Offset32>()?;
     s.skip::<u32>(); // index_tables_size
-    let number_of_subtables: u32 = s.read()?;
+    let number_of_subtables = s.read::<u32>()?;
 
     Some(BitmapSizeTable {
         subtable_array_offset,
@@ -92,9 +92,9 @@ fn select_index_subtable(
 ) -> Option<IndexSubtableInfo> {
     let mut s = Stream::new_at(data, size_table.subtable_array_offset.to_usize())?;
     for _ in 0..size_table.number_of_subtables {
-        let start_glyph_id: GlyphId = s.read()?;
-        let end_glyph_id: GlyphId = s.read()?;
-        let offset: Offset32 = s.read()?;
+        let start_glyph_id = s.read::<GlyphId>()?;
+        let end_glyph_id = s.read::<GlyphId>()?;
+        let offset = s.read::<Offset32>()?;
 
         if (start_glyph_id..=end_glyph_id).contains(&glyph_id) {
             let offset = size_table.subtable_array_offset.to_usize() + offset.to_usize();
@@ -161,8 +161,8 @@ impl<'a> Table<'a> {
         let info = select_index_subtable(self.data, size_table, glyph_id)?;
 
         let mut s = Stream::new_at(self.data, info.offset)?;
-        let index_format: u16 = s.read()?;
-        let image_format: u16 = s.read()?;
+        let index_format = s.read::<u16>()?;
+        let image_format = s.read::<u16>()?;
         let mut image_offset = s.read::<Offset32>()?.to_usize();
 
         let image_format = match image_format {
@@ -179,29 +179,29 @@ impl<'a> Table<'a> {
         match index_format {
             1 => {
                 s.advance(usize::from(glyph_diff) * Offset32::SIZE);
-                let offset: Offset32 = s.read()?;
+                let offset = s.read::<Offset32>()?;
                 image_offset += offset.to_usize();
             }
             2 => {
-                let image_size: u32 = s.read()?;
+                let image_size = s.read::<u32>()?;
                 image_offset += usize::from(glyph_diff).checked_mul(usize::num_from(image_size))?;
             }
             3 => {
                 s.advance(usize::from(glyph_diff) * Offset16::SIZE);
-                let offset: Offset16 = s.read()?;
+                let offset = s.read::<Offset16>()?;
                 image_offset += offset.to_usize();
             }
             4 => {
-                let num_glyphs: u32 = s.read()?;
+                let num_glyphs = s.read::<u32>()?;
                 let num_glyphs = num_glyphs.checked_add(1)?;
                 let pairs = s.read_array32::<GlyphIdOffsetPair>(num_glyphs)?;
                 let pair = pairs.into_iter().find(|pair| pair.glyph_id == glyph_id)?;
                 image_offset += pair.offset.to_usize();
             }
             5 => {
-                let image_size: u32 = s.read()?;
+                let image_size = s.read::<u32>()?;
                 s.advance(8); // big metrics
-                let num_glyphs: u32 = s.read()?;
+                let num_glyphs = s.read::<u32>()?;
                 let glyphs = s.read_array32::<GlyphId>(num_glyphs)?;
                 let (index, _) = glyphs.binary_search(&glyph_id)?;
                 image_offset = image_offset

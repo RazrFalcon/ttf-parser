@@ -228,7 +228,7 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let flags = CompositeGlyphFlags(self.stream.read::<u16>()?);
-        let glyph_id: GlyphId = self.stream.read()?;
+        let glyph_id = self.stream.read::<GlyphId>()?;
 
         let mut ts = Transform::default();
 
@@ -506,7 +506,7 @@ fn outline_impl(
     }
 
     let mut s = Stream::new(data);
-    let number_of_contours: i16 = s.read()?;
+    let number_of_contours = s.read::<i16>()?;
     s.advance(8); // Skip bbox. We use calculated one.
 
     if number_of_contours > 0 {
@@ -559,7 +559,7 @@ pub(crate) fn parse_simple_outline(
     }
 
     // Skip instructions byte code.
-    let instructions_len: u16 = s.read()?;
+    let instructions_len = s.read::<u16>()?;
     s.advance(usize::from(instructions_len));
 
     let flags_offset = s.offset();
@@ -593,7 +593,7 @@ fn resolve_coords_len(
 
         // The number of times a glyph point repeats.
         repeats = if flags.repeat_flag() {
-            let repeats: u8 = s.read()?;
+            let repeats = s.read::<u8>()?;
             u32::from(repeats) + 1
         } else {
             1

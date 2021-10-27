@@ -22,8 +22,8 @@ pub struct Strike<'a> {
 impl<'a> Strike<'a> {
     fn parse(number_of_glyphs: u16, data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let pixels_per_em: u16 = s.read()?;
-        let ppi: u16 = s.read()?;
+        let pixels_per_em = s.read::<u16>()?;
+        let ppi = s.read::<u16>()?;
         let offsets = s.read_array16(number_of_glyphs)?;
         Some(Strike {
             pixels_per_em,
@@ -54,9 +54,9 @@ impl<'a> Strike<'a> {
         let data_len = end.checked_sub(start)?.checked_sub(8)?; // 8 is a Glyph data header size.
 
         let mut s = Stream::new_at(self.data, start)?;
-        let x: i16 = s.read()?;
-        let y: i16 = s.read()?;
-        let image_type: Tag = s.read()?;
+        let x = s.read::<i16>()?;
+        let y = s.read::<i16>()?;
+        let image_type = s.read::<Tag>()?;
         let image_data = s.read_bytes(data_len)?;
 
         // We do ignore `pdf` and `mask` intentionally, because Apple docs state that:
@@ -190,14 +190,14 @@ impl<'a> Table<'a> {
 
         let mut s = Stream::new(data);
 
-        let version: u16 = s.read()?;
+        let version = s.read::<u16>()?;
         if version != 1 {
             return None;
         }
 
         s.skip::<u16>(); // flags
 
-        let strikes_count: u32 = s.read()?;
+        let strikes_count = s.read::<u32>()?;
         if strikes_count == 0 {
             return None;
         }
@@ -236,8 +236,8 @@ impl<'a> Table<'a> {
 fn png_size(data: &[u8]) -> Option<(u16, u16)> {
     // PNG stores its size as u32 BE at a fixed offset.
     let mut s = Stream::new_at(data, 16)?;
-    let width: u32 = s.read()?;
-    let height: u32 = s.read()?;
+    let width = s.read::<u32>()?;
+    let height = s.read::<u32>()?;
 
     // PNG size larger than u16::MAX is an error.
     Some((

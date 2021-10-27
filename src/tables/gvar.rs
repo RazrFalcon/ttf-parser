@@ -236,8 +236,8 @@ fn parse_tuple_variation_header(
     const PRIVATE_POINT_NUMBERS_FLAG: u16 = 0x2000;
     const TUPLE_INDEX_MASK: u16 = 0x0FFF;
 
-    let serialized_data_size: u16 = s.read()?;
-    let tuple_index: u16 = s.read()?;
+    let serialized_data_size = s.read::<u16>()?;
+    let tuple_index = s.read::<u16>()?;
 
     let has_embedded_peak_tuple = tuple_index & EMBEDDED_PEAK_TUPLE_FLAG != 0;
     let has_intermediate_region = tuple_index & INTERMEDIATE_REGION_FLAG != 0;
@@ -364,10 +364,10 @@ mod packed_points {
         pub fn new<'b>(s: &'b mut Stream<'a>) -> Option<Option<Self>> {
             // The total amount of points can be set as one or two bytes
             // depending on the first bit.
-            let b1: u8 = s.read()?;
+            let b1 = s.read::<u8>()?;
             let mut count = u16::from(b1);
             if b1 & Control::POINTS_ARE_WORDS_FLAG != 0 {
-                let b2: u8 = s.read()?;
+                let b2 = s.read::<u8>()?;
                 count = (u16::from(b1 & Control::POINT_RUN_COUNT_MASK) << 8) | u16::from(b2);
             }
 
@@ -384,7 +384,7 @@ mod packed_points {
             // Since deltas will be right after points.
             let mut i = 0;
             while i < count {
-                let control: Control = s.read()?;
+                let control = s.read::<Control>()?;
                 let run_count = u16::from(control.run_count());
                 let is_points_are_words = control.is_points_are_words();
                 // Do not actually parse the number, simply advance.
@@ -1333,17 +1333,17 @@ impl<'a> Table<'a> {
     /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let version: u32 = s.read()?;
+        let version = s.read::<u32>()?;
         if version != 0x00010000 {
             return None;
         }
 
-        let axis_count: u16 = s.read()?;
-        let shared_tuple_count: u16 = s.read()?;
-        let shared_tuples_offset: Offset32 = s.read()?;
-        let glyph_count: u16 = s.read()?;
-        let flags: u16 = s.read()?;
-        let glyph_variation_data_array_offset: Offset32 = s.read()?;
+        let axis_count = s.read::<u16>()?;
+        let shared_tuple_count = s.read::<u16>()?;
+        let shared_tuples_offset = s.read::<Offset32>()?;
+        let glyph_count = s.read::<u16>()?;
+        let flags = s.read::<u16>()?;
+        let glyph_variation_data_array_offset = s.read::<Offset32>()?;
 
         // The axis count cannot be zero.
         let axis_count = NonZeroU16::new(axis_count)?;
@@ -1443,7 +1443,7 @@ fn outline_var_impl<'a>(
     }
 
     let mut s = Stream::new(data);
-    let number_of_contours: i16 = s.read()?;
+    let number_of_contours = s.read::<i16>()?;
 
     // Skip bbox.
     //
@@ -1532,8 +1532,8 @@ fn parse_variation_data<'a>(
     const COUNT_MASK: u16 = 0x0FFF;
 
     let mut main_stream = Stream::new(data);
-    let tuple_variation_count: u16 = main_stream.read()?;
-    let data_offset: Offset16 = main_stream.read()?;
+    let tuple_variation_count = main_stream.read::<u16>()?;
+    let data_offset = main_stream.read::<Offset16>()?;
 
     // 'The high 4 bits are flags, and the low 12 bits
     // are the number of tuple variation tables for this glyph.'

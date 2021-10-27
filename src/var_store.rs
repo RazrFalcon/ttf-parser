@@ -33,13 +33,13 @@ impl<'a> ItemVariationStore<'a> {
         let data = s.tail()?;
 
         let mut regions_s = s.clone();
-        let format: u16 = s.read()?;
+        let format = s.read::<u16>()?;
         if format != 1 {
             return None;
         }
 
-        let region_list_offset: u32 = s.read()?;
-        let count: u16 = s.read()?;
+        let region_list_offset = s.read::<u32>()?;
+        let count = s.read::<u16>()?;
         let offsets = s.read_array16::<u32>(count)?;
 
         let regions = {
@@ -64,7 +64,7 @@ impl<'a> ItemVariationStore<'a> {
         let mut s = Stream::new_at(self.data, usize::num_from(offset))?;
         s.skip::<u16>(); // item_count
         s.skip::<u16>(); // short_delta_count
-        let count: u16 = s.read()?;
+        let count = s.read::<u16>()?;
         s.read_array16::<u16>(count)
     }
 
@@ -76,9 +76,9 @@ impl<'a> ItemVariationStore<'a> {
     ) -> Option<f32> {
         let offset = self.data_offsets.get(outer_index)?;
         let mut s = Stream::new_at(self.data, usize::num_from(offset))?;
-        let item_count: u16 = s.read()?;
-        let short_delta_count: u16 = s.read()?;
-        let region_index_count: u16 = s.read()?;
+        let item_count = s.read::<u16>()?;
+        let short_delta_count = s.read::<u16>()?;
+        let region_index_count = s.read::<u16>()?;
         let region_indices = s.read_array16::<u16>(region_index_count)?;
 
         if inner_index >= item_count {

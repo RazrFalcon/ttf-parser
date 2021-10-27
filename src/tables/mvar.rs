@@ -40,19 +40,19 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
-        let version: u32 = s.read()?;
+        let version = s.read::<u32>()?;
         if version != 0x00010000 {
             return None;
         }
 
         s.skip::<u16>(); // reserved
-        let value_record_size: u16 = s.read()?;
+        let value_record_size = s.read::<u16>()?;
 
         if usize::from(value_record_size) != ValueRecord::SIZE {
             return None;
         }
 
-        let count: u16 = s.read()?;
+        let count = s.read::<u16>()?;
         if count == 0 {
             return None;
         }

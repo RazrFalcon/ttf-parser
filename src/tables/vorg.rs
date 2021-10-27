@@ -44,13 +44,13 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
-        let version: u32 = s.read()?;
+        let version = s.read::<u32>()?;
         if version != 0x00010000 {
             return None;
         }
 
-        let default_y: i16 = s.read()?;
-        let count: u16 = s.read()?;
+        let default_y = s.read::<i16>()?;
+        let count = s.read::<u16>()?;
         let metrics = s.read_array16::<VerticalOriginMetrics>(count)?;
 
         Some(Table {

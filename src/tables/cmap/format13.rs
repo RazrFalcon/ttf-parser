@@ -21,7 +21,7 @@ impl<'a> Subtable13<'a> {
         s.skip::<u16>(); // reserved
         s.skip::<u32>(); // length
         s.skip::<u32>(); // language
-        let count: u32 = s.read()?;
+        let count = s.read::<u32>()?;
         let groups = s.read_array32::<super::format12::SequentialMapGroup>(count)?;
         Some(Self { groups })
     }

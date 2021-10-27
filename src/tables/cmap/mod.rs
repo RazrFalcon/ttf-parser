@@ -266,7 +266,7 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         s.skip::<u16>(); // version
-        let count: u16 = s.read()?;
+        let count = s.read::<u16>()?;
         let records = s.read_array16::<EncodingRecord>(count)?;
         Some(Table { subtables: Subtables { data, records }})
     }

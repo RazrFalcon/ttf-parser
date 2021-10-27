@@ -341,7 +341,7 @@ fn _parse_char_string(
 ) -> Result<(), CFFError> {
     let mut s = Stream::new(char_string);
     while !s.at_end() {
-        let op: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+        let op = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
         match op {
             0 | 2 | 9 | 13 | 15 | 16 | 17 => {
                 // Reserved.
@@ -432,7 +432,7 @@ fn _parse_char_string(
             }
             TWO_BYTE_OPERATOR_MARK => {
                 // flex
-                let op2: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+                let op2 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
                 match op2 {
                     operator::HFLEX => p.parse_hflex()?,
                     operator::FLEX => p.parse_flex()?,
@@ -619,7 +619,7 @@ impl FDSelect<'_> {
             FDSelect::Format0(ref array) => array.get(glyph_id.0),
             FDSelect::Format3(ref data) => {
                 let mut s = Stream::new(data);
-                let number_of_ranges: u16 = s.read()?;
+                let number_of_ranges = s.read::<u16>()?;
                 if number_of_ranges == 0 {
                     return None;
                 }
@@ -630,10 +630,10 @@ impl FDSelect<'_> {
                 let number_of_ranges = number_of_ranges.checked_add(1)?;
 
                 // Range is: GlyphId + u8
-                let mut prev_first_glyph: GlyphId = s.read()?;
-                let mut prev_index: u8 = s.read()?;
+                let mut prev_first_glyph = s.read::<GlyphId>()?;
+                let mut prev_index = s.read::<u8>()?;
                 for _ in 1..number_of_ranges {
-                    let curr_first_glyph: GlyphId = s.read()?;
+                    let curr_first_glyph = s.read::<GlyphId>()?;
                     if (prev_first_glyph..curr_first_glyph).contains(&glyph_id) {
                         return Some(prev_index);
                     } else {
@@ -650,7 +650,7 @@ impl FDSelect<'_> {
 }
 
 fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSelect<'a>> {
-    let format: u8 = s.read()?;
+    let format = s.read::<u8>()?;
     match format {
         0 => Some(FDSelect::Format0(s.read_array16::<u8>(number_of_glyphs)?)),
         3 => Some(FDSelect::Format3(s.tail()?)),
@@ -734,9 +734,9 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
 
         // Parse Header.
-        let major: u8 = s.read()?;
+        let major = s.read::<u8>()?;
         s.skip::<u8>(); // minor
-        let header_size: u8 = s.read()?;
+        let header_size = s.read::<u8>()?;
         s.skip::<u8>(); // Absolute offset
 
         if major != 1 {

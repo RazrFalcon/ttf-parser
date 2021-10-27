@@ -207,7 +207,7 @@ pub(crate) fn parse_charset<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Op
     }
 
     // -1 everywhere, since `.notdef` is omitted.
-    let format: u8 = s.read()?;
+    let format = s.read::<u8>()?;
     match format {
         0 => Some(Charset::Format0(s.read_array16::<StringId>(number_of_glyphs - 1)?)),
         1 => {
@@ -219,7 +219,7 @@ pub(crate) fn parse_charset<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Op
                 let mut total_left = number_of_glyphs - 1;
                 while total_left > 0 {
                     s.skip::<StringId>(); // first
-                    let left: u8 = s.read()?;
+                    let left = s.read::<u8>()?;
                     total_left = total_left.checked_sub(u16::from(left) + 1)?;
                     count += 1;
                 }
@@ -235,8 +235,7 @@ pub(crate) fn parse_charset<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Op
                 let mut total_left = number_of_glyphs - 1;
                 while total_left > 0 {
                     s.skip::<StringId>(); // first
-                    let left: u16 = s.read()?;
-                    let left = left.checked_add(1)?;
+                    let left = s.read::<u16>()?.checked_add(1)?;
                     total_left = total_left.checked_sub(left)?;
                     count += 1;
                 }

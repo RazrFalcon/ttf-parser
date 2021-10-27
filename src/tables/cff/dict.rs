@@ -45,7 +45,7 @@ impl<'a> DictionaryParser<'a> {
         let mut s = Stream::new_at(self.data, self.offset)?;
         self.operands_offset = self.offset;
         while !s.at_end() {
-            let b: u8 = s.read()?;
+            let b = s.read::<u8>()?;
             // 0..=21 bytes are operators.
             if is_dict_one_byte_op(b) {
                 let mut operator = u16::from(b);
@@ -81,7 +81,7 @@ impl<'a> DictionaryParser<'a> {
         let mut s = Stream::new_at(self.data, self.operands_offset)?;
         self.operands_len = 0;
         while !s.at_end() {
-            let b: u8 = s.read()?;
+            let b = s.read::<u8>()?;
             // 0..=21 bytes are operators.
             if is_dict_one_byte_op(b) {
                 break;
@@ -157,7 +157,7 @@ pub fn parse_number(b0: u8, s: &mut Stream) -> Option<i32> {
             // We do not parse float, because we don't use it.
             // And by skipping it we can remove the core::num::dec2flt dependency.
             while !s.at_end() {
-                let b1: u8 = s.read()?;
+                let b1 = s.read::<u8>()?;
                 let nibble1 = b1 >> 4;
                 let nibble2 = b1 & 15;
                 if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {
@@ -191,7 +191,7 @@ pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
         29 => s.skip::<u32>(),
         30 => {
             while !s.at_end() {
-                let b1: u8 = s.read()?;
+                let b1 = s.read::<u8>()?;
                 let nibble1 = b1 >> 4;
                 let nibble2 = b1 & 15;
                 if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {

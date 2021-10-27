@@ -25,11 +25,11 @@ impl Table {
 
         let mut s = Stream::new(data);
         s.skip::<u32>(); // version
-        let ascender: i16 = s.read()?;
-        let descender: i16 = s.read()?;
-        let line_gap: i16 = s.read()?;
+        let ascender = s.read::<i16>()?;
+        let descender = s.read::<i16>()?;
+        let line_gap = s.read::<i16>()?;
         s.advance(24);
-        let number_of_metrics: u16 = s.read()?;
+        let number_of_metrics = s.read::<u16>()?;
 
         Some(Table {
             ascender,

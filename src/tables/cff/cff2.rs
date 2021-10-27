@@ -282,7 +282,7 @@ fn _parse_char_string(
 ) -> Result<(), CFFError> {
     let mut s = Stream::new(char_string);
     while !s.at_end() {
-        let op: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+        let op = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
         match op {
             0 | 2 | 9 | 11 | 13 | 14 | 17 => {
                 // Reserved.
@@ -334,7 +334,7 @@ fn _parse_char_string(
             }
             TWO_BYTE_OPERATOR_MARK => {
                 // flex
-                let op2: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+                let op2 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
                 match op2 {
                     operator::HFLEX => p.parse_hflex()?,
                     operator::FLEX => p.parse_flex()?,
@@ -473,10 +473,10 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
 
         // Parse Header.
-        let major: u8 = s.read()?;
+        let major = s.read::<u8>()?;
         s.skip::<u8>(); // minor
-        let header_size: u8 = s.read()?;
-        let top_dict_length: u16 = s.read()?;
+        let header_size = s.read::<u8>()?;
+        let top_dict_length = s.read::<u16>()?;
 
         if major != 2 {
             return None;

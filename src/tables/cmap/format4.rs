@@ -21,7 +21,7 @@ impl<'a> Subtable4<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         s.advance(6); // format + length + language
-        let seg_count_x2: u16 = s.read()?;
+        let seg_count_x2 = s.read::<u16>()?;
         if seg_count_x2 < 2 {
             return None;
         }

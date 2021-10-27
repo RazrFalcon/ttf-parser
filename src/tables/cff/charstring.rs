@@ -575,7 +575,7 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_int2(&mut self, op: u8, s: &mut Stream) -> Result<(), CFFError> {
-        let b1: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+        let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
         let n = (i16::from(op) - 247) * 256 + i16::from(b1) + 108;
         debug_assert!((108..=1131).contains(&n));
         self.stack.push(f32::from(n))?;
@@ -584,7 +584,7 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_int3(&mut self, op: u8, s: &mut Stream) -> Result<(), CFFError> {
-        let b1: u8 = s.read().ok_or(CFFError::ReadOutOfBounds)?;
+        let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
         let n = -(i16::from(op) - 251) * 256 - i16::from(b1) - 108;
         debug_assert!((-1131..=-108).contains(&n));
         self.stack.push(f32::from(n))?;

@@ -19,8 +19,8 @@ impl<'a> Subtable10<'a> {
         s.skip::<u16>(); // reserved
         s.skip::<u32>(); // length
         s.skip::<u32>(); // language
-        let first_code_point: u32 = s.read()?;
-        let count: u32 = s.read()?;
+        let first_code_point = s.read::<u32>()?;
+        let count = s.read::<u32>()?;
         let glyphs = s.read_array32::<GlyphId>(count)?;
         Some(Self { first_code_point, glyphs })
     }

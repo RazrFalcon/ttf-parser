@@ -99,7 +99,7 @@ impl<'a> Subtable14<'a> {
         let mut s = Stream::new(data);
         s.skip::<u16>(); // format
         s.skip::<u32>(); // length
-        let count: u32 = s.read()?;
+        let count = s.read::<u32>()?;
         let records = s.read_array32::<VariationSelectorRecord>(count)?;
         Some(Self { records, data })
     }
@@ -113,7 +113,7 @@ impl<'a> Subtable14<'a> {
         if let Some(offset) = record.default_uvs_offset {
             let data = self.data.get(offset.to_usize()..)?;
             let mut s = Stream::new(data);
-            let count: u32 = s.read()?;
+            let count = s.read::<u32>()?;
             let ranges = s.read_array32::<UnicodeRangeRecord>(count)?;
             for range in ranges {
                 if range.contains(code_point) {
@@ -125,7 +125,7 @@ impl<'a> Subtable14<'a> {
         if let Some(offset) = record.non_default_uvs_offset {
             let data = self.data.get(offset.to_usize()..)?;
             let mut s = Stream::new(data);
-            let count: u32 = s.read()?;
+            let count = s.read::<u32>()?;
             let uvs_mappings = s.read_array32::<UVSMappingRecord>(count)?;
             let (_, mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&code_point))?;
             return Some(GlyphVariationResult::Found(mapping.glyph_id));

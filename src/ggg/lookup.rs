@@ -24,7 +24,7 @@ impl<'a> FromSlice<'a> for Lookup<'a> {
 
         let mut mark_filtering_set: Option<u16> = None;
         if flags.use_mark_filtering_set() {
-            mark_filtering_set = Some(s.read()?);
+            mark_filtering_set = Some(s.read::<u16>()?);
         }
 
         Some(Self {
@@ -139,7 +139,7 @@ pub(crate) fn parse_extension_lookup<'a, T: 'a>(
     parse: impl FnOnce(&'a [u8], u16) -> Option<T>,
 ) -> Option<T> {
     let mut s = Stream::new(data);
-    let format: u16 = s.read()?;
+    let format = s.read::<u16>()?;
     match format {
         1 => {
             let kind = s.read::<u16>()?;

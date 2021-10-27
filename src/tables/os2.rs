@@ -183,7 +183,7 @@ impl<'a> Table<'a> {
     /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let version: u16 = s.read()?;
+        let version = s.read::<u16>()?;
 
         let table_len = match version {
             0 => 78,

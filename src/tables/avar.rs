@@ -76,7 +76,7 @@ impl<'a> Iterator for SegmentMapsIter<'a> {
     type Item = LazyArray16<'a, AxisValueMap>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let count: u16 = self.stream.read()?;
+        let count = self.stream.read::<u16>()?;
         return self.stream.read_array16::<AxisValueMap>(count);
     }
 }
@@ -96,7 +96,7 @@ impl<'a> Table<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
-        let version: u32 = s.read()?;
+        let version = s.read::<u32>()?;
         if version != 0x00010000 {
             return None;
         }

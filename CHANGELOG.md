@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.13.1] - 2021-10-27
 ### Fixed
 - `Face::line_gap` logic.
 
@@ -281,7 +283,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.3...v0.13.0
 [0.12.3]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.1...v0.12.2

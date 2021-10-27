@@ -1049,10 +1049,15 @@ impl<'a> Face<'a> {
         }
 
         let mut value = self.tables.hhea.line_gap;
-        if value == 0 {
+        // For line gap, we have to check that ascender or descender are 0, not line gap itself.
+        if self.tables.hhea.ascender == 0 || self.tables.hhea.descender == 0 {
             if let Some(os_2) = self.tables.os2 {
-                value = os_2.typographic_line_gap();
-                value = self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
+                if os_2.typographic_ascender() != 0 || os_2.typographic_descender() != 0 {
+                    value = os_2.typographic_line_gap();
+                    value = self.apply_metrics_variation(Tag::from_bytes(b"hlgp"), value);
+                } else {
+                    value = 0;
+                }
             }
         }
 

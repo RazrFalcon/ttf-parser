@@ -25,6 +25,8 @@ opentype-layout = []
 # which means we have to store them in ttf-parser. And there are almost 500 of them.
 # By disabling this feature a user can reduce binary size a bit.
 glyph-names = []
+# Enables allocation for tables which would otherwise exceed a reasonable stack size.
+alloc = ["std"]
 
 [dev-dependencies]
 base64 = "0.12"

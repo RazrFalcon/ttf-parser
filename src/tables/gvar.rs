@@ -46,27 +46,128 @@ struct VariationTuple<'a> {
 }
 
 
-/// The maximum number of variation tuples.
+/// The maximum number of variation tuples stored on the stack.
 ///
 /// The TrueType spec allows up to 4095 tuples, which is way larger
 /// than we do. But in reality, an average font will have less than 10 tuples.
-const MAX_TUPLES_LEN: u16 = 32;
+/// We can avoid heap allocations if the number of tuples is less than this number.
+const MAX_STACK_TUPLES_LEN: u16 = 32;
 
-/// A list of variation tuples.
+/// A list of variation tuples, possibly stored on the heap.
 ///
 /// This is the only part of the `gvar` algorithm that actually allocates a data.
-/// On stack and not on heap, but still.
 /// This is probably unavoidable due to `gvar` structure,
 /// since we have to iterate all tuples in parallel.
-struct VariationTuples<'a> {
-    headers: [VariationTuple<'a>; MAX_TUPLES_LEN as usize], // 2560B
-    len: u16,
+enum VariationTuples<'a> {
+    Stack {
+        headers: [VariationTuple<'a>; MAX_STACK_TUPLES_LEN as usize],
+        len: u16
+    },
+    #[cfg(feature = "gvar-alloc")]
+    Heap {
+        vec: std::vec::Vec<VariationTuple<'a>>
+    }
+}
+
+impl<'a> Default for VariationTuples<'a> {
+    fn default() -> Self {
+        Self::Stack { headers: [VariationTuple::default(); MAX_STACK_TUPLES_LEN as usize], len: 0 }
+    }
 }
 
 impl<'a> VariationTuples<'a> {
+    /// Attempt to reserve up to `capacity` total slots for variation tuples.
+    #[cfg(feature = "gvar-alloc")]
+    fn reserve(&mut self, capacity: u16) -> bool {
+        // If the requested capacity exceeds the configured maximum stack tuple size ...
+        if capacity > MAX_STACK_TUPLES_LEN {
+            // ... and we're currently on the stack, move to the heap.
+            if let Self::Stack { headers, len } = self {
+                let mut vec = std::vec::Vec::with_capacity(capacity as usize);
+                for header in headers.iter_mut().take(*len as usize) {
+                    let header = core::mem::take(header);
+                    vec.push(header);
+                }
+
+                *self = Self::Heap { vec };
+                return true;
+            }
+        }
+
+        // Otherwise ...
+        match self {
+            // ... extend the vec capacity to hold our new elements ...
+            Self::Heap { vec } if vec.len() < capacity as usize => {
+                vec.reserve(capacity as usize - vec.len());
+                true
+            }
+            // ... or do nothing if the vec is already large enough or we're on the stack.
+            _ => true
+        }
+    }
+
+    /// Attempt to reserve up to `capacity` total slots for variation tuples.
+    #[cfg(not(feature = "gvar-alloc"))]
+    fn reserve(&mut self, capacity: u16) -> bool {
+        capacity <= MAX_STACK_TUPLES_LEN
+    }
+
+    /// Get the number of tuples stored in the structure.
+    #[cfg_attr(not(feature = "gvar-alloc"), allow(dead_code))]
+    fn len(&self) -> u16 {
+        match self {
+            Self::Stack { len, .. } => *len,
+            #[cfg(feature = "gvar-alloc")]
+            Self::Heap { vec } => vec.len() as u16
+        }
+    }
+
+    /// Append a new tuple header to the list.
+    /// This may panic if the list can't hold a new header.
+    #[cfg(feature = "gvar-alloc")]
+    fn push(&mut self, header: VariationTuple<'a>) {
+        // Reserve space for the new element.
+        // This may fail and result in a later panic, but that matches pre-heap behavior.
+        self.reserve(self.len() + 1);
+
+        match self {
+            Self::Stack { headers, len } => {
+                headers[usize::from(*len)] = header;
+                *len += 1;
+            },
+            Self::Heap { vec } => vec.push(header)
+        }
+    }
+    
+    /// Append a new tuple header to the list.
+    /// This may panic if the list can't hold a new header.
+    #[cfg(not(feature = "gvar-alloc"))]
+    #[inline]
+    fn push(&mut self, header: VariationTuple<'a>) {
+        match self {
+            Self::Stack { headers, len } => {
+                headers[usize::from(*len)] = header;
+                *len += 1;
+            }
+        }
+    }
+
+    /// Remove all tuples from the structure.
+    fn clear(&mut self) {
+        match self {
+            Self::Stack { len, .. } => *len = 0,
+            #[cfg(feature = "gvar-alloc")]
+            Self::Heap { vec } => vec.clear()
+        }
+    }
+
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [VariationTuple<'a>] {
-        &mut self.headers[0..usize::from(self.len)]
+        match self {
+            Self::Stack { headers, len } => &mut headers[0..usize::from(*len)],
+            #[cfg(feature = "gvar-alloc")]
+            Self::Heap { vec } => vec.as_mut_slice()
+        }
     }
 
     fn apply(
@@ -218,8 +319,7 @@ fn parse_variation_tuples<'a>(
             prev_point: None,
         };
 
-        tuples.headers[usize::from(tuples.len)] = tuple;
-        tuples.len += 1;
+        tuples.push(tuple);
     }
 
     Some(())
@@ -1380,7 +1480,7 @@ impl<'a> Table<'a> {
         points_len: u16,
         tuples: &mut VariationTuples<'a>,
     ) -> Option<()> {
-        tuples.len = 0;
+        tuples.clear();
 
         if coordinates.len() != usize::from(self.axis_count.get()) {
             return None;
@@ -1454,10 +1554,7 @@ fn outline_var_impl<'a>(
 
     // TODO: This is the most expensive part. Find a way to allocate it only once.
     // `VariationTuples` is a very large struct, so allocate it once.
-    let mut tuples = VariationTuples {
-        headers: [VariationTuple::default(); MAX_TUPLES_LEN as usize],
-        len: 0,
-    };
+    let mut tuples = VariationTuples::default();
 
     if number_of_contours > 0 {
         // Simple glyph.
@@ -1546,7 +1643,9 @@ fn parse_variation_data<'a>(
         return None;
     }
 
-    if tuple_variation_count >= MAX_TUPLES_LEN {
+    // Attempt to reserve space for the tuples we're about to parse.
+    // If it fails, bail out.
+    if !tuples.reserve(tuple_variation_count) {
         return None;
     }
 

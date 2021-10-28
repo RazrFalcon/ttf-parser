@@ -1643,8 +1643,8 @@ fn parse_variation_data<'a>(
         return None;
     }
 
-    // Attempt to reserve space for the tuples we're about to parse
-    // If it fails, bail out
+    // Attempt to reserve space for the tuples we're about to parse.
+    // If it fails, bail out.
     if !tuples.reserve(tuple_variation_count) {
         return None;
     }

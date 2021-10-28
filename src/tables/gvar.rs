@@ -50,7 +50,7 @@ struct VariationTuple<'a> {
 ///
 /// The TrueType spec allows up to 4095 tuples, which is way larger
 /// than we do. But in reality, an average font will have less than 10 tuples.
-/// We can avoid allocating if the number of tuples is less than this number.
+/// We can avoid heap allocations if the number of tuples is less than this number.
 const MAX_STACK_TUPLES_LEN: u16 = 32;
 
 /// A list of variation tuples, possibly stored on the heap.
@@ -63,9 +63,9 @@ enum VariationTuples<'a> {
         headers: [VariationTuple<'a>; MAX_STACK_TUPLES_LEN as usize],
         len: u16
     },
-    #[cfg(all(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "gvar-alloc")]
     Heap {
-        vec: ::std::vec::Vec<VariationTuple<'a>>
+        vec: std::vec::Vec<VariationTuple<'a>>
     }
 }
 
@@ -76,16 +76,16 @@ impl<'a> Default for VariationTuples<'a> {
 }
 
 impl<'a> VariationTuples<'a> {
-    /// Attempt to reserve up to `capacity` total slots for variation tuples
-    #[cfg(all(feature = "std", feature = "alloc"))]
+    /// Attempt to reserve up to `capacity` total slots for variation tuples.
+    #[cfg(feature = "gvar-alloc")]
     fn reserve(&mut self, capacity: u16) -> bool {
         // If the requested capacity exceeds the configured maximum stack tuple size ...
         if capacity > MAX_STACK_TUPLES_LEN {
-            // ... and we're currently on the stack, move to the heap
+            // ... and we're currently on the stack, move to the heap.
             if let Self::Stack { headers, len } = self {
-                let mut vec = ::std::vec::Vec::with_capacity(capacity as usize);
+                let mut vec = std::vec::Vec::with_capacity(capacity as usize);
                 for header in headers.iter_mut().take(*len as usize) {
-                    let header = ::core::mem::take(header);
+                    let header = core::mem::take(header);
                     vec.push(header);
                 }
 
@@ -96,45 +96,42 @@ impl<'a> VariationTuples<'a> {
 
         // Otherwise ...
         match self {
-            // Extend the vec capacity to hold our new elements
+            // ... extend the vec capacity to hold our new elements ...
             Self::Heap { vec } if vec.len() < capacity as usize => {
                 vec.reserve(capacity as usize - vec.len());
                 true
             }
-            // Or do nothing if the vec is already large enough or we're on the stack
+            // ... or do nothing if the vec is already large enough or we're on the stack.
             _ => true
         }
     }
 
-    /// Attempt to reserve up to `capacity` total slots for variation tuples
-    #[cfg(any(not(feature = "std"), not(feature = "alloc")))]
+    /// Attempt to reserve up to `capacity` total slots for variation tuples.
+    #[cfg(not(feature = "gvar-alloc"))]
     fn reserve(&mut self, capacity: u16) -> bool {
         capacity <= MAX_STACK_TUPLES_LEN
     }
 
-    /// Get the number of tuples stored in the structure
-    #[cfg_attr(any(not(feature = "std"), not(feature = "alloc")), allow(dead_code))]
+    /// Get the number of tuples stored in the structure.
+    #[cfg_attr(not(feature = "gvar-alloc"), allow(dead_code))]
     fn len(&self) -> u16 {
         match self {
             Self::Stack { len, .. } => *len,
-            #[cfg(all(feature = "std", feature = "alloc"))]
+            #[cfg(feature = "gvar-alloc")]
             Self::Heap { vec } => vec.len() as u16
         }
     }
 
-    /// Append a new tuple header to the list
-    /// This may panic if the list can't hold a new header
-    #[cfg(all(feature = "std", feature = "alloc"))]
+    /// Append a new tuple header to the list.
+    /// This may panic if the list can't hold a new header.
+    #[cfg(feature = "gvar-alloc")]
     fn push(&mut self, header: VariationTuple<'a>) {
-        // Reserve space for the new element
-        // This may fail and result in a later panic, but that matches pre-heap behavior
+        // Reserve space for the new element.
+        // This may fail and result in a later panic, but that matches pre-heap behavior.
         self.reserve(self.len() + 1);
 
         match self {
-            Self::Stack {
-                headers,
-                len
-            } => {
+            Self::Stack { headers, len } => {
                 headers[usize::from(*len)] = header;
                 *len += 1;
             },
@@ -142,9 +139,9 @@ impl<'a> VariationTuples<'a> {
         }
     }
     
-    /// Append a new tuple header to the list
-    /// This may panic if the list can't hold a new header
-    #[cfg(any(not(feature = "std"), not(feature = "alloc")))]
+    /// Append a new tuple header to the list.
+    /// This may panic if the list can't hold a new header.
+    #[cfg(not(feature = "gvar-alloc"))]
     #[inline]
     fn push(&mut self, header: VariationTuple<'a>) {
         match self {
@@ -155,11 +152,11 @@ impl<'a> VariationTuples<'a> {
         }
     }
 
-    /// Remove all tuples from the structure
+    /// Remove all tuples from the structure.
     fn clear(&mut self) {
         match self {
             Self::Stack { len, .. } => *len = 0,
-            #[cfg(all(feature = "std", feature = "alloc"))]
+            #[cfg(feature = "gvar-alloc")]
             Self::Heap { vec } => vec.clear()
         }
     }
@@ -168,7 +165,7 @@ impl<'a> VariationTuples<'a> {
     fn as_mut_slice(&mut self) -> &mut [VariationTuple<'a>] {
         match self {
             Self::Stack { headers, len } => &mut headers[0..usize::from(*len)],
-            #[cfg(all(feature = "std", feature = "alloc"))]
+            #[cfg(feature = "gvar-alloc")]
             Self::Heap { vec } => vec.as_mut_slice()
         }
     }

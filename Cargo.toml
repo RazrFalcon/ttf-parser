@@ -25,8 +25,13 @@ opentype-layout = []
 # which means we have to store them in ttf-parser. And there are almost 500 of them.
 # By disabling this feature a user can reduce binary size a bit.
 glyph-names = []
-# Enables allocation for tables which would otherwise exceed a reasonable stack size.
-alloc = ["std"]
+# Enables heap allocations during gvar table parsing used by Apple's variable fonts.
+# Due to a way gvar table is structured, we cannot avoid allocations.
+# By default, only up to 32 variable tuples will be allocated on the stack,
+# while the spec allows up to 4095. Most variable fonts use 10-20 tuples at most,
+# so our limit is suitable for most of the cases. But if you need the full support, you have to
+# enable this feature.
+gvar-alloc = ["std"]
 
 [dev-dependencies]
 base64 = "0.12"

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.2] - 2021-10-28
+### Added
+- `gvar-alloc` build feature that unlocks `gvar` table limits by using heap.
+  Thanks to [OrionNebula](https://github.com/OrionNebula)
+
 ## [0.13.1] - 2021-10-27
 ### Fixed
 - `Face::line_gap` logic.

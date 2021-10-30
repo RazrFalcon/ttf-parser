@@ -44,6 +44,22 @@ pub enum Format<'a> {
     UnicodeVariationSequences(Subtable14<'a>),
 }
 
+impl Format<'_> {
+    #[inline]
+    fn format_num(&self) -> u16 {
+        match self {
+            Self::ByteEncodingTable(_) => 0,
+            Self::HighByteMappingThroughTable(_) => 2,
+            Self::SegmentMappingToDeltaValues(_) => 4,
+            Self::TrimmedTableMapping(_) => 6,
+            Self::MixedCoverage => 8,
+            Self::TrimmedArray(_) => 10,
+            Self::SegmentedCoverage(_) => 12,
+            Self::ManyToOneRangeMappings(_) => 13,
+            Self::UnicodeVariationSequences(_) => 14,
+        }
+    }
+}
 
 /// A character encoding subtable.
 #[derive(Clone, Copy, Debug)]
@@ -60,27 +76,7 @@ impl<'a> Subtable<'a> {
     /// Checks that the current encoding is Unicode compatible.
     #[inline]
     pub fn is_unicode(&self) -> bool {
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
-        const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
-        const WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID: u16 = 10;
-
-        match self.platform_id {
-            PlatformId::Unicode => true,
-            PlatformId::Windows if self.encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
-            PlatformId::Windows => {
-                // "Note: Subtable format 13 has the same structure as format 12; it differs only
-                // in the interpretation of the startGlyphID/glyphID fields".
-                let is_format_12_compatible =
-                    matches!(self.format, Format::SegmentedCoverage(..) | Format::ManyToOneRangeMappings(..));
-
-                // "Fonts that support Unicode supplementary-plane characters (U+10000 to U+10FFFF)
-                // on the Windows platform must have a format 12 subtable for platform ID 3,
-                // encoding ID 10."
-                self.encoding_id == WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID
-                && is_format_12_compatible
-            }
-            _ => false,
-        }
+        unicode_compatible(self.platform_id, self.encoding_id, self.format.format_num())
     }
 
     /// Maps a character to a glyph ID.
@@ -164,12 +160,17 @@ impl EncodingRecord {
     /// Optimized glyph_index code path. See bench `glyph_index_u41`.
     fn glyph_index(&self, subtables: &[u8], code_point: char) -> Option<GlyphId> {
         let data = subtables.get(self.offset.to_usize()..)?;
-        match Stream::read_at::<u16>(data, 0)? {
-            0  => Subtable0::parse(data)?.glyph_index(code_point),
-            2  => Subtable2::parse(data)?.glyph_index(code_point),
-            4  => Subtable4::parse(data)?.glyph_index(code_point),
-            6  => Subtable6::parse(data)?.glyph_index(code_point),
-            8  => None, // unsupported
+        let format = Stream::read_at::<u16>(data, 0)?;
+        if !unicode_compatible(self.platform_id, self.encoding_id, format) {
+            return None;
+        }
+
+        match format {
+            0 => Subtable0::parse(data)?.glyph_index(code_point),
+            2 => Subtable2::parse(data)?.glyph_index(code_point),
+            4 => Subtable4::parse(data)?.glyph_index(code_point),
+            6 => Subtable6::parse(data)?.glyph_index(code_point),
+            8 => None, // unsupported
             10 => Subtable10::parse(data)?.glyph_index(code_point),
             12 => Subtable12::parse(data)?.glyph_index(code_point),
             13 => Subtable13::parse(data)?.glyph_index(code_point),
@@ -294,5 +295,28 @@ impl<'a> Table<'a> {
         let count = s.read::<u16>()?;
         let records = s.read_array16::<EncodingRecord>(count)?;
         Some(Table { subtables: Subtables { data, records }})
+    }
+}
+
+#[inline]
+fn unicode_compatible(platform_id: PlatformId, encoding_id: u16, format: u16) -> bool {
+    // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
+    const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
+    const WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID: u16 = 10;
+
+    match platform_id {
+        PlatformId::Unicode => true,
+        PlatformId::Windows if encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+        PlatformId::Windows => {
+            // "Note: Subtable format 13 has the same structure as format 12; it differs only
+            // in the interpretation of the startGlyphID/glyphID fields".
+            let is_format_12_compatible = format == 12 || format == 13;
+
+            // "Fonts that support Unicode supplementary-plane characters (U+10000 to U+10FFFF)
+            // on the Windows platform must have a format 12 subtable for platform ID 3,
+            // encoding ID 10."
+            encoding_id == WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID && is_format_12_compatible
+        }
+        _ => false,
     }
 }

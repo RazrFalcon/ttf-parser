@@ -214,6 +214,7 @@ impl<'a> Subtables<'a> {
     }
 
     /// Returns the number
+    #[inline]
     pub fn len(&self) -> u16 {
         self.records.len()
     }
@@ -242,6 +243,7 @@ pub struct SubtablesIter<'a> {
 impl<'a> Iterator for SubtablesIter<'a> {
     type Item = Subtable<'a>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.subtables.len() {
             self.index += 1;

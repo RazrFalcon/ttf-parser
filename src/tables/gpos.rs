@@ -317,6 +317,7 @@ impl<'a> SingleAdjustment<'a> {
     }
 
     /// Returns the subtable coverage.
+    #[inline]
     pub fn coverage(&self) -> Coverage<'a> {
         match self {
             Self::Format1 { coverage, .. } => *coverage,
@@ -549,6 +550,7 @@ impl<'a> PairAdjustment<'a> {
     }
 
     /// Returns the subtable coverage.
+    #[inline]
     pub fn coverage(&self) -> Coverage<'a> {
         match self {
             Self::Format1 { coverage, .. } => *coverage,
@@ -936,6 +938,7 @@ impl<'a> LookupSubtable<'a> for PositioningSubtable<'a> {
 
 impl<'a> PositioningSubtable<'a> {
     /// Returns the subtable coverage.
+    #[inline]
     pub fn coverage(&self) -> Coverage<'a> {
         match self {
             Self::Single(t) => t.coverage(),

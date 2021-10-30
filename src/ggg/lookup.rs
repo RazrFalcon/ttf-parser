@@ -59,6 +59,7 @@ impl core::fmt::Debug for LookupSubtables<'_> {
 
 impl<'a> LookupSubtables<'a> {
     /// Returns a number of items in the LookupSubtables.
+    #[inline]
     pub fn len(&self) -> u16 {
         self.offsets.len()
     }

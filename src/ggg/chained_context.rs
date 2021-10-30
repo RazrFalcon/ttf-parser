@@ -80,6 +80,7 @@ impl<'a> ChainedContextLookup<'a> {
     }
 
     /// Returns the subtable coverage.
+    #[inline]
     pub fn coverage(&self) -> Coverage<'a> {
         match self {
             Self::Format1 { coverage, .. } => *coverage,

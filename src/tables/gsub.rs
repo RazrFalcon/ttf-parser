@@ -42,6 +42,7 @@ impl<'a> SingleSubstitution<'a> {
     }
 
     /// Returns the subtable coverage.
+    #[inline]
     pub fn coverage(&self) -> Coverage<'a> {
         match self {
             Self::Format1 { coverage, .. } => *coverage,
@@ -272,6 +273,7 @@ impl<'a> LookupSubtable<'a> for SubstitutionSubtable<'a> {
 
 impl<'a> SubstitutionSubtable<'a> {
     /// Returns the subtable coverage.
+    #[inline]
     pub fn coverage(&self) -> Coverage<'a> {
         match self {
             Self::Single(t) => t.coverage(),
@@ -285,6 +287,7 @@ impl<'a> SubstitutionSubtable<'a> {
     }
 
     /// Checks that the current subtable is *Reverse Chaining Contextual Single*.
+    #[inline]
     pub fn is_reverse(&self) -> bool {
         matches!(self, Self::ReverseChainSingle(_))
     }

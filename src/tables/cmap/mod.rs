@@ -160,6 +160,25 @@ struct EncodingRecord {
     offset: Offset32,
 }
 
+impl EncodingRecord {
+    /// Optimized glyph_index code path. See bench `glyph_index_u41`.
+    fn glyph_index(&self, subtables: &[u8], code_point: char) -> Option<GlyphId> {
+        let data = subtables.get(self.offset.to_usize()..)?;
+        match Stream::read_at::<u16>(data, 0)? {
+            0  => Subtable0::parse(data)?.glyph_index(code_point),
+            2  => Subtable2::parse(data)?.glyph_index(code_point),
+            4  => Subtable4::parse(data)?.glyph_index(code_point),
+            6  => Subtable6::parse(data)?.glyph_index(code_point),
+            8  => None, // unsupported
+            10 => Subtable10::parse(data)?.glyph_index(code_point),
+            12 => Subtable12::parse(data)?.glyph_index(code_point),
+            13 => Subtable13::parse(data)?.glyph_index(code_point),
+            14 => None, // This subtable should be accessed via glyph_variation_index().
+            _ => None,
+        }
+    }
+}
+
 impl FromData for EncodingRecord {
     const SIZE: usize = 8;
 
@@ -189,6 +208,12 @@ impl core::fmt::Debug for Subtables<'_> {
 }
 
 impl<'a> Subtables<'a> {
+    /// Optimized glyph_index code path. See bench `glyph_index_u41`.
+    #[inline]
+    pub(crate) fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
+        self.records.into_iter().find_map(|r| r.glyph_index(self.data, code_point))
+    }
+
     /// Returns a subtable at an index.
     pub fn get(&self, index: u16) -> Option<Subtable<'a>> {
         let record = self.records.get(index)?;

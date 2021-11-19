@@ -500,7 +500,7 @@ fn outline_impl(
     data: &[u8],
     depth: u8,
     builder: &mut Builder,
-) -> Option<Rect> {
+) -> Option<Option<Rect>> {
     if depth >= MAX_COMPONENTS {
         return None;
     }
@@ -525,8 +525,7 @@ fn outline_impl(
                 if let Some(glyph_data) = glyf_table.get(range) {
                     let transform = Transform::combine(builder.transform, comp.transform);
                     let mut b = Builder::new(transform, builder.bbox, builder.builder);
-                    // We don't care about errors here.
-                    let _ = outline_impl(loca_table, glyf_table, glyph_data, depth + 1, &mut b);
+                    outline_impl(loca_table, glyf_table, glyph_data, depth + 1, &mut b)?;
 
                     // Take updated bbox.
                     builder.bbox = b.bbox;
@@ -536,10 +535,10 @@ fn outline_impl(
     }
 
     if builder.bbox.is_default() {
-        return None;
+        return Some(None);
     }
 
-    builder.bbox.to_rect()
+    Some(builder.bbox.to_rect())
 }
 
 #[inline]
@@ -658,7 +657,7 @@ impl<'a> Table<'a> {
     ) -> Option<Rect> {
         let mut b = Builder::new(Transform::default(), BBox::new(), builder);
         let glyph_data = self.get(glyph_id)?;
-        outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)
+        outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)?
     }
 
     #[inline]

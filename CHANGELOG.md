@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- (glyf) Endless loop during malformed file parsing.
 
 ## [0.13.2] - 2021-10-28
 ### Added

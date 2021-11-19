@@ -12,8 +12,8 @@
 
 #define TTFP_MAJOR_VERSION 0
 #define TTFP_MINOR_VERSION 13
-#define TTFP_PATCH_VERSION 0
-#define TTFP_VERSION "0.13.0"
+#define TTFP_PATCH_VERSION 3
+#define TTFP_VERSION "0.13.3"
 
 /**
  * @brief A glyph image format.

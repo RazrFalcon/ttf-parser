@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.13.3] - 2021-11-19
 ### Fixed
 - (glyf) Endless loop during malformed file parsing.
 
@@ -290,7 +292,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.3...HEAD
+[0.13.3]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.12.3...v0.13.0

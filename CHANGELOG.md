@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- (CFF) Panic during `seac` resolving.
+- (CFF) Stack overflow during `seac` resolving.
 
 ## [0.13.3] - 2021-11-19
 ### Fixed

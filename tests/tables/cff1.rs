@@ -742,6 +742,14 @@ test_cs_err!(multiple_endchar, &[
     UInt8(operator::ENDCHAR),
 ], CFFError::DataAfterEndChar);
 
+test_cs_err!(seac_with_not_enough_data, &[
+    CFFInt(0),
+    CFFInt(0),
+    CFFInt(0),
+    CFFInt(0),
+    UInt8(operator::ENDCHAR),
+], CFFError::NestingLimitReached);
+
 test_cs_err!(operands_overflow, &[
     CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),
     CFFInt(0), CFFInt(1), CFFInt(2), CFFInt(3), CFFInt(4), CFFInt(5), CFFInt(6), CFFInt(7), CFFInt(8), CFFInt(9),

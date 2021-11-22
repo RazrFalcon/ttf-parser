@@ -451,12 +451,16 @@ fn _parse_char_string(
                     let dy = p.stack.pop();
                     let dx = p.stack.pop();
 
-                    if !ctx.width_parsed {
+                    if !ctx.width_parsed && !p.stack.is_empty() {
                         p.stack.pop();
                         ctx.width_parsed = true;
                     }
 
                     ctx.has_seac = true;
+
+                    if depth == STACK_LIMIT {
+                        return Err(CFFError::NestingLimitReached);
+                    }
 
                     let base_char_string = ctx.metadata.char_strings.get(u32::from(base_char.0))
                         .ok_or(CFFError::InvalidSeacCode)?;

@@ -1,5 +1,3 @@
-use core::convert::TryFrom;
-
 use crate::parser::{Stream, U24, NumFrom, FromData};
 
 pub trait IndexSize: FromData {
@@ -81,28 +79,22 @@ pub struct VarOffsets<'a> {
 
 impl<'a> VarOffsets<'a> {
     pub fn get(&self, index: u32) -> Option<u32> {
-        if u32::from(index) >= self.len() {
+        if index >= self.len() {
             return None;
         }
 
         let start = usize::num_from(index) * self.offset_size.to_usize();
-        let end = start + self.offset_size.to_usize();
-        let data = self.data.get(start..end)?;
+        let mut s = Stream::new_at(self.data, start)?;
         let n: u32 = match self.offset_size {
-            OffsetSize::Size1 => u32::from(u8::parse(data)?),
-            OffsetSize::Size2 => u32::from(u16::parse(data)?),
-            OffsetSize::Size3 => U24::parse(data)?.0,
-            OffsetSize::Size4 => u32::parse(data)?,
+            OffsetSize::Size1 => u32::from(s.read::<u8>()?),
+            OffsetSize::Size2 => u32::from(s.read::<u16>()?),
+            OffsetSize::Size3 => s.read::<U24>()?.0,
+            OffsetSize::Size4 => s.read::<u32>()?,
         };
-
-        // Offset must be positive.
-        if n == 0 {
-            return None;
-        }
 
         // Offsets are offset by one byte in the font,
         // so we have to shift them back.
-        Some(n - 1)
+        n.checked_sub(1)
     }
 
     #[inline]
@@ -158,27 +150,15 @@ impl<'a> IntoIterator for Index<'a> {
 impl<'a> Index<'a> {
     #[inline]
     pub fn len(&self) -> u32 {
-        if !self.offsets.is_empty() {
-            // Last offset points to the byte after the `Object data`.
-            // We should skip it.
-            self.offsets.len() - 1
-        } else {
-            0
-        }
+        // Last offset points to the byte after the `Object data`. We should skip it.
+        self.offsets.len().checked_sub(1).unwrap_or(0)
     }
 
     pub fn get(&self, index: u32) -> Option<&'a [u8]> {
-        // Check for overflow first.
-        if index == core::u32::MAX {
-            None
-        } else if u32::from(index + 1) < self.offsets.len() {
-            let start = usize::try_from(self.offsets.get(index)?).ok()?;
-            let end = usize::try_from(self.offsets.get(index + 1)?).ok()?;
-            let data = self.data.get(start..end)?;
-            Some(data)
-        } else {
-            None
-        }
+        let next_index = index.checked_add(1)?; // make sure we do not overflow
+        let start = usize::num_from(self.offsets.get(index)?);
+        let end = usize::num_from(self.offsets.get(next_index)?);
+        self.data.get(start..end)
     }
 }
 

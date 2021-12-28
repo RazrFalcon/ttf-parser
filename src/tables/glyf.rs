@@ -394,7 +394,7 @@ impl<'a> Iterator for FlagsIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.repeats == 0 {
-            self.flags = SimpleGlyphFlags(self.stream.read::<u8>().unwrap_or_default());
+            self.flags = SimpleGlyphFlags(self.stream.read::<u8>().unwrap_or(0));
             if self.flags.repeat_flag() {
                 self.repeats = self.stream.read::<u8>().unwrap_or(0);
             }

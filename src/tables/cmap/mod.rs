@@ -94,7 +94,7 @@ impl<'a> Subtable<'a> {
     /// - when format is `MixedCoverage`, since it's not supported.
     /// - when format is `UnicodeVariationSequences`. Use `glyph_variation_index` instead.
     #[inline]
-    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
+    pub fn glyph_index(&self, code_point: u32) -> Option<GlyphId> {
         match self.format {
             Format::ByteEncodingTable(ref subtable) => subtable.glyph_index(code_point),
             Format::HighByteMappingThroughTable(ref subtable) => subtable.glyph_index(code_point),
@@ -115,7 +115,7 @@ impl<'a> Subtable<'a> {
     /// - when glyph ID is `0`.
     /// - when format is not `UnicodeVariationSequences`.
     #[inline]
-    pub fn glyph_variation_index(&self, code_point: char, variation: char) -> Option<GlyphVariationResult> {
+    pub fn glyph_variation_index(&self, code_point: u32, variation: u32) -> Option<GlyphVariationResult> {
         match self.format {
             Format::UnicodeVariationSequences(ref subtable) => {
                 subtable.glyph_index(code_point, variation)

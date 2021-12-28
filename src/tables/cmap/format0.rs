@@ -21,7 +21,7 @@ impl<'a> Subtable0<'a> {
     }
 
     /// Returns a glyph index for a code point.
-    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
+    pub fn glyph_index(&self, code_point: u32) -> Option<GlyphId> {
         let glyph_id = *self.glyph_ids.get(usize::num_from(code_point))?;
         // Make sure that the glyph is not zero, the array always has 256 ids,
         // but some codepoints may be mapped to zero.

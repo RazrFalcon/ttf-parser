@@ -15,9 +15,9 @@ mod format0 {
 
         let subtable = cmap::Subtable0::parse(&data).unwrap();
 
-        assert_eq!(subtable.glyph_index(0 as char), None);
-        assert_eq!(subtable.glyph_index(0x40 as char), Some(GlyphId(100)));
-        assert_eq!(subtable.glyph_index(100 as char), None);
+        assert_eq!(subtable.glyph_index(0), None);
+        assert_eq!(subtable.glyph_index(0x40), Some(GlyphId(100)));
+        assert_eq!(subtable.glyph_index(100), None);
 
         let mut vec = vec![];
         subtable.codepoints(|c| vec.push(c));
@@ -85,10 +85,10 @@ mod format2 {
         ]);
 
         let subtable = cmap::Subtable2::parse(&data).unwrap();
-        assert_eq!(subtable.glyph_index(39 as char), None);
-        assert_eq!(subtable.glyph_index(40 as char), Some(GlyphId(100)));
-        assert_eq!(subtable.glyph_index(41 as char), Some(GlyphId(1000)));
-        assert_eq!(subtable.glyph_index(42 as char), None);
+        assert_eq!(subtable.glyph_index(39), None);
+        assert_eq!(subtable.glyph_index(40), Some(GlyphId(100)));
+        assert_eq!(subtable.glyph_index(41), Some(GlyphId(1000)));
+        assert_eq!(subtable.glyph_index(42), None);
     }
 }
 
@@ -121,8 +121,8 @@ mod format4 {
         ];
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
-        assert_eq!(subtable.glyph_index(0x41 as char), Some(GlyphId(1)));
-        assert_eq!(subtable.glyph_index(0x42 as char), None);
+        assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
+        assert_eq!(subtable.glyph_index(0x42), None);
     }
 
     #[test]
@@ -151,17 +151,17 @@ mod format4 {
         ];
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
-        assert_eq!(subtable.glyph_index(0x40 as char), None);
-        assert_eq!(subtable.glyph_index(0x41 as char), Some(GlyphId(1)));
-        assert_eq!(subtable.glyph_index(0x42 as char), Some(GlyphId(2)));
-        assert_eq!(subtable.glyph_index(0x43 as char), Some(GlyphId(3)));
-        assert_eq!(subtable.glyph_index(0x44 as char), Some(GlyphId(4)));
-        assert_eq!(subtable.glyph_index(0x45 as char), Some(GlyphId(5)));
-        assert_eq!(subtable.glyph_index(0x46 as char), Some(GlyphId(6)));
-        assert_eq!(subtable.glyph_index(0x47 as char), Some(GlyphId(7)));
-        assert_eq!(subtable.glyph_index(0x48 as char), Some(GlyphId(8)));
-        assert_eq!(subtable.glyph_index(0x49 as char), Some(GlyphId(9)));
-        assert_eq!(subtable.glyph_index(0x4A as char), None);
+        assert_eq!(subtable.glyph_index(0x40), None);
+        assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
+        assert_eq!(subtable.glyph_index(0x42), Some(GlyphId(2)));
+        assert_eq!(subtable.glyph_index(0x43), Some(GlyphId(3)));
+        assert_eq!(subtable.glyph_index(0x44), Some(GlyphId(4)));
+        assert_eq!(subtable.glyph_index(0x45), Some(GlyphId(5)));
+        assert_eq!(subtable.glyph_index(0x46), Some(GlyphId(6)));
+        assert_eq!(subtable.glyph_index(0x47), Some(GlyphId(7)));
+        assert_eq!(subtable.glyph_index(0x48), Some(GlyphId(8)));
+        assert_eq!(subtable.glyph_index(0x49), Some(GlyphId(9)));
+        assert_eq!(subtable.glyph_index(0x4A), None);
     }
 
     #[test]
@@ -198,17 +198,17 @@ mod format4 {
         ];
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
-        assert_eq!(subtable.glyph_index(0x40 as char), None);
-        assert_eq!(subtable.glyph_index(0x41 as char), Some(GlyphId(1)));
-        assert_eq!(subtable.glyph_index(0x42 as char), None);
-        assert_eq!(subtable.glyph_index(0x43 as char), Some(GlyphId(2)));
-        assert_eq!(subtable.glyph_index(0x44 as char), Some(GlyphId(3)));
-        assert_eq!(subtable.glyph_index(0x45 as char), Some(GlyphId(4)));
-        assert_eq!(subtable.glyph_index(0x46 as char), None);
-        assert_eq!(subtable.glyph_index(0x47 as char), Some(GlyphId(5)));
-        assert_eq!(subtable.glyph_index(0x48 as char), Some(GlyphId(6)));
-        assert_eq!(subtable.glyph_index(0x49 as char), Some(GlyphId(7)));
-        assert_eq!(subtable.glyph_index(0x4A as char), None);
+        assert_eq!(subtable.glyph_index(0x40), None);
+        assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
+        assert_eq!(subtable.glyph_index(0x42), None);
+        assert_eq!(subtable.glyph_index(0x43), Some(GlyphId(2)));
+        assert_eq!(subtable.glyph_index(0x44), Some(GlyphId(3)));
+        assert_eq!(subtable.glyph_index(0x45), Some(GlyphId(4)));
+        assert_eq!(subtable.glyph_index(0x46), None);
+        assert_eq!(subtable.glyph_index(0x47), Some(GlyphId(5)));
+        assert_eq!(subtable.glyph_index(0x48), Some(GlyphId(6)));
+        assert_eq!(subtable.glyph_index(0x49), Some(GlyphId(7)));
+        assert_eq!(subtable.glyph_index(0x4A), None);
     }
 
     #[test]
@@ -243,13 +243,13 @@ mod format4 {
         ];
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
-        assert_eq!(subtable.glyph_index(0x40 as char), None);
-        assert_eq!(subtable.glyph_index(0x41 as char), Some(GlyphId(1)));
-        assert_eq!(subtable.glyph_index(0x42 as char), Some(GlyphId(10)));
-        assert_eq!(subtable.glyph_index(0x43 as char), Some(GlyphId(100)));
-        assert_eq!(subtable.glyph_index(0x44 as char), Some(GlyphId(1000)));
-        assert_eq!(subtable.glyph_index(0x45 as char), Some(GlyphId(10000)));
-        assert_eq!(subtable.glyph_index(0x46 as char), None);
+        assert_eq!(subtable.glyph_index(0x40), None);
+        assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
+        assert_eq!(subtable.glyph_index(0x42), Some(GlyphId(10)));
+        assert_eq!(subtable.glyph_index(0x43), Some(GlyphId(100)));
+        assert_eq!(subtable.glyph_index(0x44), Some(GlyphId(1000)));
+        assert_eq!(subtable.glyph_index(0x45), Some(GlyphId(10000)));
+        assert_eq!(subtable.glyph_index(0x46), None);
     }
 
     #[test]
@@ -294,13 +294,13 @@ mod format4 {
         ];
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
-        assert_eq!(subtable.glyph_index(0x40 as char),  None);
-        assert_eq!(subtable.glyph_index(0x50 as char),  Some(GlyphId(1)));
-        assert_eq!(subtable.glyph_index(std::char::from_u32(0x100).unwrap()), Some(GlyphId(10)));
-        assert_eq!(subtable.glyph_index(std::char::from_u32(0x150).unwrap()), Some(GlyphId(100)));
-        assert_eq!(subtable.glyph_index(std::char::from_u32(0x200).unwrap()), Some(GlyphId(1000)));
-        assert_eq!(subtable.glyph_index(std::char::from_u32(0x250).unwrap()), Some(GlyphId(10000)));
-        assert_eq!(subtable.glyph_index(std::char::from_u32(0x300).unwrap()), None);
+        assert_eq!(subtable.glyph_index(0x40),  None);
+        assert_eq!(subtable.glyph_index(0x50),  Some(GlyphId(1)));
+        assert_eq!(subtable.glyph_index(0x100), Some(GlyphId(10)));
+        assert_eq!(subtable.glyph_index(0x150), Some(GlyphId(100)));
+        assert_eq!(subtable.glyph_index(0x200), Some(GlyphId(1000)));
+        assert_eq!(subtable.glyph_index(0x250), Some(GlyphId(10000)));
+        assert_eq!(subtable.glyph_index(0x300), None);
     }
 
     #[test]
@@ -384,7 +384,7 @@ mod format4 {
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
         // Should not loop forever.
-        assert_eq!(subtable.glyph_index(0x41 as char), None);
+        assert_eq!(subtable.glyph_index(0x41), None);
     }
 
     #[test]
@@ -413,8 +413,8 @@ mod format4 {
         ];
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
-        assert_eq!(subtable.glyph_index(0x41 as char), Some(GlyphId(1)));
-        assert_eq!(subtable.glyph_index(0x42 as char), None);
+        assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
+        assert_eq!(subtable.glyph_index(0x42), None);
     }
 
     #[test]
@@ -444,7 +444,7 @@ mod format4 {
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
         // Format 4 support only u16 codepoints, so we have to bail immediately otherwise.
-        assert_eq!(subtable.glyph_index(std::char::from_u32(0x1FFFF).unwrap()), None);
+        assert_eq!(subtable.glyph_index(0x1FFFF), None);
     }
 
     #[test]
@@ -479,7 +479,7 @@ mod format4 {
         ];
 
         let subtable = cmap::Subtable4::parse(data).unwrap();
-        assert_eq!(subtable.glyph_index(0x41 as char), None);
+        assert_eq!(subtable.glyph_index(0x41), None);
     }
 
     #[test]

@@ -26,8 +26,8 @@ impl<'a> Subtable10<'a> {
     }
 
     /// Returns a glyph index for a code point.
-    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
-        let idx = u32::from(code_point).checked_sub(self.first_code_point)?;
+    pub fn glyph_index(&self, code_point: u32) -> Option<GlyphId> {
+        let idx = code_point.checked_sub(self.first_code_point)?;
         self.glyphs.get(idx)
     }
 

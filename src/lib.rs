@@ -1273,7 +1273,7 @@ impl<'a> Face<'a> {
                 continue;
             }
 
-            if let Some(id) = encoding.glyph_index(code_point) {
+            if let Some(id) = encoding.glyph_index(u32::from(code_point)) {
                 return Some(id);
             }
         }
@@ -1292,7 +1292,7 @@ impl<'a> Face<'a> {
     pub fn glyph_variation_index(&self, code_point: char, variation: char) -> Option<GlyphId> {
         for subtable in self.tables.cmap?.subtables {
             if let cmap::Format::UnicodeVariationSequences(ref table) = subtable.format {
-                return match table.glyph_index(code_point, variation)? {
+                return match table.glyph_index(u32::from(code_point), u32::from(variation))? {
                     cmap::GlyphVariationResult::Found(v) => Some(v),
                     cmap::GlyphVariationResult::UseDefault => self.glyph_index(code_point),
                 };

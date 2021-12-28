@@ -27,8 +27,7 @@ impl<'a> Subtable13<'a> {
     }
 
     /// Returns a glyph index for a code point.
-    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
-        let code_point = u32::from(code_point);
+    pub fn glyph_index(&self, code_point: u32) -> Option<GlyphId> {
         for group in self.groups {
             let start_char_code = group.start_char_code;
             if code_point >= start_char_code && code_point <= group.end_char_code {

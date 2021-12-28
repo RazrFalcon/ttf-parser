@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Changed
+- (cmap) `cmap::Subtable::glyph_index` and `cmap::Subtable::glyph_variation_index` accept
+  `u32` instead of `char` now.
 - (glyf) ~7% faster outline parsing.
 
 ## [0.13.4] - 2021-11-23

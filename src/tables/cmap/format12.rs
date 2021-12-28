@@ -46,9 +46,7 @@ impl<'a> Subtable12<'a> {
     }
 
     /// Returns a glyph index for a code point.
-    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
-        let code_point = u32::from(code_point);
-
+    pub fn glyph_index(&self, code_point: u32) -> Option<GlyphId> {
         let (_, group) = self.groups.binary_search_by(|range| {
             use core::cmp::Ordering;
 

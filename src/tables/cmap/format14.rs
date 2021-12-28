@@ -105,9 +105,7 @@ impl<'a> Subtable14<'a> {
     }
 
     /// Returns a glyph index for a code point.
-    pub fn glyph_index(&self, code_point: char, variation: char) -> Option<GlyphVariationResult> {
-        let code_point = u32::from(code_point);
-        let variation = u32::from(variation);
+    pub fn glyph_index(&self, code_point: u32, variation: u32) -> Option<GlyphVariationResult> {
         let (_, record) = self.records.binary_search_by(|v| v.var_selector.cmp(&variation))?;
 
         if let Some(offset) = record.default_uvs_offset {

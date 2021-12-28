@@ -47,9 +47,11 @@ impl<'a> Subtable4<'a> {
     }
 
     /// Returns a glyph index for a code point.
-    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
+    ///
+    /// Returns `None` when `code_point` is larger than `u16`.
+    pub fn glyph_index(&self, code_point: u32) -> Option<GlyphId> {
         // This subtable supports code points only in a u16 range.
-        let code_point = u16::try_from(code_point as u32).ok()?;
+        let code_point = u16::try_from(code_point).ok()?;
 
         // A custom binary search.
         let mut start = 0;

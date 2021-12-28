@@ -27,9 +27,11 @@ impl<'a> Subtable6<'a> {
     }
 
     /// Returns a glyph index for a code point.
-    pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
+    ///
+    /// Returns `None` when `code_point` is larger than `u16`.
+    pub fn glyph_index(&self, code_point: u32) -> Option<GlyphId> {
         // This subtable supports code points only in a u16 range.
-        let code_point = u16::try_from(code_point as u32).ok()?;
+        let code_point = u16::try_from(code_point).ok()?;
         let idx = code_point.checked_sub(self.first_code_point)?;
         self.glyphs.get(idx)
     }
@@ -38,9 +40,7 @@ impl<'a> Subtable6<'a> {
     pub fn codepoints(&self, mut f: impl FnMut(u32)) {
         for i in 0..self.glyphs.len() {
             if let Some(code_point) = self.first_code_point.checked_add(i) {
-                if let Ok(c) = u32::try_from(code_point) {
-                    f(c);
-                }
+                f(u32::from(code_point));
             }
         }
     }

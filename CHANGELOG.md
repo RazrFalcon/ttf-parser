@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- (glyf) ~7% faster outline parsing.
 
 ## [0.13.4] - 2021-11-23
 ### Fixed

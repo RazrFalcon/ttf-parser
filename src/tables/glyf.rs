@@ -604,21 +604,30 @@ fn resolve_coords_len(
 
         // No need to check for `*_coords_len` overflow since u32 is more than enough.
 
-        if flags.x_short() {
-            // Coordinate is 1 byte long.
-            x_coords_len += repeats;
-        } else if !flags.x_is_same_or_positive_short() {
-            // Coordinate is 2 bytes long.
-            x_coords_len += repeats * 2;
-        }
+        // Non-obfuscated code below.
+        // Branchless version is surprisingly faster.
+        //
+        // if flags.x_short() {
+        //     // Coordinate is 1 byte long.
+        //     x_coords_len += repeats;
+        // } else if !flags.x_is_same_or_positive_short() {
+        //     // Coordinate is 2 bytes long.
+        //     x_coords_len += repeats * 2;
+        // }
+        // if flags.y_short() {
+        //     // Coordinate is 1 byte long.
+        //     y_coords_len += repeats;
+        // } else if !flags.y_is_same_or_positive_short() {
+        //     // Coordinate is 2 bytes long.
+        //     y_coords_len += repeats * 2;
+        // }
 
-        if flags.y_short() {
-            // Coordinate is 1 byte long.
-            y_coords_len += repeats;
-        } else if !flags.y_is_same_or_positive_short() {
-            // Coordinate is 2 bytes long.
-            y_coords_len += repeats * 2;
-        }
+        x_coords_len += (flags.0 & 0x02 != 0) as u32 * repeats;
+        x_coords_len += (flags.0 & (0x02 | 0x10) == 0) as u32 * (repeats * 2);
+
+        y_coords_len += (flags.0 & 0x04 != 0) as u32 * repeats;
+        y_coords_len += (flags.0 & (0x04 | 0x20) == 0) as u32 * (repeats * 2);
+
 
         flags_left -= repeats;
     }

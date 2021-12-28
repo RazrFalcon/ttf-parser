@@ -119,14 +119,25 @@ and [Compact Font Format](http://wwwimages.adobe.com/content/dam/Adobe/en/devnet
 The first one is fairly simple which makes it faster to process.
 The second one is basically a tiny language with a stack-based VM, which makes it way harder to process.
 
-The [benchmark](./benches/outline/) tests how long it takes to outline all glyphs in the font.
+The [benchmark](./benches/outline/) tests how long it takes to outline all glyphs in a font.
+
+x86 (AMD 3700X)
 
 | Table/Library | ttf-parser     | FreeType   | stb_truetype   |
 | ------------- | -------------: | ---------: | -------------: |
-| `glyf`        |   `0.915 ms`   | `1.258 ms` | **`0.718 ms`** |
-| `gvar`        | **`3.545 ms`** | `4.288 ms` |              - |
-| `CFF`         | **`1.365 ms`** | `5.992 ms` |   `2.836 ms`   |
-| `CFF2`        | **`1.982 ms`** | `6.859 ms` |              - |
+| `glyf`        |   `0.963 ms`   | `1.171 ms` | **`0.675 ms`** |
+| `gvar`        | **`3.082 ms`** | `4.132 ms` |              - |
+| `CFF`         | **`1.197 ms`** | `5.647 ms` |   `2.813 ms`   |
+| `CFF2`        | **`1.968 ms`** | `6.392 ms` |              - |
+
+ARM (Apple M1)
+
+| Table/Library | ttf-parser     | FreeType   | stb_truetype   |
+| ------------- | -------------: | ---------: | -------------: |
+| `glyf`        | **`0.586 ms`** | `0.854 ms` |   `0.703 ms`   |
+| `gvar`        | **`2.295 ms`** | `4.594 ms` |              - |
+| `CFF`         | **`1.054 ms`** | `5.223 ms` |   `3.262 ms`   |
+| `CFF2`        | **`1.765 ms`** | `5.995 ms` |              - |
 
 **Note:** FreeType is surprisingly slow, so I'm worried that I've messed something up.
 

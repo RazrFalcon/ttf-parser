@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.14.0] - 2021-12-28
 ### Changed
 - (cmap) `cmap::Subtable::glyph_index` and `cmap::Subtable::glyph_variation_index` accept
   `u32` instead of `char` now.
@@ -301,7 +303,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.4...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.4...v0.14.0
 [0.13.4]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.1...v0.13.2

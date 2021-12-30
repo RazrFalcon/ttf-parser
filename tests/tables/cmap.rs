@@ -1,13 +1,14 @@
 mod format0 {
     use ttf_parser::{cmap, GlyphId};
+    use crate::{convert, Unit::*};
 
     #[test]
     fn maps_not_all_256_codepoints() {
-        let mut data = vec![
-            0x00, 0x00, // format: 0
-            0x01, 0x06, // subtable size: 262
-            0x00, 0x00, // language ID: 0
-        ];
+        let mut data = convert(&[
+            UInt16(0), // format
+            UInt16(262), // subtable size
+            UInt16(0), // language ID
+        ]);
 
         // Map (only) codepoint 0x40 to 100.
         data.extend(std::iter::repeat(0).take(256));
@@ -27,31 +28,32 @@ mod format0 {
 
 mod format2 {
     use ttf_parser::{cmap, GlyphId, parser::FromData};
+    use crate::{convert, Unit::*};
 
     #[test]
     fn collect_codepoints() {
-        let mut data = vec![
-            0x00, 0x02, // format: 2
-            0x02, 0x16, // subtable size: 534
-            0x00, 0x00, // language ID: 0
-        ];
+        let mut data = convert(&[
+            UInt16(2), // format
+            UInt16(534), // subtable size
+            UInt16(0), // language ID
+        ]);
 
         // Make only high byte 0x28 multi-byte.
         data.extend(std::iter::repeat(0x00).take(256 * u16::SIZE));
         data[6 + 0x28 * u16::SIZE + 1] = 0x08;
 
-        data.extend(&[
+        data.extend(convert(&[
             // First sub header (for single byte mapping)
-            0x00, 0xFE, // first code: 254
-            0x00, 0x02, // entry count: 2
-            0x00, 0x00, // id delta: uninteresting
-            0x00, 0x00, // id range offset: uninteresting
+            UInt16(254), // first code
+            UInt16(2), // entry count
+            UInt16(0), // id delta: uninteresting
+            UInt16(0), // id range offset: uninteresting
             // Second sub header (for high byte 0x28)
-            0x00, 0x10, // first code: (0x28 << 8) + 0x10 = 10256,
-            0x00, 0x03, // entry count: 3
-            0x00, 0x00, // id delta: uninteresting
-            0x00, 0x00, // id range offset: uninteresting
-        ]);
+            UInt16(16), // first code: (0x28 << 8) + 0x10 = 10256
+            UInt16(3), // entry count
+            UInt16(0), // id delta: uninteresting
+            UInt16(0), // id range offset: uninteresting
+        ]));
 
         // Now only glyph ID's would follow. Not interesting for codepoints.
 
@@ -64,25 +66,25 @@ mod format2 {
 
     #[test]
     fn codepoint_at_range_end() {
-        let mut data = vec![
-            0x00, 0x02, // format: 2
-            0x02, 0x14, // subtable size: 532
-            0x00, 0x00, // language ID: 0
-        ];
+        let mut data = convert(&[
+            UInt16(2), // format
+            UInt16(532), // subtable size
+            UInt16(0), // language ID
+        ]);
 
         // Only single bytes.
         data.extend(std::iter::repeat(0x00).take(256 * u16::SIZE));
-        data.extend(&[
+        data.extend(convert(&[
             // First sub header (for single byte mapping)
-            0x00, 0x28, // first code: 40
-            0x00, 0x02, // entry count: 2
-            0x00, 0x00, // id delta: 0
-            0x00, 0x02, // id range offset: 2
+            UInt16(40), // first code
+            UInt16(2), // entry count
+            UInt16(0), // id delta
+            UInt16(2), // id range offset
             // Glyph index
-            0x00, 0x64, // glyph ID [0]: 100
-            0x03, 0xE8, // glyph ID [1]: 1000
-            0x03, 0xE8, // glyph ID [2]: 10000 (unused)
-        ]);
+            UInt16(100), // glyph ID [0]
+            UInt16(1000), // glyph ID [1]
+            UInt16(10000), // glyph ID [2] (unused)
+        ]));
 
         let subtable = cmap::Subtable2::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(39), None);
@@ -94,63 +96,64 @@ mod format2 {
 
 mod format4 {
     use ttf_parser::{cmap, GlyphId};
+    use crate::{convert, Unit::*};
 
     #[test]
     fn single_glyph() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x20, // subtable size: 32
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(32), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0x00, 0x01, // delta [1]: 1
+            Int16(-64), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
         assert_eq!(subtable.glyph_index(0x42), None);
     }
 
     #[test]
     fn continuous_range() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x20, // subtable size: 32
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(32), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x49, // char code [0]: 73
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(73), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0x00, 0x01, // delta [1]: 1
+            Int16(-64), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x40), None);
         assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
         assert_eq!(subtable.glyph_index(0x42), Some(GlyphId(2)));
@@ -166,38 +169,38 @@ mod format4 {
 
     #[test]
     fn multiple_ranges() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x30, // subtable size: 48
-            0x00, 0x00, // language ID: 0
-            0x00, 0x08, // 2 x segCount: 8
-            0x00, 0x04, // search range: 4
-            0x00, 0x01, // entry selector: 1
-            0x00, 0x04, // range shift: 4
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(48), // subtable size
+            UInt16(0), // language ID
+            UInt16(8), // 2 x segCount
+            UInt16(4), // search range
+            UInt16(1), // entry selector
+            UInt16(4), // range shift
             // End character codes
-            0x00, 0x41, // char code [0]: 65
-            0x00, 0x45, // char code [1]: 69
-            0x00, 0x49, // char code [2]: 73
-            0xFF, 0xFF, // char code [3]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(65), // char code [0]
+            UInt16(69), // char code [1]
+            UInt16(73), // char code [2]
+            UInt16(65535), // char code [3]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0x00, 0x43, // char code [1]: 67
-            0x00, 0x47, // char code [2]: 71
-            0xFF, 0xFF, // char code [3]: 65535
+            UInt16(65), // char code [0]
+            UInt16(67), // char code [1]
+            UInt16(71), // char code [2]
+            UInt16(65535), // char code [3]
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0xFF, 0xBF, // delta [1]: -65
-            0xFF, 0xBE, // delta [2]: -66
-            0x00, 0x01, // delta [3]: 1
+            Int16(-64), // delta [0]
+            Int16(-65), // delta [1]
+            Int16(-66), // delta [2]
+            Int16(1), // delta [3]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-            0x00, 0x00, // offset [2]: 0
-            0x00, 0x00, // offset [3]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+            UInt16(0), // offset [2]
+            UInt16(0), // offset [3]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x40), None);
         assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
         assert_eq!(subtable.glyph_index(0x42), None);
@@ -213,36 +216,36 @@ mod format4 {
 
     #[test]
     fn unordered_ids() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x2A, // subtable size: 42
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(42), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x45, // char code [0]: 69
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(69), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
             // Deltas
-            0x00, 0x00, // delta [0]: 0
-            0x00, 0x01, // delta [1]: 1
+            Int16(0), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x04, // offset [0]: 4
-            0x00, 0x00, // offset [1]: 0
+            UInt16(4), // offset [0]
+            UInt16(0), // offset [1]
             // Glyph index array
-            0x00, 0x01, // glyph ID [0]: 1
-            0x00, 0x0A, // glyph ID [1]: 10
-            0x00, 0x64, // glyph ID [2]: 100
-            0x03, 0xE8, // glyph ID [3]: 1000
-            0x27, 0x10, // glyph ID [4]: 10000
-        ];
+            UInt16(1), // glyph ID [0]
+            UInt16(10), // glyph ID [1]
+            UInt16(100), // glyph ID [2]
+            UInt16(1000), // glyph ID [3]
+            UInt16(10000), // glyph ID [4]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x40), None);
         assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
         assert_eq!(subtable.glyph_index(0x42), Some(GlyphId(10)));
@@ -254,46 +257,46 @@ mod format4 {
 
     #[test]
     fn unordered_chars_and_ids() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x40, // subtable size: 64
-            0x00, 0x00, // language ID: 0
-            0x00, 0x0C, // 2 x segCount: 12
-            0x00, 0x08, // search range: 8
-            0x00, 0x02, // entry selector: 2
-            0x00, 0x04, // range shift: 4
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(64), // subtable size
+            UInt16(0), // language ID
+            UInt16(12), // 2 x segCount
+            UInt16(8), // search range
+            UInt16(2), // entry selector
+            UInt16(4), // range shift
             // End character codes
-            0x00, 0x50, // char code [0]: 80
-            0x01, 0x00, // char code [1]: 256
-            0x01, 0x50, // char code [2]: 336
-            0x02, 0x00, // char code [3]: 512
-            0x02, 0x50, // char code [4]: 592
-            0xFF, 0xFF, // char code [5]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(80), // char code [0]
+            UInt16(256), // char code [1]
+            UInt16(336), // char code [2]
+            UInt16(512), // char code [3]
+            UInt16(592), // char code [4]
+            UInt16(65535), // char code [5]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x50, // char code [0]: 80
-            0x01, 0x00, // char code [1]: 256
-            0x01, 0x50, // char code [2]: 336
-            0x02, 0x00, // char code [3]: 512
-            0x02, 0x50, // char code [4]: 592
-            0xFF, 0xFF, // char code [5]: 65535
+            UInt16(80), // char code [0]
+            UInt16(256), // char code [1]
+            UInt16(336), // char code [2]
+            UInt16(512), // char code [3]
+            UInt16(592), // char code [4]
+            UInt16(65535), // char code [5]
             // Deltas
-            0xFF, 0xB1, // delta [0]: -79
-            0xFF, 0x0A, // delta [1]: -246
-            0xFF, 0x14, // delta [2]: -236
-            0x01, 0xE8, // delta [3]: 488
-            0x24, 0xC0, // delta [4]: 9408
-            0x00, 0x01, // delta [5]: 1
+            Int16(-79), // delta [0]
+            Int16(-246), // delta [1]
+            Int16(-236), // delta [2]
+            Int16(488), // delta [3]
+            Int16(9408), // delta [4]
+            Int16(1), // delta [5]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-            0x00, 0x00, // offset [2]: 0
-            0x00, 0x00, // offset [3]: 0
-            0x00, 0x00, // offset [4]: 0
-            0x00, 0x00, // offset [5]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+            UInt16(0), // offset [2]
+            UInt16(0), // offset [3]
+            UInt16(0), // offset [4]
+            UInt16(0), // offset [5]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x40),  None);
         assert_eq!(subtable.glyph_index(0x50),  Some(GlyphId(1)));
         assert_eq!(subtable.glyph_index(0x100), Some(GlyphId(10)));
@@ -305,212 +308,212 @@ mod format4 {
 
     #[test]
     fn no_end_codes() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x20, // subtable size: 28
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(28), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x49, // char code [0]: 73
-            // 0xFF, 0xFF, // char code [1]: 65535 <-- removed
-            0x00, 0x00, // reserved: 0
+            UInt16(73), // char code [0]
+            // 0xFF, 0xFF, // char code [1] <-- removed
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            // 0xFF, 0xFF, // char code [1]: 65535 <-- removed
+            UInt16(65), // char code [0]
+            // 0xFF, 0xFF, // char code [1] <-- removed
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0x00, 0x01, // delta [1]: 1
+            Int16(-64), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+        ]);
 
-        assert!(cmap::Subtable4::parse(data).is_none());
+        assert!(cmap::Subtable4::parse(&data).is_none());
     }
 
     #[test]
     fn invalid_segment_count() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x20, // subtable size: 32
-            0x00, 0x00, // language ID: 0
-            0x00, 0x01, // 2 x segCount: 1 <-- must be more than 1
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(32), // subtable size
+            UInt16(0), // language ID
+            UInt16(1), // 2 x segCount <-- must be more than 1
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0x00, 0x01, // delta [1]: 1
+            Int16(-64), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+        ]);
 
-        assert!(cmap::Subtable4::parse(data).is_none());
+        assert!(cmap::Subtable4::parse(&data).is_none());
     }
 
     #[test]
     fn only_end_segments() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x20, // subtable size: 32
-            0x00, 0x00, // language ID: 0
-            0x00, 0x02, // 2 x segCount: 2
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(32), // subtable size
+            UInt16(0), // language ID
+            UInt16(2), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65535), // char code [1]
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0x00, 0x01, // delta [1]: 1
+            Int16(-64), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         // Should not loop forever.
         assert_eq!(subtable.glyph_index(0x41), None);
     }
 
     #[test]
     fn invalid_length() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x10, // subtable size: 16 <-- the size should be 32, but we don't check it anyway
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(16), // subtable size <-- the size should be 32, but we don't check it anyway
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0x00, 0x01, // delta [1]: 1
+            Int16(-64), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x41), Some(GlyphId(1)));
         assert_eq!(subtable.glyph_index(0x42), None);
     }
 
     #[test]
     fn codepoint_out_of_range() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x20, // subtable size: 32
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(32), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
             // Deltas
-            0xFF, 0xC0, // delta [0]: -64
-            0x00, 0x01, // delta [1]: 1
+            Int16(-64), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x00, // offset [0]: 0
-            0x00, 0x00, // offset [1]: 0
-        ];
+            UInt16(0), // offset [0]
+            UInt16(0), // offset [1]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         // Format 4 support only u16 codepoints, so we have to bail immediately otherwise.
         assert_eq!(subtable.glyph_index(0x1FFFF), None);
     }
 
     #[test]
     fn zero() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x2A, // subtable size: 42
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(42), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x45, // char code [0]: 69
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(69), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x41, // char code [0]: 65
-            0xFF, 0xFF, // char code [1]: 65535
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
             // Deltas
-            0x00, 0x00, // delta [0]: 0
-            0x00, 0x01, // delta [1]: 1
+            Int16(0), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x04, // offset [0]: 4
-            0x00, 0x00, // offset [1]: 0
+            UInt16(4), // offset [0]
+            UInt16(0), // offset [1]
             // Glyph index array
-            0x00, 0x00, // glyph ID [0]: 0 <-- indicates missing glyph
-            0x00, 0x0A, // glyph ID [1]: 10
-            0x00, 0x64, // glyph ID [2]: 100
-            0x03, 0xE8, // glyph ID [3]: 1000
-            0x27, 0x10, // glyph ID [4]: 10000
-        ];
+            UInt16(0), // glyph ID [0] <-- indicates missing glyph
+            UInt16(10), // glyph ID [1]
+            UInt16(100), // glyph ID [2]
+            UInt16(1000), // glyph ID [3]
+            UInt16(10000), // glyph ID [4]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x41), None);
     }
 
     #[test]
     fn collect_codepoints() {
-        let data = &[
-            0x00, 0x04, // format: 4
-            0x00, 0x18, // subtable size: 24
-            0x00, 0x00, // language ID: 0
-            0x00, 0x04, // 2 x segCount: 4
-            0x00, 0x02, // search range: 2
-            0x00, 0x00, // entry selector: 0
-            0x00, 0x02, // range shift: 2
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(24), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
             // End character codes
-            0x00, 0x22, // char code [0]: 34
-            0xFF, 0xFF, // char code [1]: 65535
-            0x00, 0x00, // reserved: 0
+            UInt16(34), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
             // Start character codes
-            0x00, 0x1B, // char code [0]: 27
-            0xFF, 0xFD, // char code [1]: 65533
+            UInt16(27), // char code [0]
+            UInt16(65533), // char code [1]
             // Deltas
-            0x00, 0x00, // delta [0]: 0
-            0x00, 0x01, // delta [1]: 1
+            Int16(0), // delta [0]
+            Int16(1), // delta [1]
             // Offsets into Glyph index array
-            0x00, 0x04, // offset [0]: 4
-            0x00, 0x00, // offset [1]: 0
+            UInt16(4), // offset [0]
+            UInt16(0), // offset [1]
             // Glyph index array
-            0x00, 0x00, // glyph ID [0]: 0
-            0x00, 0x0A, // glyph ID [1]: 10
-        ];
+            UInt16(0), // glyph ID [0]
+            UInt16(10), // glyph ID [1]
+        ]);
 
-        let subtable = cmap::Subtable4::parse(data).unwrap();
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
 
         let mut vec = vec![];
         subtable.codepoints(|c| vec.push(c));

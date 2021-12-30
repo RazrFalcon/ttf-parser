@@ -1,16 +1,17 @@
 use ttf_parser::trak::Table;
+use crate::{convert, Unit::*};
 
 #[test]
 fn empty() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // version: 1
-        0x00, 0x00, // format: 0
-        0x00, 0x00, // horizontal data offset: NULL
-        0x00, 0x00, // vertical data offset: NULL
-        0x00, 0x00, // padding
-    ];
+    let data = convert(&[
+        Fixed(1.0), // version
+        UInt16(0), // format
+        UInt16(0), // horizontal data offset
+        UInt16(0), // vertical data offset
+        UInt16(0), // padding
+    ]);
 
-    let table = Table::parse(data).unwrap();
+    let table = Table::parse(&data).unwrap();
     assert_eq!(table.horizontal.tracks.len(), 0);
     assert_eq!(table.horizontal.sizes.len(), 0);
     assert_eq!(table.vertical.tracks.len(), 0);
@@ -19,48 +20,48 @@ fn empty() {
 
 #[test]
 fn basic() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // version: 1
-        0x00, 0x00, // format: 0
-        0x00, 0x0C, // horizontal data offset: 12
-        0x00, 0x00, // vertical data offset: NULL
-        0x00, 0x00, // padding
+    let data = convert(&[
+        Fixed(1.0), // version
+        UInt16(0), // format
+        UInt16(12), // horizontal data offset
+        UInt16(0), // vertical data offset
+        UInt16(0), // padding
 
         // TrackData
-        0x00, 0x03, // number of tracks: 3
-        0x00, 0x02, // number of sizes: 2
-        0x00, 0x00, 0x00, 0x2C, // offset to size table: 44
+        UInt16(3), // number of tracks
+        UInt16(2), // number of sizes
+        UInt32(44), // offset to size table
 
         // TrackTableEntry [0]
-        0xFF, 0xFF, 0x00, 0x00, // track: -1
-        0x01, 0x00, // name index: 256
-        0x00, 0x34, // offset of the two per-size tracking values: 52
+        Fixed(-1.0), // track
+        UInt16(256), // name index
+        UInt16(52), // offset of the two per-size tracking values
 
         // TrackTableEntry [1]
-        0x00, 0x00, 0x00, 0x00, // track: 0
-        0x01, 0x02, // name index: 258
-        0x00, 0x3C, // offset of the two per-size tracking values: 60
+        Fixed(0.0), // track
+        UInt16(258), // name index
+        UInt16(60), // offset of the two per-size tracking values
 
         // TrackTableEntry [2]
-        0x00, 0x01, 0x00, 0x00, // track: 1
-        0x01, 0x01, // name index: 257
-        0x00, 0x38, // offset of the two per-size tracking values: 56
+        Fixed(1.0), // track
+        UInt16(257), // name index
+        UInt16(56), // offset of the two per-size tracking values
 
         // Size [0]
-        0x00, 0x0C, 0x00, 0x00, // points: 12
+        Fixed(12.0), // points
         // Size [1]
-        0x00, 0x18, 0x00, 0x00, // points: 24
+        Fixed(24.0), // points
 
         // Per-size tracking values.
-        0xFF, 0xF1, // -15
-        0xFF, 0xF9, // -7
-        0x00, 0x32, // 50
-        0x00, 0x14, // 20
-        0x00, 0x00, // 0
-        0x00, 0x00, // 0
-    ];
+        Int16(-15),
+        Int16(-7),
+        Int16(50),
+        Int16(20),
+        Int16(0),
+        Int16(0),
+    ]);
 
-    let table = Table::parse(data).unwrap();
+    let table = Table::parse(&data).unwrap();
 
     assert_eq!(table.horizontal.tracks.len(), 3);
     assert_eq!(table.horizontal.tracks.get(0).unwrap().value, -1.0);

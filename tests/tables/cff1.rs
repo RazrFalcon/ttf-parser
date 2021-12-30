@@ -76,7 +76,7 @@ mod private_dict_operator {
 
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
-pub enum TtfType {
+enum TtfType {
     Raw(&'static [u8]),
     TrueTypeMagic,
     OpenTypeMagic,

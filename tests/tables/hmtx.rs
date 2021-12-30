@@ -1,6 +1,7 @@
 use std::num::NonZeroU16;
 use ttf_parser::GlyphId;
 use ttf_parser::hmtx::Table;
+use crate::{convert, Unit::*};
 
 macro_rules! nzu16 {
     ($n:expr) => { NonZeroU16::new($n).unwrap() };
@@ -8,12 +9,12 @@ macro_rules! nzu16 {
 
 #[test]
 fn simple_case() {
-    let data = &[
-        0x00, 0x01, // advance width [0]: 1
-        0x00, 0x02, // side bearing [0]: 2
-    ];
+    let data = convert(&[
+        UInt16(1), // advance width [0]
+        Int16(2), // side bearing [0]
+    ]);
 
-    let table = Table::parse(1, nzu16!(1), data).unwrap();
+    let table = Table::parse(1, nzu16!(1), &data).unwrap();
     assert_eq!(table.advance(GlyphId(0)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
 }
@@ -25,24 +26,24 @@ fn empty() {
 
 #[test]
 fn zero_metrics() {
-    let data = &[
-        0x00, 0x01, // advance width [0]: 1
-        0x00, 0x02, // side bearing [0]: 2
-    ];
+    let data = convert(&[
+        UInt16(1), // advance width [0]
+        Int16(2), // side bearing [0]
+    ]);
 
-    assert!(Table::parse(0, nzu16!(1), data).is_none());
+    assert!(Table::parse(0, nzu16!(1), &data).is_none());
 }
 
 #[test]
 fn smaller_than_glyphs_count() {
-    let data = &[
-        0x00, 0x01, // advance width [0]: 1
-        0x00, 0x02, // side bearing [0]: 2
+    let data = convert(&[
+        UInt16(1), // advance width [0]
+        Int16(2), // side bearing [0]
 
-        0x00, 0x03, // side bearing [1]: 3
-    ];
+        Int16(3), // side bearing [1]
+    ]);
 
-    let table = Table::parse(1, nzu16!(2), data).unwrap();
+    let table = Table::parse(1, nzu16!(2), &data).unwrap();
     assert_eq!(table.advance(GlyphId(0)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
     assert_eq!(table.advance(GlyphId(1)), Some(1));
@@ -51,17 +52,17 @@ fn smaller_than_glyphs_count() {
 
 #[test]
 fn less_metrics_than_glyphs() {
-    let data = &[
-        0x00, 0x01, // advance width [0]: 1
-        0x00, 0x02, // side bearing [0]: 2
+    let data = convert(&[
+        UInt16(1), // advance width [0]
+        Int16(2), // side bearing [0]
 
-        0x00, 0x03, // advance width [1]: 3
-        0x00, 0x04, // side bearing [1]: 4
+        UInt16(3), // advance width [1]
+        Int16(4), // side bearing [1]
 
-        0x00, 0x05, // side bearing [2]: 5
-    ];
+        Int16(5), // side bearing [2]
+    ]);
 
-    let table = Table::parse(2, nzu16!(1), data).unwrap();
+    let table = Table::parse(2, nzu16!(1), &data).unwrap();
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
     assert_eq!(table.side_bearing(GlyphId(1)), Some(4));
     assert_eq!(table.side_bearing(GlyphId(2)), None);
@@ -69,12 +70,12 @@ fn less_metrics_than_glyphs() {
 
 #[test]
 fn glyph_out_of_bounds_0() {
-    let data = &[
-        0x00, 0x01, // advance width [0]: 1
-        0x00, 0x02, // side bearing [0]: 2
-    ];
+    let data = convert(&[
+        UInt16(1), // advance width [0]
+        Int16(2), // side bearing [0]
+    ]);
 
-    let table = Table::parse(1, nzu16!(1), data).unwrap();
+    let table = Table::parse(1, nzu16!(1), &data).unwrap();
     assert_eq!(table.advance(GlyphId(0)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
     assert_eq!(table.advance(GlyphId(1)), None);
@@ -83,14 +84,14 @@ fn glyph_out_of_bounds_0() {
 
 #[test]
 fn glyph_out_of_bounds_1() {
-    let data = &[
-        0x00, 0x01, // advance width [0]: 1
-        0x00, 0x02, // side bearing [0]: 2
+    let data = convert(&[
+        UInt16(1), // advance width [0]
+        Int16(2), // side bearing [0]
 
-        0x00, 0x03, // side bearing [1]: 3
-    ];
+        Int16(3), // side bearing [1]
+    ]);
 
-    let table = Table::parse(1, nzu16!(2), data).unwrap();
+    let table = Table::parse(1, nzu16!(2), &data).unwrap();
     assert_eq!(table.advance(GlyphId(1)), Some(1));
     assert_eq!(table.side_bearing(GlyphId(1)), Some(3));
     assert_eq!(table.advance(GlyphId(2)), None);

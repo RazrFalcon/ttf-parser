@@ -1,12 +1,65 @@
 mod cff1;
 mod cmap;
 mod feat;
+mod glyf;
 mod hmtx;
 mod maxp;
 mod sbix;
 mod trak;
 
 use ttf_parser::{Face, FaceParsingError, fonts_in_collection};
+
+#[allow(dead_code)]
+#[derive(Clone, Copy)]
+pub enum Unit {
+    Raw(&'static [u8]),
+    Int8(i8),
+    UInt8(u8),
+    Int16(i16),
+    UInt16(u16),
+    Int32(i32),
+    UInt32(u32),
+    Fixed(f32),
+}
+
+pub fn convert(units: &[Unit]) -> Vec<u8> {
+    let mut data = Vec::with_capacity(256);
+    for v in units {
+        convert_unit(*v, &mut data);
+    }
+
+    data
+}
+
+fn convert_unit(unit: Unit, data: &mut Vec<u8>) {
+    match unit {
+        Unit::Raw(bytes) => {
+            data.extend_from_slice(bytes);
+        }
+        Unit::Int8(n) => {
+            data.extend_from_slice(&i8::to_be_bytes(n));
+        }
+        Unit::UInt8(n) => {
+            data.extend_from_slice(&u8::to_be_bytes(n));
+        }
+        Unit::Int16(n) => {
+            data.extend_from_slice(&i16::to_be_bytes(n));
+        }
+        Unit::UInt16(n) => {
+            data.extend_from_slice(&u16::to_be_bytes(n));
+        }
+        Unit::Int32(n) => {
+            data.extend_from_slice(&i32::to_be_bytes(n));
+        }
+        Unit::UInt32(n) => {
+            data.extend_from_slice(&u32::to_be_bytes(n));
+        }
+        Unit::Fixed(n) => {
+            data.extend_from_slice(&i32::to_be_bytes((n * 65536.0) as i32));
+        }
+    }
+}
+
 
 #[test]
 fn empty_font() {
@@ -16,71 +69,76 @@ fn empty_font() {
 
 #[test]
 fn zero_tables() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // magic
-        0x00, 0x00, // numTables: 0
-        0x00, 0x00, // searchRange: 0
-        0x00, 0x00, // entrySelector: 0
-        0x00, 0x00, // rangeShift: 0
-    ];
+    use Unit::*;
+    let data = convert(&[
+        Raw(&[0x00, 0x01, 0x00, 0x00]), // magic
+        UInt16(0), // numTables
+        UInt16(0), // searchRange
+        UInt16(0), // entrySelector
+        UInt16(0), // rangeShift
+    ]);
 
-    assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
                FaceParsingError::NoHeadTable);
 }
 
 #[test]
 fn tables_count_overflow() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // magic
-        0xFF, 0xFF, // numTables: u16::MAX
-        0x00, 0x00, // searchRange: 0
-        0x00, 0x00, // entrySelector: 0
-        0x00, 0x00, // rangeShift: 0
-    ];
+    use Unit::*;
+    let data = convert(&[
+        Raw(&[0x00, 0x01, 0x00, 0x00]), // magic
+        UInt16(u16::MAX), // numTables
+        UInt16(0), // searchRange
+        UInt16(0), // entrySelector
+        UInt16(0), // rangeShift
+    ]);
 
-    assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
                FaceParsingError::MalformedFont);
 }
 
 #[test]
 fn empty_font_collection() {
-    let data = &[
-        0x74, 0x74, 0x63, 0x66, // magic
-        0x00, 0x00, // majorVersion: 0
-        0x00, 0x00, // minorVersion: 0
-        0x00, 0x00, 0x00, 0x00, // numFonts: 0
-    ];
+    use Unit::*;
+    let data = convert(&[
+        Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
+        UInt16(0), // majorVersion
+        UInt16(0), // minorVersion
+        UInt32(0), // numFonts
+    ]);
 
-    assert_eq!(fonts_in_collection(data), Some(0));
-    assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+    assert_eq!(fonts_in_collection(&data), Some(0));
+    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
                FaceParsingError::FaceIndexOutOfBounds);
 }
 
 #[test]
 fn font_collection_num_fonts_overflow() {
-    let data = &[
-        0x74, 0x74, 0x63, 0x66, // magic
-        0x00, 0x00, // majorVersion: 0
-        0x00, 0x00, // minorVersion: 0
-        0xFF, 0xFF, 0xFF, 0xFF, // numFonts: u32::MAX
-    ];
+    use Unit::*;
+    let data = convert(&[
+        Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
+        UInt16(0), // majorVersion
+        UInt16(0), // minorVersion
+        UInt32(u32::MAX), // numFonts
+    ]);
 
-    assert_eq!(fonts_in_collection(data), Some(std::u32::MAX));
-    assert_eq!(Face::from_slice(data, 0).unwrap_err(),
+    assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
+    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
                FaceParsingError::MalformedFont);
 }
 
 #[test]
 fn font_index_overflow() {
-    let data = &[
-        0x74, 0x74, 0x63, 0x66, // magic
-        0x00, 0x00, // majorVersion: 0
-        0x00, 0x00, // minorVersion: 0
-        0x00, 0x00, 0x00, 0x01, // numFonts: 1
-        0x00, 0x00, 0x00, 0x0C, // offset [0]: 12
-    ];
+    use Unit::*;
+    let data = convert(&[
+        Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
+        UInt16(0), // majorVersion
+        UInt16(0), // minorVersion
+        UInt32(1), // numFonts
+        UInt32(12), // offset [0]
+    ]);
 
-    assert_eq!(fonts_in_collection(data), Some(1));
-    assert_eq!(Face::from_slice(data, std::u32::MAX).unwrap_err(),
+    assert_eq!(fonts_in_collection(&data), Some(1));
+    assert_eq!(Face::from_slice(&data, std::u32::MAX).unwrap_err(),
                FaceParsingError::FaceIndexOutOfBounds);
 }

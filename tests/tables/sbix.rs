@@ -1,35 +1,36 @@
 use std::num::NonZeroU16;
 use ttf_parser::{GlyphId, RasterImageFormat};
 use ttf_parser::sbix::Table;
+use crate::{convert, Unit::*};
 
 #[test]
 fn single_glyph() {
-    let data = &[
-        0x00, 0x01, // version: 1
-        0x00, 0x00, // flags
-        0x00, 0x00, 0x00, 0x01, // number of strikes: 1
-        0x00, 0x00, 0x00, 0x0C, // strike offset [0]: 12
+    let data = convert(&[
+        UInt16(1), // version
+        UInt16(0), // flags
+        UInt32(1), // number of strikes
+        UInt32(12), // strike offset [0]
 
         // Strike [0]
-        0x00, 0x14, // pixels_per_em: 20
-        0x00, 0x48, // ppi: 72
-        0x00, 0x00, 0x00, 0x0C, // glyph data offset [0]: 12
-        0x00, 0x00, 0x00, 0x2C, // glyph data offset [1]: 44
+        UInt16(20), // pixels_per_em
+        UInt16(72), // ppi
+        UInt32(12), // glyph data offset [0]
+        UInt32(44), // glyph data offset [1]
 
         // Glyph Data [0]
-        0x00, 0x01, // x: 1
-        0x00, 0x02, // y: 2
-        0x70, 0x6E, 0x67, 0x20, // type tag: PNG
+        UInt16(1), // x
+        UInt16(2), // y
+        Raw(b"png "), // type tag
         // PNG data, just the part we need
-        0x89, 0x50, 0x4E, 0x47,
-        0x0D, 0x0A, 0x1A, 0x0A,
-        0x00, 0x00, 0x00, 0x0D,
-        0x49, 0x48, 0x44, 0x52,
-        0x00, 0x00, 0x00, 0x14, // width: 20
-        0x00, 0x00, 0x00, 0x1E, // height: 30
-    ];
+        Raw(&[0x89, 0x50, 0x4E, 0x47]),
+        Raw(&[0x0D, 0x0A, 0x1A, 0x0A]),
+        Raw(&[0x00, 0x00, 0x00, 0x0D]),
+        Raw(&[0x49, 0x48, 0x44, 0x52]),
+        UInt32(20), // width
+        UInt32(30), // height
+    ]);
 
-    let table = Table::parse(NonZeroU16::new(1).unwrap(), data).unwrap();
+    let table = Table::parse(NonZeroU16::new(1).unwrap(), &data).unwrap();
     assert_eq!(table.strikes.len(), 1);
 
     let strike = table.strikes.get(0).unwrap();
@@ -49,39 +50,39 @@ fn single_glyph() {
 
 #[test]
 fn duplicate_glyph() {
-    let data = &[
-        0x00, 0x01, // version: 1
-        0x00, 0x00, // flags
-        0x00, 0x00, 0x00, 0x01, // number of strikes: 1
-        0x00, 0x00, 0x00, 0x0C, // strike offset [0]: 12
+    let data = convert(&[
+        UInt16(1), // version
+        UInt16(0), // flags
+        UInt32(1), // number of strikes
+        UInt32(12), // strike offset [0]
 
         // Strike [0]
-        0x00, 0x14, // pixels_per_em: 20
-        0x00, 0x48, // ppi: 72
-        0x00, 0x00, 0x00, 0x10, // glyph data offset [0]: 16
-        0x00, 0x00, 0x00, 0x30, // glyph data offset [1]: 48
-        0x00, 0x00, 0x00, 0x3A, // glyph data offset [2]: 58
+        UInt16(20), // pixels_per_em
+        UInt16(72), // ppi
+        UInt32(16), // glyph data offset [0]
+        UInt32(48), // glyph data offset [1]
+        UInt32(58), // glyph data offset [2]
 
         // Glyph Data [0]
-        0x00, 0x01, // x: 1
-        0x00, 0x02, // y: 2
-        0x70, 0x6E, 0x67, 0x20, // type tag: png
+        UInt16(1), // x
+        UInt16(2), // y
+        Raw(b"png "), // type tag
         // PNG data, just the part we need
-        0x89, 0x50, 0x4E, 0x47,
-        0x0D, 0x0A, 0x1A, 0x0A,
-        0x00, 0x00, 0x00, 0x0D,
-        0x49, 0x48, 0x44, 0x52,
-        0x00, 0x00, 0x00, 0x14, // width: 20
-        0x00, 0x00, 0x00, 0x1E, // height: 30
+        Raw(&[0x89, 0x50, 0x4E, 0x47]),
+        Raw(&[0x0D, 0x0A, 0x1A, 0x0A]),
+        Raw(&[0x00, 0x00, 0x00, 0x0D]),
+        Raw(&[0x49, 0x48, 0x44, 0x52]),
+        UInt32(20), // width
+        UInt32(30), // height
 
         // Glyph Data [1]
-        0x00, 0x01, // x: 3
-        0x00, 0x02, // y: 4
-        0x64, 0x75, 0x70, 0x65, // type tag: dupe
-        0x00, 0x00, // glyph id: 0
-    ];
+        UInt16(3), // x
+        UInt16(4), // y
+        Raw(b"dupe"), // type tag
+        UInt16(0), // glyph id
+    ]);
 
-    let table = Table::parse(NonZeroU16::new(2).unwrap(), data).unwrap();
+    let table = Table::parse(NonZeroU16::new(2).unwrap(), &data).unwrap();
     assert_eq!(table.strikes.len(), 1);
 
     let strike = table.strikes.get(0).unwrap();
@@ -101,33 +102,33 @@ fn duplicate_glyph() {
 
 #[test]
 fn recursive() {
-    let data = &[
-        0x00, 0x01, // version: 1
-        0x00, 0x00, // flags
-        0x00, 0x00, 0x00, 0x01, // number of strikes: 1
-        0x00, 0x00, 0x00, 0x0C, // strike offset [0]: 12
+    let data = convert(&[
+        UInt16(1), // version
+        UInt16(0), // flags
+        UInt32(1), // number of strikes
+        UInt32(12), // strike offset [0]
 
         // Strike [0]
-        0x00, 0x14, // pixels_per_em: 20
-        0x00, 0x48, // ppi: 72
-        0x00, 0x00, 0x00, 0x10, // glyph data offset [0]: 16
-        0x00, 0x00, 0x00, 0x1A, // glyph data offset [1]: 26
-        0x00, 0x00, 0x00, 0x24, // glyph data offset [2]: 36
+        UInt16(20), // pixels_per_em
+        UInt16(72), // ppi
+        UInt32(16), // glyph data offset [0]
+        UInt32(26), // glyph data offset [1]
+        UInt32(36), // glyph data offset [2]
 
         // Glyph Data [0]
-        0x00, 0x01, // x: 0
-        0x00, 0x02, // y: 0
-        0x64, 0x75, 0x70, 0x65, // type tag: dupe
-        0x00, 0x00, // glyph id: 1
+        UInt16(1), // x
+        UInt16(2), // y
+        Raw(b"dupe"), // type tag
+        UInt16(0), // glyph id
 
         // Glyph Data [1]
-        0x00, 0x01, // x: 0
-        0x00, 0x02, // y: 0
-        0x64, 0x75, 0x70, 0x65, // type tag: dupe
-        0x00, 0x00, // glyph id: 0
-    ];
+        UInt16(1), // x
+        UInt16(2), // y
+        Raw(b"dupe"), // type tag
+        UInt16(0), // glyph id
+    ]);
 
-    let table = Table::parse(NonZeroU16::new(2).unwrap(), data).unwrap();
+    let table = Table::parse(NonZeroU16::new(2).unwrap(), &data).unwrap();
     let strike = table.strikes.get(0).unwrap();
     assert!(strike.get(GlyphId(0)).is_none());
     assert!(strike.get(GlyphId(1)).is_none());

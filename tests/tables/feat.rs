@@ -1,65 +1,66 @@
 use ttf_parser::feat::Table;
+use crate::{convert, Unit::*};
 
 #[test]
 fn basic() {
-    let data = &[
-        0x00, 0x01, 0x00, 0x00, // version: 1
-        0x00, 0x04, // number of features: 4
-        0x00, 0x00, // reserved
-        0x00, 0x00, 0x00, 0x00, // reserved
+    let data = convert(&[
+        Fixed(1.0), // version: 1
+        UInt16(4), // number of features: 4
+        UInt16(0), // reserved
+        UInt32(0), // reserved
 
         // Feature Name [0]
-        0x00, 0x00, // feature: 0
-        0x00, 0x01, // number of settings: 1
-        0x00, 0x00, 0x00, 0x3C, // offset to settings table: 60
-        0x00, 0x00, // flags: none
-        0x01, 0x04, // name index: 260
+        UInt16(0), // feature: 0
+        UInt16(1), // number of settings: 1
+        UInt32(60), // offset to settings table: 60
+        UInt16(0), // flags: none
+        UInt16(260), // name index: 260
 
         // Feature Name [1]
-        0x00, 0x01, // feature: 1
-        0x00, 0x01, // number of settings: 1
-        0x00, 0x00, 0x00, 0x40, // offset to settings table: 64
-        0x00, 0x00, // flags: none
-        0x01, 0x00, // name index: 256
+        UInt16(1), // feature: 1
+        UInt16(1), // number of settings: 1
+        UInt32(64), // offset to settings table: 64
+        UInt16(0), // flags: none
+        UInt16(256), // name index: 256
 
         // Feature Name [2]
-        0x00, 0x03, // feature: 3
-        0x00, 0x03, // number of settings: 3
-        0x00, 0x00, 0x00, 0x44, // offset to settings table: 68
-        0x80, 0x00, // flags: exclusive
-        0x01, 0x06, // name index: 262
+        UInt16(3), // feature: 3
+        UInt16(3), // number of settings: 3
+        UInt32(68), // offset to settings table: 68
+        Raw(&[0x80, 0x00]), // flags: exclusive
+        UInt16(262), // name index: 262
 
         // Feature Name [3]
-        0x00, 0x06, // feature: 6
-        0x00, 0x01, // number of settings: 2
-        0x00, 0x00, 0x00, 0x50, // offset to settings table: 80
-        0xC0, 0x01, // flags: exclusive and other
-        0x01, 0x02, // name index: 258
+        UInt16(6), // feature: 6
+        UInt16(2), // number of settings: 2
+        UInt32(80), // offset to settings table: 80
+        Raw(&[0xC0, 0x01]), // flags: exclusive and other
+        UInt16(258), // name index: 258
 
         // Setting Name [0]
-        0x00, 0x00, // setting: 0
-        0x01, 0x05, // name index: 261
+        UInt16(0), // setting: 0
+        UInt16(261), // name index: 261
 
         // Setting Name [1]
-        0x00, 0x02, // setting: 2
-        0x01, 0x01, // name index: 257
+        UInt16(2), // setting: 2
+        UInt16(257), // name index: 257
 
         // Setting Name [2]
-        0x00, 0x00, // setting: 0
-        0x01, 0x0C, // name index: 268
-        0x00, 0x03, // setting: 3
-        0x01, 0x08, // name index: 264
-        0x00, 0x04, // setting: 4
-        0x01, 0x09, // name index: 265
+        UInt16(0), // setting: 0
+        UInt16(268), // name index: 268
+        UInt16(3), // setting: 3
+        UInt16(264), // name index: 264
+        UInt16(4), // setting: 4
+        UInt16(265), // name index: 265
 
         // Setting Name [3]
-        0x00, 0x00, // setting: 0
-        0x01, 0x03, // name index: 259
-        0x00, 0x00, // setting: 1
-        0x01, 0x04, // name index: 260
-    ];
+        UInt16(0), // setting: 0
+        UInt16(259), // name index: 259
+        UInt16(1), // setting: 1
+        UInt16(260), // name index: 260
+    ]);
 
-    let table = Table::parse(data).unwrap();
+    let table = Table::parse(&data).unwrap();
     assert_eq!(table.names.len(), 4);
 
     let feature0 = table.names.get(0).unwrap();

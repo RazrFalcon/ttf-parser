@@ -21,6 +21,8 @@ pub mod vorg;
 #[cfg(feature = "opentype-layout")] pub mod gsub;
 #[cfg(feature = "opentype-layout")] pub mod gpos;
 
+#[cfg(feature = "apple-layout")] pub mod feat;
+
 #[cfg(feature = "variable-fonts")] pub mod avar;
 #[cfg(feature = "variable-fonts")] pub mod fvar;
 #[cfg(feature = "variable-fonts")] pub mod gvar;

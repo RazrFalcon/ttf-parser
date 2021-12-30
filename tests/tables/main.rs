@@ -1,5 +1,6 @@
 mod cff1;
 mod cmap;
+mod feat;
 mod hmtx;
 mod maxp;
 mod sbix;

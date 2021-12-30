@@ -4,6 +4,7 @@ mod feat;
 mod hmtx;
 mod maxp;
 mod sbix;
+mod trak;
 
 use ttf_parser::{Face, FaceParsingError, fonts_in_collection};
 

@@ -88,6 +88,7 @@ There are roughly three types of TrueType tables:
 | `post` table      | ✓                      | ✓                   |                                |
 | `sbix` table      | ~ (PNG only)           | ~ (PNG only)        |                                |
 | `SVG `&nbsp;table | ✓                      |                     | ✓                              |
+| `trak` table      | ✓                      |                     |                                |
 | `vhea` table      | ✓                      | ✓                   |                                |
 | `vmtx` table      | ✓                      | ✓                   |                                |
 | `VORG` table      | ✓                      | ✓                   |                                |

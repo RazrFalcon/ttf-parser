@@ -68,7 +68,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea, cbdt, cblc};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "apple-layout")] pub use tables::{feat};
+#[cfg(feature = "apple-layout")] pub use tables::{feat, trak};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar, mvar};
 
 #[cfg(feature = "opentype-layout")]
@@ -570,6 +570,7 @@ pub struct RawFaceTables<'a> {
     #[cfg(feature = "opentype-layout")] pub gsub: Option<&'a [u8]>,
 
     #[cfg(feature = "apple-layout")] pub feat: Option<&'a [u8]>,
+    #[cfg(feature = "apple-layout")] pub trak: Option<&'a [u8]>,
 
     #[cfg(feature = "variable-fonts")] pub avar: Option<&'a [u8]>,
     #[cfg(feature = "variable-fonts")] pub cff2: Option<&'a [u8]>,
@@ -616,6 +617,7 @@ pub struct FaceTables<'a> {
     #[cfg(feature = "opentype-layout")] pub gsub: Option<opentype_layout::LayoutTable<'a>>,
 
     #[cfg(feature = "apple-layout")] pub feat: Option<feat::Table<'a>>,
+    #[cfg(feature = "apple-layout")] pub trak: Option<trak::Table<'a>>,
 
     #[cfg(feature = "variable-fonts")] pub avar: Option<avar::Table<'a>>,
     #[cfg(feature = "variable-fonts")] pub cff2: Option<cff2::Table<'a>>,
@@ -769,6 +771,8 @@ impl<'a> Face<'a> {
                 b"name" => tables.name = table_data,
                 b"post" => tables.post = table_data,
                 b"sbix" => tables.sbix = table_data,
+                #[cfg(feature = "apple-fonts")]
+                b"trak" => tables.trak = table_data,
                 b"vhea" => tables.vhea = table_data,
                 b"vmtx" => tables.vmtx = table_data,
                 _ => {}
@@ -855,6 +859,7 @@ impl<'a> Face<'a> {
             #[cfg(feature = "opentype-layout")] gsub: raw_tables.gsub.and_then(opentype_layout::LayoutTable::parse),
 
             #[cfg(feature = "apple-layout")] feat: raw_tables.feat.and_then(feat::Table::parse),
+            #[cfg(feature = "apple-layout")] trak: raw_tables.trak.and_then(trak::Table::parse),
 
             #[cfg(feature = "variable-fonts")] avar: raw_tables.avar.and_then(avar::Table::parse),
             #[cfg(feature = "variable-fonts")] cff2: raw_tables.cff2.and_then(cff2::Table::parse),

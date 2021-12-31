@@ -755,7 +755,7 @@ impl<'a> Face<'a> {
                 #[cfg(feature = "variable-fonts")]
                 b"avar" => tables.avar = table_data,
                 b"cmap" => tables.cmap = table_data,
-                #[cfg(feature = "apple-fonts")]
+                #[cfg(feature = "apple-layout")]
                 b"feat" => tables.feat = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"fvar" => tables.fvar = table_data,
@@ -771,7 +771,7 @@ impl<'a> Face<'a> {
                 b"name" => tables.name = table_data,
                 b"post" => tables.post = table_data,
                 b"sbix" => tables.sbix = table_data,
-                #[cfg(feature = "apple-fonts")]
+                #[cfg(feature = "apple-layout")]
                 b"trak" => tables.trak = table_data,
                 b"vhea" => tables.vhea = table_data,
                 b"vmtx" => tables.vmtx = table_data,

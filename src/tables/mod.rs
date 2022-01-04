@@ -21,6 +21,7 @@ pub mod vorg;
 #[cfg(feature = "opentype-layout")] pub mod gsub;
 #[cfg(feature = "opentype-layout")] pub mod gpos;
 
+#[cfg(feature = "apple-layout")] pub mod ankr;
 #[cfg(feature = "apple-layout")] pub mod feat;
 #[cfg(feature = "apple-layout")] pub mod trak;
 

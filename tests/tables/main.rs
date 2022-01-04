@@ -1,3 +1,5 @@
+mod aat;
+mod ankr;
 mod cff1;
 mod cmap;
 mod feat;

@@ -58,6 +58,7 @@ There are roughly three types of TrueType tables:
 | Zero allocation   | ✓                      |                     |                                |
 | Variable fonts    | ✓                      | ✓                   |                                |
 | Rendering         | -<sup>1</sup>          | ✓                   | ~ (very primitive)             |
+| `ankr` table      | ✓                      |                     |                                |
 | `avar` table      | ✓                      | ✓                   |                                |
 | `bdat` table      |                        | ✓                   |                                |
 | `bloc` table      |                        | ✓                   |                                |

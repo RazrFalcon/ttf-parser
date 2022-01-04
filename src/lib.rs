@@ -54,6 +54,7 @@ macro_rules! try_opt_or {
 
 pub mod parser;
 mod tables;
+#[cfg(feature = "apple-layout")] pub mod aat;
 #[cfg(feature = "opentype-layout")] mod ggg;
 #[cfg(feature = "variable-fonts")] mod var_store;
 
@@ -68,7 +69,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea, cbdt, cblc};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "apple-layout")] pub use tables::{feat, trak};
+#[cfg(feature = "apple-layout")] pub use tables::{ankr, feat, trak};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar, mvar};
 
 #[cfg(feature = "opentype-layout")]
@@ -569,6 +570,7 @@ pub struct RawFaceTables<'a> {
     #[cfg(feature = "opentype-layout")] pub gpos: Option<&'a [u8]>,
     #[cfg(feature = "opentype-layout")] pub gsub: Option<&'a [u8]>,
 
+    #[cfg(feature = "apple-layout")] pub ankr: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub feat: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub trak: Option<&'a [u8]>,
 
@@ -616,6 +618,7 @@ pub struct FaceTables<'a> {
     #[cfg(feature = "opentype-layout")] pub gpos: Option<opentype_layout::LayoutTable<'a>>,
     #[cfg(feature = "opentype-layout")] pub gsub: Option<opentype_layout::LayoutTable<'a>>,
 
+    #[cfg(feature = "apple-layout")] pub ankr: Option<ankr::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub feat: Option<feat::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub trak: Option<trak::Table<'a>>,
 
@@ -752,6 +755,8 @@ impl<'a> Face<'a> {
                 b"VORG" => tables.vorg = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"VVAR" => tables.vvar = table_data,
+                #[cfg(feature = "apple-layout")]
+                b"ankr" => tables.ankr = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"avar" => tables.avar = table_data,
                 b"cmap" => tables.cmap = table_data,
@@ -858,6 +863,8 @@ impl<'a> Face<'a> {
             #[cfg(feature = "opentype-layout")] gpos: raw_tables.gpos.and_then(opentype_layout::LayoutTable::parse),
             #[cfg(feature = "opentype-layout")] gsub: raw_tables.gsub.and_then(opentype_layout::LayoutTable::parse),
 
+            #[cfg(feature = "apple-layout")] ankr: raw_tables.ankr
+                .and_then(|data| ankr::Table::parse(maxp.number_of_glyphs, data)),
             #[cfg(feature = "apple-layout")] feat: raw_tables.feat.and_then(feat::Table::parse),
             #[cfg(feature = "apple-layout")] trak: raw_tables.trak.and_then(trak::Table::parse),
 

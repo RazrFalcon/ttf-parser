@@ -1,34 +1,36 @@
 //! A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math) implementation.
 
+use crate::GlyphId;
 use crate::gpos::Device;
-use crate::parser::{Offset, Offset16, Stream};
+use crate::opentype_layout::Coverage;
+use crate::parser::{FromSlice, Offset, Offset16, Stream};
 
+/// A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
 #[allow(missing_debug_implementations)]
+#[allow(missing_docs)]
 #[derive(Clone)]
 pub struct Table<'a> {
     pub major_version: u8,
     pub minor_version: u8,
-    pub math_constants: Option<MathConstants<'a>>,
-    // pub math_glyph_info: MathGlyphInfo<'a>,
+    pub math_constants: MathConstants<'a>,
+    pub math_glyph_info: MathGlyphInfo<'a>,
     // pub math_variants: MathVariants<'a>,
 }
 
+/// A [MathValueRecord](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord).
 #[allow(missing_debug_implementations)]
+#[allow(missing_docs)]
 #[derive(Default, Debug, Copy, Clone)]
 pub struct MathValueRecord<'a> {
-    value: i16,
-    device_table: Option<Device<'a>>,
+    /// The X or Y value in design units.
+    pub value: i16,
+    pub device_table: Option<Device<'a>>,
 }
 
 impl<'a> MathValueRecord<'a> {
-    pub fn get(&self) -> i16 { self.value }
     fn parse(data: &'a [u8], parent: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let value = s.read::<i16>()?;
-        let device_table = s.read::<Option<Offset16>>()?
-            .and_then(|offset| parent.get(offset.to_usize()..))
-            .and_then(Device::parse);
-        Some(MathValueRecord { value, device_table })
+        s.parse_math_value_record(parent)
     }
 }
 
@@ -38,16 +40,14 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
         let major_version = s.read::<u16>()? as u8;
         let minor_version = s.read::<u16>()? as u8;
-        let math_constants = s.read::<Option<Offset16>>()?
-            .and_then(|offset| data.get(offset.to_usize()..))
-            .map(|data| MathConstants { data });
-        let math_glyph_info_offset = s.read::<u16>()?;
-        let math_variants_offset = s.read::<u16>()?;
+        let math_constants = s.parse_from_offset(data, MathConstants::parse)?;
+        let math_glyph_info = s.parse_from_offset(data, MathGlyphInfo::parse)?;
+        // let math_variants_offset = s.read::<u16>()?;
         Some(Table {
             major_version,
             minor_version,
             math_constants,
-            // math_glyph_info: todo!(),
+            math_glyph_info,
             // math_variants: todo!(),
         })
     }
@@ -91,6 +91,10 @@ impl<'a> Table<'a> {
 #[derive(Clone)]
 pub struct MathConstants<'a> {
     data: &'a [u8],
+}
+
+impl<'a> FromSlice<'a> for MathConstants<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> { Some(MathConstants { data }) }
 }
 
 const SCRIPT_PERCENT_SCALE_DOWN_OFFSET: usize = 0;
@@ -643,6 +647,214 @@ impl<'a> MathConstants<'a> {
     }
 }
 
-// pub struct MathGlyphInfo<'a> {}
+/// The MathGlyphInfo table contains positioning information that is defined on per-glyph basis.
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct MathGlyphInfo<'a> {
+    /// Contains information on italics correction values.
+    pub math_italics_correction_info: MathValueTable<'a>,
+    /// Contains horizontal positions for attaching mathematical accents.
+    pub math_top_accent_attachment: MathValueTable<'a>,
+    /// The glyphs covered by this table are to be considered extended shapes.
+    pub extended_shape_coverage: Option<Coverage<'a>>,
+    /// Provides per-glyph information for mathematical kerning.
+    pub math_kern_info: Option<MathKernInfo<'a>>,
+}
+
+impl<'a> FromSlice<'a> for MathGlyphInfo<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let math_italics_correction_info = s.parse_from_offset(data, MathValueTable::parse)?;
+        let math_top_accent_attachment = s.parse_from_offset(data, MathValueTable::parse)?;
+        let extended_shape_coverage = s.parse_from_offset(data, Coverage::parse);
+        let math_kern_info = s.parse_from_offset(data, MathKernInfo::parse);
+        Some(MathGlyphInfo {
+            math_italics_correction_info,
+            math_top_accent_attachment,
+            extended_shape_coverage,
+            math_kern_info,
+        })
+    }
+}
+
+/// Mapping from glyph to values.
+#[allow(missing_debug_implementations)]
+#[allow(missing_docs)]
+#[derive(Clone)]
+pub struct MathValueTable<'a> {
+    pub coverage: Coverage<'a>,
+    values: MathValueArray<'a>,
+}
+
+impl<'a> MathValueTable<'a> {
+    /// Checks that glyph is present.
+    pub fn contains(&self, glyph: GlyphId) -> bool {
+        self.coverage.contains(glyph)
+    }
+
+    /// Returns the [`MathValueRecord`] of the glyph or `None` if it is not covered.
+    pub fn get(&self, glyph: GlyphId) -> Option<MathValueRecord<'a>> {
+        let index = self.coverage.get(glyph)? as usize;
+        self.values.get(index)
+    }
+}
+
+impl<'a> FromSlice<'a> for MathValueTable<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let coverage = s.parse_from_offset(data, Coverage::parse)?;
+        let values = s.parse_math_value_array(data)?;
+        Some(MathValueTable { coverage, values })
+    }
+}
+
+#[derive(Clone)]
+struct MathValueArray<'a> {
+    entries: &'a [u8],
+    parent: &'a [u8], // for locating device tables
+}
+
+impl<'a> MathValueArray<'a> {
+    fn get(&self, index: usize) -> Option<MathValueRecord<'a>> {
+        let mut s = Stream::new_at(self.entries, index * 4)?;
+        s.parse_math_value_record(self.parent)
+    }
+}
+
+impl<'a> Stream<'a> {
+    fn parse_math_value_record(&mut self, base: &'a [u8]) -> Option<MathValueRecord<'a>> {
+        let value = self.read::<i16>()?;
+        let device_table = self.parse_from_offset(base, Device::parse);
+        Some(MathValueRecord { value, device_table })
+    }
+    fn parse_from_offset<F, R>(&mut self, base: &'a [u8], parse: F) -> Option<R>
+        where F: FnOnce(&'a [u8]) -> Option<R> {
+        self.read::<Option<Offset16>>()?
+            .and_then(|offset| base.get(offset.to_usize()..))
+            .and_then(parse)
+    }
+    fn parse_math_value_array(&mut self, parent: &'a [u8]) -> Option<MathValueArray<'a>> {
+        let count = self.read::<u16>()? as usize;
+        let entries = self.tail()?.get(..count * 4)?;
+        Some(MathValueArray { entries, parent })
+    }
+    fn parse_kern_info_array(&mut self, parent: &'a [u8]) -> Option<MathKernInfoArray<'a>> {
+        let count = self.read::<u16>()? as usize;
+        let entries = self.tail()?.get(..count * 8)?;
+        Some(MathKernInfoArray { entries, parent })
+    }
+}
+
+/// See <https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathkerninfo-table>.
+#[allow(missing_debug_implementations)]
+#[allow(missing_docs)]
+#[derive(Clone)]
+pub struct MathKernInfo<'a> {
+    pub coverage: Coverage<'a>,
+    values: MathKernInfoArray<'a>,
+}
+
+impl<'a> MathKernInfo<'a> {
+    /// Checks that glyph is present.
+    pub fn contains(&self, glyph: GlyphId) -> bool {
+        self.coverage.contains(glyph)
+    }
+
+    /// Returns the [`MathKernInfoRecord`] of the glyph or `None` if it is not covered.
+    pub fn get(&self, glyph: GlyphId) -> Option<MathKernInfoRecord<'a>> {
+        let index = self.coverage.get(glyph)? as usize;
+        self.values.get(index)
+    }
+}
+
+impl<'a> FromSlice<'a> for MathKernInfo<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let coverage = s.parse_from_offset(data, Coverage::parse)?;
+        let values = s.parse_kern_info_array(data)?;
+        Some(MathKernInfo { coverage, values })
+    }
+}
+
+#[derive(Clone)]
+struct MathKernInfoArray<'a> {
+    entries: &'a [u8],
+    parent: &'a [u8], // for locating device tables
+}
+
+impl<'a> MathKernInfoArray<'a> {
+    fn get(&self, index: usize) -> Option<MathKernInfoRecord<'a>> {
+        let mut s = Stream::new_at(self.entries, index * 8)?;
+        Some(MathKernInfoRecord {
+            top_right: s.parse_from_offset(self.parent, MathKern::parse),
+            top_left: s.parse_from_offset(self.parent, MathKern::parse),
+            bottom_right: s.parse_from_offset(self.parent, MathKern::parse),
+            bottom_left: s.parse_from_offset(self.parent, MathKern::parse),
+        })
+    }
+}
+
+/// Each MathKernInfoRecord points to up to four kern tables for each of the corners around the
+/// glyph. If no kern table is provided for a corner, a kerning amount of zero is assumed.
+#[allow(missing_debug_implementations)]
+#[allow(missing_docs)]
+#[derive(Clone)]
+pub struct MathKernInfoRecord<'a> {
+    pub top_right: Option<MathKern<'a>>,
+    pub top_left: Option<MathKern<'a>>,
+    pub bottom_right: Option<MathKern<'a>>,
+    pub bottom_left: Option<MathKern<'a>>,
+}
+
+/// The MathKern table provides kerning amounts for different heights in a glyph’s vertical extent.
+/// An array of kerning values is provided, each of which applies to a height range. A corresponding
+/// array of heights indicate the transition points between consecutive ranges.
+///
+/// Correction heights for each glyph are relative to the glyph baseline, with positive height
+/// values above the baseline, and negative height values below the baseline. The correctionHeights
+/// array is sorted in increasing order, from lowest to highest.
+///
+/// The kerning value corresponding to a particular height is determined by finding two consecutive
+/// entries in the correctionHeight array such that the given height is greater than or equal to
+/// the first entry and less than the second entry. The index of the second entry is used to look
+/// up a kerning value in the kernValues array. If the given height is less than the first entry
+/// in the correctionHeights array, the first kerning value (index 0) is used. For a height that is
+/// greater than or equal to the last entry in the correctionHeights array, the last entry is used.
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct MathKern<'a> {
+    parent: &'a [u8],
+    correction_height: &'a [u8],
+    kern_values: &'a [u8],
+}
+
+impl<'a> MathKern<'a> {
+    /// Number of heights as split points.
+    pub fn height_count(&self) -> usize { self.correction_height.len() / 4 }
+    /// Number of kern values. It is always greater than number of heights by one.
+    pub fn kern_count(&self) -> usize { self.kern_values.len() / 4 }
+    /// Get the height value at some specific index.
+    pub fn get_height(&self, n: usize) -> Option<MathValueRecord> {
+        let mut s = Stream::new_at(self.correction_height, n * 4)?;
+        s.parse_math_value_record(self.parent)
+    }
+    /// Get the kern value at some specific index.
+    pub fn get_kern_value(&self, n: usize) -> Option<MathValueRecord> {
+        let mut s = Stream::new_at(self.kern_values, n * 4)?;
+        s.parse_math_value_record(self.parent)
+    }
+}
+
+impl<'a> FromSlice<'a> for MathKern<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let count = s.read::<u16>()? as usize;
+        let bytes = count * 4;
+        let rest = s.tail()?;
+        let correction_height = rest.get(..bytes)?;
+        let kern_values = rest.get(bytes..bytes + bytes + 1)?;
+        Some(MathKern { parent: data, correction_height, kern_values })
+    }
+}
 
 // pub struct MathVariants<'a> {}

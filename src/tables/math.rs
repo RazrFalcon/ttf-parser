@@ -21,6 +21,32 @@ pub struct Table<'a> {
     pub math_variants: MathVariants<'a>,
 }
 
+#[derive(Debug, Default, Copy, Clone)]
+struct RawMathValueRecord {
+    value: i16,
+    device_table_offset: Option<Offset16>,
+}
+
+impl FromData for RawMathValueRecord {
+    const SIZE: usize = 4;
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(RawMathValueRecord {
+            value: s.read()?,
+            device_table_offset: s.read()?,
+        })
+    }
+}
+
+impl RawMathValueRecord {
+    fn get(self, data: &[u8]) -> MathValueRecord {
+        let device_table = self.device_table_offset
+            .and_then(|offset| data.get(offset.to_usize()..))
+            .and_then(Device::parse);
+        MathValueRecord { value: self.value, device_table }
+    }
+}
+
 /// A [MathValueRecord](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord).
 #[allow(missing_debug_implementations)]
 #[allow(missing_docs)]
@@ -34,7 +60,7 @@ pub struct MathValueRecord<'a> {
 impl<'a> MathValueRecord<'a> {
     fn parse(data: &'a [u8], parent: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        s.parse_math_value_record(parent)
+        Some(s.read::<RawMathValueRecord>()?.get(parent))
     }
 }
 
@@ -698,7 +724,7 @@ impl<'a> MathValueTable<'a> {
 
     /// Returns the [`MathValueRecord`] of the glyph or `None` if it is not covered.
     pub fn get(&self, glyph: GlyphId) -> Option<MathValueRecord<'a>> {
-        let index = self.coverage.get(glyph)? as usize;
+        let index = self.coverage.get(glyph)?;
         self.values.get(index)
     }
 }
@@ -714,23 +740,17 @@ impl<'a> FromSlice<'a> for MathValueTable<'a> {
 
 #[derive(Clone)]
 struct MathValueArray<'a> {
-    entries: &'a [u8],
-    parent: &'a [u8], // for locating device tables
+    entries: LazyArray16<'a, RawMathValueRecord>,
+    data: &'a [u8], // for locating device tables
 }
 
 impl<'a> MathValueArray<'a> {
-    fn get(&self, index: usize) -> Option<MathValueRecord<'a>> {
-        let mut s = Stream::new_at(self.entries, index * 4)?;
-        s.parse_math_value_record(self.parent)
+    fn get(&self, index: u16) -> Option<MathValueRecord<'a>> {
+        Some(self.entries.get(index)?.get(self.data))
     }
 }
 
 impl<'a> Stream<'a> {
-    fn parse_math_value_record(&mut self, base: &'a [u8]) -> Option<MathValueRecord<'a>> {
-        let value = self.read::<i16>()?;
-        let device_table = self.parse_from_offset(base, Device::parse);
-        Some(MathValueRecord { value, device_table })
-    }
     fn parse_from_offset<F, R>(&mut self, base: &'a [u8], parse: F) -> Option<R>
         where F: FnOnce(&'a [u8]) -> Option<R> {
         self.read::<Option<Offset16>>()?
@@ -738,14 +758,14 @@ impl<'a> Stream<'a> {
             .and_then(parse)
     }
     fn parse_math_value_array(&mut self, parent: &'a [u8]) -> Option<MathValueArray<'a>> {
-        let count = self.read::<u16>()? as usize;
-        let entries = self.tail()?.get(..count * 4)?;
-        Some(MathValueArray { entries, parent })
+        let count = self.read::<u16>()?;
+        let entries = self.read_array16(count)?;
+        Some(MathValueArray { entries, data: parent })
     }
     fn parse_kern_info_array(&mut self, parent: &'a [u8]) -> Option<MathKernInfoArray<'a>> {
-        let count = self.read::<u16>()? as usize;
-        let entries = self.tail()?.get(..count * 8)?;
-        Some(MathKernInfoArray { entries, parent })
+        let count = self.read::<u16>()?;
+        let entries = self.read_array16(count)?;
+        Some(MathKernInfoArray { entries, data: parent })
     }
 }
 
@@ -766,7 +786,7 @@ impl<'a> MathKernInfo<'a> {
 
     /// Returns the [`MathKernInfoRecord`] of the glyph or `None` if it is not covered.
     pub fn get(&self, glyph: GlyphId) -> Option<MathKernInfoRecord<'a>> {
-        let index = self.coverage.get(glyph)? as usize;
+        let index = self.coverage.get(glyph)?;
         self.values.get(index)
     }
 }
@@ -782,19 +802,48 @@ impl<'a> FromSlice<'a> for MathKernInfo<'a> {
 
 #[derive(Clone)]
 struct MathKernInfoArray<'a> {
-    entries: &'a [u8],
-    parent: &'a [u8], // for locating device tables
+    entries: LazyArray16<'a, RawMathKernInfoRecord>,
+    data: &'a [u8], // for locating device tables
 }
 
 impl<'a> MathKernInfoArray<'a> {
-    fn get(&self, index: usize) -> Option<MathKernInfoRecord<'a>> {
-        let mut s = Stream::new_at(self.entries, index * 8)?;
-        Some(MathKernInfoRecord {
-            top_right: s.parse_from_offset(self.parent, MathKern::parse),
-            top_left: s.parse_from_offset(self.parent, MathKern::parse),
-            bottom_right: s.parse_from_offset(self.parent, MathKern::parse),
-            bottom_left: s.parse_from_offset(self.parent, MathKern::parse),
+    fn get(&self, index: u16) -> Option<MathKernInfoRecord<'a>> {
+        Some(self.entries.get(index)?.get(self.data))
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone)]
+struct RawMathKernInfoRecord {
+    pub top_right: Option<Offset16>,
+    pub top_left: Option<Offset16>,
+    pub bottom_right: Option<Offset16>,
+    pub bottom_left: Option<Offset16>,
+}
+
+impl FromData for RawMathKernInfoRecord {
+    const SIZE: usize = 8;
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(RawMathKernInfoRecord {
+            top_right: s.read()?,
+            top_left: s.read()?,
+            bottom_right: s.read()?,
+            bottom_left: s.read()?,
         })
+    }
+}
+
+impl RawMathKernInfoRecord {
+    fn get<'a>(&self, data: &'a [u8]) -> MathKernInfoRecord<'a> {
+        let parse_field = |offset: Option<Offset16>| offset
+            .and_then(|offset| data.get(offset.to_usize()..))
+            .and_then(MathKern::parse);
+        MathKernInfoRecord {
+            top_right: parse_field(self.top_right),
+            top_left: parse_field(self.top_left),
+            bottom_right: parse_field(self.bottom_right),
+            bottom_left: parse_field(self.bottom_left),
+        }
     }
 }
 
@@ -827,37 +876,33 @@ pub struct MathKernInfoRecord<'a> {
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
 pub struct MathKern<'a> {
-    parent: &'a [u8],
-    correction_height: &'a [u8],
-    kern_values: &'a [u8],
+    data: &'a [u8],
+    correction_height: LazyArray16<'a, RawMathValueRecord>,
+    kern_values: LazyArray16<'a, RawMathValueRecord>,
 }
 
 impl<'a> MathKern<'a> {
     /// Number of heights as split points.
-    pub fn height_count(&self) -> usize { self.correction_height.len() / 4 }
+    pub fn height_count(&self) -> u16 { self.correction_height.len() }
     /// Number of kern values. It is always greater than number of heights by one.
-    pub fn kern_count(&self) -> usize { self.kern_values.len() / 4 }
+    pub fn kern_count(&self) -> u16 { self.kern_values.len() }
     /// Get the height value at some specific index.
-    pub fn get_height(&self, n: usize) -> Option<MathValueRecord> {
-        let mut s = Stream::new_at(self.correction_height, n * 4)?;
-        s.parse_math_value_record(self.parent)
+    pub fn get_height(&self, index: u16) -> Option<MathValueRecord> {
+        Some(self.correction_height.get(index)?.get(self.data))
     }
     /// Get the kern value at some specific index.
-    pub fn get_kern_value(&self, n: usize) -> Option<MathValueRecord> {
-        let mut s = Stream::new_at(self.kern_values, n * 4)?;
-        s.parse_math_value_record(self.parent)
+    pub fn get_kern_value(&self, index: u16) -> Option<MathValueRecord> {
+        Some(self.kern_values.get(index)?.get(self.data))
     }
 }
 
 impl<'a> FromSlice<'a> for MathKern<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let count = s.read::<u16>()? as usize;
-        let bytes = count * 4;
-        let rest = s.tail()?;
-        let correction_height = rest.get(..bytes)?;
-        let kern_values = rest.get(bytes..bytes + bytes + 1)?;
-        Some(MathKern { parent: data, correction_height, kern_values })
+        let count = s.read::<u16>()?;
+        let correction_height = s.read_array16(count)?;
+        let kern_values = s.read_array16(count + 1)?;
+        Some(MathKern { data: data, correction_height, kern_values })
     }
 }
 
@@ -972,7 +1017,7 @@ pub struct GlyphAssembly<'a> {
 impl<'a> FromSlice<'a> for GlyphAssembly<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let italics_correction = s.parse_math_value_record(data)?;
+        let italics_correction = s.read::<RawMathValueRecord>()?.get(data);
         let glyph_part_count = s.read()?;
         let glyph_parts = s.read_array16(glyph_part_count)?;
         Some(GlyphAssembly { italics_correction, glyph_parts })

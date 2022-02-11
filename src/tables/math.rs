@@ -3,7 +3,11 @@
 use crate::GlyphId;
 use crate::gpos::Device;
 use crate::opentype_layout::Coverage;
-use crate::parser::{FromSlice, Offset, Offset16, Stream};
+use crate::parser::{
+    Offset16, Stream,
+    FromSlice, FromData, Offset,
+    LazyArray16, LazyOffsetArray16,
+};
 
 /// A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
 #[allow(missing_debug_implementations)]
@@ -14,7 +18,7 @@ pub struct Table<'a> {
     pub minor_version: u8,
     pub math_constants: MathConstants<'a>,
     pub math_glyph_info: MathGlyphInfo<'a>,
-    // pub math_variants: MathVariants<'a>,
+    pub math_variants: MathVariants<'a>,
 }
 
 /// A [MathValueRecord](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord).
@@ -42,13 +46,13 @@ impl<'a> Table<'a> {
         let minor_version = s.read::<u16>()? as u8;
         let math_constants = s.parse_from_offset(data, MathConstants::parse)?;
         let math_glyph_info = s.parse_from_offset(data, MathGlyphInfo::parse)?;
-        // let math_variants_offset = s.read::<u16>()?;
+        let math_variants = s.parse_from_offset(data, MathVariants::parse)?;
         Some(Table {
             major_version,
             minor_version,
             math_constants,
             math_glyph_info,
-            // math_variants: todo!(),
+            math_variants,
         })
     }
 }
@@ -857,4 +861,168 @@ impl<'a> FromSlice<'a> for MathKern<'a> {
     }
 }
 
-// pub struct MathVariants<'a> {}
+/// The MathVariants table solves the following problem: given a particular default glyph shape and
+/// a certain width or height, find a variant shape glyph (or construct created by putting several
+/// glyphs together) that has the required measurement. This functionality is needed for growing
+/// the parentheses to match the height of the expression within, growing the radical sign to match
+/// the height of the expression under the radical, stretching accents like tilde when they are put
+/// over several characters, for stretching arrows, horizontal curly braces, and so forth.
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct MathVariants<'a> {
+    /// Minimum overlap of connecting glyphs during glyph construction, in design units.
+    ///
+    /// `min_connector_overlap` defines by how much two glyphs need to overlap with each other when
+    /// used to construct a larger shape. Each glyph to be used as a building block in constructing
+    /// extended shapes will have a straight part at either or both ends. This connector part is
+    /// used to connect that glyph to other glyphs in the assembly. These connectors need to overlap
+    /// to compensate for rounding errors and hinting corrections at a lower resolution. The
+    /// `min_connector_overlap` value tells how much overlap is necessary for this particular font.
+    pub min_connector_overlap: u16,
+    /// Offset to Coverage table, from the beginning of the MathVariants table.
+    pub vert_glyph_coverage: Coverage<'a>,
+    /// Offset to Coverage table, from the beginning of the MathVariants table.
+    pub horiz_glyph_coverage: Coverage<'a>,
+    /// For shapes growing in the vertical direction.
+    pub vert_glyph_construction: LazyOffsetArray16<'a, MathGlyphConstruction<'a>>,
+    /// For shapes growing in the horizontal direction.
+    pub horiz_glyph_construction: LazyOffsetArray16<'a, MathGlyphConstruction<'a>>,
+}
+
+impl<'a> FromSlice<'a> for MathVariants<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let min_connector_overlap = s.read()?;
+        let vert_glyph_coverage = s.parse_from_offset(data, Coverage::parse)?;
+        let horiz_glyph_coverage = s.parse_from_offset(data, Coverage::parse)?;
+        let vert_glyph_count = s.read()?;
+        let horiz_glyph_count = s.read()?;
+        let vert_glyph_construction_offsets = s.read_array16(vert_glyph_count)?;
+        let horiz_glyph_construction_offsets = s.read_array16(horiz_glyph_count)?;
+        Some(MathVariants {
+            min_connector_overlap,
+            vert_glyph_coverage,
+            horiz_glyph_coverage,
+            vert_glyph_construction: LazyOffsetArray16::new(data, vert_glyph_construction_offsets),
+            horiz_glyph_construction: LazyOffsetArray16::new(data, horiz_glyph_construction_offsets),
+        })
+    }
+}
+
+/// The `MathGlyphConstruction` table provides information on finding or assembling extended
+/// variants for one particular glyph. It can be used for shapes that grow in either horizontal or
+/// vertical directions.
+///
+/// Note that it is quite possible that both the [`GlyphAssembly`] table and some variants are
+/// defined for a particular glyph. For example, the font may provide several variants of curly
+/// braces with different sizes, and also a general mechanism for constructing larger versions of
+/// curly braces by stacking parts found in the glyph set. First, an attempt is made to find glyph
+/// among provided variants. If the required size is larger than any of the glyph variants
+/// provided, however, then the general mechanism can be employed to typeset the curly braces as a
+/// glyph assembly.
+#[allow(missing_docs)]
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct MathGlyphConstruction<'a> {
+    pub glyph_assembly: Option<GlyphAssembly<'a>>,
+    pub variants: LazyArray16<'a, MathGlyphVariantRecord>,
+}
+
+impl<'a> FromSlice<'a> for MathGlyphConstruction<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let glyph_assembly = s.parse_from_offset(data, GlyphAssembly::parse);
+        let variant_count = s.read()?;
+        let variants = s.read_array16(variant_count)?;
+        Some(MathGlyphConstruction { glyph_assembly, variants })
+    }
+}
+
+/// Description of math glyph variants.
+#[derive(Debug, Default, Copy, Clone)]
+pub struct MathGlyphVariantRecord {
+    /// Glyph ID for the variant.
+    pub variant_glyph: GlyphId,
+    /// Advance width/height, in design units, of the variant, in the direction of requested glyph
+    /// extension.
+    pub advance_measurement: u16,
+}
+
+impl FromData for MathGlyphVariantRecord {
+    const SIZE: usize = 4;
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let variant_glyph = s.read()?;
+        let advance_measurement = s.read()?;
+        Some(MathGlyphVariantRecord { variant_glyph, advance_measurement })
+    }
+}
+
+/// How the shape for this glyph can be assembled from parts found in the glyph set of the font.
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct GlyphAssembly<'a> {
+    /// Italics correction of this GlyphAssembly. Should not depend on the assembly size.
+    pub italics_correction: MathValueRecord<'a>,
+    /// Array of part records, from left to right (for assemblies that extend horizontally) or
+    /// bottom to top (for assemblies that extend vertically).
+    pub glyph_parts: LazyArray16<'a, GlyphPartRecord>,
+}
+
+impl<'a> FromSlice<'a> for GlyphAssembly<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let italics_correction = s.parse_math_value_record(data)?;
+        let glyph_part_count = s.read()?;
+        let glyph_parts = s.read_array16(glyph_part_count)?;
+        Some(GlyphAssembly { italics_correction, glyph_parts })
+    }
+}
+
+/// Description of glyph parts to be assembled.
+#[allow(missing_debug_implementations)]
+#[derive(Copy, Clone)]
+pub struct GlyphPartRecord {
+    /// Glyph ID for the part.
+    pub glyph_id: GlyphId,
+    /// Lengths of the connectors on the start of the glyph.
+    pub start_connector_length: u16,
+    /// Lengths of the connectors on the end of the glyph.
+    pub end_connector_length: u16,
+    /// The full advance of the part. It is also used to determine the measurement of the result
+    /// by using the following formula:
+    ///
+    /// _Size of Assembly = Offset of the Last Part + Full Advance of the Last Part_
+    pub full_advance: u16,
+}
+
+impl FromData for GlyphPartRecord {
+    const SIZE: usize = 8;
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(GlyphPartRecord {
+            glyph_id: s.read()?,
+            start_connector_length: s.read()?,
+            end_connector_length: s.read()?,
+            full_advance: s.read()?,
+        })
+    }
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug)]
+pub struct PartFlags(pub u16);
+
+impl PartFlags {
+    /// If set, the part can be skipped or repeated.
+    #[inline]
+    pub fn extender(self) -> bool { self.0 & 0x0001 != 0 }
+}
+
+impl FromData for PartFlags {
+    const SIZE: usize = 2;
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        s.read::<u16>().map(PartFlags)
+    }
+}

@@ -70,9 +70,9 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
         let major_version = s.read::<u16>()? as u8;
         let minor_version = s.read::<u16>()? as u8;
-        let math_constants = s.parse_from_offset(data, MathConstants::parse)?;
-        let math_glyph_info = s.parse_from_offset(data, MathGlyphInfo::parse)?;
-        let math_variants = s.parse_from_offset(data, MathVariants::parse)?;
+        let math_constants = s.parse_at_offset16(data)?;
+        let math_glyph_info = s.parse_at_offset16(data)?;
+        let math_variants = s.parse_at_offset16(data)?;
         Some(Table {
             major_version,
             minor_version,
@@ -694,10 +694,10 @@ pub struct MathGlyphInfo<'a> {
 impl<'a> FromSlice<'a> for MathGlyphInfo<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let math_italics_correction_info = s.parse_from_offset(data, MathValueTable::parse)?;
-        let math_top_accent_attachment = s.parse_from_offset(data, MathValueTable::parse)?;
-        let extended_shape_coverage = s.parse_from_offset(data, Coverage::parse);
-        let math_kern_info = s.parse_from_offset(data, MathKernInfo::parse);
+        let math_italics_correction_info = s.parse_at_offset16(data)?;
+        let math_top_accent_attachment = s.parse_at_offset16(data)?;
+        let extended_shape_coverage = s.parse_at_offset16(data);
+        let math_kern_info = s.parse_at_offset16(data);
         Some(MathGlyphInfo {
             math_italics_correction_info,
             math_top_accent_attachment,
@@ -732,9 +732,10 @@ impl<'a> MathValueTable<'a> {
 impl<'a> FromSlice<'a> for MathValueTable<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let coverage = s.parse_from_offset(data, Coverage::parse)?;
-        let values = s.parse_math_value_array(data)?;
-        Some(MathValueTable { coverage, values })
+        let coverage = s.parse_at_offset16(data)?;
+        let count = s.read::<u16>()?;
+        let entries = s.read_array16(count)?;
+        Some(MathValueTable { coverage, values: MathValueArray { entries, data } })
     }
 }
 
@@ -751,21 +752,8 @@ impl<'a> MathValueArray<'a> {
 }
 
 impl<'a> Stream<'a> {
-    fn parse_from_offset<F, R>(&mut self, base: &'a [u8], parse: F) -> Option<R>
-        where F: FnOnce(&'a [u8]) -> Option<R> {
-        self.read::<Option<Offset16>>()?
-            .and_then(|offset| base.get(offset.to_usize()..))
-            .and_then(parse)
-    }
-    fn parse_math_value_array(&mut self, parent: &'a [u8]) -> Option<MathValueArray<'a>> {
-        let count = self.read::<u16>()?;
-        let entries = self.read_array16(count)?;
-        Some(MathValueArray { entries, data: parent })
-    }
-    fn parse_kern_info_array(&mut self, parent: &'a [u8]) -> Option<MathKernInfoArray<'a>> {
-        let count = self.read::<u16>()?;
-        let entries = self.read_array16(count)?;
-        Some(MathKernInfoArray { entries, data: parent })
+    fn parse_at_offset16<T: FromSlice<'a>>(&mut self, base: &'a [u8]) -> Option<T> {
+        self.read_at_offset16(base).and_then(T::parse)
     }
 }
 
@@ -794,9 +782,10 @@ impl<'a> MathKernInfo<'a> {
 impl<'a> FromSlice<'a> for MathKernInfo<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let coverage = s.parse_from_offset(data, Coverage::parse)?;
-        let values = s.parse_kern_info_array(data)?;
-        Some(MathKernInfo { coverage, values })
+        let coverage = s.parse_at_offset16(data)?;
+        let count = s.read::<u16>()?;
+        let entries = s.read_array16(count)?;
+        Some(MathKernInfo { coverage, values: MathKernInfoArray { entries, data } })
     }
 }
 
@@ -902,7 +891,7 @@ impl<'a> FromSlice<'a> for MathKern<'a> {
         let count = s.read::<u16>()?;
         let correction_height = s.read_array16(count)?;
         let kern_values = s.read_array16(count + 1)?;
-        Some(MathKern { data: data, correction_height, kern_values })
+        Some(MathKern { data, correction_height, kern_values })
     }
 }
 
@@ -938,8 +927,8 @@ impl<'a> FromSlice<'a> for MathVariants<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let min_connector_overlap = s.read()?;
-        let vert_glyph_coverage = s.parse_from_offset(data, Coverage::parse)?;
-        let horiz_glyph_coverage = s.parse_from_offset(data, Coverage::parse)?;
+        let vert_glyph_coverage = s.parse_at_offset16(data)?;
+        let horiz_glyph_coverage = s.parse_at_offset16(data)?;
         let vert_glyph_count = s.read()?;
         let horiz_glyph_count = s.read()?;
         let vert_glyph_construction_offsets = s.read_array16(vert_glyph_count)?;
@@ -976,7 +965,7 @@ pub struct MathGlyphConstruction<'a> {
 impl<'a> FromSlice<'a> for MathGlyphConstruction<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let glyph_assembly = s.parse_from_offset(data, GlyphAssembly::parse);
+        let glyph_assembly = s.parse_at_offset16(data);
         let variant_count = s.read()?;
         let variants = s.read_array16(variant_count)?;
         Some(MathGlyphConstruction { glyph_assembly, variants })

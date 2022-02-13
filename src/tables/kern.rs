@@ -15,7 +15,7 @@ But we still try to keep the API as high-level as possible.
 */
 
 use crate::GlyphId;
-use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset16, Stream};
+use crate::parser::{FromData, Array, LazyArray16, NumFrom, Offset, Offset16, Stream};
 
 #[derive(Clone, Copy, Debug)]
 struct OTCoverage(u8);

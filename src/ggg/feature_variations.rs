@@ -1,5 +1,5 @@
 use crate::{NormalizedCoordinate, Tag};
-use crate::parser::{FromData, LazyArray16, LazyArray32};
+use crate::parser::{FromData, Array, LazyArray16, LazyArray32};
 use crate::parser::{Offset, Offset32, Stream};
 use super::{Feature, FeatureIndex, VariationIndex, RecordListItem};
 

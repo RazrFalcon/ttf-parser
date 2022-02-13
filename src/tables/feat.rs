@@ -1,7 +1,7 @@
 //! A [Feature Name Table](
 //! https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6feat.html) implementation.
 
-use crate::parser::{FromData, LazyArray16, Offset, Offset32, Stream};
+use crate::parser::{FromData, Array, LazyArray16, Offset, Offset32, Stream};
 
 #[derive(Clone, Copy, Debug)]
 struct FeatureNameRecord {

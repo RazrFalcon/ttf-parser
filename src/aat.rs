@@ -7,7 +7,7 @@ related types.
 use core::num::NonZeroU16;
 
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
+use crate::parser::{Stream, FromData, Array, LazyArray16};
 
 /// A [lookup table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).

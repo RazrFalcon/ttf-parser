@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 
-use crate::parser::{LazyArray16, Stream};
+use crate::parser::{Array, LazyArray16, Stream};
 use crate::GlyphId;
 
 /// A [format 6](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-6-trimmed-table-mapping)

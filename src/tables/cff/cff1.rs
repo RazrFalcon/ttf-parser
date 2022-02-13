@@ -10,7 +10,7 @@ use core::convert::TryFrom;
 use core::ops::Range;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox};
-use crate::parser::{Stream, LazyArray16, NumFrom, TryNumFrom};
+use crate::parser::{Stream, Array, LazyArray16, NumFrom, TryNumFrom};
 use super::{Builder, IsEven, CFFError, StringId, calc_subroutine_bias, conv_subroutine_index};
 use super::argstack::ArgumentsStack;
 use super::charset::{STANDARD_ENCODING, Charset, parse_charset};

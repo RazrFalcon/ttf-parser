@@ -8,7 +8,7 @@ use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox, NormalizedCoordinate};
-use crate::parser::{Stream, Offset, Offset16, Offset32, LazyArray16, F2DOT14};
+use crate::parser::{Stream, Offset, Offset16, Offset32, Array, LazyArray16, F2DOT14};
 use crate::glyf::{self, Transform};
 
 /// 'The TrueType rasterizer dynamically generates 'phantom' points for each glyph

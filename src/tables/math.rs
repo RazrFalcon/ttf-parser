@@ -6,7 +6,7 @@ use crate::opentype_layout::Coverage;
 use crate::parser::{
     Offset16, Stream,
     FromSlice, FromData, Offset,
-    LazyArray16, LazyOffsetArray16,
+    Array, LazyArray16, LazyOffsetArray16,
 };
 
 /// A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
@@ -857,13 +857,6 @@ impl<'a> FromSlice<'a> for MathKern<'a> {
 #[derive(Clone)]
 pub struct MathVariants<'a> {
     /// Minimum overlap of connecting glyphs during glyph construction, in design units.
-    ///
-    /// `min_connector_overlap` defines by how much two glyphs need to overlap with each other when
-    /// used to construct a larger shape. Each glyph to be used as a building block in constructing
-    /// extended shapes will have a straight part at either or both ends. This connector part is
-    /// used to connect that glyph to other glyphs in the assembly. These connectors need to overlap
-    /// to compensate for rounding errors and hinting corrections at a lower resolution. The
-    /// `min_connector_overlap` value tells how much overlap is necessary for this particular font.
     pub min_connector_overlap: u16,
     /// Coverage table for shapes growing in the vertical direction.
     pub vert_glyph_coverage: Coverage<'a>,

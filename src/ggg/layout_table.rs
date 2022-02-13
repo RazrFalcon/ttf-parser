@@ -2,7 +2,7 @@
 #![allow(unused_variables)]
 
 use super::LookupList;
-use crate::parser::{FromData, LazyArray16, Offset, Offset16, Stream};
+use crate::parser::{FromData, Array, LazyArray16, Offset, Offset16, Stream};
 use crate::Tag;
 #[cfg(feature = "variable-fonts")] use super::FeatureVariations;
 #[cfg(feature = "variable-fonts")] use crate::parser::Offset32;

@@ -1,5 +1,5 @@
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
+use crate::parser::{Stream, FromData, Array, LazyArray16};
 use super::StringId;
 
 /// The Standard Encoding as defined in the Adobe Technical Note #5176 Appendix B.

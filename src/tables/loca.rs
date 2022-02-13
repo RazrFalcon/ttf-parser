@@ -5,7 +5,7 @@ use core::num::NonZeroU16;
 use core::ops::Range;
 
 use crate::{GlyphId, IndexToLocationFormat};
-use crate::parser::{Stream, LazyArray16, NumFrom};
+use crate::parser::{Stream, Array, LazyArray16, NumFrom};
 
 /// An [Index to Location Table](https://docs.microsoft.com/en-us/typography/opentype/spec/loca).
 #[derive(Clone, Copy, Debug)]

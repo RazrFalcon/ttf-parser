@@ -997,7 +997,7 @@ pub struct GlyphPartRecord {
 }
 
 impl FromData for GlyphPartRecord {
-    const SIZE: usize = 8;
+    const SIZE: usize = 10;
 
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);

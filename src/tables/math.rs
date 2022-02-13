@@ -819,17 +819,6 @@ pub struct MathKernInfoRecord<'a> {
 /// The MathKern table provides kerning amounts for different heights in a glyph’s vertical extent.
 /// An array of kerning values is provided, each of which applies to a height range. A corresponding
 /// array of heights indicate the transition points between consecutive ranges.
-///
-/// Correction heights for each glyph are relative to the glyph baseline, with positive height
-/// values above the baseline, and negative height values below the baseline. The correctionHeights
-/// array is sorted in increasing order, from lowest to highest.
-///
-/// The kerning value corresponding to a particular height is determined by finding two consecutive
-/// entries in the correctionHeight array such that the given height is greater than or equal to
-/// the first entry and less than the second entry. The index of the second entry is used to look
-/// up a kerning value in the kernValues array. If the given height is less than the first entry
-/// in the correctionHeights array, the first kerning value (index 0) is used. For a height that is
-/// greater than or equal to the last entry in the correctionHeights array, the last entry is used.
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
 pub struct MathKern<'a> {
@@ -906,17 +895,7 @@ impl<'a> FromSlice<'a> for MathVariants<'a> {
     }
 }
 
-/// The `MathGlyphConstruction` table provides information on finding or assembling extended
-/// variants for one particular glyph. It can be used for shapes that grow in either horizontal or
-/// vertical directions.
-///
-/// Note that it is quite possible that both the [`GlyphAssembly`] table and some variants are
-/// defined for a particular glyph. For example, the font may provide several variants of curly
-/// braces with different sizes, and also a general mechanism for constructing larger versions of
-/// curly braces by stacking parts found in the glyph set. First, an attempt is made to find glyph
-/// among provided variants. If the required size is larger than any of the glyph variants
-/// provided, however, then the general mechanism can be employed to typeset the curly braces as a
-/// glyph assembly.
+/// Description of glyph variants at different sizes, with one optional stretchable variant.
 #[allow(missing_docs)]
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]

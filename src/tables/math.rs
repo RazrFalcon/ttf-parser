@@ -10,18 +10,23 @@ use crate::parser::{
 };
 
 /// A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
-#[allow(missing_debug_implementations)]
-#[allow(missing_docs)]
 #[derive(Clone)]
 pub struct Table<'a> {
-    pub major_version: u8,
-    pub minor_version: u8,
+    /// MathConstants Table, math positioning constants.
     pub math_constants: MathConstants<'a>,
+    /// MathGlyphInfo Table, per-glyph positioning information.
     pub math_glyph_info: MathGlyphInfo<'a>,
+    /// MathVariants Table, glyph in different sizes and infinitely stretchable shapes.
     pub math_variants: MathVariants<'a>,
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+impl<'a> core::fmt::Debug for Table<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Table {{ ... }}")
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 struct RawMathValueRecord {
     value: i16,
     device_table_offset: Option<Offset16>,
@@ -29,12 +34,12 @@ struct RawMathValueRecord {
 
 impl FromData for RawMathValueRecord {
     const SIZE: usize = 4;
+
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        Some(RawMathValueRecord {
-            value: s.read()?,
-            device_table_offset: s.read()?,
-        })
+        let value = s.read::<i16>()?;
+        let device_table_offset = s.read::<Option<Offset16>>()?;
+        Some(RawMathValueRecord { value, device_table_offset })
     }
 }
 
@@ -43,24 +48,22 @@ impl RawMathValueRecord {
         let device_table = self.device_table_offset
             .and_then(|offset| data.get(offset.to_usize()..))
             .and_then(Device::parse);
-        MathValueRecord { value: self.value, device_table }
+        MathValueRecord { value: self.value, device_correction: device_table }
     }
 }
 
 /// A [MathValueRecord](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord).
-#[allow(missing_debug_implementations)]
-#[allow(missing_docs)]
 #[derive(Default, Debug, Copy, Clone)]
 pub struct MathValueRecord<'a> {
     /// The X or Y value in design units.
     pub value: i16,
-    pub device_table: Option<Device<'a>>,
+    /// Device corrections for this value.
+    pub device_correction: Option<Device<'a>>,
 }
 
 impl<'a> MathValueRecord<'a> {
     fn parse(data: &'a [u8], parent: &'a [u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        Some(s.read::<RawMathValueRecord>()?.get(parent))
+        Some(RawMathValueRecord::parse(data)?.get(parent))
     }
 }
 
@@ -70,12 +73,12 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
         let major_version = s.read::<u16>()? as u8;
         let minor_version = s.read::<u16>()? as u8;
+        // handle the version implicitly, we only recognize version 1.0
+        if [major_version, minor_version] != [1, 0] { return None; }
         let math_constants = s.parse_at_offset16(data)?;
         let math_glyph_info = s.parse_at_offset16(data)?;
         let math_variants = s.parse_at_offset16(data)?;
         Some(Table {
-            major_version,
-            minor_version,
             math_constants,
             math_glyph_info,
             math_variants,
@@ -83,44 +86,16 @@ impl<'a> Table<'a> {
     }
 }
 
-/// The MathConstants table defines a number of constants required to properly position elements of
-/// mathematical formulas. These constants belong to several groups of semantically-related values,
-/// such as values for positioning of accents, positioning of superscripts and subscripts, and
-/// positioning of elements of fractions. The table also contains general-use constants that may
-/// affect all parts of the formula, such as axis height and math leading. Note that most of the
-/// constants deal with aspects of vertical positioning.
-///
-/// In most cases, values in the MathConstants table are assumed to be positive. For example, for
-/// descenders and shift-down values a positive constant signifies movement in a downwards
-/// direction. Most values in the MathConstants table are represented by a MathValueRecord, which
-/// allows the font designer to supply device corrections to those values when necessary.
-///
-/// For values that pertain to layout interaction between a base and dependent elements (e.g.,
-/// superscripts or limits), the specific value used is taken from the font associated with the
-/// base, and the size of the value is relative to the size of the base.
-///
-/// The following naming convention are used for fields in the MathConstants table:
-///
-/// - Height — Specifies a distance from the main baseline.
-/// - Kern — Represents a fixed amount of empty space to be introduced.
-/// - Gap — Represents an amount of empty space that may need to be increased to meet certain criteria.
-/// - Drop and Rise — Specifies the relationship between measurements of two elements to be
-///   positioned relative to each other (but not necessarily in a stack-like manner) that must meet
-///   certain criteria. For a Drop, one of the positioned elements has to be moved down to satisfy
-///   those criteria; for a Rise, the movement is upwards.
-/// - Shift — Defines a vertical shift applied to an element sitting on a baseline. Note that the
-///   value is an amount of adjustment to the position of an element, not the resulting distance
-///   from the baseline or other reference line.
-/// - Dist — Defines a distance between baselines of two elements.
-///
-/// The descriptions for several fields refer to default rule thickness. Layout engines control how
-/// rules are drawn and how their thickness is set. It is recommended that rules have the same
-/// thickness as a minus sign, low line, or a similar font value such as `OS/2.yStrikeoutSize`. For
-/// fields that are described in reference to default rule thickness, one of these should be assumed.
-#[allow(missing_debug_implementations)]
+/// Constants for math positioning.
 #[derive(Clone)]
 pub struct MathConstants<'a> {
     data: &'a [u8],
+}
+
+impl<'a> core::fmt::Debug for MathConstants<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "MathConstants {{ ... }}")
+    }
 }
 
 impl<'a> FromSlice<'a> for MathConstants<'a> {
@@ -217,7 +192,7 @@ impl<'a> MathConstants<'a> {
     /// above (os2.sTypoAscender + os2.sTypoLineGap - MathLeading) or with ink going below
     /// os2.sTypoDescender will result in increasing line height.
     #[inline]
-    pub fn math_leading(&self) -> MathValueRecord {
+    pub fn math_leading(&self) -> MathValueRecord<'a> {
         self.data.get(MATH_LEADING_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -232,7 +207,7 @@ impl<'a> MathConstants<'a> {
     /// baseline that is offset from the axis. The `axis_height` value determines the amount of
     /// that offset.
     #[inline]
-    pub fn axis_height(&self) -> MathValueRecord {
+    pub fn axis_height(&self) -> MathValueRecord<'a> {
         self.data.get(AXIS_HEIGHT_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -241,7 +216,7 @@ impl<'a> MathConstants<'a> {
     /// Maximum (ink) height of accent base that does not require raising the accents. Suggested:
     /// x‑height of the font (os2.sxHeight) plus any possible overshots.
     #[inline]
-    pub fn accent_base_height(&self) -> MathValueRecord {
+    pub fn accent_base_height(&self) -> MathValueRecord<'a> {
         self.data.get(ACCENT_BASE_HEIGHT_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -250,7 +225,7 @@ impl<'a> MathConstants<'a> {
     /// Maximum (ink) height of accent base that does not require flattening the accents.
     /// Suggested: cap height of the font (os2.sCapHeight).
     #[inline]
-    pub fn flattened_accent_base_height(&self) -> MathValueRecord {
+    pub fn flattened_accent_base_height(&self) -> MathValueRecord<'a> {
         self.data.get(FLATTENED_ACCENT_BASE_HEIGHT_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -259,7 +234,7 @@ impl<'a> MathConstants<'a> {
     /// The standard shift down applied to subscript elements. Positive for moving in the downward
     /// direction. Suggested: os2.ySubscriptYOffset.
     #[inline]
-    pub fn subscript_shift_down(&self) -> MathValueRecord {
+    pub fn subscript_shift_down(&self) -> MathValueRecord<'a> {
         self.data.get(SUBSCRIPT_SHIFT_DOWN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -268,7 +243,7 @@ impl<'a> MathConstants<'a> {
     /// Maximum allowed height of the (ink) top of subscripts that does not require moving
     /// subscripts further down. Suggested: 4/5 x-height.
     #[inline]
-    pub fn subscript_top_max(&self) -> MathValueRecord {
+    pub fn subscript_top_max(&self) -> MathValueRecord<'a> {
         self.data.get(SUBSCRIPT_TOP_MAX_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -278,7 +253,7 @@ impl<'a> MathConstants<'a> {
     /// base. Checked for bases that are treated as a box or extended shape. Positive for
     /// subscript baseline dropped below the base bottom.
     #[inline]
-    pub fn subscript_baseline_drop_min(&self) -> MathValueRecord {
+    pub fn subscript_baseline_drop_min(&self) -> MathValueRecord<'a> {
         self.data.get(SUBSCRIPT_BASELINE_DROP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -286,7 +261,7 @@ impl<'a> MathConstants<'a> {
 
     /// Standard shift up applied to superscript elements. Suggested: os2.ySuperscriptYOffset.
     #[inline]
-    pub fn superscript_shift_up(&self) -> MathValueRecord {
+    pub fn superscript_shift_up(&self) -> MathValueRecord<'a> {
         self.data.get(SUPERSCRIPT_SHIFT_UP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -294,7 +269,7 @@ impl<'a> MathConstants<'a> {
 
     /// Standard shift of superscripts relative to the base, in cramped style.
     #[inline]
-    pub fn superscript_shift_up_cramped(&self) -> MathValueRecord {
+    pub fn superscript_shift_up_cramped(&self) -> MathValueRecord<'a> {
         self.data.get(SUPERSCRIPT_SHIFT_UP_CRAMPED_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -303,7 +278,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum allowed height of the (ink) bottom of superscripts that does not require moving
     /// subscripts further up. Suggested: ¼ x-height.
     #[inline]
-    pub fn superscript_bottom_min(&self) -> MathValueRecord {
+    pub fn superscript_bottom_min(&self) -> MathValueRecord<'a> {
         self.data.get(SUPERSCRIPT_BOTTOM_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -313,7 +288,7 @@ impl<'a> MathConstants<'a> {
     /// base. Checked for bases that are treated as a box or extended shape. Positive for
     /// superscript baseline below the base top.
     #[inline]
-    pub fn superscript_baseline_drop_max(&self) -> MathValueRecord {
+    pub fn superscript_baseline_drop_max(&self) -> MathValueRecord<'a> {
         self.data.get(SUPERSCRIPT_BASELINE_DROP_MAX_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -322,7 +297,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum gap between the superscript and subscript ink. Suggested: 4 × default rule
     /// thickness.
     #[inline]
-    pub fn sub_superscript_gap_min(&self) -> MathValueRecord {
+    pub fn sub_superscript_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(SUB_SUPERSCRIPT_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -332,7 +307,7 @@ impl<'a> MathConstants<'a> {
     /// gap between superscript and subscript, before subscript starts being moved down.
     /// Suggested: 4/5 x-height.
     #[inline]
-    pub fn superscript_bottom_max_with_subscript(&self) -> MathValueRecord {
+    pub fn superscript_bottom_max_with_subscript(&self) -> MathValueRecord<'a> {
         self.data.get(SUPERSCRIPT_BOTTOM_MAX_WITH_SUBSCRIPT_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -343,7 +318,7 @@ impl<'a> MathConstants<'a> {
     /// 0.5 pt, may be used for all text sizes. Some implementations may use a constant ratio of
     /// text size, such as 1/24 of em.)
     #[inline]
-    pub fn space_after_script(&self) -> MathValueRecord {
+    pub fn space_after_script(&self) -> MathValueRecord<'a> {
         self.data.get(SPACE_AFTER_SCRIPT_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -352,7 +327,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum gap between the (ink) bottom of the upper limit, and the (ink) top of the base
     /// operator.
     #[inline]
-    pub fn upper_limit_gap_min(&self) -> MathValueRecord {
+    pub fn upper_limit_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(UPPER_LIMIT_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -360,7 +335,7 @@ impl<'a> MathConstants<'a> {
 
     /// Minimum distance between baseline of upper limit and (ink) top of the base operator.
     #[inline]
-    pub fn upper_limit_baseline_rise_min(&self) -> MathValueRecord {
+    pub fn upper_limit_baseline_rise_min(&self) -> MathValueRecord<'a> {
         self.data.get(UPPER_LIMIT_BASELINE_RISE_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -368,7 +343,7 @@ impl<'a> MathConstants<'a> {
 
     /// Minimum gap between (ink) top of the lower limit, and (ink) bottom of the base operator.
     #[inline]
-    pub fn lower_limit_gap_min(&self) -> MathValueRecord {
+    pub fn lower_limit_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(LOWER_LIMIT_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -377,7 +352,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum distance between baseline of the lower limit and (ink) bottom of the base
     /// operator.
     #[inline]
-    pub fn lower_limit_baseline_drop_min(&self) -> MathValueRecord {
+    pub fn lower_limit_baseline_drop_min(&self) -> MathValueRecord<'a> {
         self.data.get(LOWER_LIMIT_BASELINE_DROP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -385,7 +360,7 @@ impl<'a> MathConstants<'a> {
 
     /// Standard shift up applied to the top element of a stack.
     #[inline]
-    pub fn stack_top_shift_up(&self) -> MathValueRecord {
+    pub fn stack_top_shift_up(&self) -> MathValueRecord<'a> {
         self.data.get(STACK_TOP_SHIFT_UP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -393,7 +368,7 @@ impl<'a> MathConstants<'a> {
 
     /// Standard shift up applied to the top element of a stack in display style.
     #[inline]
-    pub fn stack_top_display_style_shift_up(&self) -> MathValueRecord {
+    pub fn stack_top_display_style_shift_up(&self) -> MathValueRecord<'a> {
         self.data.get(STACK_TOP_DISPLAY_STYLE_SHIFT_UP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -402,7 +377,7 @@ impl<'a> MathConstants<'a> {
     /// Standard shift down applied to the bottom element of a stack. Positive for moving in the
     /// downward direction.
     #[inline]
-    pub fn stack_bottom_shift_down(&self) -> MathValueRecord {
+    pub fn stack_bottom_shift_down(&self) -> MathValueRecord<'a> {
         self.data.get(STACK_BOTTOM_SHIFT_DOWN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -411,7 +386,7 @@ impl<'a> MathConstants<'a> {
     /// Standard shift down applied to the bottom element of a stack in display style. Positive
     /// for moving in the downward direction.
     #[inline]
-    pub fn stack_bottom_display_style_shift_down(&self) -> MathValueRecord {
+    pub fn stack_bottom_display_style_shift_down(&self) -> MathValueRecord<'a> {
         self.data.get(STACK_BOTTOM_DISPLAY_STYLE_SHIFT_DOWN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -420,7 +395,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum gap between (ink) bottom of the top element of a stack, and the (ink) top of the
     /// bottom element. Suggested: 3 × default rule thickness.
     #[inline]
-    pub fn stack_gap_min(&self) -> MathValueRecord {
+    pub fn stack_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(STACK_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -429,7 +404,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum gap between (ink) bottom of the top element of a stack, and the (ink) top of the
     /// bottom element in display style. Suggested: 7 × default rule thickness.
     #[inline]
-    pub fn stack_display_style_gap_min(&self) -> MathValueRecord {
+    pub fn stack_display_style_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(STACK_DISPLAY_STYLE_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -437,7 +412,7 @@ impl<'a> MathConstants<'a> {
 
     /// Standard shift up applied to the top element of the stretch stack.
     #[inline]
-    pub fn stretch_stack_top_shift_up(&self) -> MathValueRecord {
+    pub fn stretch_stack_top_shift_up(&self) -> MathValueRecord<'a> {
         self.data.get(STRETCH_STACK_TOP_SHIFT_UP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -446,25 +421,25 @@ impl<'a> MathConstants<'a> {
     /// Standard shift down applied to the bottom element of the stretch stack. Positive for
     /// moving in the downward direction.
     #[inline]
-    pub fn stretch_stack_bottom_shift_down(&self) -> MathValueRecord {
+    pub fn stretch_stack_bottom_shift_down(&self) -> MathValueRecord<'a> {
         self.data.get(STRETCH_STACK_BOTTOM_SHIFT_DOWN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
     }
 
     /// Minimum gap between the ink of the stretched element, and the (ink) bottom of the element
-    /// above. Suggested: same value as upperLimitGapMin.
+    /// above. Suggested: same value as [`MathConstants::upper_limit_gap_min`].
     #[inline]
-    pub fn stretch_stack_gap_above_min(&self) -> MathValueRecord {
+    pub fn stretch_stack_gap_above_min(&self) -> MathValueRecord<'a> {
         self.data.get(STRETCH_STACK_GAP_ABOVE_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
     }
 
     /// Minimum gap between the ink of the stretched element, and the (ink) top of the element
-    /// below. Suggested: same value as lowerLimitGapMin.
+    /// below. Suggested: same value as [`MathConstants::lower_limit_gap_min`].
     #[inline]
-    pub fn stretch_stack_gap_below_min(&self) -> MathValueRecord {
+    pub fn stretch_stack_gap_below_min(&self) -> MathValueRecord<'a> {
         self.data.get(STRETCH_STACK_GAP_BELOW_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -472,34 +447,33 @@ impl<'a> MathConstants<'a> {
 
     /// Standard shift up applied to the numerator.
     #[inline]
-    pub fn fraction_numerator_shift_up(&self) -> MathValueRecord {
+    pub fn fraction_numerator_shift_up(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_NUMERATOR_SHIFT_UP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
     }
 
     /// Standard shift up applied to the numerator in display style. Suggested: same value as
-    /// stackTopDisplayStyleShiftUp.
+    /// [`MathConstants::stack_top_display_style_shift_up`].
     #[inline]
-    pub fn fraction_numerator_display_style_shift_up(&self) -> MathValueRecord {
+    pub fn fraction_numerator_display_style_shift_up(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_NUMERATOR_DISPLAY_STYLE_SHIFT_UP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
     }
 
-    /// Standard shift down applied to the denominator. Positive for moving in the downward
-    /// direction.
+    /// Standard shift down applied to the denominator. Positive for moving in the downward direction.
     #[inline]
-    pub fn fraction_denominator_shift_down(&self) -> MathValueRecord {
+    pub fn fraction_denominator_shift_down(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_DENOMINATOR_SHIFT_DOWN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
     }
 
-    /// Standard shift down applied to the denominator in display style. Positive for moving in
-    /// the downward direction. Suggested: same value as stackBottomDisplayStyleShiftDown.
+    /// Standard shift down applied to the denominator in display style. Positive for moving in the
+    /// downward direction. Suggested: same value as [`MathConstants::stack_bottom_display_style_shift_down`].
     #[inline]
-    pub fn fraction_denominator_display_style_shift_down(&self) -> MathValueRecord {
+    pub fn fraction_denominator_display_style_shift_down(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_DENOMINATOR_DISPLAY_STYLE_SHIFT_DOWN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -508,7 +482,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum tolerated gap between the (ink) bottom of the numerator and the ink of the
     /// fraction bar. Suggested: default rule thickness.
     #[inline]
-    pub fn fraction_numerator_gap_min(&self) -> MathValueRecord {
+    pub fn fraction_numerator_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_NUMERATOR_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -517,7 +491,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum tolerated gap between the (ink) bottom of the numerator and the ink of the
     /// fraction bar in display style. Suggested: 3 × default rule thickness.
     #[inline]
-    pub fn fraction_num_display_style_gap_min(&self) -> MathValueRecord {
+    pub fn fraction_num_display_style_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_NUM_DISPLAY_STYLE_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -525,7 +499,7 @@ impl<'a> MathConstants<'a> {
 
     /// Thickness of the fraction bar. Suggested: default rule thickness.
     #[inline]
-    pub fn fraction_rule_thickness(&self) -> MathValueRecord {
+    pub fn fraction_rule_thickness(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_RULE_THICKNESS_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -534,7 +508,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum tolerated gap between the (ink) top of the denominator and the ink of the fraction
     /// bar. Suggested: default rule thickness.
     #[inline]
-    pub fn fraction_denominator_gap_min(&self) -> MathValueRecord {
+    pub fn fraction_denominator_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_DENOMINATOR_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -543,7 +517,7 @@ impl<'a> MathConstants<'a> {
     /// Minimum tolerated gap between the (ink) top of the denominator and the ink of the fraction
     /// bar in display style. Suggested: 3 × default rule thickness.
     #[inline]
-    pub fn fraction_denom_display_style_gap_min(&self) -> MathValueRecord {
+    pub fn fraction_denom_display_style_gap_min(&self) -> MathValueRecord<'a> {
         self.data.get(FRACTION_DENOM_DISPLAY_STYLE_GAP_MIN_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -551,7 +525,7 @@ impl<'a> MathConstants<'a> {
 
     /// Horizontal distance between the top and bottom elements of a skewed fraction.
     #[inline]
-    pub fn skewed_fraction_horizontal_gap(&self) -> MathValueRecord {
+    pub fn skewed_fraction_horizontal_gap(&self) -> MathValueRecord<'a> {
         self.data.get(SKEWED_FRACTION_HORIZONTAL_GAP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -559,7 +533,7 @@ impl<'a> MathConstants<'a> {
 
     /// Vertical distance between the ink of the top and bottom elements of a skewed fraction.
     #[inline]
-    pub fn skewed_fraction_vertical_gap(&self) -> MathValueRecord {
+    pub fn skewed_fraction_vertical_gap(&self) -> MathValueRecord<'a> {
         self.data.get(SKEWED_FRACTION_VERTICAL_GAP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -568,7 +542,7 @@ impl<'a> MathConstants<'a> {
     /// Distance between the overbar and the (ink) top of he base. Suggested: 3 × default rule
     /// thickness.
     #[inline]
-    pub fn overbar_vertical_gap(&self) -> MathValueRecord {
+    pub fn overbar_vertical_gap(&self) -> MathValueRecord<'a> {
         self.data.get(OVERBAR_VERTICAL_GAP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -576,7 +550,7 @@ impl<'a> MathConstants<'a> {
 
     /// Thickness of overbar. Suggested: default rule thickness.
     #[inline]
-    pub fn overbar_rule_thickness(&self) -> MathValueRecord {
+    pub fn overbar_rule_thickness(&self) -> MathValueRecord<'a> {
         self.data.get(OVERBAR_RULE_THICKNESS_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -584,7 +558,7 @@ impl<'a> MathConstants<'a> {
 
     /// Extra white space reserved above the overbar. Suggested: default rule thickness.
     #[inline]
-    pub fn overbar_extra_ascender(&self) -> MathValueRecord {
+    pub fn overbar_extra_ascender(&self) -> MathValueRecord<'a> {
         self.data.get(OVERBAR_EXTRA_ASCENDER_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -593,7 +567,7 @@ impl<'a> MathConstants<'a> {
     /// Distance between underbar and (ink) bottom of the base. Suggested: 3 × default rule
     /// thickness.
     #[inline]
-    pub fn underbar_vertical_gap(&self) -> MathValueRecord {
+    pub fn underbar_vertical_gap(&self) -> MathValueRecord<'a> {
         self.data.get(UNDERBAR_VERTICAL_GAP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -601,7 +575,7 @@ impl<'a> MathConstants<'a> {
 
     /// Thickness of underbar. Suggested: default rule thickness.
     #[inline]
-    pub fn underbar_rule_thickness(&self) -> MathValueRecord {
+    pub fn underbar_rule_thickness(&self) -> MathValueRecord<'a> {
         self.data.get(UNDERBAR_RULE_THICKNESS_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -610,7 +584,7 @@ impl<'a> MathConstants<'a> {
     /// Extra white space reserved below the underbar. Always positive. Suggested: default rule
     /// thickness.
     #[inline]
-    pub fn underbar_extra_descender(&self) -> MathValueRecord {
+    pub fn underbar_extra_descender(&self) -> MathValueRecord<'a> {
         self.data.get(UNDERBAR_EXTRA_DESCENDER_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -619,7 +593,7 @@ impl<'a> MathConstants<'a> {
     /// Space between the (ink) top of the expression and the bar over it. Suggested: 1¼ default
     /// rule thickness.
     #[inline]
-    pub fn radical_vertical_gap(&self) -> MathValueRecord {
+    pub fn radical_vertical_gap(&self) -> MathValueRecord<'a> {
         self.data.get(RADICAL_VERTICAL_GAP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -628,7 +602,7 @@ impl<'a> MathConstants<'a> {
     /// Space between the (ink) top of the expression and the bar over it. Suggested: default rule
     /// thickness + ¼ x-height.
     #[inline]
-    pub fn radical_display_style_vertical_gap(&self) -> MathValueRecord {
+    pub fn radical_display_style_vertical_gap(&self) -> MathValueRecord<'a> {
         self.data.get(RADICAL_DISPLAY_STYLE_VERTICAL_GAP_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -637,16 +611,16 @@ impl<'a> MathConstants<'a> {
     /// Thickness of the radical rule. This is the thickness of the rule in designed or
     /// constructed radical signs. Suggested: default rule thickness.
     #[inline]
-    pub fn radical_rule_thickness(&self) -> MathValueRecord {
+    pub fn radical_rule_thickness(&self) -> MathValueRecord<'a> {
         self.data.get(RADICAL_RULE_THICKNESS_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
     }
 
     /// Extra white space reserved above the radical. Suggested: same value as
-    /// radicalRuleThickness.
+    /// [`MathConstants::radical_rule_thickness`].
     #[inline]
-    pub fn radical_extra_ascender(&self) -> MathValueRecord {
+    pub fn radical_extra_ascender(&self) -> MathValueRecord<'a> {
         self.data.get(RADICAL_EXTRA_ASCENDER_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -655,7 +629,7 @@ impl<'a> MathConstants<'a> {
     /// Extra horizontal kern before the degree of a radical, if such is present. Suggested: 5/18
     /// of em.
     #[inline]
-    pub fn radical_kern_before_degree(&self) -> MathValueRecord {
+    pub fn radical_kern_before_degree(&self) -> MathValueRecord<'a> {
         self.data.get(RADICAL_KERN_BEFORE_DEGREE_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -663,7 +637,7 @@ impl<'a> MathConstants<'a> {
 
     /// Negative kern after the degree of a radical, if such is present. Suggested: −10/18 of em.
     #[inline]
-    pub fn radical_kern_after_degree(&self) -> MathValueRecord {
+    pub fn radical_kern_after_degree(&self) -> MathValueRecord<'a> {
         self.data.get(RADICAL_KERN_AFTER_DEGREE_OFFSET..)
             .and_then(|data| MathValueRecord::parse(data, self.data))
             .unwrap_or_default()
@@ -803,14 +777,15 @@ impl<'a> MathKernInfoArray<'a> {
 
 #[derive(Default, Debug, Copy, Clone)]
 struct RawMathKernInfoRecord {
-    pub top_right: Option<Offset16>,
-    pub top_left: Option<Offset16>,
-    pub bottom_right: Option<Offset16>,
-    pub bottom_left: Option<Offset16>,
+    top_right: Option<Offset16>,
+    top_left: Option<Offset16>,
+    bottom_right: Option<Offset16>,
+    bottom_left: Option<Offset16>,
 }
 
 impl FromData for RawMathKernInfoRecord {
     const SIZE: usize = 8;
+
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(RawMathKernInfoRecord {
@@ -895,12 +870,7 @@ impl<'a> FromSlice<'a> for MathKern<'a> {
     }
 }
 
-/// The MathVariants table solves the following problem: given a particular default glyph shape and
-/// a certain width or height, find a variant shape glyph (or construct created by putting several
-/// glyphs together) that has the required measurement. This functionality is needed for growing
-/// the parentheses to match the height of the expression within, growing the radical sign to match
-/// the height of the expression under the radical, stretching accents like tilde when they are put
-/// over several characters, for stretching arrows, horizontal curly braces, and so forth.
+/// Used for selecting glyph variants at correct size, or constructing stretchable shapes.
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
 pub struct MathVariants<'a> {
@@ -913,9 +883,9 @@ pub struct MathVariants<'a> {
     /// to compensate for rounding errors and hinting corrections at a lower resolution. The
     /// `min_connector_overlap` value tells how much overlap is necessary for this particular font.
     pub min_connector_overlap: u16,
-    /// Offset to Coverage table, from the beginning of the MathVariants table.
+    /// Coverage table for shapes growing in the vertical direction.
     pub vert_glyph_coverage: Coverage<'a>,
-    /// Offset to Coverage table, from the beginning of the MathVariants table.
+    /// Coverage table for shapes growing in the horizontal direction.
     pub horiz_glyph_coverage: Coverage<'a>,
     /// For shapes growing in the vertical direction.
     pub vert_glyph_construction: LazyOffsetArray16<'a, MathGlyphConstruction<'a>>,
@@ -984,6 +954,7 @@ pub struct MathGlyphVariantRecord {
 
 impl FromData for MathGlyphVariantRecord {
     const SIZE: usize = 4;
+
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let variant_glyph = s.read()?;
@@ -1028,17 +999,21 @@ pub struct GlyphPartRecord {
     ///
     /// _Size of Assembly = Offset of the Last Part + Full Advance of the Last Part_
     pub full_advance: u16,
+    /// Part qualifiers.
+    pub part_flags: PartFlags,
 }
 
 impl FromData for GlyphPartRecord {
     const SIZE: usize = 8;
+
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(GlyphPartRecord {
-            glyph_id: s.read()?,
-            start_connector_length: s.read()?,
-            end_connector_length: s.read()?,
-            full_advance: s.read()?,
+            glyph_id: s.read::<GlyphId>()?,
+            start_connector_length: s.read::<u16>()?,
+            end_connector_length: s.read::<u16>()?,
+            full_advance: s.read::<u16>()?,
+            part_flags: s.read::<PartFlags>()?,
         })
     }
 }
@@ -1055,8 +1030,8 @@ impl PartFlags {
 
 impl FromData for PartFlags {
     const SIZE: usize = 2;
+
     fn parse(data: &[u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        s.read::<u16>().map(PartFlags)
+        u16::parse(data).map(PartFlags)
     }
 }

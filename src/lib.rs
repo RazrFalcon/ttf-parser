@@ -69,7 +69,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea, cbdt, cblc};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "opentype-math")] pub use tables::math;
+#[cfg(feature = "opentype-layout")] pub use tables::math;
 #[cfg(feature = "apple-layout")] pub use tables::{ankr, feat, trak};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar, mvar};
 
@@ -570,8 +570,7 @@ pub struct RawFaceTables<'a> {
     #[cfg(feature = "opentype-layout")] pub gdef: Option<&'a [u8]>,
     #[cfg(feature = "opentype-layout")] pub gpos: Option<&'a [u8]>,
     #[cfg(feature = "opentype-layout")] pub gsub: Option<&'a [u8]>,
-
-    #[cfg(feature = "opentype-math")] pub math: Option<&'a [u8]>,
+    #[cfg(feature = "opentype-layout")] pub math: Option<&'a [u8]>,
 
     #[cfg(feature = "apple-layout")] pub ankr: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub feat: Option<&'a [u8]>,
@@ -620,8 +619,7 @@ pub struct FaceTables<'a> {
     #[cfg(feature = "opentype-layout")] pub gdef: Option<gdef::Table<'a>>,
     #[cfg(feature = "opentype-layout")] pub gpos: Option<opentype_layout::LayoutTable<'a>>,
     #[cfg(feature = "opentype-layout")] pub gsub: Option<opentype_layout::LayoutTable<'a>>,
-
-    #[cfg(feature = "opentype-math")] pub math: Option<math::Table<'a>>,
+    #[cfg(feature = "opentype-layout")] pub math: Option<math::Table<'a>>,
 
     #[cfg(feature = "apple-layout")] pub ankr: Option<ankr::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub feat: Option<feat::Table<'a>>,
@@ -751,7 +749,7 @@ impl<'a> Face<'a> {
                 b"GPOS" => tables.gpos = table_data,
                 #[cfg(feature = "opentype-layout")]
                 b"GSUB" => tables.gsub = table_data,
-                #[cfg(feature = "opentype-math")]
+                #[cfg(feature = "opentype-layout")]
                 b"MATH" => tables.math = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"HVAR" => tables.hvar = table_data,
@@ -869,8 +867,7 @@ impl<'a> Face<'a> {
             #[cfg(feature = "opentype-layout")] gdef: raw_tables.gdef.and_then(gdef::Table::parse),
             #[cfg(feature = "opentype-layout")] gpos: raw_tables.gpos.and_then(opentype_layout::LayoutTable::parse),
             #[cfg(feature = "opentype-layout")] gsub: raw_tables.gsub.and_then(opentype_layout::LayoutTable::parse),
-
-            #[cfg(feature = "opentype-math")] math: raw_tables.math.and_then(math::Table::parse),
+            #[cfg(feature = "opentype-layout")] math: raw_tables.math.and_then(math::Table::parse),
 
             #[cfg(feature = "apple-layout")] ankr: raw_tables.ankr
                 .and_then(|data| ankr::Table::parse(maxp.number_of_glyphs, data)),

@@ -20,8 +20,7 @@ pub mod vorg;
 #[cfg(feature = "opentype-layout")] pub mod gdef;
 #[cfg(feature = "opentype-layout")] pub mod gsub;
 #[cfg(feature = "opentype-layout")] pub mod gpos;
-
-#[cfg(feature = "opentype-math")] pub mod math;
+#[cfg(feature = "opentype-layout")] pub mod math;
 
 #[cfg(feature = "apple-layout")] pub mod ankr;
 #[cfg(feature = "apple-layout")] pub mod feat;

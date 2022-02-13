@@ -9,6 +9,12 @@ use crate::parser::{
     Array, LazyArray16, LazyOffsetArray16,
 };
 
+impl<'a> Stream<'a> {
+    fn parse_at_offset16<T: FromSlice<'a>>(&mut self, base: &'a [u8]) -> Option<T> {
+        self.read_at_offset16(base).and_then(T::parse)
+    }
+}
+
 /// A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
 #[derive(Clone)]
 pub struct Table<'a> {
@@ -64,6 +70,30 @@ pub struct MathValueRecord<'a> {
 impl<'a> MathValueRecord<'a> {
     fn parse(data: &'a [u8], parent: &'a [u8]) -> Option<Self> {
         Some(RawMathValueRecord::parse(data)?.get(parent))
+    }
+}
+
+/// Array of [`MathValueRecord`]s.
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct MathValueArray<'a> {
+    entries: LazyArray16<'a, RawMathValueRecord>,
+    data: &'a [u8], // for locating device tables
+}
+
+impl<'a> Array for MathValueArray<'a> {
+    type Index = u16;
+    type Value = MathValueRecord<'a>;
+
+    #[inline]
+    fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    #[inline]
+    fn len(&self) -> u16 { self.entries.len() }
+
+    #[inline]
+    fn get(&self, index: u16) -> Option<MathValueRecord<'a>> {
+        Some(self.entries.get(index)?.get(self.data))
     }
 }
 
@@ -674,27 +704,31 @@ impl<'a> FromSlice<'a> for MathGlyphInfo<'a> {
     }
 }
 
-/// Mapping from glyph to values.
+/// Coverage table with an array, serves as a mapping from glyph to values.
 #[allow(missing_debug_implementations)]
-#[allow(missing_docs)]
 #[derive(Clone)]
-pub struct MathValueTable<'a> {
+pub struct CoverageMapping<'a, A> {
+    /// The coverage table, maps glyphs to indices.
     pub coverage: Coverage<'a>,
-    values: MathValueArray<'a>,
+    /// The value array, maps indices to values.
+    pub values: A,
 }
 
-impl<'a> MathValueTable<'a> {
+impl<'a, A: Array<Index=u16>> CoverageMapping<'a, A> {
     /// Checks that glyph is present.
     pub fn contains(&self, glyph: GlyphId) -> bool {
         self.coverage.contains(glyph)
     }
 
     /// Returns the [`MathValueRecord`] of the glyph or `None` if it is not covered.
-    pub fn get(&self, glyph: GlyphId) -> Option<MathValueRecord<'a>> {
+    pub fn get(&self, glyph: GlyphId) -> Option<A::Value> {
         let index = self.coverage.get(glyph)?;
         self.values.get(index)
     }
 }
+
+/// Mapping from glyph to [`MathValueRecord`].
+pub type MathValueTable<'a> = CoverageMapping<'a, MathValueArray<'a>>;
 
 impl<'a> FromSlice<'a> for MathValueTable<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
@@ -706,45 +740,8 @@ impl<'a> FromSlice<'a> for MathValueTable<'a> {
     }
 }
 
-#[derive(Clone)]
-struct MathValueArray<'a> {
-    entries: LazyArray16<'a, RawMathValueRecord>,
-    data: &'a [u8], // for locating device tables
-}
-
-impl<'a> MathValueArray<'a> {
-    fn get(&self, index: u16) -> Option<MathValueRecord<'a>> {
-        Some(self.entries.get(index)?.get(self.data))
-    }
-}
-
-impl<'a> Stream<'a> {
-    fn parse_at_offset16<T: FromSlice<'a>>(&mut self, base: &'a [u8]) -> Option<T> {
-        self.read_at_offset16(base).and_then(T::parse)
-    }
-}
-
 /// See <https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathkerninfo-table>.
-#[allow(missing_debug_implementations)]
-#[allow(missing_docs)]
-#[derive(Clone)]
-pub struct MathKernInfo<'a> {
-    pub coverage: Coverage<'a>,
-    values: MathKernInfoArray<'a>,
-}
-
-impl<'a> MathKernInfo<'a> {
-    /// Checks that glyph is present.
-    pub fn contains(&self, glyph: GlyphId) -> bool {
-        self.coverage.contains(glyph)
-    }
-
-    /// Returns the [`MathKernInfoRecord`] of the glyph or `None` if it is not covered.
-    pub fn get(&self, glyph: GlyphId) -> Option<MathKernInfoRecord<'a>> {
-        let index = self.coverage.get(glyph)?;
-        self.values.get(index)
-    }
-}
+pub type MathKernInfo<'a> = CoverageMapping<'a, MathKernInfoArray<'a>>;
 
 impl<'a> FromSlice<'a> for MathKernInfo<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
@@ -756,13 +753,25 @@ impl<'a> FromSlice<'a> for MathKernInfo<'a> {
     }
 }
 
+/// Array of [`MathKernInfoRecord`].
+#[allow(missing_debug_implementations)]
 #[derive(Clone)]
-struct MathKernInfoArray<'a> {
+pub struct MathKernInfoArray<'a> {
     entries: LazyArray16<'a, RawMathKernInfoRecord>,
     data: &'a [u8], // for locating device tables
 }
 
-impl<'a> MathKernInfoArray<'a> {
+impl<'a> Array for MathKernInfoArray<'a> {
+    type Index = u16;
+    type Value = MathKernInfoRecord<'a>;
+
+    #[inline]
+    fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    #[inline]
+    fn len(&self) -> Self::Index { self.entries.len() }
+
+    #[inline]
     fn get(&self, index: u16) -> Option<MathKernInfoRecord<'a>> {
         Some(self.entries.get(index)?.get(self.data))
     }
@@ -852,20 +861,19 @@ impl<'a> FromSlice<'a> for MathKern<'a> {
     }
 }
 
+/// Description of glyph variants at different sizes and shape construction from part glyphs.
+pub type GlyphConstructionTable<'a> = CoverageMapping<'a, LazyOffsetArray16<'a, MathGlyphConstruction<'a>>>;
+
 /// Used for selecting glyph variants at correct size, or constructing stretchable shapes.
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
 pub struct MathVariants<'a> {
     /// Minimum overlap of connecting glyphs during glyph construction, in design units.
     pub min_connector_overlap: u16,
-    /// Coverage table for shapes growing in the vertical direction.
-    pub vert_glyph_coverage: Coverage<'a>,
-    /// Coverage table for shapes growing in the horizontal direction.
-    pub horiz_glyph_coverage: Coverage<'a>,
     /// For shapes growing in the vertical direction.
-    pub vert_glyph_construction: LazyOffsetArray16<'a, MathGlyphConstruction<'a>>,
+    pub vert_glyph_construction: GlyphConstructionTable<'a>,
     /// For shapes growing in the horizontal direction.
-    pub horiz_glyph_construction: LazyOffsetArray16<'a, MathGlyphConstruction<'a>>,
+    pub horiz_glyph_construction: GlyphConstructionTable<'a>,
 }
 
 impl<'a> FromSlice<'a> for MathVariants<'a> {
@@ -880,10 +888,14 @@ impl<'a> FromSlice<'a> for MathVariants<'a> {
         let horiz_glyph_construction_offsets = s.read_array16(horiz_glyph_count)?;
         Some(MathVariants {
             min_connector_overlap,
-            vert_glyph_coverage,
-            horiz_glyph_coverage,
-            vert_glyph_construction: LazyOffsetArray16::new(data, vert_glyph_construction_offsets),
-            horiz_glyph_construction: LazyOffsetArray16::new(data, horiz_glyph_construction_offsets),
+            vert_glyph_construction: CoverageMapping {
+                coverage: vert_glyph_coverage,
+                values: LazyOffsetArray16::new(data, vert_glyph_construction_offsets),
+            },
+            horiz_glyph_construction: CoverageMapping {
+                coverage: horiz_glyph_coverage,
+                values: LazyOffsetArray16::new(data, horiz_glyph_construction_offsets),
+            },
         })
     }
 }

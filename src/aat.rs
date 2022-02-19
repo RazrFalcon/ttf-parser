@@ -7,7 +7,120 @@ related types.
 use core::num::NonZeroU16;
 
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
+use crate::parser::{Stream, FromData, LazyArray16, Offset, Offset32, NumFrom};
+
+/// Predefined classes.
+///
+/// Search for _Class Code_ in [Apple Advanced Typography Font Tables](
+/// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).
+pub mod class {
+    #![allow(missing_docs)]
+    pub const END_OF_TEXT: u16 = 0;
+    pub const OUT_OF_BOUNDS: u16 = 1;
+    pub const DELETED_GLYPH: u16 = 2;
+}
+
+/// An [Extended State Table](ExtendedStateTable) entry.
+#[derive(Clone, Copy, Debug)]
+pub struct ExtendedStateEntry<T: FromData> {
+    /// A new state.
+    pub new_state: u16,
+    /// Entry flags.
+    pub flags: u16,
+    /// Additional data.
+    ///
+    /// Use `()` if no data expected.
+    pub extra: T,
+}
+
+impl<T: FromData> FromData for ExtendedStateEntry<T> {
+    const SIZE: usize = 4 + T::SIZE;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(ExtendedStateEntry {
+            new_state: s.read::<u16>()?,
+            flags: s.read::<u16>()?,
+            extra: s.read::<T>()?,
+        })
+    }
+}
+
+/// An [Extended State Table](
+/// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).
+///
+/// Also called `STXHeader`.
+///
+/// Currently used by `kerx` and `morx` tables.
+#[derive(Clone)]
+pub struct ExtendedStateTable<'a, T> {
+    number_of_classes: u32,
+    lookup: Lookup<'a>,
+    state_array: &'a [u8],
+    entry_table: &'a [u8],
+    entry_type: core::marker::PhantomData<T>,
+}
+
+impl<'a, T: FromData> ExtendedStateTable<'a, T> {
+    // TODO: make private
+    /// Parses an Extended State Table from a stream.
+    ///
+    /// `number_of_glyphs` is from the `maxp` table.
+    pub fn parse(number_of_glyphs: NonZeroU16, s: &mut Stream<'a>) -> Option<Self> {
+        let data = s.tail()?;
+
+        let number_of_classes = s.read::<u32>()?;
+        // Note that offsets are not from the subtable start,
+        // but from subtable start + `header_size`.
+        // So there is not need to subtract the `header_size`.
+        let lookup_table_offset = s.read::<Offset32>()?.to_usize();
+        let state_array_offset = s.read::<Offset32>()?.to_usize();
+        let entry_table_offset = s.read::<Offset32>()?.to_usize();
+
+        Some(ExtendedStateTable {
+            number_of_classes,
+            lookup: Lookup::parse(number_of_glyphs, data.get(lookup_table_offset..)?)?,
+            // We don't know the actual data size and it's kinda expensive to calculate.
+            // So we are simply storing all the data past the offset.
+            // Despite the fact that they may overlap.
+            state_array: data.get(state_array_offset..)?,
+            entry_table: data.get(entry_table_offset..)?,
+            entry_type: core::marker::PhantomData,
+        })
+    }
+
+    /// Returns a glyph class.
+    #[inline]
+    pub fn class(&self, glyph_id: GlyphId) -> Option<u16> {
+        if glyph_id.0 == 0xFFFF {
+            return Some(class::DELETED_GLYPH);
+        }
+
+        self.lookup.value(glyph_id)
+    }
+
+    /// Returns a class entry.
+    #[inline]
+    pub fn entry(&self, state: u16, mut class: u16) -> Option<ExtendedStateEntry<T>> {
+        if u32::from(class) >= self.number_of_classes {
+            class = class::OUT_OF_BOUNDS;
+        }
+
+        let state_idx =
+            usize::from(state) * usize::num_from(self.number_of_classes) + usize::from(class);
+
+        let entry_idx: u16 = Stream::read_at(self.state_array, state_idx * u16::SIZE)?;
+        Stream::read_at(self.entry_table, usize::from(entry_idx) * ExtendedStateEntry::<T>::SIZE)
+    }
+}
+
+impl<T> core::fmt::Debug for ExtendedStateTable<'_, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "ExtendedStateTable {{ ... }}")
+    }
+}
+
 
 /// A [lookup table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).

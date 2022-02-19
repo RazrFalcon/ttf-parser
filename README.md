@@ -83,6 +83,7 @@ There are roughly three types of TrueType tables:
 | `HVAR` table      | ✓                      | ✓                   |                                |
 | `kern` table      | ~ (no AAT 1)           | ~ (only 0)          | ~ (only 0)                     |
 | `maxp` table      | ✓                      | ✓                   | ✓                              |
+| `morx` table      | ✓                      |                     |                                |
 | `MVAR` table      | ✓                      | ✓                   |                                |
 | `name` table      | ✓                      | ✓                   |                                |
 | `OS/2` table      | ✓                      | ✓                   |                                |

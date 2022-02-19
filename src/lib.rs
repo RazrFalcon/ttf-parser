@@ -69,7 +69,7 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea, cbdt, cblc};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "apple-layout")] pub use tables::{ankr, feat, trak};
+#[cfg(feature = "apple-layout")] pub use tables::{ankr, feat, morx, trak};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar, mvar};
 
 #[cfg(feature = "opentype-layout")]
@@ -572,6 +572,7 @@ pub struct RawFaceTables<'a> {
 
     #[cfg(feature = "apple-layout")] pub ankr: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub feat: Option<&'a [u8]>,
+    #[cfg(feature = "apple-layout")] pub morx: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub trak: Option<&'a [u8]>,
 
     #[cfg(feature = "variable-fonts")] pub avar: Option<&'a [u8]>,
@@ -620,6 +621,7 @@ pub struct FaceTables<'a> {
 
     #[cfg(feature = "apple-layout")] pub ankr: Option<ankr::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub feat: Option<feat::Table<'a>>,
+    #[cfg(feature = "apple-layout")] pub morx: Option<morx::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub trak: Option<trak::Table<'a>>,
 
     #[cfg(feature = "variable-fonts")] pub avar: Option<avar::Table<'a>>,
@@ -773,6 +775,8 @@ impl<'a> Face<'a> {
                 b"kern" => tables.kern = table_data,
                 b"loca" => tables.loca = table_data,
                 b"maxp" => tables.maxp = table_data.unwrap_or_default(),
+                #[cfg(feature = "apple-layout")]
+                b"morx" => tables.morx = table_data,
                 b"name" => tables.name = table_data,
                 b"post" => tables.post = table_data,
                 b"sbix" => tables.sbix = table_data,
@@ -866,6 +870,8 @@ impl<'a> Face<'a> {
             #[cfg(feature = "apple-layout")] ankr: raw_tables.ankr
                 .and_then(|data| ankr::Table::parse(maxp.number_of_glyphs, data)),
             #[cfg(feature = "apple-layout")] feat: raw_tables.feat.and_then(feat::Table::parse),
+            #[cfg(feature = "apple-layout")] morx: raw_tables.morx
+                .and_then(|data| morx::Table::parse(maxp.number_of_glyphs, data)),
             #[cfg(feature = "apple-layout")] trak: raw_tables.trak.and_then(trak::Table::parse),
 
             #[cfg(feature = "variable-fonts")] avar: raw_tables.avar.and_then(avar::Table::parse),

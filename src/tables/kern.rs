@@ -14,7 +14,7 @@ a kerning algorithm manually.
 But we still try to keep the API as high-level as possible.
 */
 
-use crate::GlyphId;
+use crate::{aat, GlyphId};
 use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset16, Stream};
 
 #[derive(Clone, Copy, Debug)]
@@ -96,17 +96,17 @@ impl FromData for KerningPair {
 
 /// A kerning subtable format.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Format<'a> {
     Format0(Subtable0<'a>),
-    Format1, // unsupported
+    Format1(aat::StateTable<'a>),
     Format2(Subtable2<'a>),
     Format3(Subtable3<'a>),
 }
 
 
 /// A kerning subtable.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Subtable<'a> {
     /// Indicates that subtable is for horizontal text.
     pub horizontal: bool,
@@ -130,7 +130,7 @@ impl<'a> Subtable<'a> {
     pub fn glyphs_kerning(&self, left: GlyphId, right: GlyphId) -> Option<i16> {
         match self.format {
             Format::Format0(ref subtable) => subtable.glyphs_kerning(left, right),
-            Format::Format1 => None,
+            Format::Format1(_) => None,
             Format::Format2(ref subtable) => subtable.glyphs_kerning(left, right),
             Format::Format3(ref subtable) => subtable.glyphs_kerning(left, right),
         }
@@ -226,7 +226,7 @@ impl<'a> Iterator for SubtablesIter<'a> {
 
             let format = match format_id {
                 0 => Format::Format0(Subtable0::parse(data)?),
-                1 => Format::Format1,
+                1 => Format::Format1(aat::StateTable::parse(data)?),
                 2 => Format::Format2(Subtable2::parse(HEADER_SIZE, data)?),
                 3 => Format::Format3(Subtable3::parse(data)?),
                 _ => return None,

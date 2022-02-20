@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - `apple-layout` build feature.
 - `ankr`, `feat`, `morx` and `trak` tables.
+- `kern` AAT subtable format 1.
 
 ## [0.14.0] - 2021-12-28
 ### Changed

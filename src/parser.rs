@@ -554,11 +554,13 @@ pub struct LazyOffsetArray16<'a, T: FromSlice<'a>> {
 
 impl<'a, T: FromSlice<'a>> LazyOffsetArray16<'a, T> {
     /// Creates a new `LazyOffsetArray16`.
+    #[allow(dead_code)]
     pub fn new(data: &'a [u8], offsets: LazyArray16<'a, Option<Offset16>>) -> Self {
         Self { data, offsets, data_type: core::marker::PhantomData }
     }
 
     /// Parses `LazyOffsetArray16` from raw data.
+    #[allow(dead_code)]
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let count = s.read::<u16>()?;
@@ -581,6 +583,7 @@ impl<'a, T: FromSlice<'a>> LazyOffsetArray16<'a, T> {
 
     /// Checks if array is empty.
     #[inline]
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

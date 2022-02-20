@@ -1,6 +1,6 @@
 [package]
 name = "ttf-parser-capi"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["Yevhenii Reizner <razrfalcon@gmail.com>"]
 license = "MIT"
 edition = "2018"
@@ -25,6 +25,7 @@ variable-fonts = ["ttf-parser/variable-fonts"]
 # enable this feature.
 gvar-alloc = ["ttf-parser/gvar-alloc"]
 # opentype-layout is not supported.
+# apple-layout is not supported.
 
 [profile.release]
 lto = true

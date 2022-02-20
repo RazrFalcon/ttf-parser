@@ -14,8 +14,9 @@ a kerning algorithm manually.
 But we still try to keep the API as high-level as possible.
 */
 
-use crate::{aat, GlyphId};
+use crate::GlyphId;
 use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset16, Stream};
+#[cfg(feature = "apple-layout")] use crate::aat;
 
 #[derive(Clone, Copy, Debug)]
 struct OTCoverage(u8);
@@ -99,7 +100,8 @@ impl FromData for KerningPair {
 #[derive(Clone, Debug)]
 pub enum Format<'a> {
     Format0(Subtable0<'a>),
-    Format1(aat::StateTable<'a>),
+    #[cfg(feature = "apple-layout")] Format1(aat::StateTable<'a>),
+    #[cfg(not(feature = "apple-layout"))] Format1,
     Format2(Subtable2<'a>),
     Format3(Subtable3<'a>),
 }
@@ -130,9 +132,9 @@ impl<'a> Subtable<'a> {
     pub fn glyphs_kerning(&self, left: GlyphId, right: GlyphId) -> Option<i16> {
         match self.format {
             Format::Format0(ref subtable) => subtable.glyphs_kerning(left, right),
-            Format::Format1(_) => None,
             Format::Format2(ref subtable) => subtable.glyphs_kerning(left, right),
             Format::Format3(ref subtable) => subtable.glyphs_kerning(left, right),
+            _ => None,
         }
     }
 }
@@ -226,7 +228,10 @@ impl<'a> Iterator for SubtablesIter<'a> {
 
             let format = match format_id {
                 0 => Format::Format0(Subtable0::parse(data)?),
+                #[cfg(feature = "apple-layout")]
                 1 => Format::Format1(aat::StateTable::parse(data)?),
+                #[cfg(not(feature = "apple-layout"))]
+                1 => Format::Format1,
                 2 => Format::Format2(Subtable2::parse(HEADER_SIZE, data)?),
                 3 => Format::Format3(Subtable3::parse(data)?),
                 _ => return None,

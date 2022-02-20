@@ -206,7 +206,7 @@ impl core::fmt::Debug for Transform {
 pub(crate) struct CompositeGlyphInfo {
     pub glyph_id: GlyphId,
     pub transform: Transform,
-    pub flags: CompositeGlyphFlags,
+    #[allow(dead_code)] pub flags: CompositeGlyphFlags,
 }
 
 

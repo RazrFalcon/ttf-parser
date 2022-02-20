@@ -1,6 +1,6 @@
 use std::num::NonZeroU16;
 use ttf_parser::GlyphId;
-use ttf_parser::aat::Lookup;
+use ttf_parser::apple_layout::Lookup;
 use crate::{convert, Unit::*};
 
 mod format0 {

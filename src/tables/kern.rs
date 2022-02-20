@@ -359,7 +359,7 @@ impl<'a> Subtable2<'a> {
     }
 }
 
-fn get_format2_class(glyph_id: u16, offset: usize, data: &[u8]) -> Option<u16> {
+pub(crate) fn get_format2_class(glyph_id: u16, offset: usize, data: &[u8]) -> Option<u16> {
     let mut s = Stream::new_at(data, offset)?;
     let first_glyph = s.read::<u16>()?;
     let index = glyph_id.checked_sub(first_glyph)?;

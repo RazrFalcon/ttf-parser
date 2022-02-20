@@ -92,7 +92,7 @@ impl<T: FromData> GenericStateEntry<T> {
     ///
     /// Used by kerx::format4 subtable.
     ///
-    /// Yes, the same as [`has_push`].
+    /// Yes, the same as [`has_push`](Self::has_push).
     #[inline]
     pub fn has_mark(&self) -> bool {
         self.flags & 0x8000 != 0

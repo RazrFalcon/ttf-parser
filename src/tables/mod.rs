@@ -23,6 +23,7 @@ pub mod vorg;
 
 #[cfg(feature = "apple-layout")] pub mod ankr;
 #[cfg(feature = "apple-layout")] pub mod feat;
+#[cfg(feature = "apple-layout")] pub mod kerx;
 #[cfg(feature = "apple-layout")] pub mod morx;
 #[cfg(feature = "apple-layout")] pub mod trak;
 

@@ -54,7 +54,7 @@ macro_rules! try_opt_or {
 
 pub mod parser;
 mod tables;
-#[cfg(feature = "apple-layout")] pub mod aat;
+#[cfg(feature = "apple-layout")] mod aat;
 #[cfg(feature = "opentype-layout")] mod ggg;
 #[cfg(feature = "variable-fonts")] mod var_store;
 
@@ -69,15 +69,24 @@ pub use tables::CFFError;
 pub use tables::{cmap, kern, sbix, maxp, hmtx, name, os2, loca, svg, vorg, post, head, hhea, glyf};
 pub use tables::{cff1 as cff, vhea, cbdt, cblc};
 #[cfg(feature = "opentype-layout")] pub use tables::{gdef, gpos, gsub};
-#[cfg(feature = "apple-layout")] pub use tables::{ankr, feat, morx, trak};
+#[cfg(feature = "apple-layout")] pub use tables::{ankr, feat, kerx, morx, trak};
 #[cfg(feature = "variable-fonts")] pub use tables::{cff2, avar, fvar, gvar, hvar, mvar};
 
 #[cfg(feature = "opentype-layout")]
 pub mod opentype_layout {
     //! This module contains
     //! [OpenType Layout](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#overview)
-    //! tables implementation.
+    //! supplementary tables implementation.
     pub use crate::ggg::*;
+}
+
+#[cfg(feature = "apple-layout")]
+pub mod apple_layout {
+    //! This module contains
+    //! [Apple Advanced Typography Layout](
+    //! https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6AATIntro.html)
+    //! supplementary tables implementation.
+    pub use crate::aat::*;
 }
 
 
@@ -572,6 +581,7 @@ pub struct RawFaceTables<'a> {
 
     #[cfg(feature = "apple-layout")] pub ankr: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub feat: Option<&'a [u8]>,
+    #[cfg(feature = "apple-layout")] pub kerx: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub morx: Option<&'a [u8]>,
     #[cfg(feature = "apple-layout")] pub trak: Option<&'a [u8]>,
 
@@ -621,6 +631,7 @@ pub struct FaceTables<'a> {
 
     #[cfg(feature = "apple-layout")] pub ankr: Option<ankr::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub feat: Option<feat::Table<'a>>,
+    #[cfg(feature = "apple-layout")] pub kerx: Option<kerx::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub morx: Option<morx::Table<'a>>,
     #[cfg(feature = "apple-layout")] pub trak: Option<trak::Table<'a>>,
 
@@ -773,6 +784,8 @@ impl<'a> Face<'a> {
                 b"hhea" => tables.hhea = table_data.unwrap_or_default(),
                 b"hmtx" => tables.hmtx = table_data,
                 b"kern" => tables.kern = table_data,
+                #[cfg(feature = "apple-layout")]
+                b"kerx" => tables.kerx = table_data,
                 b"loca" => tables.loca = table_data,
                 b"maxp" => tables.maxp = table_data.unwrap_or_default(),
                 #[cfg(feature = "apple-layout")]
@@ -870,6 +883,8 @@ impl<'a> Face<'a> {
             #[cfg(feature = "apple-layout")] ankr: raw_tables.ankr
                 .and_then(|data| ankr::Table::parse(maxp.number_of_glyphs, data)),
             #[cfg(feature = "apple-layout")] feat: raw_tables.feat.and_then(feat::Table::parse),
+            #[cfg(feature = "apple-layout")] kerx: raw_tables.kerx
+                .and_then(|data| kerx::Table::parse(maxp.number_of_glyphs, data)),
             #[cfg(feature = "apple-layout")] morx: raw_tables.morx
                 .and_then(|data| morx::Table::parse(maxp.number_of_glyphs, data)),
             #[cfg(feature = "apple-layout")] trak: raw_tables.trak.and_then(trak::Table::parse),

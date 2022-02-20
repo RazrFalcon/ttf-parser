@@ -195,6 +195,12 @@ pub struct Tag(pub u32);
 
 impl Tag {
     /// Creates a `Tag` from bytes.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// println!("{}", ttf_parser::Tag::from_bytes(b"name"));
+    /// ```
     #[inline]
     pub const fn from_bytes(bytes: &[u8; 4]) -> Self {
         Tag(((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16) |
@@ -543,6 +549,85 @@ impl core::fmt::Display for FaceParsingError {
 impl std::error::Error for FaceParsingError {}
 
 
+/// A raw font face.
+///
+/// You are probably looking for [`Face`]. This is a low-level type.
+///
+/// Unlike [`Face`], [`RawFace`] parses only face table records.
+/// Meaning all you can get from this type is a raw (`&[u8]`) data of a requested table.
+/// Then you can either parse just a singe table from a font/face or populate [`RawFaceTables`]
+/// manually before passing it to [`Face::from_raw_tables`].
+#[derive(Clone, Copy)]
+pub struct RawFace<'a> {
+    data: &'a [u8],
+    table_records: LazyArray16<'a, TableRecord>,
+}
+
+impl<'a> RawFace<'a> {
+    /// Creates a new [`RawFace`] from a raw data.
+    ///
+    /// `index` indicates the specific font face in a font collection.
+    /// Use [`fonts_in_collection`] to get the total number of font faces.
+    /// Set to 0 if unsure.
+    ///
+    /// While we do reuse [`FaceParsingError`], `No*Table` errors will not be throws.
+    pub fn from_slice(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
+
+        let mut s = Stream::new(data);
+
+        // Read **font** magic.
+        let magic = s.read::<Magic>().ok_or(FaceParsingError::UnknownMagic)?;
+        if magic == Magic::FontCollection {
+            s.skip::<u32>(); // version
+            let number_of_faces = s.read::<u32>().ok_or(FaceParsingError::MalformedFont)?;
+            let offsets = s.read_array32::<Offset32>(number_of_faces)
+                .ok_or(FaceParsingError::MalformedFont)?;
+
+            let face_offset = offsets.get(index).ok_or(FaceParsingError::FaceIndexOutOfBounds)?;
+            // Face offset is from the start of the font data,
+            // so we have to adjust it to the current parser offset.
+            let face_offset = face_offset.to_usize().checked_sub(s.offset())
+                .ok_or(FaceParsingError::MalformedFont)?;
+            s.advance_checked(face_offset).ok_or(FaceParsingError::MalformedFont)?;
+
+            // Read **face** magic.
+            // Each face in a font collection also starts with a magic.
+            let magic = s.read::<Magic>().ok_or(FaceParsingError::UnknownMagic)?;
+            // And face in a font collection can't be another collection.
+            if magic == Magic::FontCollection {
+                return Err(FaceParsingError::UnknownMagic);
+            }
+        }
+
+        let num_tables = s.read::<u16>().ok_or(FaceParsingError::MalformedFont)?;
+        s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
+        let table_records = s.read_array16::<TableRecord>(num_tables)
+            .ok_or(FaceParsingError::MalformedFont)?;
+
+        Ok(RawFace {
+            data,
+            table_records,
+        })
+    }
+
+    /// Returns the raw data of a selected table.
+    pub fn table(&self, tag: Tag) -> Option<&'a [u8]> {
+        let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
+        let offset = usize::num_from(table.offset);
+        let length = usize::num_from(table.length);
+        let end = offset.checked_add(length)?;
+        self.data.get(offset..end)
+    }
+}
+
+impl core::fmt::Debug for RawFace<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "RawFace {{ ... }}")
+    }
+}
+
+
 /// A list of all supported tables as raw data.
 ///
 /// This type should be used in tandem with
@@ -662,8 +747,7 @@ pub struct FaceTables<'a> {
 /// While `Face` is technically copyable, we disallow it because it's almost 2KB big.
 #[derive(Clone)]
 pub struct Face<'a> {
-    font_data: &'a [u8], // The input data. Used by Face::table_data.
-    table_records: LazyArray16<'a, TableRecord>, // Raw table data.
+    raw_face: RawFace<'a>,
     tables: FaceTables<'a>, // Parsed tables.
     #[cfg(feature = "variable-fonts")] coordinates: VarCoords,
 }
@@ -672,7 +756,7 @@ impl<'a> Face<'a> {
     /// Creates a new [`Face`] from a raw data.
     ///
     /// `index` indicates the specific font face in a font collection.
-    /// Use `fonts_in_collection` to get the total number of font faces.
+    /// Use [`fonts_in_collection`] to get the total number of font faces.
     /// Set to 0 if unsure.
     ///
     /// This method will do some parsing and sanitization,
@@ -682,45 +766,12 @@ impl<'a> Face<'a> {
     ///
     /// If an optional table has invalid data it will be skipped.
     pub fn from_slice(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
-        // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
-
-        let mut s = Stream::new(data);
-
-        // Read **font** magic.
-        let magic = s.read::<Magic>().ok_or(FaceParsingError::UnknownMagic)?;
-        if magic == Magic::FontCollection {
-            s.skip::<u32>(); // version
-            let number_of_faces = s.read::<u32>().ok_or(FaceParsingError::MalformedFont)?;
-            let offsets = s.read_array32::<Offset32>(number_of_faces)
-                .ok_or(FaceParsingError::MalformedFont)?;
-
-            let face_offset = offsets.get(index).ok_or(FaceParsingError::FaceIndexOutOfBounds)?;
-            // Face offset is from the start of the font data,
-            // so we have to adjust it to the current parser offset.
-            let face_offset = face_offset.to_usize().checked_sub(s.offset())
-                .ok_or(FaceParsingError::MalformedFont)?;
-            s.advance_checked(face_offset).ok_or(FaceParsingError::MalformedFont)?;
-
-            // Read **face** magic.
-            // Each face in a font collection also starts with a magic.
-            let magic = s.read::<Magic>().ok_or(FaceParsingError::UnknownMagic)?;
-            // And face in a font collection can't be another collection.
-            if magic == Magic::FontCollection {
-                return Err(FaceParsingError::UnknownMagic);
-            }
-        }
-
-        let num_tables = s.read::<u16>().ok_or(FaceParsingError::MalformedFont)?;
-        s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
-        let table_records = s.read_array16::<TableRecord>(num_tables)
-            .ok_or(FaceParsingError::MalformedFont)?;
-
-        let raw_tables = Self::collect_tables(data, table_records);
+        let raw_face = RawFace::from_slice(data, index)?;
+        let raw_tables = Self::collect_tables(raw_face);
 
         #[allow(unused_mut)]
         let mut face = Face {
-            font_data: data,
-            table_records: table_records,
+            raw_face,
             #[cfg(feature = "variable-fonts")] coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
         };
@@ -734,20 +785,17 @@ impl<'a> Face<'a> {
         Ok(face)
     }
 
-    fn collect_tables(
-        data: &'a [u8],
-        records: LazyArray16<TableRecord>,
-    ) -> RawFaceTables<'a> {
+    fn collect_tables(raw_face: RawFace<'a>) -> RawFaceTables<'a> {
         let mut tables = RawFaceTables::default();
 
-        for record in records {
+        for record in raw_face.table_records {
             let start = usize::num_from(record.offset);
             let end = match start.checked_add(usize::num_from(record.length)) {
                 Some(v) => v,
                 None => continue,
             };
 
-            let table_data = data.get(start..end);
+            let table_data = raw_face.data.get(start..end);
             match &record.table_tag.to_bytes() {
                 b"CBDT" => tables.cbdt = table_data,
                 b"CBLC" => tables.cblc = table_data,
@@ -809,8 +857,10 @@ impl<'a> Face<'a> {
     pub fn from_raw_tables(raw_tables: RawFaceTables<'a>) -> Result<Self, FaceParsingError> {
         #[allow(unused_mut)]
         let mut face = Face {
-            font_data: &[],
-            table_records: LazyArray16::default(),
+            raw_face: RawFace {
+                data: &[],
+                table_records: LazyArray16::default(),
+            },
             #[cfg(feature = "variable-fonts")] coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
         };
@@ -911,12 +961,9 @@ impl<'a> Face<'a> {
     /// Useful if you want to parse the data manually.
     ///
     /// Available only for faces created using [`Face::from_slice()`](struct.Face.html#method.from_slice).
+    #[inline]
     pub fn table_data(&self, tag: Tag) -> Option<&'a [u8]> {
-        let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
-        let offset = usize::num_from(table.offset);
-        let length = usize::num_from(table.length);
-        let end = offset.checked_add(length)?;
-        self.font_data.get(offset..end)
+        self.raw_face.table(tag)
     }
 
     /// Returns a list of names.

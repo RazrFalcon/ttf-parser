@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `apple-layout` build feature.
 - `ankr`, `feat`, `kerx`, `morx` and `trak` tables.
 - `kern` AAT subtable format 1.
+- `RawFace`
 
 ### Changed
 - The `parser` module is private now again.

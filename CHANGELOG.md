@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `ankr`, `feat`, `kerx`, `morx` and `trak` tables.
 - `kern` AAT subtable format 1.
 
+### Changed
+- The `parser` module is private now again.
+
 ## [0.14.0] - 2021-12-28
 ### Changed
 - (cmap) `cmap::Subtable::glyph_index` and `cmap::Subtable::glyph_variation_index` accept

@@ -27,8 +27,10 @@ mod format0 {
 }
 
 mod format2 {
-    use ttf_parser::{cmap, GlyphId, parser::FromData};
+    use ttf_parser::{cmap, GlyphId};
     use crate::{convert, Unit::*};
+
+    const U16_SIZE: usize = std::mem::size_of::<u16>();
 
     #[test]
     fn collect_codepoints() {
@@ -39,8 +41,8 @@ mod format2 {
         ]);
 
         // Make only high byte 0x28 multi-byte.
-        data.extend(std::iter::repeat(0x00).take(256 * u16::SIZE));
-        data[6 + 0x28 * u16::SIZE + 1] = 0x08;
+        data.extend(std::iter::repeat(0x00).take(256 * U16_SIZE));
+        data[6 + 0x28 * U16_SIZE + 1] = 0x08;
 
         data.extend(convert(&[
             // First sub header (for single byte mapping)
@@ -73,7 +75,7 @@ mod format2 {
         ]);
 
         // Only single bytes.
-        data.extend(std::iter::repeat(0x00).take(256 * u16::SIZE));
+        data.extend(std::iter::repeat(0x00).take(256 * U16_SIZE));
         data.extend(convert(&[
             // First sub header (for single byte mapping)
             UInt16(40), // first code

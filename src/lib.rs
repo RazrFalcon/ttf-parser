@@ -52,13 +52,14 @@ macro_rules! try_opt_or {
     };
 }
 
-pub mod parser;
+mod parser;
 mod tables;
 #[cfg(feature = "apple-layout")] mod aat;
 #[cfg(feature = "opentype-layout")] mod ggg;
 #[cfg(feature = "variable-fonts")] mod var_store;
 
-use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, LazyArrayIter16, Offset32, Offset};
+use parser::{Stream, NumFrom, TryNumFrom, Offset32, Offset};
+pub use parser::{FromData, LazyArray16, LazyArrayIter16, LazyArray32, LazyArrayIter32, Fixed};
 use head::IndexToLocationFormat;
 
 #[cfg(feature = "variable-fonts")] pub use fvar::VariationAxis;

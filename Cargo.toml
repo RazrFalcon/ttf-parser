@@ -20,7 +20,7 @@ std = []
 variable-fonts = []
 # Enables GDEF, GPOS and GSUB tables.
 opentype-layout = []
-# Enables ankr, feat, morx and trak tables.
+# Enables ankr, feat, format1 subtable in kern, kerx, morx and trak tables.
 apple-layout = []
 # Enables glyph name query via `Face::glyph_name`.
 # TrueType fonts do not store default glyph names, to reduce file size,

@@ -36,7 +36,7 @@ glyph-names = []
 gvar-alloc = ["std"]
 
 [dev-dependencies]
-base64 = "0.12"
+base64 = "0.13"
 pico-args = "0.3.1"
 svgtypes = "0.5"
 xmlwriter = "0.1"

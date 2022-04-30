@@ -65,7 +65,6 @@ impl<'a> Builder<'a> {
             self.transform.apply_to(&mut x, &mut y);
         }
 
-        self.bbox.extend_by(x1, y1);
         self.bbox.extend_by(x, y);
 
         self.builder.quad_to(x1, y1, x, y);

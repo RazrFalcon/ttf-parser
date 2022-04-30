@@ -1807,3 +1807,48 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     s.skip::<u32>(); // version
     s.read::<u32>()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::fmt::Write;
+    use std::string::String;
+
+    struct Builder(String);
+    
+    impl crate::OutlineBuilder for Builder {
+        fn move_to(&mut self, x: f32, y: f32) {
+            write!(&mut self.0, "M {} {} ", x, y).unwrap();
+        }
+    
+        fn line_to(&mut self, x: f32, y: f32) {
+            write!(&mut self.0, "L {} {} ", x, y).unwrap();
+        }
+    
+        fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+            write!(&mut self.0, "Q {} {} {} {} ", x1, y1, x, y).unwrap();
+        }
+    
+        fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+            write!(&mut self.0, "C {} {} {} {} {} {} ", x1, y1, x2, y2, x, y).unwrap();
+        }
+    
+        fn close(&mut self) {
+            write!(&mut self.0, "Z ").unwrap();
+        }
+    }
+
+    #[test]
+    fn outline_glyph() {
+        let data = std::fs::read("tests/fonts/glyph_test.ttf").unwrap();
+        let face = crate::Face::from_slice(&data, 0).unwrap();
+        let mut builder = Builder(String::new());
+        let bbox = face.outline_glyph(crate::GlyphId(1), &mut builder).unwrap();
+
+        // For the Quadratic Curve with points: (190.0, 348.0), (340.0, 548.0), (210.0, 308.0)
+        // the y_max extreme is at t=0.45454547
+        // and
+        // B(0.45454547) = (268.5124, 438.90906)
+        assert_eq!(bbox.y_max, 438.90906);
+    }
+}

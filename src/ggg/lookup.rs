@@ -46,9 +46,12 @@ pub trait LookupSubtable<'a>: Sized {
 /// A list of lookup subtables.
 #[derive(Clone, Copy)]
 pub struct LookupSubtables<'a> {
-    kind: u16,
-    data: &'a [u8],
-    offsets: LazyArray16<'a, Offset16>,
+    /// lookup type for GPOS or GSUB
+    pub kind: u16,
+    /// raw data of subtables
+    pub data: &'a [u8],
+    /// offsets to each lookup subtables
+    pub offsets: LazyArray16<'a, Offset16>,
 }
 
 impl core::fmt::Debug for LookupSubtables<'_> {

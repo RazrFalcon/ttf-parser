@@ -1355,7 +1355,7 @@ impl<'a> Face<'a> {
     ///
     /// All subtable formats except Mixed Coverage (8) are supported.
     ///
-    /// If you need a more low-level control, prefer `Face::character_mapping_subtables`.
+    /// If you need a more low-level control, prefer `Face::tables().cmap`.
     #[inline]
     pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
         for encoding in self.tables.cmap?.subtables {

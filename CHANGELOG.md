@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- (cmap) `cmap::Subtable4::glyph_index` correctly handles malformed glyph offsets now.
+- (cmap) `cmap::Subtable4::codepoints` no longer includes `0xFFFF` codepoint.
 
 ## [0.15.0] - 2022-02-20
 ### Added

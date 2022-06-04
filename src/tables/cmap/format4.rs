@@ -68,6 +68,10 @@ impl<'a> Subtable4<'a> {
                     let id_delta = self.id_deltas.get(index)?;
                     if id_range_offset == 0 {
                         return Some(GlyphId(code_point.wrapping_add(id_delta as u16)));
+                    } else if id_range_offset == 0xFFFF {
+                        // Some malformed fonts have 0xFFFF as the last offset,
+                        // which is invalid and should be ignored.
+                        return None;
                     }
 
                     let delta = (u32::from(code_point) - u32::from(start_value)) * 2;
@@ -76,6 +80,7 @@ impl<'a> Subtable4<'a> {
                     let id_range_offset_pos = (self.id_range_offset_pos + usize::from(index) * 2) as u16;
                     let pos = id_range_offset_pos.wrapping_add(delta);
                     let pos = pos.wrapping_add(id_range_offset);
+
                     let glyph_array_value: u16 = Stream::read_at(self.data, usize::from(pos))?;
 
                     // 0 indicates missing glyph.
@@ -97,6 +102,11 @@ impl<'a> Subtable4<'a> {
     /// Calls `f` for each codepoint defined in this table.
     pub fn codepoints(&self, mut f: impl FnMut(u32)) {
         for (start, end) in self.start_codes.into_iter().zip(self.end_codes) {
+            // OxFFFF value is special and indicates codes end.
+            if start == end && start == 0xFFFF {
+                break;
+            }
+
             for code_point in start..=end {
                 f(u32::from(code_point));
             }

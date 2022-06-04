@@ -64,9 +64,8 @@ There are roughly three types of TrueType tables:
 | `bloc` table      |                        | ✓                   |                                |
 | `CBDT` table      | ✓                      | ✓                   |                                |
 | `CBLC` table      | ✓                      | ✓                   |                                |
-| `COLR` table      |                        | ✓ (2.10.0)          |                                |
-| `CPAL` table      |                        | ✓ (2.10.0)          |                                |
-| `COLR` table v1   |                        | ✓ (2.11.0)          |                                |
+| `COLR` table      |                        | ✓                   |                                |
+| `CPAL` table      |                        | ✓                   |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ~ (no `seac` support)          |
 | `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8)               | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
@@ -93,14 +92,14 @@ There are roughly three types of TrueType tables:
 | `OS/2` table      | ✓                      | ✓                   |                                |
 | `post` table      | ✓                      | ✓                   |                                |
 | `sbix` table      | ~ (PNG only)           | ~ (PNG only)        |                                |
-| `SVG `&nbsp;table | ✓                      | ✓ (2.12.0)          | ✓                              |
+| `SVG `&nbsp;table | ✓                      | ✓                   | ✓                              |
 | `trak` table      | ✓                      |                     |                                |
 | `vhea` table      | ✓                      | ✓                   |                                |
 | `vmtx` table      | ✓                      | ✓                   |                                |
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Tested version    | 0.15.0                 | 2.10.4              | 1.24                           |
+| Tested version    | 0.15.0                 | 2.12.0              | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
 Legend:

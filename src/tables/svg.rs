@@ -128,7 +128,7 @@ impl<'a> Table<'a> {
 
         Some(Table {
             documents: SvgDocumentsList {
-                data,
+                data: &data[doc_list_offset.0 as usize..],
                 records,
             }
         })

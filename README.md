@@ -64,6 +64,9 @@ There are roughly three types of TrueType tables:
 | `bloc` table      |                        | ✓                   |                                |
 | `CBDT` table      | ✓                      | ✓                   |                                |
 | `CBLC` table      | ✓                      | ✓                   |                                |
+| `COLR` table      |                        | ✓ (2.10.0)          |                                |
+| `CPAL` table      |                        | ✓ (2.10.0)          |                                |
+| `COLR` table v1   |                        | ✓ (2.11.0)          |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ~ (no `seac` support)          |
 | `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8)               | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
@@ -90,7 +93,7 @@ There are roughly three types of TrueType tables:
 | `OS/2` table      | ✓                      | ✓                   |                                |
 | `post` table      | ✓                      | ✓                   |                                |
 | `sbix` table      | ~ (PNG only)           | ~ (PNG only)        |                                |
-| `SVG `&nbsp;table | ✓                      |                     | ✓                              |
+| `SVG `&nbsp;table | ✓                      | ✓ (2.12.0)          | ✓                              |
 | `trak` table      | ✓                      |                     |                                |
 | `vhea` table      | ✓                      | ✓                   |                                |
 | `vmtx` table      | ✓                      | ✓                   |                                |

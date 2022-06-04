@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::io::Write;
 
 use ttf_parser as ttf;
-use svgtypes::WriteBuffer;
 
 const FONT_SIZE: f64 = 128.0;
 const COLUMNS: u32 = 100;
@@ -44,7 +43,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     }
 
     let variations = args.opt_value_from_fn("--variations", parse_variations)?;
-    let free = args.free()?;
+    let free = args.finish();
     if free.len() != 2 {
         return Err("invalid number of arguments".into());
     }
@@ -110,7 +109,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     draw_grid(face.number_of_glyphs(), cell_size, &mut svg);
 
-    let mut path_buf = svgtypes::Path::with_capacity(64);
+    let mut path_buf = String::with_capacity(256);
     let mut row = 0;
     let mut column = 0;
     for id in 0..face.number_of_glyphs() {
@@ -196,23 +195,24 @@ fn draw_grid(
     svg.write_attribute("stroke", "black");
     svg.write_attribute("stroke-width", "5");
 
-    let mut path = svgtypes::Path::with_capacity(256);
+    let mut path = String::with_capacity(256);
 
+    use std::fmt::Write;
     let mut x = 0.0;
     for _ in 0..=columns {
-        path.push_move_to(x, 0.0);
-        path.push_line_to(x, height);
+        write!(&mut path, "M {} {} L {} {} ", x, 0.0, x, height).unwrap();
         x += cell_size;
     }
 
     let mut y = 0.0;
     for _ in 0..=rows {
-        path.push_move_to(0.0, y);
-        path.push_line_to(width, y);
+        write!(&mut path, "M {} {} L {} {} ", 0.0, y, width, y).unwrap();
         y += cell_size;
     }
 
-    svg.write_attribute_raw("d", |buf| path.write_buf(buf));
+    path.pop();
+
+    svg.write_attribute("d", &path);
     svg.end_element();
 }
 
@@ -224,7 +224,7 @@ fn glyph_to_path(
     cell_size: f64,
     scale: f64,
     svg: &mut xmlwriter::XmlWriter,
-    path_buf: &mut svgtypes::Path,
+    path_buf: &mut String,
 ) {
     path_buf.clear();
     let mut builder = Builder(path_buf);
@@ -232,19 +232,19 @@ fn glyph_to_path(
         Some(v) => v,
         None => return,
     };
+    if !path_buf.is_empty() {
+        path_buf.pop(); // remove trailing space
+    }
 
     let bbox_w = (bbox.x_max as f64 - bbox.x_min as f64) * scale;
     let dx = (cell_size - bbox_w) / 2.0;
     let y = y + cell_size + face.descender() as f64 * scale;
 
-    let mut ts = svgtypes::Transform::default();
-    ts.translate(x + dx, y);
-    ts.scale(1.0, -1.0);
-    ts.scale(scale, scale);
+    let transform = format!("matrix({} 0 0 {} {} {})", scale, -scale, x + dx, y);
 
     svg.start_element("path");
-    svg.write_attribute_raw("d", |buf| path_buf.write_buf(buf));
-    svg.write_attribute_raw("transform", |buf| ts.write_buf(buf));
+    svg.write_attribute("d", path_buf);
+    svg.write_attribute("transform", &transform);
     svg.end_element();
 
     {
@@ -263,26 +263,30 @@ fn glyph_to_path(
     }
 }
 
-struct Builder<'a>(&'a mut svgtypes::Path);
+struct Builder<'a>(&'a mut String);
 
 impl ttf::OutlineBuilder for Builder<'_> {
     fn move_to(&mut self, x: f32, y: f32) {
-        self.0.push_move_to(x as f64, y as f64);
+        use std::fmt::Write;
+        write!(self.0, "M {} {} ", x, y).unwrap()
     }
 
     fn line_to(&mut self, x: f32, y: f32) {
-        self.0.push_line_to(x as f64, y as f64);
+        use std::fmt::Write;
+        write!(self.0, "L {} {} ", x, y).unwrap()
     }
 
     fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-        self.0.push_quad_to(x1 as f64, y1 as f64, x as f64, y as f64);
+        use std::fmt::Write;
+        write!(self.0, "Q {} {} {} {} ", x1, y1, x, y).unwrap()
     }
 
     fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        self.0.push_curve_to(x1 as f64, y1 as f64, x2 as f64, y2 as f64, x as f64, y as f64);
+        use std::fmt::Write;
+        write!(self.0, "C {} {} {} {} {} {} ", x1, y1, x2, y2, x, y).unwrap()
     }
 
     fn close(&mut self) {
-        self.0.push_close_path();
+        self.0.push_str("Z ")
     }
 }

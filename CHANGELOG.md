@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.15.2] - 2022-06-17
 ### Fixed
 - Missing advance and side bearing offsets in `HVAR`/`VVAR` is not an error. Simply ignore them.
 
@@ -321,7 +323,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.2...HEAD
+[0.15.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.4...v0.14.0

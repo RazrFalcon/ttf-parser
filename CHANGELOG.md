@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- Missing advance and side bearing offsets in `HVAR`/`VVAR` is not an error. Simply ignore them.
 
 ## [0.15.1] - 2022-06-04
 ### Fixed

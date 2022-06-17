@@ -1450,9 +1450,14 @@ impl<'a> Face<'a> {
 
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
-                if let Some(hvar) = self.tables.hvar {
+                if let Some(side_bearing_offset) = self
+                    .tables
+                    .hvar
+                    .as_ref()
+                    .and_then(|hvar| hvar.side_bearing_offset(glyph_id, self.coords()))
+                {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    bearing += hvar.side_bearing_offset(glyph_id, self.coords())? + 0.5;
+                    bearing += side_bearing_offset + 0.5;
                 }
             }
 

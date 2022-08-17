@@ -105,6 +105,12 @@ impl<'a> DictionaryParser<'a> {
     }
 
     #[inline]
+    pub fn parse_number(&mut self) -> Option<i32> {
+        self.parse_operands()?;
+        self.operands().get(0).cloned()
+    }
+
+    #[inline]
     pub fn parse_offset(&mut self) -> Option<usize> {
         self.parse_operands()?;
         let operands = self.operands();

@@ -1358,12 +1358,12 @@ impl<'a> Face<'a> {
     /// If you need a more low-level control, prefer `Face::tables().cmap`.
     #[inline]
     pub fn glyph_index(&self, code_point: char) -> Option<GlyphId> {
-        for encoding in self.tables.cmap?.subtables {
-            if !encoding.is_unicode() {
+        for subtable in self.tables.cmap?.subtables {
+            if !subtable.is_unicode() {
                 continue;
             }
 
-            if let Some(id) = encoding.glyph_index(u32::from(code_point)) {
+            if let Some(id) = subtable.glyph_index(u32::from(code_point)) {
                 return Some(id);
             }
         }

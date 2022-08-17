@@ -9,7 +9,7 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::{GlyphId, OutlineBuilder, Rect, BBox};
+use crate::{GlyphId, OutlineBuilder, Rect, BBox, Fixed};
 use crate::parser::{Stream, LazyArray16, NumFrom, TryNumFrom};
 use super::{Builder, IsEven, CFFError, StringId, calc_subroutine_bias, conv_subroutine_index};
 use super::argstack::ArgumentsStack;
@@ -76,6 +76,8 @@ mod top_dict_operator {
 /// Table 23 Private DICT Operators
 mod private_dict_operator {
     pub const LOCAL_SUBROUTINES_OFFSET: u16 = 19;
+    pub const DEFAULT_WIDTH: u16 = 20;
+    pub const NOMINAL_WIDTH: u16 = 21;
 }
 
 /// Enumerates Charset IDs defined in the Adobe Technical Note #5176, Table 22
@@ -94,6 +96,10 @@ pub(crate) enum FontKind<'a> {
 #[derive(Clone, Copy, Default, Debug)]
 pub(crate) struct SIDMetadata<'a> {
     local_subrs: Index<'a>,
+    /// Can be zero.
+    default_width: f32,
+    /// Can be zero.
+    nominal_width: f32,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -218,16 +224,28 @@ mod tests {
     }
 }
 
-fn parse_private_dict(data: &[u8]) -> Option<usize> {
+#[derive(Default, Debug)]
+struct PrivateDict {
+    local_subroutines_offset: Option<usize>,
+    default_width: Option<i32>,
+    nominal_width: Option<i32>,
+}
+
+fn parse_private_dict(data: &[u8]) -> PrivateDict {
+    let mut dict = PrivateDict::default();
     let mut operands_buffer = [0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
-            return dict_parser.parse_offset();
+            dict.local_subroutines_offset = dict_parser.parse_offset();
+        } else if operator.get() == private_dict_operator::DEFAULT_WIDTH {
+            dict.default_width = dict_parser.parse_number();
+        } else if operator.get() == private_dict_operator::NOMINAL_WIDTH {
+            dict.nominal_width = dict_parser.parse_number();
         }
     }
 
-    None
+    dict
 }
 
 fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
@@ -257,7 +275,8 @@ fn parse_cid_local_subrs<'a>(
     let font_dict_data = cid.fd_array.get(u32::from(font_dict_index))?;
     let private_dict_range = parse_font_dict(font_dict_data)?;
     let private_dict_data = data.get(private_dict_range.clone())?;
-    let subroutines_offset = parse_private_dict(private_dict_data)?;
+    let private_dict = parse_private_dict(private_dict_data);
+    let subroutines_offset = private_dict.local_subroutines_offset?;
 
     // 'The local subroutines offset is relative to the beginning
     // of the Private DICT data.'
@@ -591,7 +610,7 @@ fn _parse_char_string(
 fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
     let code = u8::try_num_from(n)?;
 
-    let sid = STANDARD_ENCODING[code as usize];
+    let sid = STANDARD_ENCODING[usize::from(code)];
     let sid = StringId(u16::from(sid));
 
     match charset {
@@ -602,6 +621,85 @@ fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
         Charset::Expert | Charset::ExpertSubset => None,
         _ => charset.sid_to_gid(sid),
     }
+}
+
+// The first number of the first char string operator (well, some of them) can be a width.
+// This width is different from glyph's bbox width and somewhat relates to
+// glyph's advance (`hmtx`).
+//
+// We ignore this width during glyph outlining, because we don't really care about it.
+// But when parsing standalone CFF tables/fonts it might be useful.
+fn parse_char_string_width(data: &[u8]) -> Option<f32> {
+    let mut stack = ArgumentsStack {
+        data: &mut [0.0; MAX_ARGUMENTS_STACK_LEN], // 192B
+        len: 0,
+        max_len: MAX_ARGUMENTS_STACK_LEN,
+    };
+    _parse_char_string_width(data, &mut stack)
+}
+
+// Just like `_parse_char_string`, but parses only the first operator.
+fn _parse_char_string_width(
+    char_string: &[u8],
+    stack: &mut ArgumentsStack,
+) -> Option<f32> {
+    let mut s = Stream::new(char_string);
+    while !s.at_end() {
+        let op = s.read::<u8>()?;
+        match op {
+            operator::HORIZONTAL_STEM |
+            operator::VERTICAL_STEM |
+            operator::HORIZONTAL_STEM_HINT_MASK |
+            operator::VERTICAL_STEM_HINT_MASK |
+            operator::HINT_MASK |
+            operator::COUNTER_MASK |
+            operator::MOVE_TO |
+            operator::ENDCHAR => {
+                return if stack.len().is_odd() {
+                    Some(stack.at(0))
+                } else {
+                    None
+                };
+            }
+            operator::HORIZONTAL_MOVE_TO | operator::VERTICAL_MOVE_TO => {
+                return if stack.len() == 2 {
+                    Some(stack.at(0))
+                } else {
+                    None
+                };
+            }
+            operator::RETURN => {
+                break;
+            }
+            operator::SHORT_INT => {
+                let n = s.read::<i16>()?;
+                stack.push(f32::from(n)).ok()?;
+            }
+            32..=246 => {
+                let n = i16::from(op) - 139;
+                stack.push(f32::from(n)).ok()?;
+            }
+            247..=250 => {
+                let b1 = s.read::<u8>()?;
+                let n = (i16::from(op) - 247) * 256 + i16::from(b1) + 108;
+                debug_assert!((108..=1131).contains(&n));
+                stack.push(f32::from(n)).ok()?;
+            }
+            251..=254 => {
+                let b1 = s.read::<u8>()?;
+                let n = -(i16::from(op) - 251) * 256 - i16::from(b1) - 108;
+                debug_assert!((-1131..=-108).contains(&n));
+                stack.push(f32::from(n)).ok()?;
+            }
+            operator::FIXED_16_16 => {
+                let n = s.read::<Fixed>()?;
+                stack.push(n.0).ok()?;
+            }
+            _ => return None,
+        }
+    }
+
+    None
 }
 
 
@@ -663,16 +761,18 @@ fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSe
 }
 
 fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
-    let subroutines_offset = if let Some(range) = top_dict.private_dict_range.clone() {
-        parse_private_dict(data.get(range)?)
-    } else {
-        None
-    };
-
-    // Parse Global Subroutines INDEX.
     let mut metadata = SIDMetadata::default();
 
-    match (top_dict.private_dict_range, subroutines_offset) {
+    let private_dict = if let Some(range) = top_dict.private_dict_range.clone() {
+        parse_private_dict(data.get(range)?)
+    } else {
+        return Some(FontKind::SID(metadata))
+    };
+
+    metadata.default_width = private_dict.default_width.map(|n| n as f32).unwrap_or(0.0);
+    metadata.nominal_width = private_dict.nominal_width.map(|n| n as f32).unwrap_or(0.0);
+
+    match (top_dict.private_dict_range, private_dict.local_subroutines_offset) {
         (Some(private_dict_range), Some(subroutines_offset)) => {
             // 'The local subroutines offset is relative to the beginning
             // of the Private DICT data.'
@@ -812,6 +912,32 @@ impl<'a> Table<'a> {
     ) -> Result<Rect, CFFError> {
         let data = self.char_strings.get(u32::from(glyph_id.0)).ok_or(CFFError::NoGlyph)?;
         parse_char_string(data, self, glyph_id, builder)
+    }
+
+    /// Resolves a Glyph ID for a code point.
+    ///
+    /// Similar to [`Face::glyph_index`](crate::Face::glyph_index) but 8bit
+    /// and uses CFF charset table instead of TrueType `cmap`.
+    pub fn glyph_index(&self, code_point: u8) -> Option<GlyphId> {
+        self.charset.glyph_index(code_point)
+    }
+
+    /// Returns a glyph width.
+    ///
+    /// This value is different from outline bbox width and is stored separately.
+    ///
+    /// Technically similar to [`Face::glyph_hor_advance`](crate::Face::glyph_hor_advance).
+    pub fn glyph_width(&self, glyph_id: GlyphId) -> Option<u16> {
+        match self.kind {
+            FontKind::SID(ref sid) => {
+                let data = self.char_strings.get(u32::from(glyph_id.0))?;
+                let width = parse_char_string_width(data)
+                    .map(|w| sid.nominal_width + w)
+                    .unwrap_or(sid.default_width);
+                u16::try_from(width as i32).ok()
+            }
+            FontKind::CID(_) => None,
+        }
     }
 
     /// Returns a glyph name.

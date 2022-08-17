@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `cff::Table::glyph_index`
+- `cff::Table::glyph_width`
 
 ## [0.15.2] - 2022-06-17
 ### Fixed

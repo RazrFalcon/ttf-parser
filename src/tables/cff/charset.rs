@@ -101,6 +101,12 @@ pub(crate) enum Charset<'a> {
 }
 
 impl Charset<'_> {
+    pub fn glyph_index(&self, code_point: u8) -> Option<GlyphId> {
+        let sid = STANDARD_ENCODING[usize::from(code_point)];
+        let sid = StringId(u16::from(sid));
+        self.sid_to_gid(sid)
+    }
+
     pub fn sid_to_gid(&self, sid: StringId) -> Option<GlyphId> {
         if sid.0 == 0 {
             return Some(GlyphId(0));

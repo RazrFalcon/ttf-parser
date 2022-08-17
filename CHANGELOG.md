@@ -6,8 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
+- CFF Encoding support.
 - `cff::Table::glyph_index`
 - `cff::Table::glyph_width`
+- `cff::Table::number_of_glyphs`
 
 ## [0.15.2] - 2022-06-17
 ### Fixed

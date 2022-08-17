@@ -8,14 +8,16 @@
 
 use core::convert::TryFrom;
 use core::ops::Range;
+use core::num::NonZeroU16;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox, Fixed};
 use crate::parser::{Stream, LazyArray16, NumFrom, TryNumFrom};
 use super::{Builder, IsEven, CFFError, StringId, calc_subroutine_bias, conv_subroutine_index};
 use super::argstack::ArgumentsStack;
-use super::charset::{STANDARD_ENCODING, Charset, parse_charset};
+use super::charset::{Charset, parse_charset};
 use super::charstring::CharStringParser;
 use super::dict::DictionaryParser;
+use super::encoding::{STANDARD_ENCODING, Encoding, parse_encoding};
 use super::index::{Index, parse_index, skip_index};
 #[cfg(feature = "glyph-names")] use super::std_names::STANDARD_NAMES;
 
@@ -65,6 +67,7 @@ mod operator {
 /// Table 9 Top DICT Operator Entries
 mod top_dict_operator {
     pub const CHARSET_OFFSET: u16               = 15;
+    pub const ENCODING_OFFSET: u16              = 16;
     pub const CHAR_STRINGS_OFFSET: u16          = 17;
     pub const PRIVATE_DICT_SIZE_AND_OFFSET: u16 = 18;
     pub const ROS: u16                          = 1230;
@@ -87,6 +90,12 @@ mod charset_id {
     pub const EXPERT_SUBSET: usize = 2;
 }
 
+/// Enumerates Charset IDs defined in the Adobe Technical Note #5176, Table 16
+mod encoding_id {
+    pub const STANDARD: usize = 0;
+    pub const EXPERT: usize = 1;
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum FontKind<'a> {
     SID(SIDMetadata<'a>),
@@ -100,6 +109,7 @@ pub(crate) struct SIDMetadata<'a> {
     default_width: f32,
     /// Can be zero.
     nominal_width: f32,
+    encoding: Encoding<'a>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -111,6 +121,7 @@ pub(crate) struct CIDMetadata<'a> {
 #[derive(Default)]
 struct TopDict {
     charset_offset: Option<usize>,
+    encoding_offset: Option<usize>,
     char_strings_offset: usize,
     private_dict_range: Option<Range<usize>>,
     has_ros: bool,
@@ -132,6 +143,9 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
         match operator.get() {
             top_dict_operator::CHARSET_OFFSET => {
                 top_dict.charset_offset = dict_parser.parse_offset();
+            }
+            top_dict_operator::ENCODING_OFFSET => {
+                top_dict.encoding_offset = dict_parser.parse_offset();
             }
             top_dict_operator::CHAR_STRINGS_OFFSET => {
                 top_dict.char_strings_offset = dict_parser.parse_offset()?;
@@ -760,8 +774,13 @@ fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSe
     }
 }
 
-fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
+fn parse_sid_metadata<'a>(
+    data: &'a [u8],
+    top_dict: TopDict,
+    encoding: Encoding<'a>,
+) -> Option<FontKind<'a>> {
     let mut metadata = SIDMetadata::default();
+    metadata.encoding = encoding;
 
     let private_dict = if let Some(range) = top_dict.private_dict_range.clone() {
         parse_private_dict(data.get(range)?)
@@ -828,6 +847,7 @@ pub struct Table<'a> {
     #[allow(dead_code)] strings: Index<'a>,
     global_subrs: Index<'a>,
     charset: Charset<'a>,
+    number_of_glyphs: NonZeroU16,
     char_strings: Index<'a>,
     kind: FontKind<'a>,
 }
@@ -873,25 +893,32 @@ impl<'a> Table<'a> {
             parse_index::<u16>(&mut s)?
         };
 
-        if char_strings.len() == 0 {
-            return None;
-        }
-
         // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
-        let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
+        let number_of_glyphs = u16::try_from(char_strings.len()).ok().and_then(NonZeroU16::new)?;
 
         let charset = match top_dict.charset_offset {
             Some(charset_id::ISO_ADOBE) => Charset::ISOAdobe,
             Some(charset_id::EXPERT) => Charset::Expert,
             Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
-            Some(offset) => parse_charset(number_of_glyphs, &mut Stream::new_at(data, offset)?)?,
+            Some(offset) => {
+                let mut s = Stream::new_at(data, offset)?;
+                parse_charset(number_of_glyphs.get(), &mut s)?
+            }
             None => Charset::ISOAdobe, // default
         };
 
         let kind = if top_dict.has_ros {
-            parse_cid_metadata(data, top_dict, number_of_glyphs)?
+            parse_cid_metadata(data, top_dict, number_of_glyphs.get())?
         } else {
-            parse_sid_metadata(data, top_dict)?
+            // Only SID fonts are allowed to have an Encoding.
+            let encoding = match top_dict.encoding_offset {
+                Some(encoding_id::STANDARD) => Encoding::new_standard(),
+                Some(encoding_id::EXPERT) => Encoding::new_expert(),
+                Some(offset) => parse_encoding(&mut Stream::new_at(data, offset)?)?,
+                None => Encoding::new_standard(), // default
+            };
+
+            parse_sid_metadata(data, top_dict, encoding)?
         };
 
         Some(Self {
@@ -899,9 +926,18 @@ impl<'a> Table<'a> {
             strings,
             global_subrs,
             charset,
+            number_of_glyphs,
             char_strings,
             kind,
         })
+    }
+
+    /// Returns a total number of glyphs in the font.
+    ///
+    /// Never zero.
+    #[inline]
+    pub fn number_of_glyphs(&self) -> u16 {
+        self.number_of_glyphs.get()
     }
 
     /// Outlines a glyph.
@@ -917,9 +953,14 @@ impl<'a> Table<'a> {
     /// Resolves a Glyph ID for a code point.
     ///
     /// Similar to [`Face::glyph_index`](crate::Face::glyph_index) but 8bit
-    /// and uses CFF charset table instead of TrueType `cmap`.
+    /// and uses CFF encoding and charset tables instead of TrueType `cmap`.
     pub fn glyph_index(&self, code_point: u8) -> Option<GlyphId> {
-        self.charset.glyph_index(code_point)
+        match self.kind {
+            FontKind::SID(ref sid_meta) => {
+                sid_meta.encoding.code_to_gid(&self.charset, code_point)
+            }
+            FontKind::CID(_) => None,
+        }
     }
 
     /// Returns a glyph width.

@@ -4,6 +4,7 @@ mod argstack;
 mod charset;
 mod charstring;
 mod dict;
+mod encoding;
 mod index;
 #[cfg(feature = "glyph-names")] mod std_names;
 

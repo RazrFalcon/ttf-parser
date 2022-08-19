@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `cff::Table::glyph_index`
 - `cff::Table::glyph_width`
 - `cff::Table::number_of_glyphs`
+- `cff::Table::matrix`
 
 ## [0.15.2] - 2022-06-17
 ### Fixed

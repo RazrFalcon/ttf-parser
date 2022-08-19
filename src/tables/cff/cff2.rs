@@ -85,7 +85,7 @@ struct TopDictData {
 fn parse_top_dict(data: &[u8]) -> Option<TopDictData> {
     let mut dict_data = TopDictData::default();
 
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == top_dict_operator::CHAR_STRINGS_OFFSET {
@@ -108,7 +108,7 @@ fn parse_top_dict(data: &[u8]) -> Option<TopDictData> {
 fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
     let mut private_dict_range = None;
 
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == font_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
@@ -116,8 +116,8 @@ fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
             let operands = dict_parser.operands();
 
             if operands.len() == 2 {
-                let len = usize::try_from(operands[0]).ok()?;
-                let start = usize::try_from(operands[1]).ok()?;
+                let len = usize::try_from(operands[0] as i32).ok()?;
+                let start = usize::try_from(operands[1] as i32).ok()?;
                 let end = start.checked_add(len)?;
                 private_dict_range = Some(start..end);
             }
@@ -131,7 +131,7 @@ fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
 
 fn parse_private_dict(data: &[u8]) -> Option<usize> {
     let mut subroutines_offset = None;
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
@@ -139,7 +139,7 @@ fn parse_private_dict(data: &[u8]) -> Option<usize> {
             let operands = dict_parser.operands();
 
             if operands.len() == 1 {
-                subroutines_offset = usize::try_from(operands[0]).ok();
+                subroutines_offset = usize::try_from(operands[0] as i32).ok();
             }
 
             break;

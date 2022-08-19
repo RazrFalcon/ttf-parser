@@ -70,6 +70,7 @@ mod top_dict_operator {
     pub const ENCODING_OFFSET: u16              = 16;
     pub const CHAR_STRINGS_OFFSET: u16          = 17;
     pub const PRIVATE_DICT_SIZE_AND_OFFSET: u16 = 18;
+    pub const FONT_MATRIX: u16                  = 1207;
     pub const ROS: u16                          = 1230;
     pub const FD_ARRAY: u16                     = 1236;
     pub const FD_SELECT: u16                    = 1237;
@@ -118,12 +119,31 @@ pub(crate) struct CIDMetadata<'a> {
     fd_select: FDSelect<'a>,
 }
 
+/// An affine transformation matrix.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug)]
+pub struct Matrix {
+    pub sx: f32,
+    pub ky: f32,
+    pub kx: f32,
+    pub sy: f32,
+    pub tx: f32,
+    pub ty: f32,
+}
+
+impl Default for Matrix {
+    fn default() -> Self {
+        Self { sx: 0.001, ky: 0.0, kx: 0.0, sy: 0.001, tx: 0.0, ty: 0.0 }
+    }
+}
+
 #[derive(Default)]
 struct TopDict {
     charset_offset: Option<usize>,
     encoding_offset: Option<usize>,
     char_strings_offset: usize,
     private_dict_range: Option<Range<usize>>,
+    matrix: Matrix,
     has_ros: bool,
     fd_array_offset: Option<usize>,
     fd_select_offset: Option<usize>,
@@ -137,7 +157,7 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
     // The Top DICT INDEX should have only one dictionary.
     let data = index.get(0)?;
 
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         match operator.get() {
@@ -152,6 +172,20 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
             }
             top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET => {
                 top_dict.private_dict_range = dict_parser.parse_range();
+            }
+            top_dict_operator::FONT_MATRIX => {
+                dict_parser.parse_operands()?;
+                let operands = dict_parser.operands();
+                if operands.len() == 6 {
+                    top_dict.matrix = Matrix {
+                        sx: operands[0],
+                        ky: operands[1],
+                        kx: operands[2],
+                        sy: operands[3],
+                        tx: operands[4],
+                        ty: operands[5],
+                    };
+                }
             }
             top_dict_operator::ROS => {
                 top_dict.has_ros = true;
@@ -241,13 +275,13 @@ mod tests {
 #[derive(Default, Debug)]
 struct PrivateDict {
     local_subroutines_offset: Option<usize>,
-    default_width: Option<i32>,
-    nominal_width: Option<i32>,
+    default_width: Option<f32>,
+    nominal_width: Option<f32>,
 }
 
 fn parse_private_dict(data: &[u8]) -> PrivateDict {
     let mut dict = PrivateDict::default();
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
@@ -263,7 +297,7 @@ fn parse_private_dict(data: &[u8]) -> PrivateDict {
 }
 
 fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
@@ -788,8 +822,8 @@ fn parse_sid_metadata<'a>(
         return Some(FontKind::SID(metadata))
     };
 
-    metadata.default_width = private_dict.default_width.map(|n| n as f32).unwrap_or(0.0);
-    metadata.nominal_width = private_dict.nominal_width.map(|n| n as f32).unwrap_or(0.0);
+    metadata.default_width = private_dict.default_width.unwrap_or(0.0);
+    metadata.nominal_width = private_dict.nominal_width.unwrap_or(0.0);
 
     match (top_dict.private_dict_range, private_dict.local_subroutines_offset) {
         (Some(private_dict_range), Some(subroutines_offset)) => {
@@ -848,6 +882,7 @@ pub struct Table<'a> {
     global_subrs: Index<'a>,
     charset: Charset<'a>,
     number_of_glyphs: NonZeroU16,
+    matrix: Matrix,
     char_strings: Index<'a>,
     kind: FontKind<'a>,
 }
@@ -907,6 +942,8 @@ impl<'a> Table<'a> {
             None => Charset::ISOAdobe, // default
         };
 
+        let matrix = top_dict.matrix;
+
         let kind = if top_dict.has_ros {
             parse_cid_metadata(data, top_dict, number_of_glyphs.get())?
         } else {
@@ -927,6 +964,7 @@ impl<'a> Table<'a> {
             global_subrs,
             charset,
             number_of_glyphs,
+            matrix,
             char_strings,
             kind,
         })
@@ -938,6 +976,12 @@ impl<'a> Table<'a> {
     #[inline]
     pub fn number_of_glyphs(&self) -> u16 {
         self.number_of_glyphs.get()
+    }
+
+    /// Returns a font transformation matrix.
+    #[inline]
+    pub fn matrix(&self) -> Matrix {
+        self.matrix
     }
 
     /// Outlines a glyph.

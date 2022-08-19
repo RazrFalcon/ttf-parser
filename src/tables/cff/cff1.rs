@@ -209,22 +209,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn private_dict_size_overflow() {
-        let data = &[
-            0x00, 0x01, // count: 1
-            0x01, // offset size: 1
-            0x01, // index [0]: 1
-            0x0C, // index [1]: 14
-            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // length: i32::MAX
-            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // offset: i32::MAX
-            0x12 // operator: 18 (private)
-        ];
-
-        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
-        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
-    }
-
-    #[test]
     fn private_dict_negative_char_strings_offset() {
         let data = &[
             0x00, 0x01, // count: 1

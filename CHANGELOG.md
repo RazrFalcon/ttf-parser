@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `cff::Table::number_of_glyphs`
 - `cff::Table::matrix`
 
+### Fixed
+- (hmtx/vmtx) Allow missing additional side bearings.
+
 ## [0.15.2] - 2022-06-17
 ### Fixed
 - Missing advance and side bearing offsets in `HVAR`/`VVAR` is not an error. Simply ignore them.

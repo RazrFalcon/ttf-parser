@@ -985,7 +985,14 @@ impl<'a> Table<'a> {
     pub fn glyph_index(&self, code_point: u8) -> Option<GlyphId> {
         match self.kind {
             FontKind::SID(ref sid_meta) => {
-                sid_meta.encoding.code_to_gid(&self.charset, code_point)
+                match sid_meta.encoding.code_to_gid(&self.charset, code_point) {
+                    Some(id) => Some(id),
+                    None => {
+                        // Try using the Standard encoding otherwise.
+                        // Custom Encodings does not guarantee to include all glyphs.
+                        Encoding::new_standard().code_to_gid(&self.charset, code_point)
+                    }
+                }
             }
             FontKind::CID(_) => None,
         }

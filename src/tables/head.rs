@@ -31,7 +31,9 @@ pub struct Table {
 impl Table {
     /// Parses a table from raw data.
     pub fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != 54 {
+        // Do not check the exact length, because some fonts include
+        // padding in table's length in table records, which is incorrect.
+        if data.len() < 54 {
             return None
         }
 

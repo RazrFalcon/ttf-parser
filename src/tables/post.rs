@@ -5,7 +5,6 @@ use crate::LineMetrics;
 use crate::parser::{Stream, Fixed, LazyArray16};
 #[cfg(feature = "glyph-names")] use crate::GlyphId;
 
-const TABLE_SIZE: usize = 32;
 const ITALIC_ANGLE_OFFSET: usize = 4;
 const UNDERLINE_POSITION_OFFSET: usize = 8;
 const UNDERLINE_THICKNESS_OFFSET: usize = 10;
@@ -354,7 +353,9 @@ pub struct Table<'a> {
 impl<'a> Table<'a> {
     /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
-        if data.len() < TABLE_SIZE {
+        // Do not check the exact length, because some fonts include
+        // padding in table's length in table records, which is incorrect.
+        if data.len() < 32 {
             return None;
         }
 
@@ -378,7 +379,7 @@ impl<'a> Table<'a> {
         let mut names = Names::default();
         // Only version 2.0 of the table has data at the end.
         if version == 0x00020000 {
-            let mut s = Stream::new_at(data, TABLE_SIZE)?;
+            let mut s = Stream::new_at(data, 32)?;
             let count = s.read::<u16>()?;
             names.indexes = s.read_array16::<u16>(count)?;
             names.data = s.tail()?;

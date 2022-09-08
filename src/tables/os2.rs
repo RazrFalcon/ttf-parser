@@ -195,7 +195,9 @@ impl<'a> Table<'a> {
             _ => return None,
         };
 
-        if data.len() != table_len {
+        // Do not check the exact length, because some fonts include
+        // padding in table's length in table records, which is incorrect.
+        if data.len() < table_len {
             return None;
         }
 

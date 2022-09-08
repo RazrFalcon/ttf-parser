@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 - (hmtx/vmtx) Allow missing additional side bearings.
+- Reduce strictness of some table length checks.
 
 ## [0.15.2] - 2022-06-17
 ### Fixed

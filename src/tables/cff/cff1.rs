@@ -1016,6 +1016,24 @@ impl<'a> Table<'a> {
         }
     }
 
+    /// Returns a glyph ID by a name.
+    #[cfg(feature = "glyph-names")]
+    pub fn glyph_index_by_name(&self, name: &str) -> Option<GlyphId> {
+        match self.kind {
+            FontKind::SID(_) => {
+                let sid = if let Some(index) = STANDARD_NAMES.iter().position(|n| *n == name) {
+                    StringId(index as u16)
+                } else {
+                    let index = self.strings.into_iter().position(|n| n == name.as_bytes())?;
+                    StringId((STANDARD_NAMES.len() + index) as u16)
+                };
+
+                self.charset.sid_to_gid(sid)
+            }
+            FontKind::CID(_) => None,
+        }
+    }
+
     /// Returns a glyph name.
     #[cfg(feature = "glyph-names")]
     pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {

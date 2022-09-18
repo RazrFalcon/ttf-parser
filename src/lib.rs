@@ -1371,6 +1371,25 @@ impl<'a> Face<'a> {
         None
     }
 
+    /// Resolves a Glyph ID for a glyph name.
+    ///
+    /// Uses the `post` and `CFF` tables as sources.
+    ///
+    /// Returns `None` when no name is associated with a `glyph`.
+    #[cfg(feature = "glyph-names")]
+    #[inline]
+    pub fn glyph_index_by_name(&self, name: &str) -> Option<GlyphId> {
+        if let Some(name) = self.tables.post.and_then(|post| post.glyph_index_by_name(name)) {
+            return Some(name);
+        }
+
+        if let Some(name) = self.tables.cff.as_ref().and_then(|cff| cff.glyph_index_by_name(name)) {
+            return Some(name);
+        }
+
+        None
+    }
+
     /// Resolves a variation of a Glyph ID from two code points.
     ///
     /// Implemented according to
@@ -1510,7 +1529,7 @@ impl<'a> Face<'a> {
     #[cfg(feature = "glyph-names")]
     #[inline]
     pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&str> {
-        if let Some(name) = self.tables.post.and_then(|post| post.names.get(glyph_id)) {
+        if let Some(name) = self.tables.post.and_then(|post| post.glyph_name(glyph_id)) {
             return Some(name);
         }
 

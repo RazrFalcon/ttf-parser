@@ -275,63 +275,44 @@ const MACINTOSH_NAMES: &[&str] = &[
 ];
 
 
-/// A list of glyph names.
+/// An iterator over glyph names.
+///
+/// The `post` table doesn't provide the glyph names count,
+/// so we have to simply iterate over all of them to find it out.
 #[derive(Clone, Copy, Default)]
 pub struct Names<'a> {
-    indexes: LazyArray16<'a, u16>,
     data: &'a [u8],
-}
-
-// TODO: add low-level iterator
-impl<'a> Names<'a> {
-    /// Returns a glyph name by ID.
-    #[cfg(feature = "glyph-names")]
-    pub fn get(&self, glyph_id: GlyphId) -> Option<&'a str> {
-        let mut index = self.indexes.get(glyph_id.0)?;
-
-        // 'If the name index is between 0 and 257, treat the name index
-        // as a glyph index in the Macintosh standard order.'
-        if usize::from(index) < MACINTOSH_NAMES.len() {
-            Some(MACINTOSH_NAMES[usize::from(index)])
-        } else {
-            // 'If the name index is between 258 and 65535, then subtract 258 and use that
-            // to index into the list of Pascal strings at the end of the table.'
-            index -= MACINTOSH_NAMES.len() as u16;
-
-            let mut s = Stream::new(self.data);
-            let mut i = 0;
-            while !s.at_end() && i < core::u16::MAX {
-                let len = s.read::<u8>()?;
-
-                if i == index {
-                    if len == 0 {
-                        // Empty name is an error.
-                        break;
-                    } else {
-                        let name = s.read_bytes(usize::from(len))?;
-                        return core::str::from_utf8(name).ok();
-                    }
-                } else {
-                    s.advance(usize::from(len));
-                }
-
-                i += 1;
-            }
-
-            None
-        }
-    }
-
-    /// Returns names count.
-    #[inline]
-    pub fn len(&self) -> u16 {
-        self.indexes.len()
-    }
+    offset: usize,
 }
 
 impl core::fmt::Debug for Names<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "Names {{ ... }}")
+    }
+}
+
+impl<'a> Iterator for Names<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Glyph names are stored as Pascal Strings.
+        // Meaning u8 (len) + [u8] (data).
+
+        if self.offset >= self.data.len() {
+            return None;
+        }
+
+        let len = self.data[self.offset];
+        self.offset += 1;
+
+        // An empty name is an error.
+        if len == 0 {
+            return None;
+        }
+
+        let name = self.data.get(self.offset .. self.offset + usize::from(len))?;
+        self.offset += usize::from(len);
+        core::str::from_utf8(name).ok()
     }
 }
 
@@ -345,8 +326,9 @@ pub struct Table<'a> {
     pub underline_metrics: LineMetrics,
     /// Flag that indicates that the font is monospaced.
     pub is_monospaced: bool,
-    /// A list of glyph names.
-    pub names: Names<'a>,
+
+    glyph_indexes: LazyArray16<'a, u16>,
+    names_data: &'a [u8],
 }
 
 
@@ -376,20 +358,60 @@ impl<'a> Table<'a> {
 
         let is_monospaced = Stream::read_at::<u32>(data, IS_FIXED_PITCH_OFFSET)? != 0;
 
-        let mut names = Names::default();
+        let mut names_data: &[u8] = &[];
+        let mut glyph_indexes = LazyArray16::default();
         // Only version 2.0 of the table has data at the end.
         if version == 0x00020000 {
             let mut s = Stream::new_at(data, 32)?;
-            let count = s.read::<u16>()?;
-            names.indexes = s.read_array16::<u16>(count)?;
-            names.data = s.tail()?;
+            let indexes_count = s.read::<u16>()?;
+            glyph_indexes = s.read_array16::<u16>(indexes_count)?;
+            names_data = s.tail()?;
         }
 
         Some(Table {
             italic_angle,
             underline_metrics,
             is_monospaced,
-            names,
+            names_data,
+            glyph_indexes,
         })
+    }
+
+    /// Returns a glyph name by ID.
+    #[cfg(feature = "glyph-names")]
+    pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
+        let mut index = self.glyph_indexes.get(glyph_id.0)?;
+
+        // 'If the name index is between 0 and 257, treat the name index
+        // as a glyph index in the Macintosh standard order.'
+        if usize::from(index) < MACINTOSH_NAMES.len() {
+            Some(MACINTOSH_NAMES[usize::from(index)])
+        } else {
+            // 'If the name index is between 258 and 65535, then subtract 258 and use that
+            // to index into the list of Pascal strings at the end of the table.'
+            index -= MACINTOSH_NAMES.len() as u16;
+            self.names().nth(usize::from(index))
+        }
+    }
+
+    /// Returns a glyph ID by a name.
+    #[cfg(feature = "glyph-names")]
+    pub fn glyph_index_by_name(&self, name: &str) -> Option<GlyphId> {
+        let id = if let Some(index) = MACINTOSH_NAMES.iter().position(|n| *n == name) {
+            self.glyph_indexes.into_iter().position(|i| usize::from(i) == index)?
+        } else {
+            let mut index = self.names().position(|n| n == name)?;
+            index += MACINTOSH_NAMES.len();
+            self.glyph_indexes.into_iter().position(|i| usize::from(i) == index)?
+        };
+
+        Some(GlyphId(id as u16))
+    }
+
+    /// Returns an iterator over glyph names.
+    ///
+    /// Default/predefined names are not included. Just the one in the font file.
+    pub fn names(&self) -> Names<'a> {
+        Names { data: self.names_data, offset: 0 }
     }
 }

@@ -12,11 +12,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `cff::Table::glyph_width`
 - `cff::Table::number_of_glyphs`
 - `cff::Table::matrix`
+- `post::Table::glyph_name`
+- `post::Table::glyph_index_by_name`
+- `post::Table::names`
+- `Face::glyph_index_by_name`
+
+### Changed
+- `post::Table::names` is a method and not a field now.
+- Use `post::Table::glyph_name` instead of `post::Table::names.get()`.
 
 ### Fixed
 - (hmtx/vmtx) Allow missing additional side bearings.
 - (loca) Allow incomplete table.
 - Reduce strictness of some table length checks.
+- (post) `post::Names::len` was returning a wrong value. Now this method is gone completely.
+  You can use `post::Table::names().count()` instead.
 
 ## [0.15.2] - 2022-06-17
 ### Fixed

@@ -42,6 +42,6 @@ fn endless_loop() {
     \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00a\xcc\xff\
     \xce\x03CCCCCCCCC\x00\x00\x00\x00\x00C\x00\x00\x00\x00\xb5\xf8\x01\x00\x00\x9c";
 
-    let face = ttf_parser::Face::from_slice(data, 0).unwrap();
+    let face = ttf_parser::Face::parse(data, 0).unwrap();
     let _ = face.outline_glyph(ttf_parser::GlyphId(0), &mut Builder(String::new()));
 }

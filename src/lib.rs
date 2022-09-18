@@ -458,13 +458,15 @@ pub struct RasterGlyphImage<'a> {
 }
 
 
-#[derive(Clone, Copy)]
-struct TableRecord {
-    table_tag: Tag,
+/// A raw table record.
+#[derive(Clone, Copy, Debug)]
+#[allow(missing_docs)]
+pub struct TableRecord {
+    pub tag: Tag,
     #[allow(dead_code)]
-    check_sum: u32,
-    offset: u32,
-    length: u32,
+    pub check_sum: u32,
+    pub offset: u32,
+    pub length: u32,
 }
 
 impl FromData for TableRecord {
@@ -474,7 +476,7 @@ impl FromData for TableRecord {
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         Some(TableRecord {
-            table_tag: s.read::<Tag>()?,
+            tag: s.read::<Tag>()?,
             check_sum: s.read::<u32>()?,
             offset: s.read::<u32>()?,
             length: s.read::<u32>()?,
@@ -559,8 +561,10 @@ impl std::error::Error for FaceParsingError {}
 /// manually before passing it to [`Face::from_raw_tables`].
 #[derive(Clone, Copy)]
 pub struct RawFace<'a> {
-    data: &'a [u8],
-    table_records: LazyArray16<'a, TableRecord>,
+    /// The input font file data.
+    pub data: &'a [u8],
+    /// An array of table records.
+    pub table_records: LazyArray16<'a, TableRecord>,
 }
 
 impl<'a> RawFace<'a> {
@@ -571,7 +575,19 @@ impl<'a> RawFace<'a> {
     /// Set to 0 if unsure.
     ///
     /// While we do reuse [`FaceParsingError`], `No*Table` errors will not be throws.
+    #[deprecated(since="0.16.0", note="use `parse` instead")]
     pub fn from_slice(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
+        Self::parse(data, index)
+    }
+
+    /// Creates a new [`RawFace`] from a raw data.
+    ///
+    /// `index` indicates the specific font face in a font collection.
+    /// Use [`fonts_in_collection`] to get the total number of font faces.
+    /// Set to 0 if unsure.
+    ///
+    /// While we do reuse [`FaceParsingError`], `No*Table` errors will not be throws.
+    pub fn parse(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
 
         let mut s = Stream::new(data);
@@ -613,7 +629,7 @@ impl<'a> RawFace<'a> {
 
     /// Returns the raw data of a selected table.
     pub fn table(&self, tag: Tag) -> Option<&'a [u8]> {
-        let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
+        let (_, table) = self.table_records.binary_search_by(|record| record.tag.cmp(&tag))?;
         let offset = usize::num_from(table.offset);
         let length = usize::num_from(table.length);
         let end = offset.checked_add(length)?;
@@ -765,8 +781,25 @@ impl<'a> Face<'a> {
     /// Required tables: `head`, `hhea` and `maxp`.
     ///
     /// If an optional table has invalid data it will be skipped.
+    #[deprecated(since="0.16.0", note="use `parse` instead")]
     pub fn from_slice(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
-        let raw_face = RawFace::from_slice(data, index)?;
+        Self::parse(data, index)
+    }
+
+    /// Creates a new [`Face`] from a raw data.
+    ///
+    /// `index` indicates the specific font face in a font collection.
+    /// Use [`fonts_in_collection`] to get the total number of font faces.
+    /// Set to 0 if unsure.
+    ///
+    /// This method will do some parsing and sanitization,
+    /// but in general can be considered free. No significant performance overhead.
+    ///
+    /// Required tables: `head`, `hhea` and `maxp`.
+    ///
+    /// If an optional table has invalid data it will be skipped.
+    pub fn parse(data: &'a [u8], index: u32) -> Result<Self, FaceParsingError> {
+        let raw_face = RawFace::parse(data, index)?;
         let raw_tables = Self::collect_tables(raw_face);
 
         #[allow(unused_mut)]
@@ -796,7 +829,7 @@ impl<'a> Face<'a> {
             };
 
             let table_data = raw_face.data.get(start..end);
-            match &record.table_tag.to_bytes() {
+            match &record.tag.to_bytes() {
                 b"CBDT" => tables.cbdt = table_data,
                 b"CBLC" => tables.cblc = table_data,
                 b"CFF " => tables.cff = table_data,
@@ -956,11 +989,22 @@ impl<'a> Face<'a> {
         &self.tables
     }
 
+    /// Returns the `RawFace` used to create this `Face`.
+    ///
+    /// Useful if you want to parse the data manually.
+    ///
+    /// Available only for faces created using [`Face::parse()`](struct.Face.html#method.parse).
+    #[inline]
+    pub fn raw_face(&self) -> &RawFace<'a> {
+        &self.raw_face
+    }
+
     /// Returns the raw data of a selected table.
     ///
     /// Useful if you want to parse the data manually.
     ///
-    /// Available only for faces created using [`Face::from_slice()`](struct.Face.html#method.from_slice).
+    /// Available only for faces created using [`Face::parse()`](struct.Face.html#method.parse).
+    #[deprecated(since="0.16.0", note="use `self.raw_face().table()` instead")]
     #[inline]
     pub fn table_data(&self, tag: Tag) -> Option<&'a [u8]> {
         self.raw_face.table(tag)
@@ -1585,7 +1629,7 @@ impl<'a> Face<'a> {
     /// }
     ///
     /// let data = std::fs::read("tests/fonts/demo.ttf").unwrap();
-    /// let face = ttf_parser::Face::from_slice(&data, 0).unwrap();
+    /// let face = ttf_parser::Face::parse(&data, 0).unwrap();
     /// let mut builder = Builder(String::new());
     /// let bbox = face.outline_glyph(ttf_parser::GlyphId(1), &mut builder).unwrap();
     /// assert_eq!(builder.0, "M 173 267 L 369 267 L 270 587 L 173 267 Z M 6 0 L 224 656 \
@@ -1804,7 +1848,7 @@ impl<'a> Iterator for DefaultTableProvider<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.tables.next().map(|table| {
-            Ok((table.table_tag, {
+            Ok((table.tag, {
                 let offset = usize::num_from(table.offset);
                 let length = usize::num_from(table.length);
                 let end = offset.checked_add(length).ok_or(FaceParsingError::MalformedFont)?;

@@ -16,8 +16,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `post::Table::glyph_index_by_name`
 - `post::Table::names`
 - `Face::glyph_index_by_name`
+- `RawFace` fields and `TableRecord` struct are public now.
 
 ### Changed
+- `Face::from_slice` was replaced by `Face::parse`.
+- `RawFace::from_slice` was replaced by `RawFace::parse`.
 - `post::Table::names` is a method and not a field now.
 - Use `post::Table::glyph_name` instead of `post::Table::names.get()`.
 

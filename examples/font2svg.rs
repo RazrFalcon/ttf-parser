@@ -79,7 +79,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let now = std::time::Instant::now();
 
     #[allow(unused_mut)]
-    let mut face = ttf::Face::from_slice(&font_data, 0)?;
+    let mut face = ttf::Face::parse(&font_data, 0)?;
     if face.is_variable() {
         #[cfg(feature = "variable-fonts")] {
             for variation in args.variations {

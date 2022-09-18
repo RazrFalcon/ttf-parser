@@ -65,7 +65,7 @@ fn convert_unit(unit: Unit, data: &mut Vec<u8>) {
 
 #[test]
 fn empty_font() {
-    assert_eq!(Face::from_slice(&[], 0).unwrap_err(),
+    assert_eq!(Face::parse(&[], 0).unwrap_err(),
                FaceParsingError::UnknownMagic);
 }
 
@@ -80,7 +80,7 @@ fn zero_tables() {
         UInt16(0), // rangeShift
     ]);
 
-    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
+    assert_eq!(Face::parse(&data, 0).unwrap_err(),
                FaceParsingError::NoHeadTable);
 }
 
@@ -95,7 +95,7 @@ fn tables_count_overflow() {
         UInt16(0), // rangeShift
     ]);
 
-    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
+    assert_eq!(Face::parse(&data, 0).unwrap_err(),
                FaceParsingError::MalformedFont);
 }
 
@@ -110,7 +110,7 @@ fn empty_font_collection() {
     ]);
 
     assert_eq!(fonts_in_collection(&data), Some(0));
-    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
+    assert_eq!(Face::parse(&data, 0).unwrap_err(),
                FaceParsingError::FaceIndexOutOfBounds);
 }
 
@@ -125,7 +125,7 @@ fn font_collection_num_fonts_overflow() {
     ]);
 
     assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
-    assert_eq!(Face::from_slice(&data, 0).unwrap_err(),
+    assert_eq!(Face::parse(&data, 0).unwrap_err(),
                FaceParsingError::MalformedFont);
 }
 
@@ -141,6 +141,6 @@ fn font_index_overflow() {
     ]);
 
     assert_eq!(fonts_in_collection(&data), Some(1));
-    assert_eq!(Face::from_slice(&data, std::u32::MAX).unwrap_err(),
+    assert_eq!(Face::parse(&data, std::u32::MAX).unwrap_err(),
                FaceParsingError::FaceIndexOutOfBounds);
 }

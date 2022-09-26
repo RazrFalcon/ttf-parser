@@ -400,10 +400,9 @@ impl core::fmt::Debug for PairSet<'_> {
 }
 
 
+// Essentially a `LazyOffsetArray16` but stores additional data required to parse [`PairSet`].
+
 /// A list of [`PairSet`]s.
-///
-/// Essentially a [`LazyOffsetArray16`](crate::parser::LazyOffsetArray16),
-/// but stores additional data required to parse [`PairSet`].
 #[derive(Clone, Copy)]
 pub struct PairSets<'a> {
     data: &'a [u8],

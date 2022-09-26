@@ -27,8 +27,10 @@ mod format0 {
 }
 
 mod format2 {
-    use ttf_parser::{cmap, GlyphId, parser::FromData};
+    use ttf_parser::{cmap, GlyphId};
     use crate::{convert, Unit::*};
+
+    const U16_SIZE: usize = std::mem::size_of::<u16>();
 
     #[test]
     fn collect_codepoints() {
@@ -39,8 +41,8 @@ mod format2 {
         ]);
 
         // Make only high byte 0x28 multi-byte.
-        data.extend(std::iter::repeat(0x00).take(256 * u16::SIZE));
-        data[6 + 0x28 * u16::SIZE + 1] = 0x08;
+        data.extend(std::iter::repeat(0x00).take(256 * U16_SIZE));
+        data[6 + 0x28 * U16_SIZE + 1] = 0x08;
 
         data.extend(convert(&[
             // First sub header (for single byte mapping)
@@ -73,7 +75,7 @@ mod format2 {
         ]);
 
         // Only single bytes.
-        data.extend(std::iter::repeat(0x00).take(256 * u16::SIZE));
+        data.extend(std::iter::repeat(0x00).take(256 * U16_SIZE));
         data.extend(convert(&[
             // First sub header (for single byte mapping)
             UInt16(40), // first code
@@ -483,6 +485,37 @@ mod format4 {
 
         let subtable = cmap::Subtable4::parse(&data).unwrap();
         assert_eq!(subtable.glyph_index(0x41), None);
+    }
+
+    #[test]
+    fn invalid_offset() {
+        let data = convert(&[
+            UInt16(4), // format
+            UInt16(42), // subtable size
+            UInt16(0), // language ID
+            UInt16(4), // 2 x segCount
+            UInt16(2), // search range
+            UInt16(0), // entry selector
+            UInt16(2), // range shift
+            // End character codes
+            UInt16(69), // char code [0]
+            UInt16(65535), // char code [1]
+            UInt16(0), // reserved
+            // Start character codes
+            UInt16(65), // char code [0]
+            UInt16(65535), // char code [1]
+            // Deltas
+            Int16(0), // delta [0]
+            Int16(1), // delta [1]
+            // Offsets into Glyph index array
+            UInt16(4), // offset [0]
+            UInt16(65535), // offset [1]
+            // Glyph index array
+            UInt16(1), // glyph ID [0]
+        ]);
+
+        let subtable = cmap::Subtable4::parse(&data).unwrap();
+        assert_eq!(subtable.glyph_index(65535), None);
     }
 
     #[test]

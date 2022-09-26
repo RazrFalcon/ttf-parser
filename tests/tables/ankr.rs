@@ -1,7 +1,7 @@
 use std::num::NonZeroU16;
 use ttf_parser::GlyphId;
 use ttf_parser::ankr::{Table, Point};
-use ttf_parser::parser::Array;
+use ttf_parser::Array;
 use crate::{convert, Unit::*};
 
 #[test]

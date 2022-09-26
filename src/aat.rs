@@ -7,7 +7,292 @@ related types.
 use core::num::NonZeroU16;
 
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, Array, LazyArray16};
+use crate::parser::{Stream, FromData, Array, LazyArray16, Offset, Offset16, Offset32, NumFrom};
+
+/// Predefined states.
+pub mod state {
+    #![allow(missing_docs)]
+    pub const START_OF_TEXT: u16 = 0;
+}
+
+/// Predefined classes.
+///
+/// Search for _Class Code_ in [Apple Advanced Typography Font Tables](
+/// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).
+pub mod class {
+    #![allow(missing_docs)]
+    pub const END_OF_TEXT: u8 = 0;
+    pub const OUT_OF_BOUNDS: u8 = 1;
+    pub const DELETED_GLYPH: u8 = 2;
+}
+
+/// A State Table entry.
+///
+/// Used by legacy and extended tables.
+#[derive(Clone, Copy, Debug)]
+pub struct GenericStateEntry<T: FromData> {
+    /// A new state.
+    pub new_state: u16,
+    /// Entry flags.
+    pub flags: u16,
+    /// Additional data.
+    ///
+    /// Use `()` if no data expected.
+    pub extra: T,
+}
+
+impl<T: FromData> FromData for GenericStateEntry<T> {
+    const SIZE: usize = 4 + T::SIZE;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(GenericStateEntry {
+            new_state: s.read::<u16>()?,
+            flags: s.read::<u16>()?,
+            extra: s.read::<T>()?,
+        })
+    }
+}
+
+impl<T: FromData> GenericStateEntry<T> {
+    /// Checks that entry has an offset.
+    #[inline]
+    pub fn has_offset(&self) -> bool {
+        self.flags & 0x3FFF != 0
+    }
+
+    /// Returns a value offset.
+    ///
+    /// Used by kern::format1 subtable.
+    #[inline]
+    pub fn value_offset(&self) -> ValueOffset {
+        ValueOffset(self.flags & 0x3FFF)
+    }
+
+    /// If set, reset the kerning data (clear the stack).
+    #[inline]
+    pub fn has_reset(&self) -> bool {
+        self.flags & 0x2000 != 0
+    }
+
+    /// If set, advance to the next glyph before going to the new state.
+    #[inline]
+    pub fn has_advance(&self) -> bool {
+        self.flags & 0x4000 == 0
+    }
+
+    /// If set, push this glyph on the kerning stack.
+    #[inline]
+    pub fn has_push(&self) -> bool {
+        self.flags & 0x8000 != 0
+    }
+
+    /// If set, remember this glyph as the marked glyph.
+    ///
+    /// Used by kerx::format4 subtable.
+    ///
+    /// Yes, the same as [`has_push`](Self::has_push).
+    #[inline]
+    pub fn has_mark(&self) -> bool {
+        self.flags & 0x8000 != 0
+    }
+}
+
+/// A legacy state entry used by [StateTable].
+pub type StateEntry = GenericStateEntry<()>;
+
+/// A type-safe wrapper for a kerning value offset.
+#[derive(Clone, Copy, Debug)]
+pub struct ValueOffset(u16);
+
+impl ValueOffset {
+    /// Returns the next offset.
+    ///
+    /// After reaching u16::MAX will start from 0.
+    #[inline]
+    pub fn next(self) -> Self {
+        ValueOffset(self.0.wrapping_add(u16::SIZE as u16))
+    }
+}
+
+/// A [State Table](
+/// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).
+///
+/// Also called `STHeader`.
+///
+/// Currently used by `kern` table.
+#[derive(Clone)]
+pub struct StateTable<'a> {
+    number_of_classes: u16,
+    first_glyph: GlyphId,
+    class_table: &'a [u8],
+    state_array_offset: u16,
+    state_array: &'a [u8],
+    entry_table: &'a [u8],
+    actions: &'a [u8],
+}
+
+impl<'a> StateTable<'a> {
+    pub(crate) fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+
+        let number_of_classes: u16 = s.read()?;
+        // Note that in format1 subtable, offsets are not from the subtable start,
+        // but from subtable start + `header_size`.
+        // So there is not need to subtract the `header_size`.
+        let class_table_offset = s.read::<Offset16>()?.to_usize();
+        let state_array_offset = s.read::<Offset16>()?.to_usize();
+        let entry_table_offset = s.read::<Offset16>()?.to_usize();
+        // Ignore `values_offset` since we don't use it.
+
+        // Parse class subtable.
+        let mut s = Stream::new_at(data, class_table_offset)?;
+        let first_glyph: GlyphId = s.read()?;
+        let number_of_glyphs: u16 = s.read()?;
+        // The class table contains u8, so it's easier to use just a slice
+        // instead of a LazyArray.
+        let class_table = s.read_bytes(usize::from(number_of_glyphs))?;
+
+        Some(StateTable {
+            number_of_classes,
+            first_glyph,
+            class_table,
+            state_array_offset: state_array_offset as u16,
+            // We don't know the actual data size and it's kinda expensive to calculate.
+            // So we are simply storing all the data past the offset.
+            // Despite the fact that they may overlap.
+            state_array: data.get(state_array_offset..)?,
+            entry_table: data.get(entry_table_offset..)?,
+            // `ValueOffset` defines an offset from the start of the subtable data.
+            // We do not check that the provided offset is actually after `values_offset`.
+            actions: data,
+        })
+    }
+
+    /// Returns a glyph class.
+    #[inline]
+    pub fn class(&self, glyph_id: GlyphId) -> Option<u8> {
+        if glyph_id.0 == 0xFFFF {
+            return Some(class::DELETED_GLYPH as u8);
+        }
+
+        let idx = glyph_id.0.checked_sub(self.first_glyph.0)?;
+        self.class_table.get(usize::from(idx)).copied()
+    }
+
+    /// Returns a class entry.
+    #[inline]
+    pub fn entry(&self, state: u16, mut class: u8) -> Option<StateEntry> {
+        if u16::from(class) >= self.number_of_classes {
+            class = class::OUT_OF_BOUNDS as u8;
+        }
+
+        let entry_idx = self.state_array.get(
+            usize::from(state) * usize::from(self.number_of_classes) + usize::from(class)
+        )?;
+
+        Stream::read_at(self.entry_table, usize::from(*entry_idx) * StateEntry::SIZE)
+    }
+
+    /// Returns kerning at offset.
+    #[inline]
+    pub fn kerning(&self, offset: ValueOffset) -> Option<i16> {
+        Stream::read_at(self.actions, usize::from(offset.0))
+    }
+
+    /// Produces a new state.
+    #[inline]
+    pub fn new_state(&self, state: u16) -> u16 {
+        let n = (i32::from(state) - i32::from(self.state_array_offset))
+            / i32::from(self.number_of_classes);
+
+        use core::convert::TryFrom;
+        u16::try_from(n).unwrap_or(0)
+    }
+}
+
+impl core::fmt::Debug for StateTable<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "StateTable {{ ... }}")
+    }
+}
+
+
+/// An [Extended State Table](
+/// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).
+///
+/// Also called `STXHeader`.
+///
+/// Currently used by `kerx` and `morx` tables.
+#[derive(Clone)]
+pub struct ExtendedStateTable<'a, T> {
+    number_of_classes: u32,
+    lookup: Lookup<'a>,
+    state_array: &'a [u8],
+    entry_table: &'a [u8],
+    entry_type: core::marker::PhantomData<T>,
+}
+
+impl<'a, T: FromData> ExtendedStateTable<'a, T> {
+    // TODO: make private
+    /// Parses an Extended State Table from a stream.
+    ///
+    /// `number_of_glyphs` is from the `maxp` table.
+    pub fn parse(number_of_glyphs: NonZeroU16, s: &mut Stream<'a>) -> Option<Self> {
+        let data = s.tail()?;
+
+        let number_of_classes = s.read::<u32>()?;
+        // Note that offsets are not from the subtable start,
+        // but from subtable start + `header_size`.
+        // So there is not need to subtract the `header_size`.
+        let lookup_table_offset = s.read::<Offset32>()?.to_usize();
+        let state_array_offset = s.read::<Offset32>()?.to_usize();
+        let entry_table_offset = s.read::<Offset32>()?.to_usize();
+
+        Some(ExtendedStateTable {
+            number_of_classes,
+            lookup: Lookup::parse(number_of_glyphs, data.get(lookup_table_offset..)?)?,
+            // We don't know the actual data size and it's kinda expensive to calculate.
+            // So we are simply storing all the data past the offset.
+            // Despite the fact that they may overlap.
+            state_array: data.get(state_array_offset..)?,
+            entry_table: data.get(entry_table_offset..)?,
+            entry_type: core::marker::PhantomData,
+        })
+    }
+
+    /// Returns a glyph class.
+    #[inline]
+    pub fn class(&self, glyph_id: GlyphId) -> Option<u16> {
+        if glyph_id.0 == 0xFFFF {
+            return Some(u16::from(class::DELETED_GLYPH));
+        }
+
+        self.lookup.value(glyph_id)
+    }
+
+    /// Returns a class entry.
+    #[inline]
+    pub fn entry(&self, state: u16, mut class: u16) -> Option<GenericStateEntry<T>> {
+        if u32::from(class) >= self.number_of_classes {
+            class = u16::from(class::OUT_OF_BOUNDS);
+        }
+
+        let state_idx =
+            usize::from(state) * usize::num_from(self.number_of_classes) + usize::from(class);
+
+        let entry_idx: u16 = Stream::read_at(self.state_array, state_idx * u16::SIZE)?;
+        Stream::read_at(self.entry_table, usize::from(entry_idx) * GenericStateEntry::<T>::SIZE)
+    }
+}
+
+impl<T> core::fmt::Debug for ExtendedStateTable<'_, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "ExtendedStateTable {{ ... }}")
+    }
+}
+
 
 /// A [lookup table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).

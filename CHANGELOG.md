@@ -5,9 +5,53 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.16.0] - 2022-09-18
+### Added
+- CFF Encoding support.
+- `cff::Table::glyph_index`
+- `cff::Table::glyph_index_by_name`
+- `cff::Table::glyph_width`
+- `cff::Table::number_of_glyphs`
+- `cff::Table::matrix`
+- `post::Table::glyph_name`
+- `post::Table::glyph_index_by_name`
+- `post::Table::names`
+- `Face::glyph_index_by_name`
+- `RawFace` fields and `TableRecord` struct are public now.
+
+### Changed
+- `Face::from_slice` was replaced by `Face::parse`.
+- `RawFace::from_slice` was replaced by `RawFace::parse`.
+- `post::Table::names` is a method and not a field now.
+- Use `post::Table::glyph_name` instead of `post::Table::names.get()`.
+
+### Fixed
+- (hmtx/vmtx) Allow missing additional side bearings.
+- (loca) Allow incomplete table.
+- Reduce strictness of some table length checks.
+- (post) `post::Names::len` was returning a wrong value. Now this method is gone completely.
+  You can use `post::Table::names().count()` instead.
+
+## [0.15.2] - 2022-06-17
+### Fixed
+- Missing advance and side bearing offsets in `HVAR`/`VVAR` is not an error. Simply ignore them.
+
+## [0.15.1] - 2022-06-04
+### Fixed
+- (cmap) `cmap::Subtable4::glyph_index` correctly handles malformed glyph offsets now.
+- (cmap) `cmap::Subtable4::codepoints` no longer includes `0xFFFF` codepoint.
+- (SVG) Fixed table parsing. Thanks to [Shubhamj280](https://github.com/Shubhamj280)
+
+## [0.15.0] - 2022-02-20
 ### Added
 - `apple-layout` build feature.
-- `ankr`, `feat` and `trak` tables.
+- `ankr`, `feat`, `kerx`, `morx` and `trak` tables.
+- `kern` AAT subtable format 1.
+- `RawFace`
+
+### Changed
+- The `parser` module is private now again.
 
 ## [0.14.0] - 2021-12-28
 ### Changed
@@ -306,7 +350,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.2...v0.16.0
+[0.15.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.1...v0.15.2
+[0.15.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.0...v0.15.1
+[0.15.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.4...v0.14.0
 [0.13.4]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/RazrFalcon/ttf-parser/compare/v0.13.2...v0.13.3

@@ -66,7 +66,11 @@ impl<'a> Table<'a> {
         let bearings_count = number_of_glyphs.get().checked_sub(number_of_metrics);
         let bearings = if let Some(count) = bearings_count {
             number_of_metrics += count;
-            s.read_array16::<i16>(count)?
+            // Some malformed fonts can skip "left side bearing values"
+            // even when they are expected.
+            // Therefore if we weren't able to parser them, simply fallback to an empty array.
+            // No need to mark the whole table as malformed.
+            s.read_array16::<i16>(count).unwrap_or_default()
         } else {
             LazyArray16::default()
         };

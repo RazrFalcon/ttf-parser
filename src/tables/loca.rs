@@ -3,6 +3,7 @@
 
 use core::num::NonZeroU16;
 use core::ops::Range;
+use core::convert::TryFrom;
 
 use crate::{GlyphId, IndexToLocationFormat};
 use crate::parser::{Stream, Array, LazyArray16, NumFrom};
@@ -29,11 +30,25 @@ impl<'a> Table<'a> {
         // The number of ranges is `maxp.numGlyphs + 1`.
         //
         // Check for overflow first.
-        let total = if number_of_glyphs.get() == core::u16::MAX {
+        let mut total = if number_of_glyphs.get() == core::u16::MAX {
             number_of_glyphs.get()
         } else {
             number_of_glyphs.get() + 1
         };
+
+        // By the spec, the number of `loca` offsets is `maxp.numGlyphs + 1`.
+        // But some malformed fonts can have less glyphs than that.
+        // In which case we try to parse only the available offsets
+        // and do not return an error, since the expected data length
+        // would go beyond table's length.
+        //
+        // In case when `loca` has more data than needed we simply ignore the rest.
+        let actual_total = match format {
+            IndexToLocationFormat::Short => data.len() / 2,
+            IndexToLocationFormat::Long => data.len() / 4,
+        };
+        let actual_total = u16::try_from(actual_total).ok()?;
+        total = total.min(actual_total);
 
         let mut s = Stream::new(data);
         match format {

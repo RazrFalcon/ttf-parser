@@ -16,6 +16,7 @@ But we still try to keep the API as high-level as possible.
 
 use crate::GlyphId;
 use crate::parser::{FromData, Array, LazyArray16, NumFrom, Offset, Offset16, Stream};
+#[cfg(feature = "apple-layout")] use crate::aat;
 
 #[derive(Clone, Copy, Debug)]
 struct OTCoverage(u8);
@@ -96,17 +97,18 @@ impl FromData for KerningPair {
 
 /// A kerning subtable format.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Format<'a> {
     Format0(Subtable0<'a>),
-    Format1, // unsupported
+    #[cfg(feature = "apple-layout")] Format1(aat::StateTable<'a>),
+    #[cfg(not(feature = "apple-layout"))] Format1,
     Format2(Subtable2<'a>),
     Format3(Subtable3<'a>),
 }
 
 
 /// A kerning subtable.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Subtable<'a> {
     /// Indicates that subtable is for horizontal text.
     pub horizontal: bool,
@@ -130,9 +132,9 @@ impl<'a> Subtable<'a> {
     pub fn glyphs_kerning(&self, left: GlyphId, right: GlyphId) -> Option<i16> {
         match self.format {
             Format::Format0(ref subtable) => subtable.glyphs_kerning(left, right),
-            Format::Format1 => None,
             Format::Format2(ref subtable) => subtable.glyphs_kerning(left, right),
             Format::Format3(ref subtable) => subtable.glyphs_kerning(left, right),
+            _ => None,
         }
     }
 }
@@ -226,6 +228,9 @@ impl<'a> Iterator for SubtablesIter<'a> {
 
             let format = match format_id {
                 0 => Format::Format0(Subtable0::parse(data)?),
+                #[cfg(feature = "apple-layout")]
+                1 => Format::Format1(aat::StateTable::parse(data)?),
+                #[cfg(not(feature = "apple-layout"))]
                 1 => Format::Format1,
                 2 => Format::Format2(Subtable2::parse(HEADER_SIZE, data)?),
                 3 => Format::Format3(Subtable3::parse(data)?),
@@ -359,7 +364,7 @@ impl<'a> Subtable2<'a> {
     }
 }
 
-fn get_format2_class(glyph_id: u16, offset: usize, data: &[u8]) -> Option<u16> {
+pub(crate) fn get_format2_class(glyph_id: u16, offset: usize, data: &[u8]) -> Option<u16> {
     let mut s = Stream::new_at(data, offset)?;
     let first_glyph = s.read::<u16>()?;
     let index = glyph_id.checked_sub(first_glyph)?;

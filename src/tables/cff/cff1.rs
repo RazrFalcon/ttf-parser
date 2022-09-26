@@ -8,14 +8,16 @@
 
 use core::convert::TryFrom;
 use core::ops::Range;
+use core::num::NonZeroU16;
 
-use crate::{GlyphId, OutlineBuilder, Rect, BBox};
+use crate::{GlyphId, OutlineBuilder, Rect, BBox, Fixed};
 use crate::parser::{Stream, Array, LazyArray16, NumFrom, TryNumFrom};
 use super::{Builder, IsEven, CFFError, StringId, calc_subroutine_bias, conv_subroutine_index};
 use super::argstack::ArgumentsStack;
-use super::charset::{STANDARD_ENCODING, Charset, parse_charset};
+use super::charset::{Charset, parse_charset};
 use super::charstring::CharStringParser;
 use super::dict::DictionaryParser;
+use super::encoding::{STANDARD_ENCODING, Encoding, parse_encoding};
 use super::index::{Index, parse_index, skip_index};
 #[cfg(feature = "glyph-names")] use super::std_names::STANDARD_NAMES;
 
@@ -65,8 +67,10 @@ mod operator {
 /// Table 9 Top DICT Operator Entries
 mod top_dict_operator {
     pub const CHARSET_OFFSET: u16               = 15;
+    pub const ENCODING_OFFSET: u16              = 16;
     pub const CHAR_STRINGS_OFFSET: u16          = 17;
     pub const PRIVATE_DICT_SIZE_AND_OFFSET: u16 = 18;
+    pub const FONT_MATRIX: u16                  = 1207;
     pub const ROS: u16                          = 1230;
     pub const FD_ARRAY: u16                     = 1236;
     pub const FD_SELECT: u16                    = 1237;
@@ -76,6 +80,8 @@ mod top_dict_operator {
 /// Table 23 Private DICT Operators
 mod private_dict_operator {
     pub const LOCAL_SUBROUTINES_OFFSET: u16 = 19;
+    pub const DEFAULT_WIDTH: u16 = 20;
+    pub const NOMINAL_WIDTH: u16 = 21;
 }
 
 /// Enumerates Charset IDs defined in the Adobe Technical Note #5176, Table 22
@@ -83,6 +89,12 @@ mod charset_id {
     pub const ISO_ADOBE: usize = 0;
     pub const EXPERT: usize = 1;
     pub const EXPERT_SUBSET: usize = 2;
+}
+
+/// Enumerates Charset IDs defined in the Adobe Technical Note #5176, Table 16
+mod encoding_id {
+    pub const STANDARD: usize = 0;
+    pub const EXPERT: usize = 1;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -94,6 +106,11 @@ pub(crate) enum FontKind<'a> {
 #[derive(Clone, Copy, Default, Debug)]
 pub(crate) struct SIDMetadata<'a> {
     local_subrs: Index<'a>,
+    /// Can be zero.
+    default_width: f32,
+    /// Can be zero.
+    nominal_width: f32,
+    encoding: Encoding<'a>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -102,11 +119,31 @@ pub(crate) struct CIDMetadata<'a> {
     fd_select: FDSelect<'a>,
 }
 
+/// An affine transformation matrix.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug)]
+pub struct Matrix {
+    pub sx: f32,
+    pub ky: f32,
+    pub kx: f32,
+    pub sy: f32,
+    pub tx: f32,
+    pub ty: f32,
+}
+
+impl Default for Matrix {
+    fn default() -> Self {
+        Self { sx: 0.001, ky: 0.0, kx: 0.0, sy: 0.001, tx: 0.0, ty: 0.0 }
+    }
+}
+
 #[derive(Default)]
 struct TopDict {
     charset_offset: Option<usize>,
+    encoding_offset: Option<usize>,
     char_strings_offset: usize,
     private_dict_range: Option<Range<usize>>,
+    matrix: Matrix,
     has_ros: bool,
     fd_array_offset: Option<usize>,
     fd_select_offset: Option<usize>,
@@ -120,18 +157,35 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
     // The Top DICT INDEX should have only one dictionary.
     let data = index.get(0)?;
 
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         match operator.get() {
             top_dict_operator::CHARSET_OFFSET => {
                 top_dict.charset_offset = dict_parser.parse_offset();
             }
+            top_dict_operator::ENCODING_OFFSET => {
+                top_dict.encoding_offset = dict_parser.parse_offset();
+            }
             top_dict_operator::CHAR_STRINGS_OFFSET => {
                 top_dict.char_strings_offset = dict_parser.parse_offset()?;
             }
             top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET => {
                 top_dict.private_dict_range = dict_parser.parse_range();
+            }
+            top_dict_operator::FONT_MATRIX => {
+                dict_parser.parse_operands()?;
+                let operands = dict_parser.operands();
+                if operands.len() == 6 {
+                    top_dict.matrix = Matrix {
+                        sx: operands[0],
+                        ky: operands[1],
+                        kx: operands[2],
+                        sy: operands[3],
+                        tx: operands[4],
+                        ty: operands[5],
+                    };
+                }
             }
             top_dict_operator::ROS => {
                 top_dict.has_ros = true;
@@ -153,22 +207,6 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn private_dict_size_overflow() {
-        let data = &[
-            0x00, 0x01, // count: 1
-            0x01, // offset size: 1
-            0x01, // index [0]: 1
-            0x0C, // index [1]: 14
-            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // length: i32::MAX
-            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // offset: i32::MAX
-            0x12 // operator: 18 (private)
-        ];
-
-        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
-        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
-    }
 
     #[test]
     fn private_dict_negative_char_strings_offset() {
@@ -218,20 +256,32 @@ mod tests {
     }
 }
 
-fn parse_private_dict(data: &[u8]) -> Option<usize> {
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+#[derive(Default, Debug)]
+struct PrivateDict {
+    local_subroutines_offset: Option<usize>,
+    default_width: Option<f32>,
+    nominal_width: Option<f32>,
+}
+
+fn parse_private_dict(data: &[u8]) -> PrivateDict {
+    let mut dict = PrivateDict::default();
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
-            return dict_parser.parse_offset();
+            dict.local_subroutines_offset = dict_parser.parse_offset();
+        } else if operator.get() == private_dict_operator::DEFAULT_WIDTH {
+            dict.default_width = dict_parser.parse_number();
+        } else if operator.get() == private_dict_operator::NOMINAL_WIDTH {
+            dict.nominal_width = dict_parser.parse_number();
         }
     }
 
-    None
+    dict
 }
 
 fn parse_font_dict(data: &[u8]) -> Option<Range<usize>> {
-    let mut operands_buffer = [0; MAX_OPERANDS_LEN];
+    let mut operands_buffer = [0.0; MAX_OPERANDS_LEN];
     let mut dict_parser = DictionaryParser::new(data, &mut operands_buffer);
     while let Some(operator) = dict_parser.parse_next() {
         if operator.get() == top_dict_operator::PRIVATE_DICT_SIZE_AND_OFFSET {
@@ -257,7 +307,8 @@ fn parse_cid_local_subrs<'a>(
     let font_dict_data = cid.fd_array.get(u32::from(font_dict_index))?;
     let private_dict_range = parse_font_dict(font_dict_data)?;
     let private_dict_data = data.get(private_dict_range.clone())?;
-    let subroutines_offset = parse_private_dict(private_dict_data)?;
+    let private_dict = parse_private_dict(private_dict_data);
+    let subroutines_offset = private_dict.local_subroutines_offset?;
 
     // 'The local subroutines offset is relative to the beginning
     // of the Private DICT data.'
@@ -591,7 +642,7 @@ fn _parse_char_string(
 fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
     let code = u8::try_num_from(n)?;
 
-    let sid = STANDARD_ENCODING[code as usize];
+    let sid = STANDARD_ENCODING[usize::from(code)];
     let sid = StringId(u16::from(sid));
 
     match charset {
@@ -602,6 +653,85 @@ fn seac_code_to_glyph_id(charset: &Charset, n: f32) -> Option<GlyphId> {
         Charset::Expert | Charset::ExpertSubset => None,
         _ => charset.sid_to_gid(sid),
     }
+}
+
+// The first number of the first char string operator (well, some of them) can be a width.
+// This width is different from glyph's bbox width and somewhat relates to
+// glyph's advance (`hmtx`).
+//
+// We ignore this width during glyph outlining, because we don't really care about it.
+// But when parsing standalone CFF tables/fonts it might be useful.
+fn parse_char_string_width(data: &[u8]) -> Option<f32> {
+    let mut stack = ArgumentsStack {
+        data: &mut [0.0; MAX_ARGUMENTS_STACK_LEN], // 192B
+        len: 0,
+        max_len: MAX_ARGUMENTS_STACK_LEN,
+    };
+    _parse_char_string_width(data, &mut stack)
+}
+
+// Just like `_parse_char_string`, but parses only the first operator.
+fn _parse_char_string_width(
+    char_string: &[u8],
+    stack: &mut ArgumentsStack,
+) -> Option<f32> {
+    let mut s = Stream::new(char_string);
+    while !s.at_end() {
+        let op = s.read::<u8>()?;
+        match op {
+            operator::HORIZONTAL_STEM |
+            operator::VERTICAL_STEM |
+            operator::HORIZONTAL_STEM_HINT_MASK |
+            operator::VERTICAL_STEM_HINT_MASK |
+            operator::HINT_MASK |
+            operator::COUNTER_MASK |
+            operator::MOVE_TO |
+            operator::ENDCHAR => {
+                return if stack.len().is_odd() {
+                    Some(stack.at(0))
+                } else {
+                    None
+                };
+            }
+            operator::HORIZONTAL_MOVE_TO | operator::VERTICAL_MOVE_TO => {
+                return if stack.len() == 2 {
+                    Some(stack.at(0))
+                } else {
+                    None
+                };
+            }
+            operator::RETURN => {
+                break;
+            }
+            operator::SHORT_INT => {
+                let n = s.read::<i16>()?;
+                stack.push(f32::from(n)).ok()?;
+            }
+            32..=246 => {
+                let n = i16::from(op) - 139;
+                stack.push(f32::from(n)).ok()?;
+            }
+            247..=250 => {
+                let b1 = s.read::<u8>()?;
+                let n = (i16::from(op) - 247) * 256 + i16::from(b1) + 108;
+                debug_assert!((108..=1131).contains(&n));
+                stack.push(f32::from(n)).ok()?;
+            }
+            251..=254 => {
+                let b1 = s.read::<u8>()?;
+                let n = -(i16::from(op) - 251) * 256 - i16::from(b1) - 108;
+                debug_assert!((-1131..=-108).contains(&n));
+                stack.push(f32::from(n)).ok()?;
+            }
+            operator::FIXED_16_16 => {
+                let n = s.read::<Fixed>()?;
+                stack.push(n.0).ok()?;
+            }
+            _ => return None,
+        }
+    }
+
+    None
 }
 
 
@@ -662,17 +792,24 @@ fn parse_fd_select<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<FDSe
     }
 }
 
-fn parse_sid_metadata(data: &[u8], top_dict: TopDict) -> Option<FontKind> {
-    let subroutines_offset = if let Some(range) = top_dict.private_dict_range.clone() {
+fn parse_sid_metadata<'a>(
+    data: &'a [u8],
+    top_dict: TopDict,
+    encoding: Encoding<'a>,
+) -> Option<FontKind<'a>> {
+    let mut metadata = SIDMetadata::default();
+    metadata.encoding = encoding;
+
+    let private_dict = if let Some(range) = top_dict.private_dict_range.clone() {
         parse_private_dict(data.get(range)?)
     } else {
-        None
+        return Some(FontKind::SID(metadata))
     };
 
-    // Parse Global Subroutines INDEX.
-    let mut metadata = SIDMetadata::default();
+    metadata.default_width = private_dict.default_width.unwrap_or(0.0);
+    metadata.nominal_width = private_dict.nominal_width.unwrap_or(0.0);
 
-    match (top_dict.private_dict_range, subroutines_offset) {
+    match (top_dict.private_dict_range, private_dict.local_subroutines_offset) {
         (Some(private_dict_range), Some(subroutines_offset)) => {
             // 'The local subroutines offset is relative to the beginning
             // of the Private DICT data.'
@@ -728,6 +865,8 @@ pub struct Table<'a> {
     #[allow(dead_code)] strings: Index<'a>,
     global_subrs: Index<'a>,
     charset: Charset<'a>,
+    number_of_glyphs: NonZeroU16,
+    matrix: Matrix,
     char_strings: Index<'a>,
     kind: FontKind<'a>,
 }
@@ -773,25 +912,34 @@ impl<'a> Table<'a> {
             parse_index::<u16>(&mut s)?
         };
 
-        if char_strings.len() == 0 {
-            return None;
-        }
-
         // 'The number of glyphs is the value of the count field in the CharStrings INDEX.'
-        let number_of_glyphs = u16::try_from(char_strings.len()).ok()?;
+        let number_of_glyphs = u16::try_from(char_strings.len()).ok().and_then(NonZeroU16::new)?;
 
         let charset = match top_dict.charset_offset {
             Some(charset_id::ISO_ADOBE) => Charset::ISOAdobe,
             Some(charset_id::EXPERT) => Charset::Expert,
             Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
-            Some(offset) => parse_charset(number_of_glyphs, &mut Stream::new_at(data, offset)?)?,
+            Some(offset) => {
+                let mut s = Stream::new_at(data, offset)?;
+                parse_charset(number_of_glyphs.get(), &mut s)?
+            }
             None => Charset::ISOAdobe, // default
         };
 
+        let matrix = top_dict.matrix;
+
         let kind = if top_dict.has_ros {
-            parse_cid_metadata(data, top_dict, number_of_glyphs)?
+            parse_cid_metadata(data, top_dict, number_of_glyphs.get())?
         } else {
-            parse_sid_metadata(data, top_dict)?
+            // Only SID fonts are allowed to have an Encoding.
+            let encoding = match top_dict.encoding_offset {
+                Some(encoding_id::STANDARD) => Encoding::new_standard(),
+                Some(encoding_id::EXPERT) => Encoding::new_expert(),
+                Some(offset) => parse_encoding(&mut Stream::new_at(data, offset)?)?,
+                None => Encoding::new_standard(), // default
+            };
+
+            parse_sid_metadata(data, top_dict, encoding)?
         };
 
         Some(Self {
@@ -799,9 +947,25 @@ impl<'a> Table<'a> {
             strings,
             global_subrs,
             charset,
+            number_of_glyphs,
+            matrix,
             char_strings,
             kind,
         })
+    }
+
+    /// Returns a total number of glyphs in the font.
+    ///
+    /// Never zero.
+    #[inline]
+    pub fn number_of_glyphs(&self) -> u16 {
+        self.number_of_glyphs.get()
+    }
+
+    /// Returns a font transformation matrix.
+    #[inline]
+    pub fn matrix(&self) -> Matrix {
+        self.matrix
     }
 
     /// Outlines a glyph.
@@ -812,6 +976,62 @@ impl<'a> Table<'a> {
     ) -> Result<Rect, CFFError> {
         let data = self.char_strings.get(u32::from(glyph_id.0)).ok_or(CFFError::NoGlyph)?;
         parse_char_string(data, self, glyph_id, builder)
+    }
+
+    /// Resolves a Glyph ID for a code point.
+    ///
+    /// Similar to [`Face::glyph_index`](crate::Face::glyph_index) but 8bit
+    /// and uses CFF encoding and charset tables instead of TrueType `cmap`.
+    pub fn glyph_index(&self, code_point: u8) -> Option<GlyphId> {
+        match self.kind {
+            FontKind::SID(ref sid_meta) => {
+                match sid_meta.encoding.code_to_gid(&self.charset, code_point) {
+                    Some(id) => Some(id),
+                    None => {
+                        // Try using the Standard encoding otherwise.
+                        // Custom Encodings does not guarantee to include all glyphs.
+                        Encoding::new_standard().code_to_gid(&self.charset, code_point)
+                    }
+                }
+            }
+            FontKind::CID(_) => None,
+        }
+    }
+
+    /// Returns a glyph width.
+    ///
+    /// This value is different from outline bbox width and is stored separately.
+    ///
+    /// Technically similar to [`Face::glyph_hor_advance`](crate::Face::glyph_hor_advance).
+    pub fn glyph_width(&self, glyph_id: GlyphId) -> Option<u16> {
+        match self.kind {
+            FontKind::SID(ref sid) => {
+                let data = self.char_strings.get(u32::from(glyph_id.0))?;
+                let width = parse_char_string_width(data)
+                    .map(|w| sid.nominal_width + w)
+                    .unwrap_or(sid.default_width);
+                u16::try_from(width as i32).ok()
+            }
+            FontKind::CID(_) => None,
+        }
+    }
+
+    /// Returns a glyph ID by a name.
+    #[cfg(feature = "glyph-names")]
+    pub fn glyph_index_by_name(&self, name: &str) -> Option<GlyphId> {
+        match self.kind {
+            FontKind::SID(_) => {
+                let sid = if let Some(index) = STANDARD_NAMES.iter().position(|n| *n == name) {
+                    StringId(index as u16)
+                } else {
+                    let index = self.strings.into_iter().position(|n| n == name.as_bytes())?;
+                    StringId((STANDARD_NAMES.len() + index) as u16)
+                };
+
+                self.charset.sid_to_gid(sid)
+            }
+            FontKind::CID(_) => None,
+        }
     }
 
     /// Returns a glyph name.

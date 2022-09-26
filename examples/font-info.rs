@@ -9,7 +9,7 @@ fn main() {
 
     let now = std::time::Instant::now();
 
-    let face = match ttf_parser::Face::from_slice(&font_data, 0) {
+    let face = match ttf_parser::Face::parse(&font_data, 0) {
         Ok(f) => f,
         Err(e) => {
             eprint!("Error: {}.", e);

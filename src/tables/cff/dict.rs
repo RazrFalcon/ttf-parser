@@ -5,6 +5,7 @@ use crate::Stream;
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const TWO_BYTE_OPERATOR_MARK: u8 = 12;
+const FLOAT_STACK_LEN: usize = 64;
 const END_OF_FLOAT_FLAG: u8 = 0xf;
 
 #[derive(Clone, Copy, Debug)]
@@ -23,14 +24,14 @@ pub struct DictionaryParser<'a> {
     // Offset to the last operands start.
     operands_offset: usize,
     // Actual operands.
-    operands: &'a mut [i32],
+    operands: &'a mut [f32],
     // An amount of operands in the `operands` array.
     operands_len: u16,
 }
 
 impl<'a> DictionaryParser<'a> {
     #[inline]
-    pub fn new(data: &'a [u8], operands_buffer: &'a mut [i32]) -> Self {
+    pub fn new(data: &'a [u8], operands_buffer: &'a mut [f32]) -> Self {
         DictionaryParser {
             data,
             offset: 0,
@@ -100,8 +101,14 @@ impl<'a> DictionaryParser<'a> {
     }
 
     #[inline]
-    pub fn operands(&self) -> &[i32] {
+    pub fn operands(&self) -> &[f32] {
         &self.operands[..usize::from(self.operands_len)]
+    }
+
+    #[inline]
+    pub fn parse_number(&mut self) -> Option<f32> {
+        self.parse_operands()?;
+        self.operands().get(0).cloned()
     }
 
     #[inline]
@@ -109,7 +116,7 @@ impl<'a> DictionaryParser<'a> {
         self.parse_operands()?;
         let operands = self.operands();
         if operands.len() == 1 {
-            usize::try_from(operands[0]).ok()
+            usize::try_from(operands[0] as i32).ok()
         } else {
             None
         }
@@ -120,8 +127,8 @@ impl<'a> DictionaryParser<'a> {
         self.parse_operands()?;
         let operands = self.operands();
         if operands.len() == 2 {
-            let len = usize::try_from(operands[0]).ok()?;
-            let start = usize::try_from(operands[1]).ok()?;
+            let len = usize::try_from(operands[0] as i32).ok()?;
+            let start = usize::try_from(operands[1] as i32).ok()?;
             let end = start.checked_add(len)?;
             Some(start..end)
         } else {
@@ -143,45 +150,102 @@ pub fn is_dict_one_byte_op(b: u8) -> bool {
 }
 
 // Adobe Technical Note #5177, Table 3 Operand Encoding
-pub fn parse_number(b0: u8, s: &mut Stream) -> Option<i32> {
+pub fn parse_number(b0: u8, s: &mut Stream) -> Option<f32> {
     match b0 {
         28 => {
             let n = i32::from(s.read::<i16>()?);
-            Some(n)
+            Some(n as f32)
         }
         29 => {
             let n = s.read::<i32>()?;
-            Some(n)
+            Some(n as f32)
         }
         30 => {
-            // We do not parse float, because we don't use it.
-            // And by skipping it we can remove the core::num::dec2flt dependency.
-            while !s.at_end() {
-                let b1 = s.read::<u8>()?;
-                let nibble1 = b1 >> 4;
-                let nibble2 = b1 & 15;
-                if nibble1 == END_OF_FLOAT_FLAG || nibble2 == END_OF_FLOAT_FLAG {
-                    break;
-                }
-            }
-            Some(0)
+            parse_float(s)
         }
         32..=246 => {
             let n = i32::from(b0) - 139;
-            Some(n)
+            Some(n as f32)
         }
         247..=250 => {
             let b1 = i32::from(s.read::<u8>()?);
             let n = (i32::from(b0) - 247) * 256 + b1 + 108;
-            Some(n)
+            Some(n as f32)
         }
         251..=254 => {
             let b1 = i32::from(s.read::<u8>()?);
             let n = -(i32::from(b0) - 251) * 256 - b1 - 108;
-            Some(n)
+            Some(n as f32)
         }
         _ => None,
     }
+}
+
+fn parse_float(s: &mut Stream) -> Option<f32> {
+    let mut data = [0u8; FLOAT_STACK_LEN];
+    let mut idx = 0;
+
+    loop {
+        let b1: u8 = s.read()?;
+        let nibble1 = b1 >> 4;
+        let nibble2 = b1 & 15;
+
+        if nibble1 == END_OF_FLOAT_FLAG {
+            break;
+        }
+
+        idx = parse_float_nibble(nibble1, idx, &mut data)?;
+
+        if nibble2 == END_OF_FLOAT_FLAG {
+            break;
+        }
+
+        idx = parse_float_nibble(nibble2, idx, &mut data)?;
+    }
+
+    let s = core::str::from_utf8(&data[..idx]).ok()?;
+    let n = s.parse().ok()?;
+    Some(n)
+}
+
+// Adobe Technical Note #5176, Table 5 Nibble Definitions
+fn parse_float_nibble(nibble: u8, mut idx: usize, data: &mut [u8]) -> Option<usize> {
+    if idx == FLOAT_STACK_LEN {
+        return None;
+    }
+
+    match nibble {
+        0..=9 => {
+            data[idx] = b'0' + nibble;
+        }
+        10 => {
+            data[idx] = b'.';
+        }
+        11 => {
+            data[idx] = b'E';
+        }
+        12 => {
+            if idx + 1 == FLOAT_STACK_LEN {
+                return None;
+            }
+
+            data[idx] = b'E';
+            idx += 1;
+            data[idx] = b'-';
+        }
+        13 => {
+            return None;
+        }
+        14 => {
+            data[idx] = b'-';
+        }
+        _ => {
+            return None;
+        }
+    }
+
+    idx += 1;
+    Some(idx)
 }
 
 // Just like `parse_number`, but doesn't actually parses the data.
@@ -215,11 +279,11 @@ mod tests {
 
     #[test]
     fn parse_dict_number() {
-        assert_eq!(parse_number(0xFA, &mut Stream::new(&[0x7C])).unwrap(), 1000);
-        assert_eq!(parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(), -1000);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(), 10000);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(), -10000);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(), 100000);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(), -100000);
+        assert_eq!(parse_number(0xFA, &mut Stream::new(&[0x7C])).unwrap(), 1000.0);
+        assert_eq!(parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(), -1000.0);
+        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(), 10000.0);
+        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(), -10000.0);
+        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(), 100000.0);
+        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(), -100000.0);
     }
 }

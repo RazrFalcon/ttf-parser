@@ -51,6 +51,21 @@ fn smaller_than_glyphs_count() {
 }
 
 #[test]
+fn no_additional_side_bearings() {
+    let data = convert(&[
+        UInt16(1), // advance width [0]
+        Int16(2), // side bearing [0]
+
+        // A single side bearing should be present here.
+        // We should simply ignore it and not return None during Table parsing.
+    ]);
+
+    let table = Table::parse(1, nzu16!(2), &data).unwrap();
+    assert_eq!(table.advance(GlyphId(0)), Some(1));
+    assert_eq!(table.side_bearing(GlyphId(0)), Some(2));
+}
+
+#[test]
 fn less_metrics_than_glyphs() {
     let data = convert(&[
         UInt16(1), // advance width [0]

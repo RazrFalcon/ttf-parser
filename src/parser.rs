@@ -762,6 +762,12 @@ impl<'a> Stream<'a> {
 
     #[allow(dead_code)]
     #[inline]
+    pub(crate) fn parse_at_offset16<T: FromSlice<'a>>(&mut self, data: &'a [u8]) -> Option<T> {
+        self.read_at_offset16(data).and_then(T::parse)
+    }
+
+    #[allow(dead_code)]
+    #[inline]
     pub(crate) fn read_at_offset32(&mut self, data: &'a [u8]) -> Option<&'a [u8]> {
         let offset = self.read::<Offset32>()?.to_usize();
         data.get(offset..)

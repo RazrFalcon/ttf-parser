@@ -85,6 +85,7 @@ There are roughly three types of TrueType tables:
 | `HVAR` table      | ✓                      | ✓                   |                                |
 | `kern` table      | ✓                      | ~ (only 0)          | ~ (only 0)                     |
 | `kerx` table      | ✓                      |                     |                                |
+| `MATH` table      | ✓                      |                     |                                |
 | `maxp` table      | ✓                      | ✓                   | ✓                              |
 | `morx` table      | ✓                      |                     |                                |
 | `MVAR` table      | ✓                      | ✓                   |                                |

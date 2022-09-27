@@ -9,7 +9,7 @@ methods.
 */
 
 use crate::{GlyphId, name::PlatformId};
-use crate::parser::{FromData, Array, LazyArray16, Offset, Offset32, Stream};
+use crate::parser::{FromData, LazyArray16, Offset, Offset32, Stream};
 
 mod format0;
 mod format2;

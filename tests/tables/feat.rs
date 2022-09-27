@@ -1,5 +1,4 @@
 use ttf_parser::feat::Table;
-use ttf_parser::Array;
 use crate::{convert, Unit::*};
 
 #[test]

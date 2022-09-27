@@ -11,7 +11,7 @@ use core::ops::Range;
 use core::num::NonZeroU16;
 
 use crate::{GlyphId, OutlineBuilder, Rect, BBox, Fixed};
-use crate::parser::{Stream, Array, LazyArray16, NumFrom, TryNumFrom};
+use crate::parser::{Stream, LazyArray16, NumFrom, TryNumFrom};
 use super::{Builder, IsEven, CFFError, StringId, calc_subroutine_bias, conv_subroutine_index};
 use super::argstack::ArgumentsStack;
 use super::charset::{Charset, parse_charset};

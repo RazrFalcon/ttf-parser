@@ -169,9 +169,9 @@ impl NumFrom<u32> for usize {
     #[inline]
     fn num_from(v: u32) -> Self {
         #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
-            {
-                v as usize
-            }
+        {
+            v as usize
+        }
 
         // compilation error on 16 bit targets
     }
@@ -181,9 +181,9 @@ impl NumFrom<char> for usize {
     #[inline]
     fn num_from(v: char) -> Self {
         #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
-            {
-                v as usize
-            }
+        {
+            v as usize
+        }
 
         // compilation error on 16 bit targets
     }
@@ -240,20 +240,6 @@ impl TryNumFrom<f32> for i32 {
 }
 
 
-/// Common interface for arrays.
-pub trait Array {
-    /// The index type, e.g. `u16`, `u32`.
-    type Index;
-    /// The value type.
-    type Value;
-    /// Checks if array is empty.
-    fn is_empty(&self) -> bool;
-    /// Returns array's length.
-    fn len(&self) -> Self::Index;
-    /// Returns a value at `index`.
-    fn get(&self, index: Self::Index) -> Option<Self::Value>;
-}
-
 /// A slice-like container that converts internal binary data only on access.
 ///
 /// Array values are stored in a continuous data chunk.
@@ -273,32 +259,6 @@ impl<T> Default for LazyArray16<'_, T> {
     }
 }
 
-impl<T: FromData> Array for LazyArray16<'_, T> {
-    type Index = u16;
-    type Value = T;
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    fn len(&self) -> u16 {
-        (self.data.len() / T::SIZE) as u16
-    }
-
-    #[inline]
-    fn get(&self, index: u16) -> Option<T> {
-        if index < self.len() {
-            let start = usize::from(index) * T::SIZE;
-            let end = start + T::SIZE;
-            self.data.get(start..end).and_then(T::parse)
-        } else {
-            None
-        }
-    }
-}
-
 impl<'a, T: FromData> LazyArray16<'a, T> {
     /// Creates a new `LazyArray`.
     #[inline]
@@ -306,6 +266,18 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
         LazyArray16 {
             data,
             data_type: core::marker::PhantomData,
+        }
+    }
+
+    /// Returns a value at `index`.
+    #[inline]
+    pub fn get(&self, index: u16) -> Option<T> {
+        if index < self.len() {
+            let start = usize::from(index) * T::SIZE;
+            let end = start + T::SIZE;
+            self.data.get(start..end).and_then(T::parse)
+        } else {
+            None
         }
     }
 
@@ -328,6 +300,18 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
             data: self.data.get(start..end)?,
             ..LazyArray16::default()
         })
+    }
+
+    /// Returns array's length.
+    #[inline]
+    pub fn len(&self) -> u16 {
+        (self.data.len() / T::SIZE) as u16
+    }
+
+    /// Checks if array is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Performs a binary search by specified `key`.
@@ -443,32 +427,6 @@ impl<T> Default for LazyArray32<'_, T> {
     }
 }
 
-impl<T: FromData> Array for LazyArray32<'_, T> {
-    type Index = u32;
-    type Value = T;
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    fn len(&self) -> u32 {
-        (self.data.len() / T::SIZE) as u32
-    }
-
-    #[inline]
-    fn get(&self, index: u32) -> Option<T> {
-        if index < self.len() {
-            let start = usize::num_from(index) * T::SIZE;
-            let end = start + T::SIZE;
-            self.data.get(start..end).and_then(T::parse)
-        } else {
-            None
-        }
-    }
-}
-
 impl<'a, T: FromData> LazyArray32<'a, T> {
     /// Creates a new `LazyArray`.
     #[inline]
@@ -477,6 +435,24 @@ impl<'a, T: FromData> LazyArray32<'a, T> {
             data,
             data_type: core::marker::PhantomData,
         }
+    }
+
+    /// Returns a value at `index`.
+    #[inline]
+    pub fn get(&self, index: u32) -> Option<T> {
+        if index < self.len() {
+            let start = usize::num_from(index) * T::SIZE;
+            let end = start + T::SIZE;
+            self.data.get(start..end).and_then(T::parse)
+        } else {
+            None
+        }
+    }
+
+    /// Returns array's length.
+    #[inline]
+    pub fn len(&self) -> u32 {
+        (self.data.len() / T::SIZE) as u32
     }
 
     /// Performs a binary search by specified `key`.
@@ -576,27 +552,6 @@ pub struct LazyOffsetArray16<'a, T: FromSlice<'a>> {
     data_type: core::marker::PhantomData<T>,
 }
 
-impl<'a, T: FromSlice<'a>> Array for LazyOffsetArray16<'a, T> {
-    type Index = u16;
-    type Value = T;
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    fn len(&self) -> u16 {
-        self.offsets.len()
-    }
-
-    #[inline]
-    fn get(&self, index: u16) -> Option<T> {
-        let offset = self.offsets.get(index)??.to_usize();
-        self.data.get(offset..).and_then(T::parse)
-    }
-}
-
 impl<'a, T: FromSlice<'a>> LazyOffsetArray16<'a, T> {
     /// Creates a new `LazyOffsetArray16`.
     #[allow(dead_code)]
@@ -611,6 +566,26 @@ impl<'a, T: FromSlice<'a>> LazyOffsetArray16<'a, T> {
         let count = s.read::<u16>()?;
         let offsets = s.read_array16(count)?;
         Some(Self { data, offsets, data_type: core::marker::PhantomData })
+    }
+
+    /// Returns a value at `index`.
+    #[inline]
+    pub fn get(&self, index: u16) -> Option<T> {
+        let offset = self.offsets.get(index)??.to_usize();
+        self.data.get(offset..).and_then(T::parse)
+    }
+
+    /// Returns array's length.
+    #[inline]
+    pub fn len(&self) -> u16 {
+        self.offsets.len()
+    }
+
+    /// Checks if array is empty.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -783,6 +758,12 @@ impl<'a> Stream<'a> {
     pub(crate) fn read_at_offset16(&mut self, data: &'a [u8]) -> Option<&'a [u8]> {
         let offset = self.read::<Offset16>()?.to_usize();
         data.get(offset..)
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    pub(crate) fn parse_at_offset16<T: FromSlice<'a>>(&mut self, data: &'a [u8]) -> Option<T> {
+        self.read_at_offset16(data).and_then(T::parse)
     }
 
     #[allow(dead_code)]

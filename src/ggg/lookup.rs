@@ -1,4 +1,4 @@
-use crate::parser::{FromData, FromSlice, Array, LazyArray16, LazyOffsetArray16, Offset, Offset16, Offset32, Stream};
+use crate::parser::{FromData, FromSlice, LazyArray16, LazyOffsetArray16, Offset, Offset16, Offset32, Stream};
 
 /// A list of [`Lookup`] values.
 pub type LookupList<'a> = LazyOffsetArray16<'a, Lookup<'a>>;

@@ -59,7 +59,7 @@ mod tables;
 #[cfg(feature = "variable-fonts")] mod var_store;
 
 use parser::{Stream, NumFrom, TryNumFrom, Offset32, Offset};
-pub use parser::{FromData, Array, LazyArray16, LazyArrayIter16, LazyArray32, LazyArrayIter32, Fixed};
+pub use parser::{FromData, LazyArray16, LazyArrayIter16, LazyArray32, LazyArrayIter32, Fixed};
 use head::IndexToLocationFormat;
 
 #[cfg(feature = "variable-fonts")] pub use fvar::VariationAxis;

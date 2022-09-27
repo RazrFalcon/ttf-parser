@@ -1,4 +1,4 @@
-use crate::parser::{Stream, FromData, Array, LazyArray16};
+use crate::parser::{Stream, FromData, LazyArray16};
 use crate::GlyphId;
 use super::charset::Charset;
 use super::StringId;

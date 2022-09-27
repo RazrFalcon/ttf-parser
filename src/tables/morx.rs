@@ -13,7 +13,7 @@
 use core::num::NonZeroU16;
 
 use crate::{aat, GlyphId};
-use crate::parser::{Stream, FromData, Array, LazyArray32, NumFrom, Offset32, Offset};
+use crate::parser::{Stream, FromData, LazyArray32, NumFrom, Offset32, Offset};
 
 /// The feature table is used to compute the sub-feature flags
 /// for a list of requested features and settings.

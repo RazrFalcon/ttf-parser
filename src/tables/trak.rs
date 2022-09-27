@@ -1,7 +1,7 @@
 //! A [Tracking Table](
 //! https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6trak.html) implementation.
 
-use crate::parser::{FromData, Array, LazyArray16, Offset, Offset16, Offset32, Fixed, Stream};
+use crate::parser::{FromData, LazyArray16, Offset, Offset16, Offset32, Fixed, Stream};
 
 #[derive(Clone, Copy, Debug)]
 struct TrackTableRecord {

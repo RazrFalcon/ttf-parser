@@ -1,7 +1,7 @@
 //! An [SVG Table](https://docs.microsoft.com/en-us/typography/opentype/spec/svg) implementation.
 
 use crate::GlyphId;
-use crate::parser::{FromData, Array, LazyArray16, NumFrom, Offset, Offset32, Stream};
+use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset32, Stream};
 
 #[derive(Clone, Copy)]
 struct SvgDocumentRecord {

@@ -2,7 +2,7 @@
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/post) implementation.
 
 use crate::LineMetrics;
-use crate::parser::{Stream, Fixed, Array, LazyArray16};
+use crate::parser::{Stream, Fixed, LazyArray16};
 #[cfg(feature = "glyph-names")] use crate::GlyphId;
 
 const ITALIC_ANGLE_OFFSET: usize = 4;

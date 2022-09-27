@@ -1,4 +1,4 @@
-use crate::parser::{Array, LazyArray32, Stream};
+use crate::parser::{LazyArray32, Stream};
 use crate::GlyphId;
 
 /// A [format 10](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-10-trimmed-array)

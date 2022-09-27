@@ -3,7 +3,7 @@
 //! <https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store>
 
 use crate::NormalizedCoordinate;
-use crate::parser::{Stream, FromData, Array, LazyArray16, NumFrom};
+use crate::parser::{Stream, FromData, LazyArray16, NumFrom};
 
 
 #[derive(Clone, Copy)]

@@ -6,7 +6,7 @@
 // originally written by https://github.com/laurmaedje
 
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, FromSlice, Array, LazyArray16};
+use crate::parser::{Stream, FromData, FromSlice, LazyArray16};
 
 mod context;
 mod chained_context;

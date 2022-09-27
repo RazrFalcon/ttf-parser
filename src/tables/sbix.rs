@@ -5,7 +5,7 @@ use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
 use crate::{GlyphId, RasterGlyphImage, RasterImageFormat, Tag};
-use crate::parser::{Stream, FromData, Offset, Offset32, Array, LazyArray16, LazyArray32};
+use crate::parser::{Stream, FromData, Offset, Offset32, LazyArray16, LazyArray32};
 
 /// A strike of glyphs.
 #[derive(Clone, Copy)]

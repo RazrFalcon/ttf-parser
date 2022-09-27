@@ -6,7 +6,7 @@
 
 use core::convert::TryFrom;
 
-use crate::parser::{FromData, Array, LazyArray16, Stream};
+use crate::parser::{FromData, LazyArray16, Stream};
 use crate::GlyphId;
 
 #[derive(Clone, Copy)]

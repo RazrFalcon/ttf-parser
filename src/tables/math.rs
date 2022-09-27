@@ -1,133 +1,108 @@
-//! A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math) implementation.
+//! A [Math Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math) implementation.
 
 use crate::GlyphId;
 use crate::gpos::Device;
 use crate::opentype_layout::Coverage;
-use crate::parser::{
-    Offset16, Stream,
-    FromSlice, FromData, Offset,
-    Array, LazyArray16, LazyOffsetArray16,
-};
+use crate::parser::{Offset16, Stream, FromSlice, FromData, Offset, LazyArray16, LazyOffsetArray16};
 
-impl<'a> Stream<'a> {
-    fn parse_at_offset16<T: FromSlice<'a>>(&mut self, base: &'a [u8]) -> Option<T> {
-        self.read_at_offset16(base).and_then(T::parse)
+/// A [Math Value](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord)
+/// with optional device corrections.
+#[derive(Clone, Copy, Debug)]
+pub struct MathValue<'a> {
+    /// The X or Y value in font design units.
+    pub value: i16,
+    /// Device corrections for this value.
+    pub device: Option<Device<'a>>,
+}
+
+impl<'a> MathValue<'a> {
+    fn parse(data: &'a [u8], parent: &'a [u8]) -> Option<Self> {
+        Some(MathValueRecord::parse(data)?.get(parent))
     }
 }
 
-/// A [MATH Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
-#[derive(Clone)]
-pub struct Table<'a> {
-    /// MathConstants Table, math positioning constants.
-    pub math_constants: MathConstants<'a>,
-    /// MathGlyphInfo Table, per-glyph positioning information.
-    pub math_glyph_info: MathGlyphInfo<'a>,
-    /// MathVariants Table, glyph in different sizes and infinitely stretchable shapes.
-    pub math_variants: MathVariants<'a>,
-}
 
-impl<'a> core::fmt::Debug for Table<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Table {{ ... }}")
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-struct RawMathValueRecord {
+/// A math value record with unresolved offset.
+#[derive(Clone, Copy)]
+struct MathValueRecord {
     value: i16,
-    device_table_offset: Option<Offset16>,
+    device_offset: Option<Offset16>,
 }
 
-impl FromData for RawMathValueRecord {
+impl FromData for MathValueRecord {
     const SIZE: usize = 4;
 
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let value = s.read::<i16>()?;
-        let device_table_offset = s.read::<Option<Offset16>>()?;
-        Some(RawMathValueRecord { value, device_table_offset })
+        let device_offset = s.read::<Option<Offset16>>()?;
+        Some(MathValueRecord { value, device_offset })
     }
 }
 
-impl RawMathValueRecord {
-    fn get(self, data: &[u8]) -> MathValueRecord {
-        let device_table = self.device_table_offset
+impl MathValueRecord {
+    fn get(self, data: &[u8]) -> MathValue {
+        let device = self.device_offset
             .and_then(|offset| data.get(offset.to_usize()..))
             .and_then(Device::parse);
-        MathValueRecord { value: self.value, device_correction: device_table }
+        MathValue { value: self.value, device }
     }
 }
 
-/// A [MathValueRecord](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord).
-#[derive(Default, Debug, Copy, Clone)]
-pub struct MathValueRecord<'a> {
-    /// The X or Y value in design units.
-    pub value: i16,
-    /// Device corrections for this value.
-    pub device_correction: Option<Device<'a>>,
+
+/// A mapping from glyphs to
+/// [Math Values](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord).
+#[derive(Clone, Copy)]
+pub struct MathValues<'a> {
+    data: &'a [u8],
+    coverage: Coverage<'a>,
+    records: LazyArray16<'a, MathValueRecord>,
 }
 
-impl<'a> MathValueRecord<'a> {
-    fn parse(data: &'a [u8], parent: &'a [u8]) -> Option<Self> {
-        Some(RawMathValueRecord::parse(data)?.get(parent))
-    }
-}
-
-/// Array of [`MathValueRecord`]s.
-#[allow(missing_debug_implementations)]
-#[derive(Clone)]
-pub struct MathValueArray<'a> {
-    entries: LazyArray16<'a, RawMathValueRecord>,
-    data: &'a [u8], // for locating device tables
-}
-
-impl<'a> Array for MathValueArray<'a> {
-    type Index = u16;
-    type Value = MathValueRecord<'a>;
-
-    #[inline]
-    fn is_empty(&self) -> bool { self.entries.is_empty() }
-
-    #[inline]
-    fn len(&self) -> u16 { self.entries.len() }
-
-    #[inline]
-    fn get(&self, index: u16) -> Option<MathValueRecord<'a>> {
-        Some(self.entries.get(index)?.get(self.data))
-    }
-}
-
-impl<'a> Table<'a> {
-    /// Parses a table from raw data.
-    pub fn parse(data: &'a [u8]) -> Option<Self> {
+impl<'a> FromSlice<'a> for MathValues<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let major_version = s.read::<u16>()? as u8;
-        let minor_version = s.read::<u16>()? as u8;
-        // handle the version implicitly, we only recognize version 1.0
-        if [major_version, minor_version] != [1, 0] { return None; }
-        Some(Table {
-            math_constants: s.parse_at_offset16::<MathConstants>(data)?,
-            math_glyph_info: s.parse_at_offset16::<MathGlyphInfo>(data)?,
-            math_variants: s.parse_at_offset16::<MathVariants>(data)?,
-        })
+        let coverage = s.parse_at_offset16::<Coverage>(data)?;
+        let count = s.read::<u16>()?;
+        let records = s.read_array16::<MathValueRecord>(count)?;
+        Some(MathValues {data, coverage, records })
     }
 }
 
-/// Constants for math positioning.
-#[derive(Clone)]
-pub struct MathConstants<'a> {
+impl<'a> MathValues<'a> {
+    /// Returns the value for the glyph or `None` if it is not covered.
+    #[inline]
+    pub fn get(&self, glyph: GlyphId) -> Option<MathValue<'a>> {
+        let index = self.coverage.get(glyph)?;
+        Some(self.records.get(index)?.get(self.data))
+    }
+}
+
+impl core::fmt::Debug for MathValues<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "MathValues {{ ... }}")
+    }
+}
+
+
+/// A [Math Constants Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathconstants-table).
+#[derive(Clone, Copy)]
+pub struct Constants<'a> {
     data: &'a [u8],
 }
 
-impl<'a> core::fmt::Debug for MathConstants<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "MathConstants {{ ... }}")
+impl<'a> FromSlice<'a> for Constants<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        Some(Constants { data })
     }
 }
 
-impl<'a> FromSlice<'a> for MathConstants<'a> {
-    fn parse(data: &'a [u8]) -> Option<Self> { Some(MathConstants { data }) }
+impl core::fmt::Debug for Constants<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Constants {{ ... }}")
+    }
 }
+
 
 const SCRIPT_PERCENT_SCALE_DOWN_OFFSET: usize = 0;
 const SCRIPT_SCRIPT_PERCENT_SCALE_DOWN_OFFSET: usize = 2;
@@ -186,611 +161,440 @@ const RADICAL_KERN_BEFORE_DEGREE_OFFSET: usize = 204;
 const RADICAL_KERN_AFTER_DEGREE_OFFSET: usize = 208;
 const RADICAL_DEGREE_BOTTOM_RAISE_PERCENT_OFFSET: usize = 212;
 
-impl<'a> MathConstants<'a> {
-    /// Percentage of scaling down for level 1 superscripts and subscripts. Suggested value: 80%.
+
+impl<'a> Constants<'a> {
+    /// Percentage of scaling down for level 1 superscripts and subscripts.
     #[inline]
     pub fn script_percent_scale_down(&self) -> i16 {
-        Stream::read_at(self.data, SCRIPT_PERCENT_SCALE_DOWN_OFFSET).unwrap_or(0)
+        self.read_i16(SCRIPT_PERCENT_SCALE_DOWN_OFFSET)
     }
 
     /// Percentage of scaling down for level 2 (scriptScript) superscripts and subscripts.
-    /// Suggested value: 60%.
     #[inline]
     pub fn script_script_percent_scale_down(&self) -> i16 {
-        Stream::read_at(self.data, SCRIPT_SCRIPT_PERCENT_SCALE_DOWN_OFFSET).unwrap_or(0)
+        self.read_i16(SCRIPT_SCRIPT_PERCENT_SCALE_DOWN_OFFSET)
     }
 
     /// Minimum height required for a delimited expression (contained within parentheses, etc.) to
-    /// be treated as a sub-formula. Suggested value: normal line height × 1.5.
+    /// be treated as a sub-formula.
     #[inline]
     pub fn delimited_sub_formula_min_height(&self) -> u16 {
-        Stream::read_at(self.data, DELIMITED_SUB_FORMULA_MIN_HEIGHT_OFFSET).unwrap_or(0)
+        self.read_u16(DELIMITED_SUB_FORMULA_MIN_HEIGHT_OFFSET)
     }
 
     /// Minimum height of n-ary operators (such as integral and summation) for formulas in display
     /// mode (that is, appearing as standalone page elements, not embedded inline within text).
     #[inline]
     pub fn display_operator_min_height(&self) -> u16 {
-        Stream::read_at(self.data, DISPLAY_OPERATOR_MIN_HEIGHT_OFFSET).unwrap_or(0)
+        self.read_u16(DISPLAY_OPERATOR_MIN_HEIGHT_OFFSET)
     }
 
-    /// White space to be left between math formulas to ensure proper line spacing. For example,
-    /// for applications that treat line gap as a part of line ascender, formulas with ink going
-    /// above (os2.sTypoAscender + os2.sTypoLineGap - MathLeading) or with ink going below
-    /// os2.sTypoDescender will result in increasing line height.
+    /// White space to be left between math formulas to ensure proper line spacing.
     #[inline]
-    pub fn math_leading(&self) -> MathValueRecord<'a> {
-        self.data.get(MATH_LEADING_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn math_leading(&self) -> MathValue<'a> {
+        self.read_record(MATH_LEADING_OFFSET)
     }
 
     /// Axis height of the font.
-    ///
-    /// In math typesetting, the term axis refers to a horizontal reference line used for
-    /// positioning elements in a formula. The math axis is similar to but distinct from the
-    /// baseline for regular text layout. For example, in a simple equation, a minus symbol or
-    /// fraction rule would be on the axis, but a string for a variable name would be set on a
-    /// baseline that is offset from the axis. The `axis_height` value determines the amount of
-    /// that offset.
     #[inline]
-    pub fn axis_height(&self) -> MathValueRecord<'a> {
-        self.data.get(AXIS_HEIGHT_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn axis_height(&self) -> MathValue<'a> {
+        self.read_record(AXIS_HEIGHT_OFFSET)
     }
 
-    /// Maximum (ink) height of accent base that does not require raising the accents. Suggested:
-    /// x‑height of the font (os2.sxHeight) plus any possible overshots.
+    /// Maximum (ink) height of accent base that does not require raising the accents.
     #[inline]
-    pub fn accent_base_height(&self) -> MathValueRecord<'a> {
-        self.data.get(ACCENT_BASE_HEIGHT_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn accent_base_height(&self) -> MathValue<'a> {
+        self.read_record(ACCENT_BASE_HEIGHT_OFFSET)
     }
 
     /// Maximum (ink) height of accent base that does not require flattening the accents.
-    /// Suggested: cap height of the font (os2.sCapHeight).
     #[inline]
-    pub fn flattened_accent_base_height(&self) -> MathValueRecord<'a> {
-        self.data.get(FLATTENED_ACCENT_BASE_HEIGHT_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn flattened_accent_base_height(&self) -> MathValue<'a> {
+        self.read_record(FLATTENED_ACCENT_BASE_HEIGHT_OFFSET)
     }
 
-    /// The standard shift down applied to subscript elements. Positive for moving in the downward
-    /// direction. Suggested: os2.ySubscriptYOffset.
+    /// The standard shift down applied to subscript elements.
     #[inline]
-    pub fn subscript_shift_down(&self) -> MathValueRecord<'a> {
-        self.data.get(SUBSCRIPT_SHIFT_DOWN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn subscript_shift_down(&self) -> MathValue<'a> {
+        self.read_record(SUBSCRIPT_SHIFT_DOWN_OFFSET)
     }
 
     /// Maximum allowed height of the (ink) top of subscripts that does not require moving
-    /// subscripts further down. Suggested: 4/5 x-height.
+    /// subscripts further down.
     #[inline]
-    pub fn subscript_top_max(&self) -> MathValueRecord<'a> {
-        self.data.get(SUBSCRIPT_TOP_MAX_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn subscript_top_max(&self) -> MathValue<'a> {
+        self.read_record(SUBSCRIPT_TOP_MAX_OFFSET)
     }
 
     /// Minimum allowed drop of the baseline of subscripts relative to the (ink) bottom of the
-    /// base. Checked for bases that are treated as a box or extended shape. Positive for
-    /// subscript baseline dropped below the base bottom.
+    /// base.
     #[inline]
-    pub fn subscript_baseline_drop_min(&self) -> MathValueRecord<'a> {
-        self.data.get(SUBSCRIPT_BASELINE_DROP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn subscript_baseline_drop_min(&self) -> MathValue<'a> {
+        self.read_record(SUBSCRIPT_BASELINE_DROP_MIN_OFFSET)
     }
 
-    /// Standard shift up applied to superscript elements. Suggested: os2.ySuperscriptYOffset.
+    /// Standard shift up applied to superscript elements.
     #[inline]
-    pub fn superscript_shift_up(&self) -> MathValueRecord<'a> {
-        self.data.get(SUPERSCRIPT_SHIFT_UP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn superscript_shift_up(&self) -> MathValue<'a> {
+        self.read_record(SUPERSCRIPT_SHIFT_UP_OFFSET)
     }
 
     /// Standard shift of superscripts relative to the base, in cramped style.
     #[inline]
-    pub fn superscript_shift_up_cramped(&self) -> MathValueRecord<'a> {
-        self.data.get(SUPERSCRIPT_SHIFT_UP_CRAMPED_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn superscript_shift_up_cramped(&self) -> MathValue<'a> {
+        self.read_record(SUPERSCRIPT_SHIFT_UP_CRAMPED_OFFSET)
     }
 
     /// Minimum allowed height of the (ink) bottom of superscripts that does not require moving
-    /// subscripts further up. Suggested: ¼ x-height.
+    /// subscripts further up.
     #[inline]
-    pub fn superscript_bottom_min(&self) -> MathValueRecord<'a> {
-        self.data.get(SUPERSCRIPT_BOTTOM_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn superscript_bottom_min(&self) -> MathValue<'a> {
+        self.read_record(SUPERSCRIPT_BOTTOM_MIN_OFFSET)
     }
 
     /// Maximum allowed drop of the baseline of superscripts relative to the (ink) top of the
-    /// base. Checked for bases that are treated as a box or extended shape. Positive for
-    /// superscript baseline below the base top.
+    /// base.
     #[inline]
-    pub fn superscript_baseline_drop_max(&self) -> MathValueRecord<'a> {
-        self.data.get(SUPERSCRIPT_BASELINE_DROP_MAX_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn superscript_baseline_drop_max(&self) -> MathValue<'a> {
+        self.read_record(SUPERSCRIPT_BASELINE_DROP_MAX_OFFSET)
     }
 
-    /// Minimum gap between the superscript and subscript ink. Suggested: 4 × default rule
-    /// thickness.
+    /// Minimum gap between the superscript and subscript ink.
     #[inline]
-    pub fn sub_superscript_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(SUB_SUPERSCRIPT_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn sub_superscript_gap_min(&self) -> MathValue<'a> {
+        self.read_record(SUB_SUPERSCRIPT_GAP_MIN_OFFSET)
     }
 
     /// The maximum level to which the (ink) bottom of superscript can be pushed to increase the
     /// gap between superscript and subscript, before subscript starts being moved down.
-    /// Suggested: 4/5 x-height.
     #[inline]
-    pub fn superscript_bottom_max_with_subscript(&self) -> MathValueRecord<'a> {
-        self.data.get(SUPERSCRIPT_BOTTOM_MAX_WITH_SUBSCRIPT_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn superscript_bottom_max_with_subscript(&self) -> MathValue<'a> {
+        self.read_record(SUPERSCRIPT_BOTTOM_MAX_WITH_SUBSCRIPT_OFFSET)
     }
 
-    /// Extra white space to be added after each subscript and superscript. Suggested: 0.5 pt for
-    /// a 12 pt font. (Note that, in some math layout implementations, a constant value, such as
-    /// 0.5 pt, may be used for all text sizes. Some implementations may use a constant ratio of
-    /// text size, such as 1/24 of em.)
+    /// Extra white space to be added after each subscript and superscript.
     #[inline]
-    pub fn space_after_script(&self) -> MathValueRecord<'a> {
-        self.data.get(SPACE_AFTER_SCRIPT_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn space_after_script(&self) -> MathValue<'a> {
+        self.read_record(SPACE_AFTER_SCRIPT_OFFSET)
     }
 
     /// Minimum gap between the (ink) bottom of the upper limit, and the (ink) top of the base
     /// operator.
     #[inline]
-    pub fn upper_limit_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(UPPER_LIMIT_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn upper_limit_gap_min(&self) -> MathValue<'a> {
+        self.read_record(UPPER_LIMIT_GAP_MIN_OFFSET)
     }
 
     /// Minimum distance between baseline of upper limit and (ink) top of the base operator.
     #[inline]
-    pub fn upper_limit_baseline_rise_min(&self) -> MathValueRecord<'a> {
-        self.data.get(UPPER_LIMIT_BASELINE_RISE_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn upper_limit_baseline_rise_min(&self) -> MathValue<'a> {
+        self.read_record(UPPER_LIMIT_BASELINE_RISE_MIN_OFFSET)
     }
 
     /// Minimum gap between (ink) top of the lower limit, and (ink) bottom of the base operator.
     #[inline]
-    pub fn lower_limit_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(LOWER_LIMIT_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn lower_limit_gap_min(&self) -> MathValue<'a> {
+        self.read_record(LOWER_LIMIT_GAP_MIN_OFFSET)
     }
 
-    /// Minimum distance between baseline of the lower limit and (ink) bottom of the base
-    /// operator.
+    /// Minimum distance between baseline of the lower limit and (ink) bottom of the base operator.
     #[inline]
-    pub fn lower_limit_baseline_drop_min(&self) -> MathValueRecord<'a> {
-        self.data.get(LOWER_LIMIT_BASELINE_DROP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn lower_limit_baseline_drop_min(&self) -> MathValue<'a> {
+        self.read_record(LOWER_LIMIT_BASELINE_DROP_MIN_OFFSET)
     }
 
     /// Standard shift up applied to the top element of a stack.
     #[inline]
-    pub fn stack_top_shift_up(&self) -> MathValueRecord<'a> {
-        self.data.get(STACK_TOP_SHIFT_UP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stack_top_shift_up(&self) -> MathValue<'a> {
+        self.read_record(STACK_TOP_SHIFT_UP_OFFSET)
     }
 
     /// Standard shift up applied to the top element of a stack in display style.
     #[inline]
-    pub fn stack_top_display_style_shift_up(&self) -> MathValueRecord<'a> {
-        self.data.get(STACK_TOP_DISPLAY_STYLE_SHIFT_UP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stack_top_display_style_shift_up(&self) -> MathValue<'a> {
+        self.read_record(STACK_TOP_DISPLAY_STYLE_SHIFT_UP_OFFSET)
     }
 
-    /// Standard shift down applied to the bottom element of a stack. Positive for moving in the
-    /// downward direction.
+    /// Standard shift down applied to the bottom element of a stack.
     #[inline]
-    pub fn stack_bottom_shift_down(&self) -> MathValueRecord<'a> {
-        self.data.get(STACK_BOTTOM_SHIFT_DOWN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stack_bottom_shift_down(&self) -> MathValue<'a> {
+        self.read_record(STACK_BOTTOM_SHIFT_DOWN_OFFSET)
     }
 
-    /// Standard shift down applied to the bottom element of a stack in display style. Positive
-    /// for moving in the downward direction.
+    /// Standard shift down applied to the bottom element of a stack in display style.
     #[inline]
-    pub fn stack_bottom_display_style_shift_down(&self) -> MathValueRecord<'a> {
-        self.data.get(STACK_BOTTOM_DISPLAY_STYLE_SHIFT_DOWN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stack_bottom_display_style_shift_down(&self) -> MathValue<'a> {
+        self.read_record(STACK_BOTTOM_DISPLAY_STYLE_SHIFT_DOWN_OFFSET)
     }
 
     /// Minimum gap between (ink) bottom of the top element of a stack, and the (ink) top of the
-    /// bottom element. Suggested: 3 × default rule thickness.
+    /// bottom element.
     #[inline]
-    pub fn stack_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(STACK_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stack_gap_min(&self) -> MathValue<'a> {
+        self.read_record(STACK_GAP_MIN_OFFSET)
     }
 
     /// Minimum gap between (ink) bottom of the top element of a stack, and the (ink) top of the
-    /// bottom element in display style. Suggested: 7 × default rule thickness.
+    /// bottom element in display style.
     #[inline]
-    pub fn stack_display_style_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(STACK_DISPLAY_STYLE_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stack_display_style_gap_min(&self) -> MathValue<'a> {
+        self.read_record(STACK_DISPLAY_STYLE_GAP_MIN_OFFSET)
     }
 
     /// Standard shift up applied to the top element of the stretch stack.
     #[inline]
-    pub fn stretch_stack_top_shift_up(&self) -> MathValueRecord<'a> {
-        self.data.get(STRETCH_STACK_TOP_SHIFT_UP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stretch_stack_top_shift_up(&self) -> MathValue<'a> {
+        self.read_record(STRETCH_STACK_TOP_SHIFT_UP_OFFSET)
     }
 
-    /// Standard shift down applied to the bottom element of the stretch stack. Positive for
-    /// moving in the downward direction.
+    /// Standard shift down applied to the bottom element of the stretch stack.
     #[inline]
-    pub fn stretch_stack_bottom_shift_down(&self) -> MathValueRecord<'a> {
-        self.data.get(STRETCH_STACK_BOTTOM_SHIFT_DOWN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stretch_stack_bottom_shift_down(&self) -> MathValue<'a> {
+        self.read_record(STRETCH_STACK_BOTTOM_SHIFT_DOWN_OFFSET)
     }
 
-    /// Minimum gap between the ink of the stretched element, and the (ink) bottom of the element
-    /// above. Suggested: same value as [`MathConstants::upper_limit_gap_min`].
+    /// Minimum gap between the ink of the stretched element, and the (ink) bottom of the element above.
     #[inline]
-    pub fn stretch_stack_gap_above_min(&self) -> MathValueRecord<'a> {
-        self.data.get(STRETCH_STACK_GAP_ABOVE_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stretch_stack_gap_above_min(&self) -> MathValue<'a> {
+        self.read_record(STRETCH_STACK_GAP_ABOVE_MIN_OFFSET)
     }
 
-    /// Minimum gap between the ink of the stretched element, and the (ink) top of the element
-    /// below. Suggested: same value as [`MathConstants::lower_limit_gap_min`].
+    /// Minimum gap between the ink of the stretched element, and the (ink) top of the element below.
     #[inline]
-    pub fn stretch_stack_gap_below_min(&self) -> MathValueRecord<'a> {
-        self.data.get(STRETCH_STACK_GAP_BELOW_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn stretch_stack_gap_below_min(&self) -> MathValue<'a> {
+        self.read_record(STRETCH_STACK_GAP_BELOW_MIN_OFFSET)
     }
 
     /// Standard shift up applied to the numerator.
     #[inline]
-    pub fn fraction_numerator_shift_up(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_NUMERATOR_SHIFT_UP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_numerator_shift_up(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_NUMERATOR_SHIFT_UP_OFFSET)
     }
 
-    /// Standard shift up applied to the numerator in display style. Suggested: same value as
-    /// [`MathConstants::stack_top_display_style_shift_up`].
+    /// Standard shift up applied to the numerator in display style.
     #[inline]
-    pub fn fraction_numerator_display_style_shift_up(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_NUMERATOR_DISPLAY_STYLE_SHIFT_UP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_numerator_display_style_shift_up(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_NUMERATOR_DISPLAY_STYLE_SHIFT_UP_OFFSET)
     }
 
-    /// Standard shift down applied to the denominator. Positive for moving in the downward direction.
+    /// Standard shift down applied to the denominator.
     #[inline]
-    pub fn fraction_denominator_shift_down(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_DENOMINATOR_SHIFT_DOWN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_denominator_shift_down(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_DENOMINATOR_SHIFT_DOWN_OFFSET)
     }
 
-    /// Standard shift down applied to the denominator in display style. Positive for moving in the
-    /// downward direction. Suggested: same value as [`MathConstants::stack_bottom_display_style_shift_down`].
+    /// Standard shift down applied to the denominator in display style.
     #[inline]
-    pub fn fraction_denominator_display_style_shift_down(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_DENOMINATOR_DISPLAY_STYLE_SHIFT_DOWN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_denominator_display_style_shift_down(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_DENOMINATOR_DISPLAY_STYLE_SHIFT_DOWN_OFFSET)
     }
 
     /// Minimum tolerated gap between the (ink) bottom of the numerator and the ink of the
-    /// fraction bar. Suggested: default rule thickness.
+    /// fraction bar.
     #[inline]
-    pub fn fraction_numerator_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_NUMERATOR_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_numerator_gap_min(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_NUMERATOR_GAP_MIN_OFFSET)
     }
 
     /// Minimum tolerated gap between the (ink) bottom of the numerator and the ink of the
-    /// fraction bar in display style. Suggested: 3 × default rule thickness.
+    /// fraction bar in display style.
     #[inline]
-    pub fn fraction_num_display_style_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_NUM_DISPLAY_STYLE_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_num_display_style_gap_min(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_NUM_DISPLAY_STYLE_GAP_MIN_OFFSET)
     }
 
-    /// Thickness of the fraction bar. Suggested: default rule thickness.
+    /// Thickness of the fraction bar.
     #[inline]
-    pub fn fraction_rule_thickness(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_RULE_THICKNESS_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_rule_thickness(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_RULE_THICKNESS_OFFSET)
     }
 
-    /// Minimum tolerated gap between the (ink) top of the denominator and the ink of the fraction
-    /// bar. Suggested: default rule thickness.
+    /// Minimum tolerated gap between the (ink) top of the denominator and the ink of the fraction bar.
     #[inline]
-    pub fn fraction_denominator_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_DENOMINATOR_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_denominator_gap_min(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_DENOMINATOR_GAP_MIN_OFFSET)
     }
 
     /// Minimum tolerated gap between the (ink) top of the denominator and the ink of the fraction
-    /// bar in display style. Suggested: 3 × default rule thickness.
+    /// bar in display style.
     #[inline]
-    pub fn fraction_denom_display_style_gap_min(&self) -> MathValueRecord<'a> {
-        self.data.get(FRACTION_DENOM_DISPLAY_STYLE_GAP_MIN_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn fraction_denom_display_style_gap_min(&self) -> MathValue<'a> {
+        self.read_record(FRACTION_DENOM_DISPLAY_STYLE_GAP_MIN_OFFSET)
     }
 
     /// Horizontal distance between the top and bottom elements of a skewed fraction.
     #[inline]
-    pub fn skewed_fraction_horizontal_gap(&self) -> MathValueRecord<'a> {
-        self.data.get(SKEWED_FRACTION_HORIZONTAL_GAP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn skewed_fraction_horizontal_gap(&self) -> MathValue<'a> {
+        self.read_record(SKEWED_FRACTION_HORIZONTAL_GAP_OFFSET)
     }
 
     /// Vertical distance between the ink of the top and bottom elements of a skewed fraction.
     #[inline]
-    pub fn skewed_fraction_vertical_gap(&self) -> MathValueRecord<'a> {
-        self.data.get(SKEWED_FRACTION_VERTICAL_GAP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn skewed_fraction_vertical_gap(&self) -> MathValue<'a> {
+        self.read_record(SKEWED_FRACTION_VERTICAL_GAP_OFFSET)
     }
 
-    /// Distance between the overbar and the (ink) top of he base. Suggested: 3 × default rule
-    /// thickness.
+    /// Distance between the overbar and the (ink) top of he base.
     #[inline]
-    pub fn overbar_vertical_gap(&self) -> MathValueRecord<'a> {
-        self.data.get(OVERBAR_VERTICAL_GAP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn overbar_vertical_gap(&self) -> MathValue<'a> {
+        self.read_record(OVERBAR_VERTICAL_GAP_OFFSET)
     }
 
-    /// Thickness of overbar. Suggested: default rule thickness.
+    /// Thickness of overbar.
     #[inline]
-    pub fn overbar_rule_thickness(&self) -> MathValueRecord<'a> {
-        self.data.get(OVERBAR_RULE_THICKNESS_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn overbar_rule_thickness(&self) -> MathValue<'a> {
+        self.read_record(OVERBAR_RULE_THICKNESS_OFFSET)
     }
 
-    /// Extra white space reserved above the overbar. Suggested: default rule thickness.
+    /// Extra white space reserved above the overbar.
     #[inline]
-    pub fn overbar_extra_ascender(&self) -> MathValueRecord<'a> {
-        self.data.get(OVERBAR_EXTRA_ASCENDER_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn overbar_extra_ascender(&self) -> MathValue<'a> {
+        self.read_record(OVERBAR_EXTRA_ASCENDER_OFFSET)
     }
 
-    /// Distance between underbar and (ink) bottom of the base. Suggested: 3 × default rule
-    /// thickness.
+    /// Distance between underbar and (ink) bottom of the base.
     #[inline]
-    pub fn underbar_vertical_gap(&self) -> MathValueRecord<'a> {
-        self.data.get(UNDERBAR_VERTICAL_GAP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn underbar_vertical_gap(&self) -> MathValue<'a> {
+        self.read_record(UNDERBAR_VERTICAL_GAP_OFFSET)
     }
 
-    /// Thickness of underbar. Suggested: default rule thickness.
+    /// Thickness of underbar.
     #[inline]
-    pub fn underbar_rule_thickness(&self) -> MathValueRecord<'a> {
-        self.data.get(UNDERBAR_RULE_THICKNESS_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn underbar_rule_thickness(&self) -> MathValue<'a> {
+        self.read_record(UNDERBAR_RULE_THICKNESS_OFFSET)
     }
 
-    /// Extra white space reserved below the underbar. Always positive. Suggested: default rule
-    /// thickness.
+    /// Extra white space reserved below the underbar.
     #[inline]
-    pub fn underbar_extra_descender(&self) -> MathValueRecord<'a> {
-        self.data.get(UNDERBAR_EXTRA_DESCENDER_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn underbar_extra_descender(&self) -> MathValue<'a> {
+        self.read_record(UNDERBAR_EXTRA_DESCENDER_OFFSET)
     }
 
-    /// Space between the (ink) top of the expression and the bar over it. Suggested: 1¼ default
-    /// rule thickness.
+    /// Space between the (ink) top of the expression and the bar over it.
     #[inline]
-    pub fn radical_vertical_gap(&self) -> MathValueRecord<'a> {
-        self.data.get(RADICAL_VERTICAL_GAP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn radical_vertical_gap(&self) -> MathValue<'a> {
+        self.read_record(RADICAL_VERTICAL_GAP_OFFSET)
     }
 
-    /// Space between the (ink) top of the expression and the bar over it. Suggested: default rule
-    /// thickness + ¼ x-height.
+    /// Space between the (ink) top of the expression and the bar over it.
     #[inline]
-    pub fn radical_display_style_vertical_gap(&self) -> MathValueRecord<'a> {
-        self.data.get(RADICAL_DISPLAY_STYLE_VERTICAL_GAP_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn radical_display_style_vertical_gap(&self) -> MathValue<'a> {
+        self.read_record(RADICAL_DISPLAY_STYLE_VERTICAL_GAP_OFFSET)
     }
 
-    /// Thickness of the radical rule. This is the thickness of the rule in designed or
-    /// constructed radical signs. Suggested: default rule thickness.
+    /// Thickness of the radical rule.
     #[inline]
-    pub fn radical_rule_thickness(&self) -> MathValueRecord<'a> {
-        self.data.get(RADICAL_RULE_THICKNESS_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn radical_rule_thickness(&self) -> MathValue<'a> {
+        self.read_record(RADICAL_RULE_THICKNESS_OFFSET)
     }
 
-    /// Extra white space reserved above the radical. Suggested: same value as
-    /// [`MathConstants::radical_rule_thickness`].
+    /// Extra white space reserved above the radical.
     #[inline]
-    pub fn radical_extra_ascender(&self) -> MathValueRecord<'a> {
-        self.data.get(RADICAL_EXTRA_ASCENDER_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn radical_extra_ascender(&self) -> MathValue<'a> {
+        self.read_record(RADICAL_EXTRA_ASCENDER_OFFSET)
     }
 
-    /// Extra horizontal kern before the degree of a radical, if such is present. Suggested: 5/18
-    /// of em.
+    /// Extra horizontal kern before the degree of a radical, if such is present.
     #[inline]
-    pub fn radical_kern_before_degree(&self) -> MathValueRecord<'a> {
-        self.data.get(RADICAL_KERN_BEFORE_DEGREE_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn radical_kern_before_degree(&self) -> MathValue<'a> {
+        self.read_record(RADICAL_KERN_BEFORE_DEGREE_OFFSET)
     }
 
-    /// Negative kern after the degree of a radical, if such is present. Suggested: −10/18 of em.
+    /// Negative kern after the degree of a radical, if such is present.
     #[inline]
-    pub fn radical_kern_after_degree(&self) -> MathValueRecord<'a> {
-        self.data.get(RADICAL_KERN_AFTER_DEGREE_OFFSET..)
-            .and_then(|data| MathValueRecord::parse(data, self.data))
-            .unwrap_or_default()
+    pub fn radical_kern_after_degree(&self) -> MathValue<'a> {
+        self.read_record(RADICAL_KERN_AFTER_DEGREE_OFFSET)
     }
 
     /// Height of the bottom of the radical degree, if such is present, in proportion to the
-    /// ascender of the radical sign. Suggested: 60%.
+    /// ascender of the radical sign.
     #[inline]
     pub fn radical_degree_bottom_raise_percent(&self) -> i16 {
-        Stream::read_at(self.data, RADICAL_DEGREE_BOTTOM_RAISE_PERCENT_OFFSET).unwrap_or(0)
+        self.read_i16(RADICAL_DEGREE_BOTTOM_RAISE_PERCENT_OFFSET)
+    }
+
+    /// Read an `i16` at an offset into the table.
+    #[inline]
+    fn read_i16(&self, offset: usize) -> i16 {
+        Stream::read_at(self.data, offset).unwrap_or(0)
+    }
+
+    /// Read an `u16` at an offset into the table.
+    #[inline]
+    fn read_u16(&self, offset: usize) -> u16 {
+        Stream::read_at(self.data, offset).unwrap_or(0)
+    }
+
+    /// Read a `MathValueRecord` at an offset into the table.
+    #[inline]
+    fn read_record(&self, offset: usize) -> MathValue<'a> {
+        self.data.get(offset..)
+            .and_then(|data| MathValue::parse(data, self.data))
+            .unwrap_or(MathValue { value: 0, device: None })
     }
 }
 
-/// The MathGlyphInfo table contains positioning information that is defined on per-glyph basis.
-#[allow(missing_debug_implementations)]
+
+/// A [Math Kern Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathkern-table).
 #[derive(Clone)]
-pub struct MathGlyphInfo<'a> {
-    /// Contains information on italics correction values.
-    pub math_italics_correction_info: MathValueTable<'a>,
-    /// Contains horizontal positions for attaching mathematical accents.
-    pub math_top_accent_attachment: MathValueTable<'a>,
-    /// The glyphs covered by this table are to be considered extended shapes.
-    pub extended_shape_coverage: Option<Coverage<'a>>,
-    /// Provides per-glyph information for mathematical kerning.
-    pub math_kern_info: Option<MathKernInfo<'a>>,
+pub struct Kern<'a> {
+    data: &'a [u8],
+    heights: LazyArray16<'a, MathValueRecord>,
+    kerns: LazyArray16<'a, MathValueRecord>,
 }
 
-impl<'a> FromSlice<'a> for MathGlyphInfo<'a> {
+impl<'a> Kern<'a> {
+    /// Number of heights at which the kern value changes.
+    pub fn count(&self) -> u16 {
+        self.heights.len()
+    }
+
+    /// The correction height at the given index.
+    ///
+    /// The index must be smaller than `count()`.
+    pub fn height(&self, index: u16) -> Option<MathValue<'a>> {
+        Some(self.heights.get(index)?.get(self.data))
+    }
+
+    /// The kern value at the given index.
+    ///
+    /// The index must be smaller than or equal to `count()`.
+    pub fn kern(&self, index: u16) -> Option<MathValue<'a>> {
+        Some(self.kerns.get(index)?.get(self.data))
+    }
+}
+
+impl<'a> FromSlice<'a> for Kern<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        Some(MathGlyphInfo {
-            math_italics_correction_info: s.parse_at_offset16::<MathValueTable>(data)?,
-            math_top_accent_attachment: s.parse_at_offset16::<MathValueTable>(data)?,
-            extended_shape_coverage: s.parse_at_offset16::<Coverage>(data),
-            math_kern_info: s.parse_at_offset16::<MathKernInfo>(data),
-        })
-    }
-}
-
-/// Coverage table with an array, serves as a mapping from glyph to values.
-#[allow(missing_debug_implementations)]
-#[derive(Clone)]
-pub struct CoverageMapping<'a, A> {
-    /// The coverage table, maps glyphs to indices.
-    pub coverage: Coverage<'a>,
-    /// The value array, maps indices to values.
-    pub values: A,
-}
-
-impl<'a, A: Array<Index=u16>> CoverageMapping<'a, A> {
-    /// Checks that glyph is present.
-    pub fn contains(&self, glyph: GlyphId) -> bool {
-        self.coverage.contains(glyph)
-    }
-
-    /// Returns the [`MathValueRecord`] of the glyph or `None` if it is not covered.
-    pub fn get(&self, glyph: GlyphId) -> Option<A::Value> {
-        let index = self.coverage.get(glyph)?;
-        self.values.get(index)
-    }
-}
-
-/// Mapping from glyph to [`MathValueRecord`].
-pub type MathValueTable<'a> = CoverageMapping<'a, MathValueArray<'a>>;
-
-impl<'a> FromSlice<'a> for MathValueTable<'a> {
-    fn parse(data: &'a [u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        let coverage = s.parse_at_offset16::<Coverage>(data)?;
         let count = s.read::<u16>()?;
-        let entries = s.read_array16(count)?;
-        Some(MathValueTable { coverage, values: MathValueArray { entries, data } })
+        let heights = s.read_array16::<MathValueRecord>(count)?;
+        let kerns = s.read_array16::<MathValueRecord>(count + 1)?;
+        Some(Kern { data, heights, kerns })
     }
 }
 
-/// See <https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathkerninfo-table>.
-pub type MathKernInfo<'a> = CoverageMapping<'a, MathKernInfoArray<'a>>;
-
-impl<'a> FromSlice<'a> for MathKernInfo<'a> {
-    fn parse(data: &'a [u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        let coverage = s.parse_at_offset16::<Coverage>(data)?;
-        let count = s.read::<u16>()?;
-        let entries = s.read_array16(count)?;
-        Some(MathKernInfo { coverage, values: MathKernInfoArray { entries, data } })
+impl core::fmt::Debug for Kern<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "Kern {{ ... }}")
     }
 }
 
-/// Array of [`MathKernInfoRecord`].
-#[allow(missing_debug_implementations)]
-#[derive(Clone)]
-pub struct MathKernInfoArray<'a> {
-    entries: LazyArray16<'a, RawMathKernInfoRecord>,
-    data: &'a [u8], // for locating device tables
-}
 
-impl<'a> Array for MathKernInfoArray<'a> {
-    type Index = u16;
-    type Value = MathKernInfoRecord<'a>;
-
-    #[inline]
-    fn is_empty(&self) -> bool { self.entries.is_empty() }
-
-    #[inline]
-    fn len(&self) -> Self::Index { self.entries.len() }
-
-    #[inline]
-    fn get(&self, index: u16) -> Option<MathKernInfoRecord<'a>> {
-        Some(self.entries.get(index)?.get(self.data))
-    }
-}
-
-#[derive(Default, Debug, Copy, Clone)]
-struct RawMathKernInfoRecord {
+#[derive(Clone, Copy)]
+struct KernInfoRecord {
     top_right: Option<Offset16>,
     top_left: Option<Offset16>,
     bottom_right: Option<Offset16>,
     bottom_left: Option<Offset16>,
 }
 
-impl FromData for RawMathKernInfoRecord {
+impl FromData for KernInfoRecord {
     const SIZE: usize = 8;
 
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        Some(RawMathKernInfoRecord {
+        Some(KernInfoRecord {
             top_right: s.read::<Option<Offset16>>()?,
             top_left: s.read::<Option<Offset16>>()?,
             bottom_right: s.read::<Option<Offset16>>()?,
@@ -799,12 +603,12 @@ impl FromData for RawMathKernInfoRecord {
     }
 }
 
-impl RawMathKernInfoRecord {
-    fn get<'a>(&self, data: &'a [u8]) -> MathKernInfoRecord<'a> {
+impl KernInfoRecord {
+    fn get<'a>(&self, data: &'a [u8]) -> KernInfo<'a> {
         let parse_field = |offset: Option<Offset16>| offset
             .and_then(|offset| data.get(offset.to_usize()..))
-            .and_then(MathKern::parse);
-        MathKernInfoRecord {
+            .and_then(Kern::parse);
+        KernInfo {
             top_right: parse_field(self.top_right),
             top_left: parse_field(self.top_left),
             bottom_right: parse_field(self.bottom_right),
@@ -813,179 +617,121 @@ impl RawMathKernInfoRecord {
     }
 }
 
-/// Each MathKernInfoRecord points to up to four kern tables for each of the corners around the
-/// glyph. If no kern table is provided for a corner, a kerning amount of zero is assumed.
-#[allow(missing_debug_implementations)]
-#[allow(missing_docs)]
-#[derive(Clone)]
-pub struct MathKernInfoRecord<'a> {
-    pub top_right: Option<MathKern<'a>>,
-    pub top_left: Option<MathKern<'a>>,
-    pub bottom_right: Option<MathKern<'a>>,
-    pub bottom_left: Option<MathKern<'a>>,
+
+/// An [entry in a Math Kern Info Table](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathkerninforecord).
+#[derive(Clone, Debug)]
+pub struct KernInfo<'a> {
+    /// The kerning data for the top-right corner.
+    pub top_right: Option<Kern<'a>>,
+    /// The kerning data for the top-left corner.
+    pub top_left: Option<Kern<'a>>,
+    /// The kerning data for the bottom-right corner.
+    pub bottom_right: Option<Kern<'a>>,
+    /// The kerning data for the bottom-left corner.
+    pub bottom_left: Option<Kern<'a>>,
 }
 
-/// The MathKern table provides kerning amounts for different heights in a glyph’s vertical extent.
-/// An array of kerning values is provided, each of which applies to a height range. A corresponding
-/// array of heights indicate the transition points between consecutive ranges.
-#[allow(missing_debug_implementations)]
-#[derive(Clone)]
-pub struct MathKern<'a> {
+
+/// A [Math Kern Info Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathkerninfo-table).
+#[derive(Clone, Copy)]
+pub struct KernInfos<'a> {
     data: &'a [u8],
-    correction_height: LazyArray16<'a, RawMathValueRecord>,
-    kern_values: LazyArray16<'a, RawMathValueRecord>,
+    coverage: Coverage<'a>,
+    records: LazyArray16<'a, KernInfoRecord>,
 }
 
-impl<'a> MathKern<'a> {
-    /// Number of heights as split points.
-    pub fn height_count(&self) -> u16 { self.correction_height.len() }
-    /// Number of kern values. It is always greater than number of heights by one.
-    pub fn kern_count(&self) -> u16 { self.kern_values.len() }
-    /// Get the height value at some specific index.
-    pub fn get_height(&self, index: u16) -> Option<MathValueRecord> {
-        Some(self.correction_height.get(index)?.get(self.data))
-    }
-    /// Get the kern value at some specific index.
-    pub fn get_kern_value(&self, index: u16) -> Option<MathValueRecord> {
-        Some(self.kern_values.get(index)?.get(self.data))
-    }
-}
-
-impl<'a> FromSlice<'a> for MathKern<'a> {
+impl<'a> FromSlice<'a> for KernInfos<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
+        let coverage = s.parse_at_offset16::<Coverage>(data)?;
         let count = s.read::<u16>()?;
-        let correction_height = s.read_array16(count)?;
-        let kern_values = s.read_array16(count + 1)?;
-        Some(MathKern { data, correction_height, kern_values })
+        let records = s.read_array16::<KernInfoRecord>(count)?;
+        Some(KernInfos { data, coverage, records })
     }
 }
 
-/// Description of glyph variants at different sizes and shape construction from part glyphs.
-pub type GlyphConstructionTable<'a> = CoverageMapping<'a, LazyOffsetArray16<'a, MathGlyphConstruction<'a>>>;
-
-/// Used for selecting glyph variants at correct size, or constructing stretchable shapes.
-#[allow(missing_debug_implementations)]
-#[derive(Clone)]
-pub struct MathVariants<'a> {
-    /// Minimum overlap of connecting glyphs during glyph construction, in design units.
-    pub min_connector_overlap: u16,
-    /// For shapes growing in the vertical direction.
-    pub vert_glyph_construction: GlyphConstructionTable<'a>,
-    /// For shapes growing in the horizontal direction.
-    pub horiz_glyph_construction: GlyphConstructionTable<'a>,
+impl<'a> KernInfos<'a> {
+    /// Returns the kerning info for the glyph or `None` if it is not covered.
+    #[inline]
+    pub fn get(&self, glyph: GlyphId) -> Option<KernInfo<'a>> {
+        let index = self.coverage.get(glyph)?;
+        Some(self.records.get(index)?.get(self.data))
+    }
 }
 
-impl<'a> FromSlice<'a> for MathVariants<'a> {
+impl core::fmt::Debug for KernInfos<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "KernInfos {{ ... }}")
+    }
+}
+
+
+/// A [Math Glyph Info Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathglyphinfo-table).
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphInfo<'a> {
+    /// Per-glyph italics correction values.
+    pub italic_corrections: Option<MathValues<'a>>,
+    /// Per-glyph horizontal positions for attaching mathematical accents.
+    pub top_accent_attachments: Option<MathValues<'a>>,
+    /// Glyphs which are _extended shapes_.
+    pub extended_shapes: Option<Coverage<'a>>,
+    /// Per-glyph information for mathematical kerning.
+    pub kern_infos: Option<KernInfos<'a>>,
+}
+
+impl<'a> FromSlice<'a> for GlyphInfo<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let min_connector_overlap = s.read::<u16>()?;
-        let vert_glyph_coverage = s.parse_at_offset16::<Coverage>(data)?;
-        let horiz_glyph_coverage = s.parse_at_offset16::<Coverage>(data)?;
-        let vert_glyph_count = s.read::<u16>()?;
-        let horiz_glyph_count = s.read::<u16>()?;
-        let vert_glyph_construction_offsets = s.read_array16(vert_glyph_count)?;
-        let horiz_glyph_construction_offsets = s.read_array16(horiz_glyph_count)?;
-        Some(MathVariants {
-            min_connector_overlap,
-            vert_glyph_construction: CoverageMapping {
-                coverage: vert_glyph_coverage,
-                values: LazyOffsetArray16::new(data, vert_glyph_construction_offsets),
-            },
-            horiz_glyph_construction: CoverageMapping {
-                coverage: horiz_glyph_coverage,
-                values: LazyOffsetArray16::new(data, horiz_glyph_construction_offsets),
-            },
+        Some(GlyphInfo {
+            italic_corrections: s.parse_at_offset16::<MathValues>(data),
+            top_accent_attachments: s.parse_at_offset16::<MathValues>(data),
+            extended_shapes: s.parse_at_offset16::<Coverage>(data),
+            kern_infos: s.parse_at_offset16::<KernInfos>(data),
         })
     }
 }
 
-/// Description of glyph variants at different sizes, with one optional stretchable variant.
+
+/// Glyph part flags.
+#[derive(Clone, Copy, Debug)]
+pub struct PartFlags(pub u16);
+
 #[allow(missing_docs)]
-#[allow(missing_debug_implementations)]
-#[derive(Clone)]
-pub struct MathGlyphConstruction<'a> {
-    pub glyph_assembly: Option<GlyphAssembly<'a>>,
-    pub variants: LazyArray16<'a, MathGlyphVariantRecord>,
+impl PartFlags {
+    #[inline] pub fn extender(self) -> bool { self.0 & 0x0001 != 0 }
 }
 
-impl<'a> FromSlice<'a> for MathGlyphConstruction<'a> {
-    fn parse(data: &'a [u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        let glyph_assembly = s.parse_at_offset16::<GlyphAssembly>(data);
-        let variant_count = s.read::<u16>()?;
-        let variants = s.read_array16(variant_count)?;
-        Some(MathGlyphConstruction { glyph_assembly, variants })
-    }
-}
-
-/// Description of math glyph variants.
-#[derive(Debug, Default, Copy, Clone)]
-pub struct MathGlyphVariantRecord {
-    /// Glyph ID for the variant.
-    pub variant_glyph: GlyphId,
-    /// Advance width/height, in design units, of the variant, in the direction of requested glyph
-    /// extension.
-    pub advance_measurement: u16,
-}
-
-impl FromData for MathGlyphVariantRecord {
-    const SIZE: usize = 4;
+impl FromData for PartFlags {
+    const SIZE: usize = 2;
 
     fn parse(data: &[u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        let variant_glyph = s.read::<GlyphId>()?;
-        let advance_measurement = s.read::<u16>()?;
-        Some(MathGlyphVariantRecord { variant_glyph, advance_measurement })
+        u16::parse(data).map(PartFlags)
     }
 }
 
-/// How the shape for this glyph can be assembled from parts found in the glyph set of the font.
-#[allow(missing_debug_implementations)]
-#[derive(Clone)]
-pub struct GlyphAssembly<'a> {
-    /// Italics correction of this GlyphAssembly. Should not depend on the assembly size.
-    pub italics_correction: MathValueRecord<'a>,
-    /// Array of part records, from left to right (for assemblies that extend horizontally) or
-    /// bottom to top (for assemblies that extend vertically).
-    pub glyph_parts: LazyArray16<'a, GlyphPartRecord>,
-}
 
-impl<'a> FromSlice<'a> for GlyphAssembly<'a> {
-    fn parse(data: &'a [u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        let italics_correction = s.read::<RawMathValueRecord>()?.get(data);
-        let glyph_part_count = s.read::<u16>()?;
-        let glyph_parts = s.read_array16(glyph_part_count)?;
-        Some(GlyphAssembly { italics_correction, glyph_parts })
-    }
-}
-
-/// Description of glyph parts to be assembled.
-#[allow(missing_debug_implementations)]
-#[derive(Copy, Clone)]
-pub struct GlyphPartRecord {
+/// Details for a glyph part in an assembly.
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphPart {
     /// Glyph ID for the part.
     pub glyph_id: GlyphId,
-    /// Lengths of the connectors on the start of the glyph.
+    /// Lengths of the connectors on the start of the glyph, in font design units.
     pub start_connector_length: u16,
-    /// Lengths of the connectors on the end of the glyph.
+    /// Lengths of the connectors on the end of the glyph, in font design units.
     pub end_connector_length: u16,
-    /// The full advance of the part. It is also used to determine the measurement of the result
-    /// by using the following formula:
-    ///
-    /// _Size of Assembly = Offset of the Last Part + Full Advance of the Last Part_
+    /// The full advance of the part, in font design units.
     pub full_advance: u16,
-    /// Part qualifiers.
+    /// Part flags.
     pub part_flags: PartFlags,
 }
 
-impl FromData for GlyphPartRecord {
+impl FromData for GlyphPart {
     const SIZE: usize = 10;
 
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        Some(GlyphPartRecord {
+        Some(GlyphPart {
             glyph_id: s.read::<GlyphId>()?,
             start_connector_length: s.read::<u16>()?,
             end_connector_length: s.read::<u16>()?,
@@ -995,20 +741,164 @@ impl FromData for GlyphPartRecord {
     }
 }
 
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug)]
-pub struct PartFlags(pub u16);
 
-impl PartFlags {
-    /// If set, the part can be skipped or repeated.
-    #[inline]
-    pub fn extender(self) -> bool { self.0 & 0x0001 != 0 }
+/// A [Glyph Assembly Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#glyphassembly-table).
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphAssembly<'a> {
+    /// The italics correction of the assembled glyph.
+    pub italics_correction: MathValue<'a>,
+    /// Parts the assembly is composed of.
+    pub parts: LazyArray16<'a, GlyphPart>,
 }
 
-impl FromData for PartFlags {
-    const SIZE: usize = 2;
+impl<'a> FromSlice<'a> for GlyphAssembly<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let italics_correction = s.read::<MathValueRecord>()?.get(data);
+        let count = s.read::<u16>()?;
+        let parts = s.read_array16::<GlyphPart>(count)?;
+        Some(GlyphAssembly { italics_correction, parts })
+    }
+}
+
+
+/// Description of math glyph variants.
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphVariant {
+    /// The ID of the variant glyph.
+    pub variant_glyph: GlyphId,
+    /// Advance width/height, in design units, of the variant glyph.
+    pub advance_measurement: u16,
+}
+
+impl FromData for GlyphVariant {
+    const SIZE: usize = 4;
 
     fn parse(data: &[u8]) -> Option<Self> {
-        u16::parse(data).map(PartFlags)
+        let mut s = Stream::new(data);
+        Some(GlyphVariant {
+            variant_glyph: s.read::<GlyphId>()?,
+            advance_measurement:s.read::<u16>()?,
+        })
+    }
+}
+
+
+/// A [Math Glyph Construction Table](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathglyphconstruction-table).
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphConstruction<'a> {
+    /// A general recipe on how to construct a variant with large advance width/height.
+    pub assembly: Option<GlyphAssembly<'a>>,
+    /// Prepared variants of the glyph with varying advances.
+    pub variants: LazyArray16<'a, GlyphVariant>,
+}
+
+impl<'a> FromSlice<'a> for GlyphConstruction<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let assembly = s.parse_at_offset16::<GlyphAssembly>(data);
+        let variant_count = s.read::<u16>()?;
+        let variants = s.read_array16::<GlyphVariant>(variant_count)?;
+        Some(GlyphConstruction { assembly, variants })
+    }
+}
+
+
+/// A mapping from glyphs to
+/// [Math Glyph Construction Tables](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathglyphconstruction-table).
+#[derive(Clone, Copy)]
+pub struct GlyphConstructions<'a> {
+    coverage: Coverage<'a>,
+    constructions: LazyOffsetArray16<'a, GlyphConstruction<'a>>,
+}
+
+impl<'a> GlyphConstructions<'a> {
+    fn new(
+        data: &'a [u8],
+        coverage: Option<Coverage<'a>>,
+        offsets: LazyArray16<'a, Option<Offset16>>,
+    ) -> Self {
+        GlyphConstructions {
+            coverage: coverage.unwrap_or(Coverage::Format1 {
+                glyphs: LazyArray16::new(&[])
+            }),
+            constructions: LazyOffsetArray16::new(data, offsets),
+        }
+    }
+
+    /// Returns the construction for the glyph or `None` if it is not covered.
+    #[inline]
+    pub fn get(&self, glyph: GlyphId) -> Option<GlyphConstruction<'a>> {
+        let index = self.coverage.get(glyph)?;
+        self.constructions.get(index)
+    }
+}
+
+impl core::fmt::Debug for GlyphConstructions<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "GlyphConstructions {{ ... }}")
+    }
+}
+
+
+/// A [Math Variants Table](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathvariants-table).
+#[derive(Clone, Copy, Debug)]
+pub struct Variants<'a> {
+    /// Minimum overlap of connecting glyphs during glyph construction, in design units.
+    pub min_connector_overlap: u16,
+    /// Constructions for shapes growing in the vertical direction.
+    pub vertical_constructions: GlyphConstructions<'a>,
+    /// Constructions for shapes growing in the horizontal direction.
+    pub horizontal_constructions: GlyphConstructions<'a>,
+}
+
+impl<'a> FromSlice<'a> for Variants<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let min_connector_overlap = s.read::<u16>()?;
+        let vertical_coverage = s.parse_at_offset16::<Coverage>(data);
+        let horizontal_coverage = s.parse_at_offset16::<Coverage>(data);
+        let vertical_count = s.read::<u16>()?;
+        let horizontal_count = s.read::<u16>()?;
+        let vertical_offsets = s.read_array16::<Option<Offset16>>(vertical_count)?;
+        let horizontal_offsets = s.read_array16::<Option<Offset16>>(horizontal_count)?;
+        Some(Variants {
+            min_connector_overlap,
+            vertical_constructions: GlyphConstructions::new(data, vertical_coverage, vertical_offsets),
+            horizontal_constructions: GlyphConstructions::new(data, horizontal_coverage, horizontal_offsets),
+        })
+    }
+}
+
+
+/// A [Math Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
+#[derive(Clone, Copy, Debug)]
+pub struct Table<'a> {
+    /// Math positioning constants.
+    pub constants: Option<Constants<'a>>,
+    /// Per-glyph positioning information.
+    pub glyph_info: Option<GlyphInfo<'a>>,
+    /// Variants and assembly recipes for growable glyphs.
+    pub variants: Option<Variants<'a>>,
+}
+
+impl<'a> Table<'a> {
+    /// Parses a table from raw data.
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        let major_version = s.read::<u16>()? as u8;
+        s.skip::<u16>(); // minor version
+        if major_version != 1 {
+            return None;
+        }
+
+        Some(Table {
+            constants: s.parse_at_offset16::<Constants>(data),
+            glyph_info: s.parse_at_offset16::<GlyphInfo>(data),
+            variants: s.parse_at_offset16::<Variants>(data),
+        })
     }
 }

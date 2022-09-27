@@ -3,7 +3,7 @@
 
 use crate::GlyphId;
 use crate::opentype_layout::{Class, ClassDefinition, Coverage};
-use crate::parser::{Array, LazyArray16, Offset, Offset16, Offset32, Stream, FromSlice};
+use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream, FromSlice};
 
 #[cfg(feature = "variable-fonts")] use crate::NormalizedCoordinate;
 #[cfg(feature = "variable-fonts")] use crate::var_store::ItemVariationStore;

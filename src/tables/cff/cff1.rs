@@ -178,12 +178,12 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
                 let operands = dict_parser.operands();
                 if operands.len() == 6 {
                     top_dict.matrix = Matrix {
-                        sx: operands[0],
-                        ky: operands[1],
-                        kx: operands[2],
-                        sy: operands[3],
-                        tx: operands[4],
-                        ty: operands[5],
+                        sx: operands[0] as f32,
+                        ky: operands[1] as f32,
+                        kx: operands[2] as f32,
+                        sy: operands[3] as f32,
+                        tx: operands[4] as f32,
+                        ty: operands[5] as f32,
                     };
                 }
             }
@@ -207,6 +207,22 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn private_dict_size_overflow() {
+        let data = &[
+            0x00, 0x01, // count: 1
+            0x01, // offset size: 1
+            0x01, // index [0]: 1
+            0x0C, // index [1]: 14
+            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // length: i32::MAX
+            0x1D, 0x7F, 0xFF, 0xFF, 0xFF, // offset: i32::MAX
+            0x12 // operator: 18 (private)
+        ];
+
+        let top_dict = parse_top_dict(&mut Stream::new(data)).unwrap();
+        assert_eq!(top_dict.private_dict_range, Some(2147483647..4294967294));
+    }
 
     #[test]
     fn private_dict_negative_char_strings_offset() {
@@ -271,9 +287,9 @@ fn parse_private_dict(data: &[u8]) -> PrivateDict {
         if operator.get() == private_dict_operator::LOCAL_SUBROUTINES_OFFSET {
             dict.local_subroutines_offset = dict_parser.parse_offset();
         } else if operator.get() == private_dict_operator::DEFAULT_WIDTH {
-            dict.default_width = dict_parser.parse_number();
+            dict.default_width = dict_parser.parse_number().map(|n| n as f32);
         } else if operator.get() == private_dict_operator::NOMINAL_WIDTH {
-            dict.nominal_width = dict_parser.parse_number();
+            dict.nominal_width = dict_parser.parse_number().map(|n| n as f32);
         }
     }
 

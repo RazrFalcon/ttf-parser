@@ -24,14 +24,19 @@ pub struct DictionaryParser<'a> {
     // Offset to the last operands start.
     operands_offset: usize,
     // Actual operands.
-    operands: &'a mut [f32],
+    //
+    // While CFF can contain only i32 and f32 values, we have to store operands as f64
+    // since f32 cannot represent the whole i32 range.
+    // Meaning we have a choice of storing operands as f64 or as enum of i32/f32.
+    // In both cases the type size would be 8 bytes, so it's easier to simply use f64.
+    operands: &'a mut [f64],
     // An amount of operands in the `operands` array.
     operands_len: u16,
 }
 
 impl<'a> DictionaryParser<'a> {
     #[inline]
-    pub fn new(data: &'a [u8], operands_buffer: &'a mut [f32]) -> Self {
+    pub fn new(data: &'a [u8], operands_buffer: &'a mut [f64]) -> Self {
         DictionaryParser {
             data,
             offset: 0,
@@ -101,12 +106,12 @@ impl<'a> DictionaryParser<'a> {
     }
 
     #[inline]
-    pub fn operands(&self) -> &[f32] {
+    pub fn operands(&self) -> &[f64] {
         &self.operands[..usize::from(self.operands_len)]
     }
 
     #[inline]
-    pub fn parse_number(&mut self) -> Option<f32> {
+    pub fn parse_number(&mut self) -> Option<f64> {
         self.parse_operands()?;
         self.operands().get(0).cloned()
     }
@@ -150,38 +155,38 @@ pub fn is_dict_one_byte_op(b: u8) -> bool {
 }
 
 // Adobe Technical Note #5177, Table 3 Operand Encoding
-pub fn parse_number(b0: u8, s: &mut Stream) -> Option<f32> {
+pub fn parse_number(b0: u8, s: &mut Stream) -> Option<f64> {
     match b0 {
         28 => {
             let n = i32::from(s.read::<i16>()?);
-            Some(n as f32)
+            Some(f64::from(n))
         }
         29 => {
             let n = s.read::<i32>()?;
-            Some(n as f32)
+            Some(f64::from(n))
         }
         30 => {
             parse_float(s)
         }
         32..=246 => {
             let n = i32::from(b0) - 139;
-            Some(n as f32)
+            Some(f64::from(n))
         }
         247..=250 => {
             let b1 = i32::from(s.read::<u8>()?);
             let n = (i32::from(b0) - 247) * 256 + b1 + 108;
-            Some(n as f32)
+            Some(f64::from(n))
         }
         251..=254 => {
             let b1 = i32::from(s.read::<u8>()?);
             let n = -(i32::from(b0) - 251) * 256 - b1 - 108;
-            Some(n as f32)
+            Some(f64::from(n))
         }
         _ => None,
     }
 }
 
-fn parse_float(s: &mut Stream) -> Option<f32> {
+fn parse_float(s: &mut Stream) -> Option<f64> {
     let mut data = [0u8; FLOAT_STACK_LEN];
     let mut idx = 0;
 

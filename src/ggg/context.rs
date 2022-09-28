@@ -1,5 +1,5 @@
-use crate::parser::{FromData, FromSlice, LazyArray16, LazyOffsetArray16, Stream};
 use super::{ClassDefinition, Coverage, LookupIndex};
+use crate::parser::{FromData, FromSlice, LazyArray16, LazyOffsetArray16, Stream};
 
 /// A [Contextual Lookup Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#seqctxt1).

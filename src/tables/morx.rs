@@ -12,8 +12,8 @@
 
 use core::num::NonZeroU16;
 
+use crate::parser::{FromData, LazyArray32, NumFrom, Offset, Offset32, Stream};
 use crate::{aat, GlyphId};
-use crate::parser::{Stream, FromData, LazyArray32, NumFrom, Offset32, Offset};
 
 /// The feature table is used to compute the sub-feature flags
 /// for a list of requested features and settings.
@@ -43,7 +43,6 @@ impl FromData for Feature {
         })
     }
 }
-
 
 /// A contextual subtable state table trailing data.
 #[derive(Clone, Copy, Debug)]
@@ -114,7 +113,6 @@ impl core::fmt::Debug for ContextualSubtable<'_> {
     }
 }
 
-
 /// A ligature subtable.
 #[derive(Clone, Debug)]
 pub struct LigatureSubtable<'a> {
@@ -153,7 +151,6 @@ impl<'a> LigatureSubtable<'a> {
     }
 }
 
-
 /// A contextual subtable state table trailing data.
 #[derive(Clone, Copy, Debug)]
 pub struct InsertionEntryData {
@@ -176,7 +173,6 @@ impl FromData for InsertionEntryData {
     }
 }
 
-
 /// An insertion subtable.
 #[derive(Clone, Debug)]
 pub struct InsertionSubtable<'a> {
@@ -196,13 +192,9 @@ impl<'a> InsertionSubtable<'a> {
         // The list is unsized.
         let glyphs = LazyArray32::<GlyphId>::new(data.get(offset..)?);
 
-        Some(InsertionSubtable {
-            state,
-            glyphs,
-        })
+        Some(InsertionSubtable { state, glyphs })
     }
 }
-
 
 /// A subtable kind.
 #[allow(missing_docs)]
@@ -215,11 +207,11 @@ pub enum SubtableKind<'a> {
     Insertion(InsertionSubtable<'a>),
 }
 
-
 /// A subtable coverage.
 #[derive(Clone, Copy, Debug)]
 pub struct Coverage(u8);
 
+#[rustfmt::skip]
 impl Coverage {
     /// If true, this subtable will process glyphs in logical order
     /// (or reverse logical order if [`is_vertical`](Self::is_vertical) is also true).
@@ -233,7 +225,6 @@ impl Coverage {
     #[inline] pub fn is_vertical(self) -> bool { self.0 & 0x80 != 0 }
 }
 
-
 /// A subtable in a metamorphosis chain.
 #[derive(Clone, Debug)]
 pub struct Subtable<'a> {
@@ -244,7 +235,6 @@ pub struct Subtable<'a> {
     /// Subtable feature flags.
     pub feature_flags: u32,
 }
-
 
 /// A list of subtables in a metamorphosis chain.
 ///
@@ -277,7 +267,6 @@ impl core::fmt::Debug for Subtables<'_> {
         write!(f, "Subtables {{ ... }}")
     }
 }
-
 
 /// An iterator over a metamorphosis chain subtables.
 #[allow(missing_debug_implementations)]
@@ -327,9 +316,10 @@ impl<'a> Iterator for SubtablesIter<'a> {
                 SubtableKind::Ligature(table)
             }
             // 3 - reserved
-            4 => {
-                SubtableKind::NonContextual(aat::Lookup::parse(self.number_of_glyphs, subtables_data)?)
-            }
+            4 => SubtableKind::NonContextual(aat::Lookup::parse(
+                self.number_of_glyphs,
+                subtables_data,
+            )?),
             5 => {
                 let table = InsertionSubtable::parse(self.number_of_glyphs, subtables_data)?;
                 SubtableKind::Insertion(table)
@@ -345,7 +335,6 @@ impl<'a> Iterator for SubtablesIter<'a> {
     }
 }
 
-
 /// A metamorphosis chain.
 #[derive(Clone, Copy, Debug)]
 pub struct Chain<'a> {
@@ -356,7 +345,6 @@ pub struct Chain<'a> {
     /// A list of chain subtables.
     pub subtables: Subtables<'a>,
 }
-
 
 /// A list of metamorphosis chains.
 ///
@@ -455,7 +443,6 @@ impl<'a> Iterator for ChainsIter<'a> {
         })
     }
 }
-
 
 /// An [Extended Glyph Metamorphosis Table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6morx.html).

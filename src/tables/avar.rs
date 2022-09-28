@@ -3,8 +3,8 @@
 
 use core::convert::TryFrom;
 
+use crate::parser::{FromData, LazyArray16, Stream};
 use crate::NormalizedCoordinate;
-use crate::parser::{Stream, FromData, LazyArray16};
 
 /// An axis value map.
 #[derive(Clone, Copy, Debug)]
@@ -27,7 +27,6 @@ impl FromData for AxisValueMap {
         })
     }
 }
-
 
 /// A list of segment maps.
 ///
@@ -80,7 +79,6 @@ impl<'a> Iterator for SegmentMapsIter<'a> {
         return self.stream.read_array16::<AxisValueMap>(count);
     }
 }
-
 
 /// An [Axis Variations Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/avar).

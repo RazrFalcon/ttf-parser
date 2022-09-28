@@ -14,14 +14,18 @@ fn main() {
         Err(e) => {
             eprint!("Error: {}.", e);
             std::process::exit(1);
-        },
+        }
     };
 
-    let family_name = face.names().into_iter()
+    let family_name = face
+        .names()
+        .into_iter()
         .find(|name| name.name_id == ttf_parser::name_id::FULL_NAME && name.is_unicode())
         .and_then(|name| name.to_string());
 
-    let post_script_name = face.names().into_iter()
+    let post_script_name = face
+        .names()
+        .into_iter()
         .find(|name| name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME && name.is_unicode())
         .and_then(|name| name.to_string());
 
@@ -46,7 +50,8 @@ fn main() {
     println!("Superscript: {:?}", face.superscript_metrics());
     println!("Variable: {:?}", face.is_variable());
 
-    #[cfg(feature = "opentype-layout")] {
+    #[cfg(feature = "opentype-layout")]
+    {
         if let Some(ref table) = face.tables().gpos {
             print_opentype_layout("positioning", table);
         }
@@ -56,12 +61,15 @@ fn main() {
         }
     }
 
-    #[cfg(feature = "variable-fonts")] {
+    #[cfg(feature = "variable-fonts")]
+    {
         if face.is_variable() {
             println!("Variation axes:");
             for axis in face.variation_axes() {
-                println!("  {} {}..{}, default {}",
-                         axis.tag, axis.min_value, axis.max_value, axis.def_value);
+                println!(
+                    "  {} {}..{}, default {}",
+                    axis.tag, axis.min_value, axis.max_value, axis.def_value
+                );
             }
         }
     }

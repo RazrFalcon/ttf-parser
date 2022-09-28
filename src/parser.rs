@@ -3,8 +3,8 @@
 //! This module should not be used directly, unless you're planning to parse
 //! some tables manually.
 
-use core::ops::Range;
 use core::convert::{TryFrom, TryInto};
+use core::ops::Range;
 
 /// A trait for parsing raw binary data of fixed size.
 ///
@@ -117,7 +117,6 @@ impl FromData for U24 {
     }
 }
 
-
 /// A 16-bit signed fixed number with the low 14 bits of fraction (2.14).
 #[derive(Clone, Copy, Debug)]
 pub struct F2DOT14(pub i16);
@@ -139,7 +138,6 @@ impl FromData for F2DOT14 {
     }
 }
 
-
 /// A 32-bit signed fixed-point number (16.16).
 #[derive(Clone, Copy, Debug)]
 pub struct Fixed(pub f32);
@@ -153,7 +151,6 @@ impl FromData for Fixed {
         i32::parse(data).map(|n| Fixed(n as f32 / 65536.0))
     }
 }
-
 
 /// A safe u32 to usize casting.
 ///
@@ -188,7 +185,6 @@ impl NumFrom<char> for usize {
         // compilation error on 16 bit targets
     }
 }
-
 
 /// Just like TryFrom<N>, but for numeric types not supported by the Rust's std.
 pub trait TryNumFrom<T>: Sized {
@@ -238,7 +234,6 @@ impl TryNumFrom<f32> for i32 {
         }
     }
 }
-
 
 /// A slice-like container that converts internal binary data only on access.
 ///
@@ -317,7 +312,8 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
     /// Performs a binary search by specified `key`.
     #[inline]
     pub fn binary_search(&self, key: &T) -> Option<(u16, T)>
-        where T: Ord
+    where
+        T: Ord,
     {
         self.binary_search_by(|p| p.cmp(key))
     }
@@ -325,7 +321,8 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
     /// Performs a binary search using specified closure.
     #[inline]
     pub fn binary_search_by<F>(&self, mut f: F) -> Option<(u16, T)>
-        where F: FnMut(&T) -> core::cmp::Ordering
+    where
+        F: FnMut(&T) -> core::cmp::Ordering,
     {
         // Based on Rust std implementation.
 
@@ -350,7 +347,11 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
 
         // base is always in [0, size) because base <= mid.
         let value = self.get(base)?;
-        if f(&value) == Ordering::Equal { Some((base, value)) } else { None }
+        if f(&value) == Ordering::Equal {
+            Some((base, value))
+        } else {
+            None
+        }
     }
 }
 
@@ -372,7 +373,6 @@ impl<'a, T: FromData> IntoIterator for LazyArray16<'a, T> {
         }
     }
 }
-
 
 /// An iterator over `LazyArray16`.
 #[derive(Clone, Copy)]
@@ -406,7 +406,6 @@ impl<'a, T: FromData> Iterator for LazyArrayIter16<'a, T> {
         usize::from(self.data.len().checked_sub(self.index).unwrap_or(0))
     }
 }
-
 
 /// A slice-like container that converts internal binary data only on access.
 ///
@@ -458,7 +457,8 @@ impl<'a, T: FromData> LazyArray32<'a, T> {
     /// Performs a binary search by specified `key`.
     #[inline]
     pub fn binary_search(&self, key: &T) -> Option<(u32, T)>
-        where T: Ord
+    where
+        T: Ord,
     {
         self.binary_search_by(|p| p.cmp(key))
     }
@@ -466,7 +466,8 @@ impl<'a, T: FromData> LazyArray32<'a, T> {
     /// Performs a binary search using specified closure.
     #[inline]
     pub fn binary_search_by<F>(&self, mut f: F) -> Option<(u32, T)>
-        where F: FnMut(&T) -> core::cmp::Ordering
+    where
+        F: FnMut(&T) -> core::cmp::Ordering,
     {
         // Based on Rust std implementation.
 
@@ -491,7 +492,11 @@ impl<'a, T: FromData> LazyArray32<'a, T> {
 
         // base is always in [0, size) because base <= mid.
         let value = self.get(base)?;
-        if f(&value) == Ordering::Equal { Some((base, value)) } else { None }
+        if f(&value) == Ordering::Equal {
+            Some((base, value))
+        } else {
+            None
+        }
     }
 }
 
@@ -513,7 +518,6 @@ impl<'a, T: FromData> IntoIterator for LazyArray32<'a, T> {
         }
     }
 }
-
 
 /// An iterator over `LazyArray32`.
 #[derive(Clone, Copy)]
@@ -538,7 +542,6 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
     }
 }
 
-
 /// A [`LazyArray16`]-like container, but data is accessed by offsets.
 ///
 /// Unlike [`LazyArray16`], internal storage is not continuous.
@@ -556,7 +559,11 @@ impl<'a, T: FromSlice<'a>> LazyOffsetArray16<'a, T> {
     /// Creates a new `LazyOffsetArray16`.
     #[allow(dead_code)]
     pub fn new(data: &'a [u8], offsets: LazyArray16<'a, Option<Offset16>>) -> Self {
-        Self { data, offsets, data_type: core::marker::PhantomData }
+        Self {
+            data,
+            offsets,
+            data_type: core::marker::PhantomData,
+        }
     }
 
     /// Parses `LazyOffsetArray16` from raw data.
@@ -565,7 +572,11 @@ impl<'a, T: FromSlice<'a>> LazyOffsetArray16<'a, T> {
         let mut s = Stream::new(data);
         let count = s.read::<u16>()?;
         let offsets = s.read_array16(count)?;
-        Some(Self { data, offsets, data_type: core::marker::PhantomData })
+        Some(Self {
+            data,
+            offsets,
+            data_type: core::marker::PhantomData,
+        })
     }
 
     /// Returns a value at `index`.
@@ -633,7 +644,6 @@ impl<'a, T: FromSlice<'a>> Iterator for LazyOffsetArrayIter16<'a, T> {
         usize::from(self.array.len().checked_sub(self.index).unwrap_or(0))
     }
 }
-
 
 /// A streaming binary parser.
 #[derive(Clone, Copy, Default, Debug)]
@@ -774,16 +784,16 @@ impl<'a> Stream<'a> {
     }
 }
 
-
 /// A common offset methods.
 pub trait Offset {
     /// Converts the offset to `usize`.
     fn to_usize(&self) -> usize;
 
     /// Checks that offset is null.
-    fn is_null(&self) -> bool { self.to_usize() == 0 }
+    fn is_null(&self) -> bool {
+        self.to_usize() == 0
+    }
 }
-
 
 /// A type-safe u16 offset.
 #[derive(Clone, Copy, Debug)]
@@ -811,10 +821,13 @@ impl FromData for Option<Offset16> {
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let offset = Offset16::parse(data)?;
-        if offset.0 != 0 { Some(Some(offset)) } else { Some(None) }
+        if offset.0 != 0 {
+            Some(Some(offset))
+        } else {
+            Some(None)
+        }
     }
 }
-
 
 /// A type-safe u32 offset.
 #[derive(Clone, Copy, Debug)]
@@ -836,17 +849,19 @@ impl FromData for Offset32 {
     }
 }
 
-
 impl FromData for Option<Offset32> {
     const SIZE: usize = Offset32::SIZE;
 
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let offset = Offset32::parse(data)?;
-        if offset.0 != 0 { Some(Some(offset)) } else { Some(None) }
+        if offset.0 != 0 {
+            Some(Some(offset))
+        } else {
+            Some(None)
+        }
     }
 }
-
 
 #[inline]
 pub(crate) fn i16_bound(min: i16, val: i16, max: i16) -> i16 {

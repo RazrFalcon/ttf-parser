@@ -1,9 +1,10 @@
-use crate::parser::{Stream, FromData, LazyArray16};
-use crate::GlyphId;
 use super::charset::Charset;
 use super::StringId;
+use crate::parser::{FromData, LazyArray16, Stream};
+use crate::GlyphId;
 
 /// The Standard Encoding as defined in the Adobe Technical Note #5176 Appendix B.
+#[rustfmt::skip]
 pub const STANDARD_ENCODING: [u8; 256] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -22,7 +23,6 @@ pub const STANDARD_ENCODING: [u8; 256] = [
       0, 138,   0, 139,   0,   0,   0,   0, 140, 141, 142, 143,   0,   0,   0,   0,
       0, 144,   0,   0,   0, 145,   0,   0, 146, 147, 148, 149,   0,   0,   0,   0,
 ];
-
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Format1Range {
@@ -43,7 +43,6 @@ impl FromData for Format1Range {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Supplement {
     code: u8,
@@ -62,7 +61,6 @@ impl FromData for Supplement {
         })
     }
 }
-
 
 #[derive(Clone, Copy, Default, Debug)]
 pub(crate) struct Encoding<'a> {
@@ -122,7 +120,11 @@ impl Encoding<'_> {
             }
             EncodingKind::Format0(ref table) => {
                 // +1 because .notdef is implicit.
-                table.into_iter().position(|c| c == code).map(|i| (i + 1) as u16).map(GlyphId)
+                table
+                    .into_iter()
+                    .position(|c| c == code)
+                    .map(|i| (i + 1) as u16)
+                    .map(GlyphId)
             }
             EncodingKind::Format1(ref table) => {
                 // Starts from 1 because .notdef is implicit.
@@ -154,7 +156,9 @@ pub(crate) fn parse_encoding<'a>(s: &mut Stream<'a>) -> Option<Encoding<'a>> {
     let kind = match format {
         // TODO: read_array8?
         0 => s.read_array16::<u8>(count).map(EncodingKind::Format0)?,
-        1 => s.read_array16::<Format1Range>(count).map(EncodingKind::Format1)?,
+        1 => s
+            .read_array16::<Format1Range>(count)
+            .map(EncodingKind::Format1)?,
         _ => return None,
     };
 
@@ -165,8 +169,5 @@ pub(crate) fn parse_encoding<'a>(s: &mut Stream<'a>) -> Option<Encoding<'a>> {
         LazyArray16::default()
     };
 
-    Some(Encoding {
-        kind,
-        supplemental,
-    })
+    Some(Encoding { kind, supplemental })
 }

@@ -1,18 +1,19 @@
-pub mod cff1;
-#[cfg(feature = "variable-fonts")] pub mod cff2;
 mod argstack;
+pub mod cff1;
+#[cfg(feature = "variable-fonts")]
+pub mod cff2;
 mod charset;
 mod charstring;
 mod dict;
 mod encoding;
 mod index;
-#[cfg(feature = "glyph-names")] mod std_names;
+#[cfg(feature = "glyph-names")]
+mod std_names;
 
 use core::convert::TryFrom;
 
-use crate::{OutlineBuilder, BBox};
 use crate::parser::{FromData, TryNumFrom};
-
+use crate::{BBox, OutlineBuilder};
 
 /// A list of errors that can occur during a CFF glyph outlining.
 #[allow(missing_docs)]
@@ -33,11 +34,13 @@ pub enum CFFError {
     InvalidSubroutineIndex,
     NoLocalSubroutines,
     InvalidSeacCode,
-    #[cfg(feature = "variable-fonts")] InvalidItemVariationDataIndex,
-    #[cfg(feature = "variable-fonts")] InvalidNumberOfBlendOperands,
-    #[cfg(feature = "variable-fonts")] BlendRegionsLimitReached,
+    #[cfg(feature = "variable-fonts")]
+    InvalidItemVariationDataIndex,
+    #[cfg(feature = "variable-fonts")]
+    InvalidNumberOfBlendOperands,
+    #[cfg(feature = "variable-fonts")]
+    BlendRegionsLimitReached,
 }
-
 
 pub(crate) struct Builder<'a> {
     builder: &'a mut dyn OutlineBuilder,
@@ -71,7 +74,6 @@ impl<'a> Builder<'a> {
     }
 }
 
-
 /// A type-safe wrapper for string ID.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
 pub struct StringId(u16);
@@ -85,7 +87,6 @@ impl FromData for StringId {
     }
 }
 
-
 pub trait IsEven {
     fn is_even(&self) -> bool;
     fn is_odd(&self) -> bool;
@@ -93,12 +94,15 @@ pub trait IsEven {
 
 impl IsEven for usize {
     #[inline]
-    fn is_even(&self) -> bool { (*self) & 1 == 0 }
+    fn is_even(&self) -> bool {
+        (*self) & 1 == 0
+    }
 
     #[inline]
-    fn is_odd(&self) -> bool { !self.is_even() }
+    fn is_odd(&self) -> bool {
+        !self.is_even()
+    }
 }
-
 
 #[cfg(feature = "std")]
 #[inline]
@@ -109,9 +113,12 @@ pub fn f32_abs(n: f32) -> f32 {
 #[cfg(not(feature = "std"))]
 #[inline]
 pub fn f32_abs(n: f32) -> f32 {
-    if n.is_sign_negative() { -n } else { n }
+    if n.is_sign_negative() {
+        -n
+    } else {
+        n
+    }
 }
-
 
 #[inline]
 pub fn conv_subroutine_index(index: f32, bias: u16) -> Result<u32, CFFError> {

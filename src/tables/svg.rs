@@ -1,7 +1,7 @@
 //! An [SVG Table](https://docs.microsoft.com/en-us/typography/opentype/spec/svg) implementation.
 
-use crate::GlyphId;
 use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset32, Stream};
+use crate::GlyphId;
 
 #[derive(Clone, Copy)]
 struct SvgDocumentRecord {
@@ -26,7 +26,6 @@ impl FromData for SvgDocumentRecord {
     }
 }
 
-
 /// A list of [SVG documents](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/svg#svg-document-list).
 #[derive(Clone, Copy)]
@@ -43,13 +42,16 @@ impl<'a> SvgDocumentsList<'a> {
     pub fn get(&self, index: u16) -> Option<&'a [u8]> {
         let record = self.records.get(index)?;
         let offset = record.svg_doc_offset?.to_usize();
-        self.data.get(offset..offset + usize::num_from(record.svg_doc_length))
+        self.data
+            .get(offset..offset + usize::num_from(record.svg_doc_length))
     }
 
     /// Returns a SVG document data by glyph ID.
     #[inline]
     pub fn find(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
-        let index = self.records.into_iter()
+        let index = self
+            .records
+            .into_iter()
             .position(|v| (v.start_glyph_id..=v.end_glyph_id).contains(&glyph_id))?;
         self.get(index as u16)
     }
@@ -66,7 +68,7 @@ impl core::fmt::Debug for SvgDocumentsList<'_> {
     }
 }
 
-impl<'a> IntoIterator for SvgDocumentsList<'a,> {
+impl<'a> IntoIterator for SvgDocumentsList<'a> {
     type Item = &'a [u8];
     type IntoIter = SvgDocumentsListIter<'a>;
 
@@ -78,7 +80,6 @@ impl<'a> IntoIterator for SvgDocumentsList<'a,> {
         }
     }
 }
-
 
 /// An iterator over [`SvgDocumentsList`] values.
 #[derive(Clone, Copy)]
@@ -107,7 +108,6 @@ impl<'a> Iterator for SvgDocumentsListIter<'a> {
     }
 }
 
-
 /// An [SVG Table](https://docs.microsoft.com/en-us/typography/opentype/spec/svg).
 #[derive(Clone, Copy, Debug)]
 pub struct Table<'a> {
@@ -130,7 +130,7 @@ impl<'a> Table<'a> {
             documents: SvgDocumentsList {
                 data: &data[doc_list_offset.0 as usize..],
                 records,
-            }
+            },
         })
     }
 }

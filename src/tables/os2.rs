@@ -1,8 +1,8 @@
 //! A [OS/2 and Windows Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/os2)
 //! implementation.
 
-use crate::LineMetrics;
 use crate::parser::Stream;
+use crate::LineMetrics;
 
 const WEIGHT_CLASS_OFFSET: usize = 4;
 const WIDTH_CLASS_OFFSET: usize = 6;
@@ -40,16 +40,16 @@ impl Weight {
     #[inline]
     pub fn to_number(self) -> u16 {
         match self {
-            Weight::Thin        => 100,
-            Weight::ExtraLight  => 200,
-            Weight::Light       => 300,
-            Weight::Normal      => 400,
-            Weight::Medium      => 500,
-            Weight::SemiBold    => 600,
-            Weight::Bold        => 700,
-            Weight::ExtraBold   => 800,
-            Weight::Black       => 900,
-            Weight::Other(n)    => n,
+            Weight::Thin => 100,
+            Weight::ExtraLight => 200,
+            Weight::Light => 300,
+            Weight::Normal => 400,
+            Weight::Medium => 500,
+            Weight::SemiBold => 600,
+            Weight::Bold => 700,
+            Weight::ExtraBold => 800,
+            Weight::Black => 900,
+            Weight::Other(n) => n,
         }
     }
 }
@@ -67,7 +67,7 @@ impl From<u16> for Weight {
             700 => Weight::Bold,
             800 => Weight::ExtraBold,
             900 => Weight::Black,
-            _   => Weight::Other(value),
+            _ => Weight::Other(value),
         }
     }
 }
@@ -78,7 +78,6 @@ impl Default for Weight {
         Weight::Normal
     }
 }
-
 
 /// A face [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
 #[allow(missing_docs)]
@@ -100,15 +99,15 @@ impl Width {
     #[inline]
     pub fn to_number(self) -> u16 {
         match self {
-            Width::UltraCondensed   => 1,
-            Width::ExtraCondensed   => 2,
-            Width::Condensed        => 3,
-            Width::SemiCondensed    => 4,
-            Width::Normal           => 5,
-            Width::SemiExpanded     => 6,
-            Width::Expanded         => 7,
-            Width::ExtraExpanded    => 8,
-            Width::UltraExpanded    => 9,
+            Width::UltraCondensed => 1,
+            Width::ExtraCondensed => 2,
+            Width::Condensed => 3,
+            Width::SemiCondensed => 4,
+            Width::Normal => 5,
+            Width::SemiExpanded => 6,
+            Width::Expanded => 7,
+            Width::ExtraExpanded => 8,
+            Width::UltraExpanded => 9,
         }
     }
 }
@@ -119,7 +118,6 @@ impl Default for Width {
         Width::Normal
     }
 }
-
 
 /// A face style.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
@@ -139,7 +137,6 @@ impl Default for Style {
     }
 }
 
-
 /// A script metrics used by subscript and superscript.
 #[repr(C)]
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
@@ -157,11 +154,11 @@ pub struct ScriptMetrics {
     pub y_offset: i16,
 }
 
-
 // https://docs.microsoft.com/en-us/typography/opentype/spec/os2#fsselection
 #[derive(Clone, Copy)]
 struct SelectionFlags(u16);
 
+#[rustfmt::skip]
 impl SelectionFlags {
     #[inline] fn italic(self) -> bool { self.0 & (1 << 0) != 0 }
     #[inline] fn bold(self) -> bool { self.0 & (1 << 5) != 0 }
@@ -169,7 +166,6 @@ impl SelectionFlags {
     #[inline] fn use_typo_metrics(self) -> bool { self.0 & (1 << 7) != 0 }
     #[inline] fn oblique(self) -> bool { self.0 & (1 << 9) != 0 }
 }
-
 
 /// A [OS/2 and Windows Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/os2).
 #[derive(Clone, Copy)]

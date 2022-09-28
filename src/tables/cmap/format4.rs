@@ -77,7 +77,8 @@ impl<'a> Subtable4<'a> {
                     let delta = (u32::from(code_point) - u32::from(start_value)) * 2;
                     let delta = u16::try_from(delta).ok()?;
 
-                    let id_range_offset_pos = (self.id_range_offset_pos + usize::from(index) * 2) as u16;
+                    let id_range_offset_pos =
+                        (self.id_range_offset_pos + usize::from(index) * 2) as u16;
                     let pos = id_range_offset_pos.wrapping_add(delta);
                     let pos = pos.wrapping_add(id_range_offset);
 

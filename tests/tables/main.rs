@@ -1,15 +1,15 @@
-mod aat;
-mod ankr;
-mod cff1;
-mod cmap;
-mod feat;
-mod glyf;
-mod hmtx;
-mod maxp;
-mod sbix;
-mod trak;
+#[rustfmt::skip] mod aat;
+#[rustfmt::skip] mod ankr;
+#[rustfmt::skip] mod cff1;
+#[rustfmt::skip] mod cmap;
+#[rustfmt::skip] mod feat;
+#[rustfmt::skip] mod glyf;
+#[rustfmt::skip] mod hmtx;
+#[rustfmt::skip] mod maxp;
+#[rustfmt::skip] mod sbix;
+#[rustfmt::skip] mod trak;
 
-use ttf_parser::{Face, FaceParsingError, fonts_in_collection};
+use ttf_parser::{fonts_in_collection, Face, FaceParsingError};
 
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
@@ -62,11 +62,12 @@ fn convert_unit(unit: Unit, data: &mut Vec<u8>) {
     }
 }
 
-
 #[test]
 fn empty_font() {
-    assert_eq!(Face::parse(&[], 0).unwrap_err(),
-               FaceParsingError::UnknownMagic);
+    assert_eq!(
+        Face::parse(&[], 0).unwrap_err(),
+        FaceParsingError::UnknownMagic
+    );
 }
 
 #[test]
@@ -74,14 +75,16 @@ fn zero_tables() {
     use Unit::*;
     let data = convert(&[
         Raw(&[0x00, 0x01, 0x00, 0x00]), // magic
-        UInt16(0), // numTables
-        UInt16(0), // searchRange
-        UInt16(0), // entrySelector
-        UInt16(0), // rangeShift
+        UInt16(0),                      // numTables
+        UInt16(0),                      // searchRange
+        UInt16(0),                      // entrySelector
+        UInt16(0),                      // rangeShift
     ]);
 
-    assert_eq!(Face::parse(&data, 0).unwrap_err(),
-               FaceParsingError::NoHeadTable);
+    assert_eq!(
+        Face::parse(&data, 0).unwrap_err(),
+        FaceParsingError::NoHeadTable
+    );
 }
 
 #[test]
@@ -89,14 +92,16 @@ fn tables_count_overflow() {
     use Unit::*;
     let data = convert(&[
         Raw(&[0x00, 0x01, 0x00, 0x00]), // magic
-        UInt16(std::u16::MAX), // numTables
-        UInt16(0), // searchRange
-        UInt16(0), // entrySelector
-        UInt16(0), // rangeShift
+        UInt16(std::u16::MAX),          // numTables
+        UInt16(0),                      // searchRange
+        UInt16(0),                      // entrySelector
+        UInt16(0),                      // rangeShift
     ]);
 
-    assert_eq!(Face::parse(&data, 0).unwrap_err(),
-               FaceParsingError::MalformedFont);
+    assert_eq!(
+        Face::parse(&data, 0).unwrap_err(),
+        FaceParsingError::MalformedFont
+    );
 }
 
 #[test]
@@ -104,14 +109,16 @@ fn empty_font_collection() {
     use Unit::*;
     let data = convert(&[
         Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
-        UInt16(0), // majorVersion
-        UInt16(0), // minorVersion
-        UInt32(0), // numFonts
+        UInt16(0),                      // majorVersion
+        UInt16(0),                      // minorVersion
+        UInt32(0),                      // numFonts
     ]);
 
     assert_eq!(fonts_in_collection(&data), Some(0));
-    assert_eq!(Face::parse(&data, 0).unwrap_err(),
-               FaceParsingError::FaceIndexOutOfBounds);
+    assert_eq!(
+        Face::parse(&data, 0).unwrap_err(),
+        FaceParsingError::FaceIndexOutOfBounds
+    );
 }
 
 #[test]
@@ -119,14 +126,16 @@ fn font_collection_num_fonts_overflow() {
     use Unit::*;
     let data = convert(&[
         Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
-        UInt16(0), // majorVersion
-        UInt16(0), // minorVersion
-        UInt32(std::u32::MAX), // numFonts
+        UInt16(0),                      // majorVersion
+        UInt16(0),                      // minorVersion
+        UInt32(std::u32::MAX),          // numFonts
     ]);
 
     assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
-    assert_eq!(Face::parse(&data, 0).unwrap_err(),
-               FaceParsingError::MalformedFont);
+    assert_eq!(
+        Face::parse(&data, 0).unwrap_err(),
+        FaceParsingError::MalformedFont
+    );
 }
 
 #[test]
@@ -134,13 +143,15 @@ fn font_index_overflow() {
     use Unit::*;
     let data = convert(&[
         Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
-        UInt16(0), // majorVersion
-        UInt16(0), // minorVersion
-        UInt32(1), // numFonts
-        UInt32(12), // offset [0]
+        UInt16(0),                      // majorVersion
+        UInt16(0),                      // minorVersion
+        UInt32(1),                      // numFonts
+        UInt32(12),                     // offset [0]
     ]);
 
     assert_eq!(fonts_in_collection(&data), Some(1));
-    assert_eq!(Face::parse(&data, std::u32::MAX).unwrap_err(),
-               FaceParsingError::FaceIndexOutOfBounds);
+    assert_eq!(
+        Face::parse(&data, std::u32::MAX).unwrap_err(),
+        FaceParsingError::FaceIndexOutOfBounds
+    );
 }

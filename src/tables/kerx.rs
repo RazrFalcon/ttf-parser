@@ -7,9 +7,9 @@
 
 use core::num::NonZeroU16;
 
-use crate::{aat, GlyphId};
 use crate::kern::KerningPair;
-use crate::parser::{Stream, FromData, NumFrom, Offset32, Offset, LazyArray32};
+use crate::parser::{FromData, LazyArray32, NumFrom, Offset, Offset32, Stream};
+use crate::{aat, GlyphId};
 
 const HEADER_SIZE: usize = 12;
 
@@ -38,10 +38,11 @@ impl<'a> Subtable0<'a> {
     #[inline]
     pub fn glyphs_kerning(&self, left: GlyphId, right: GlyphId) -> Option<i16> {
         let needle = u32::from(left.0) << 16 | u32::from(right.0);
-        self.pairs.binary_search_by(|v| v.pair.cmp(&needle)).map(|(_, v)| v.value)
+        self.pairs
+            .binary_search_by(|v| v.pair.cmp(&needle))
+            .map(|(_, v)| v.value)
     }
 }
-
 
 /// A state machine entry.
 #[derive(Clone, Copy, Debug)]
@@ -111,7 +112,6 @@ impl core::fmt::Debug for Subtable1<'_> {
     }
 }
 
-
 /// A format 2 subtable.
 ///
 /// Simple n x m Array of Kerning Values.
@@ -136,8 +136,10 @@ impl<'a> Subtable2<'a> {
         // adding the class values to the address of the subtable,
         // and fetching the kerning value to which the new address points.'
 
-        let left_class = crate::kern::get_format2_class(left.0, left_hand_table_offset, self.0).unwrap_or(0);
-        let right_class = crate::kern::get_format2_class(right.0, right_hand_table_offset, self.0).unwrap_or(0);
+        let left_class =
+            crate::kern::get_format2_class(left.0, left_hand_table_offset, self.0).unwrap_or(0);
+        let right_class =
+            crate::kern::get_format2_class(right.0, right_hand_table_offset, self.0).unwrap_or(0);
 
         // 'Values within the left-hand offset table should not be less than the kerning array offset.'
         if usize::from(left_class) < array_offset {
@@ -156,7 +158,6 @@ impl core::fmt::Debug for Subtable2<'_> {
         write!(f, "Subtable2 {{ ... }}")
     }
 }
-
 
 /// A container of Anchor Points used by [`Subtable4`].
 #[derive(Clone, Copy)]
@@ -226,12 +227,11 @@ impl core::fmt::Debug for Subtable4<'_> {
     }
 }
 
-
 /// A format 6 subtable.
 ///
 /// Simple Index-based n x m Array of Kerning Values.
 #[derive(Clone, Copy)]
-pub struct Subtable6<'a>{
+pub struct Subtable6<'a> {
     data: &'a [u8],
     number_of_glyphs: NonZeroU16,
 }
@@ -239,7 +239,10 @@ pub struct Subtable6<'a>{
 impl<'a> Subtable6<'a> {
     // TODO: parse actual structure
     fn parse(number_of_glyphs: NonZeroU16, data: &'a [u8]) -> Self {
-        Subtable6 { number_of_glyphs, data }
+        Subtable6 {
+            number_of_glyphs,
+            data,
+        }
     }
 
     /// Returns kerning for a pair of glyphs.
@@ -250,9 +253,10 @@ impl<'a> Subtable6<'a> {
         let flags = s.read::<u32>()?;
         s.skip::<u16>(); // row_count
         s.skip::<u16>(); // col_count
-        // All offsets are from the start of the subtable.
+                         // All offsets are from the start of the subtable.
         let row_index_table_offset = s.read::<Offset32>()?.to_usize().checked_sub(HEADER_SIZE)?;
-        let column_index_table_offset = s.read::<Offset32>()?.to_usize().checked_sub(HEADER_SIZE)?;
+        let column_index_table_offset =
+            s.read::<Offset32>()?.to_usize().checked_sub(HEADER_SIZE)?;
         let kerning_array_offset = s.read::<Offset32>()?.to_usize().checked_sub(HEADER_SIZE)?;
         let kerning_vector_offset = s.read::<Offset32>()?.to_usize().checked_sub(HEADER_SIZE)?;
 
@@ -264,10 +268,12 @@ impl<'a> Subtable6<'a> {
         let has_long_values = flags & 0x00000001 != 0;
         if has_long_values {
             let l: u32 = aat::Lookup::parse(self.number_of_glyphs, row_index_table_data)?
-                .value(left).unwrap_or(0) as u32;
+                .value(left)
+                .unwrap_or(0) as u32;
 
             let r: u32 = aat::Lookup::parse(self.number_of_glyphs, column_index_table_data)?
-                .value(right).unwrap_or(0) as u32;
+                .value(right)
+                .unwrap_or(0) as u32;
 
             let array_offset = usize::try_from(l + r).ok()?.checked_mul(i32::SIZE)?;
             let vector_offset: u32 = Stream::read_at(kerning_array_data, array_offset)?;
@@ -275,10 +281,12 @@ impl<'a> Subtable6<'a> {
             Stream::read_at(kerning_vector_data, usize::num_from(vector_offset))
         } else {
             let l: u16 = aat::Lookup::parse(self.number_of_glyphs, row_index_table_data)?
-                .value(left).unwrap_or(0);
+                .value(left)
+                .unwrap_or(0);
 
             let r: u16 = aat::Lookup::parse(self.number_of_glyphs, column_index_table_data)?
-                .value(right).unwrap_or(0);
+                .value(right)
+                .unwrap_or(0);
 
             let array_offset = usize::try_from(l + r).ok()?.checked_mul(i16::SIZE)?;
             let vector_offset: u16 = Stream::read_at(kerning_array_data, array_offset)?;
@@ -293,7 +301,6 @@ impl core::fmt::Debug for Subtable6<'_> {
         write!(f, "Subtable6 {{ ... }}")
     }
 }
-
 
 /// An extended kerning subtable format.
 #[allow(missing_docs)]
@@ -343,17 +350,16 @@ impl<'a> Subtable<'a> {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 struct Coverage(u8);
 
+#[rustfmt::skip]
 impl Coverage {
     // TODO: use hex
     #[inline] pub fn is_horizontal(self) -> bool { self.0 & (1 << 7) == 0 }
     #[inline] pub fn has_cross_stream(self) -> bool { self.0 & (1 << 6) != 0 }
     #[inline] pub fn is_variable(self) -> bool { self.0 & (1 << 5) != 0 }
 }
-
 
 /// A list of extended kerning subtables.
 ///
@@ -450,7 +456,6 @@ impl<'a> Iterator for SubtablesIter<'a> {
         })
     }
 }
-
 
 /// An [Extended Kerning Table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6kerx.html).

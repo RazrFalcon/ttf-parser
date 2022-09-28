@@ -1,9 +1,9 @@
 //! A [Metrics Variations Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/mvar) implementation.
 
-use crate::{Tag, NormalizedCoordinate};
-use crate::parser::{Stream, FromData, Offset, Offset16, LazyArray16};
+use crate::parser::{FromData, LazyArray16, Offset, Offset16, Stream};
 use crate::var_store::ItemVariationStore;
+use crate::{NormalizedCoordinate, Tag};
 
 #[derive(Clone, Copy)]
 struct ValueRecord {
@@ -25,7 +25,6 @@ impl FromData for ValueRecord {
         })
     }
 }
-
 
 /// A [Metrics Variations Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/mvar).
@@ -73,7 +72,7 @@ impl<'a> Table<'a> {
         self.variation_store.parse_delta(
             record.delta_set_outer_index,
             record.delta_set_inner_index,
-            coordinates
+            coordinates,
         )
     }
 }

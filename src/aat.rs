@@ -6,8 +6,8 @@ related types.
 
 use core::num::NonZeroU16;
 
+use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset16, Offset32, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16, Offset, Offset16, Offset32, NumFrom};
 
 /// Predefined states.
 pub mod state {
@@ -188,9 +188,9 @@ impl<'a> StateTable<'a> {
             class = class::OUT_OF_BOUNDS as u8;
         }
 
-        let entry_idx = self.state_array.get(
-            usize::from(state) * usize::from(self.number_of_classes) + usize::from(class)
-        )?;
+        let entry_idx = self
+            .state_array
+            .get(usize::from(state) * usize::from(self.number_of_classes) + usize::from(class))?;
 
         Stream::read_at(self.entry_table, usize::from(*entry_idx) * StateEntry::SIZE)
     }
@@ -217,7 +217,6 @@ impl core::fmt::Debug for StateTable<'_> {
         write!(f, "StateTable {{ ... }}")
     }
 }
-
 
 /// An [Extended State Table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).
@@ -283,7 +282,10 @@ impl<'a, T: FromData> ExtendedStateTable<'a, T> {
             usize::from(state) * usize::num_from(self.number_of_classes) + usize::from(class);
 
         let entry_idx: u16 = Stream::read_at(self.state_array, state_idx * u16::SIZE)?;
-        Stream::read_at(self.entry_table, usize::from(entry_idx) * GenericStateEntry::<T>::SIZE)
+        Stream::read_at(
+            self.entry_table,
+            usize::from(entry_idx) * GenericStateEntry::<T>::SIZE,
+        )
     }
 }
 
@@ -292,7 +294,6 @@ impl<T> core::fmt::Debug for ExtendedStateTable<'_, T> {
         write!(f, "ExtendedStateTable {{ ... }}")
     }
 }
-
 
 /// A [lookup table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6Tables.html).
@@ -326,7 +327,6 @@ impl core::fmt::Debug for Lookup<'_> {
     }
 }
 
-
 #[derive(Clone)]
 enum LookupInner<'a> {
     Format1(LazyArray16<'a, u16>),
@@ -335,7 +335,7 @@ enum LookupInner<'a> {
     Format6(BinarySearchTable<'a, LookupSingle>),
     Format8 {
         first_glyph: u16,
-        values: LazyArray16<'a, u16>
+        values: LazyArray16<'a, u16>,
     },
     Format10 {
         value_size: u16,
@@ -370,28 +370,30 @@ impl<'a> LookupInner<'a> {
                 let first_glyph = s.read::<u16>()?;
                 let glyph_count = s.read::<u16>()?;
                 let values = s.read_array16::<u16>(glyph_count)?;
-                Some(Self::Format8 { first_glyph, values })
+                Some(Self::Format8 {
+                    first_glyph,
+                    values,
+                })
             }
             10 => {
                 let value_size = s.read::<u16>()?;
                 let first_glyph = s.read::<u16>()?;
                 let glyph_count = s.read::<u16>()?;
-                Some(Self::Format10 { value_size, first_glyph, glyph_count, data: s.tail()? })
+                Some(Self::Format10 {
+                    value_size,
+                    first_glyph,
+                    glyph_count,
+                    data: s.tail()?,
+                })
             }
-            _ => {
-                None
-            }
+            _ => None,
         }
     }
 
     fn value(&self, glyph_id: GlyphId) -> Option<u16> {
         match self {
-            Self::Format1(values) => {
-                values.get(glyph_id.0)
-            }
-            Self::Format2(ref bsearch) => {
-                bsearch.get(glyph_id).map(|v| v.value)
-            }
+            Self::Format1(values) => values.get(glyph_id.0),
+            Self::Format2(ref bsearch) => bsearch.get(glyph_id).map(|v| v.value),
             Self::Format4(ref bsearch, data) => {
                 // In format 4, LookupSegment contains an offset to a list of u16 values.
                 // One value for each glyph in the LookupSegment range.
@@ -400,21 +402,30 @@ impl<'a> LookupInner<'a> {
                 let offset = usize::from(segment.value) + u16::SIZE * usize::from(index);
                 Stream::read_at::<u16>(data, offset)
             }
-            Self::Format6(ref bsearch) => {
-                bsearch.get(glyph_id).map(|v| v.value)
-            }
-            Self::Format8 { first_glyph, values } => {
+            Self::Format6(ref bsearch) => bsearch.get(glyph_id).map(|v| v.value),
+            Self::Format8 {
+                first_glyph,
+                values,
+            } => {
                 let idx = glyph_id.0.checked_sub(*first_glyph)?;
                 values.get(idx)
             }
-            Self::Format10 { value_size, first_glyph, glyph_count, data } => {
+            Self::Format10 {
+                value_size,
+                first_glyph,
+                glyph_count,
+                data,
+            } => {
                 let idx = glyph_id.0.checked_sub(*first_glyph)?;
                 let mut s = Stream::new(data);
                 match value_size {
                     1 => s.read_array16::<u8>(*glyph_count)?.get(idx).map(u16::from),
                     2 => s.read_array16::<u16>(*glyph_count)?.get(idx),
                     // TODO: we should return u32 here, but this is not supported yet
-                    4 => s.read_array16::<u32>(*glyph_count)?.get(idx).map(|n| n as u16),
+                    4 => s
+                        .read_array16::<u32>(*glyph_count)?
+                        .get(idx)
+                        .map(|n| n as u16),
                     _ => None, // 8 is also supported
                 }
             }
@@ -468,9 +479,9 @@ impl<'a, T: BinarySearchValue + core::fmt::Debug> BinarySearchTable<'a, T> {
             let mid = (min + max) / 2;
             let v = self.values.get(mid as u16)?;
             match v.contains(key) {
-                core::cmp::Ordering::Less    => max = mid - 1,
+                core::cmp::Ordering::Less => max = mid - 1,
                 core::cmp::Ordering::Greater => min = mid + 1,
-                core::cmp::Ordering::Equal   => return Some(v),
+                core::cmp::Ordering::Equal => return Some(v),
             }
         }
 
@@ -478,12 +489,10 @@ impl<'a, T: BinarySearchValue + core::fmt::Debug> BinarySearchTable<'a, T> {
     }
 }
 
-
 trait BinarySearchValue: FromData {
     fn is_termination(&self) -> bool;
     fn contains(&self, glyph_id: GlyphId) -> core::cmp::Ordering;
 }
-
 
 #[derive(Clone, Copy, Debug)]
 struct LookupSegment {
@@ -523,7 +532,6 @@ impl BinarySearchValue for LookupSegment {
         }
     }
 }
-
 
 #[derive(Clone, Copy, Debug)]
 struct LookupSingle {

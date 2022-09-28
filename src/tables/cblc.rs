@@ -1,8 +1,8 @@
 //! A [Color Bitmap Location Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/cblc) implementation.
 
+use crate::parser::{FromData, NumFrom, Offset, Offset16, Offset32, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, Offset, Offset16, Offset32, NumFrom};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum BitmapFormat {
@@ -58,7 +58,9 @@ fn select_bitmap_size_table(
         }
 
         // Select a best matching subtable based on `pixels_per_em`.
-        if (pixels_per_em <= ppem && ppem < max_ppem) || (pixels_per_em > max_ppem && ppem > max_ppem) {
+        if (pixels_per_em <= ppem && ppem < max_ppem)
+            || (pixels_per_em > max_ppem && ppem > max_ppem)
+        {
             idx = Some(usize::num_from(i));
             max_ppem = ppem;
         }
@@ -77,7 +79,6 @@ fn select_bitmap_size_table(
         ppem: max_ppem,
     })
 }
-
 
 #[derive(Clone, Copy)]
 struct IndexSubtableInfo {
@@ -101,13 +102,12 @@ fn select_index_subtable(
             return Some(IndexSubtableInfo {
                 start_glyph_id,
                 offset,
-            })
+            });
         }
     }
 
     None
 }
-
 
 #[derive(Clone, Copy)]
 struct GlyphIdOffsetPair {
@@ -143,11 +143,7 @@ impl<'a> Table<'a> {
         Some(Self { data })
     }
 
-    pub(crate) fn get(
-        &self,
-        glyph_id: GlyphId,
-        pixels_per_em: u16,
-    ) -> Option<Location> {
+    pub(crate) fn get(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<Location> {
         let mut s = Stream::new(self.data);
 
         // The CBLC table version is a bit tricky, so we are ignoring it for now.
@@ -204,8 +200,9 @@ impl<'a> Table<'a> {
                 let num_glyphs = s.read::<u32>()?;
                 let glyphs = s.read_array32::<GlyphId>(num_glyphs)?;
                 let (index, _) = glyphs.binary_search(&glyph_id)?;
-                image_offset = image_offset
-                    .checked_add(usize::num_from(index).checked_mul(usize::num_from(image_size))?)?;
+                image_offset = image_offset.checked_add(
+                    usize::num_from(index).checked_mul(usize::num_from(image_size))?,
+                )?;
             }
             _ => return None, // Invalid format.
         }

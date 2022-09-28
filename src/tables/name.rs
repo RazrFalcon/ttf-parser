@@ -1,43 +1,44 @@
 //! A [Naming Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/name) implementation.
 
-#[cfg(feature = "std")] use std::vec::Vec;
-#[cfg(feature = "std")] use std::string::String;
+#[cfg(feature = "std")]
+use std::string::String;
+#[cfg(feature = "std")]
+use std::vec::Vec;
 
-use crate::parser::{LazyArray16, FromData, Offset, Offset16, Stream};
+use crate::parser::{FromData, LazyArray16, Offset, Offset16, Stream};
 
 /// A list of [name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids)'s.
 pub mod name_id {
     #![allow(missing_docs)]
 
-    pub const COPYRIGHT_NOTICE: u16                     = 0;
-    pub const FAMILY: u16                               = 1;
-    pub const SUBFAMILY: u16                            = 2;
-    pub const UNIQUE_ID: u16                            = 3;
-    pub const FULL_NAME: u16                            = 4;
-    pub const VERSION: u16                              = 5;
-    pub const POST_SCRIPT_NAME: u16                     = 6;
-    pub const TRADEMARK: u16                            = 7;
-    pub const MANUFACTURER: u16                         = 8;
-    pub const DESIGNER: u16                             = 9;
-    pub const DESCRIPTION: u16                          = 10;
-    pub const VENDOR_URL: u16                           = 11;
-    pub const DESIGNER_URL: u16                         = 12;
-    pub const LICENSE: u16                              = 13;
-    pub const LICENSE_URL: u16                          = 14;
+    pub const COPYRIGHT_NOTICE: u16 = 0;
+    pub const FAMILY: u16 = 1;
+    pub const SUBFAMILY: u16 = 2;
+    pub const UNIQUE_ID: u16 = 3;
+    pub const FULL_NAME: u16 = 4;
+    pub const VERSION: u16 = 5;
+    pub const POST_SCRIPT_NAME: u16 = 6;
+    pub const TRADEMARK: u16 = 7;
+    pub const MANUFACTURER: u16 = 8;
+    pub const DESIGNER: u16 = 9;
+    pub const DESCRIPTION: u16 = 10;
+    pub const VENDOR_URL: u16 = 11;
+    pub const DESIGNER_URL: u16 = 12;
+    pub const LICENSE: u16 = 13;
+    pub const LICENSE_URL: u16 = 14;
     //        RESERVED                                  = 15
-    pub const TYPOGRAPHIC_FAMILY: u16                   = 16;
-    pub const TYPOGRAPHIC_SUBFAMILY: u16                = 17;
-    pub const COMPATIBLE_FULL: u16                      = 18;
-    pub const SAMPLE_TEXT: u16                          = 19;
-    pub const POST_SCRIPT_CID: u16                      = 20;
-    pub const WWS_FAMILY: u16                           = 21;
-    pub const WWS_SUBFAMILY: u16                        = 22;
-    pub const LIGHT_BACKGROUND_PALETTE: u16             = 23;
-    pub const DARK_BACKGROUND_PALETTE: u16              = 24;
-    pub const VARIATIONS_POST_SCRIPT_NAME_PREFIX: u16   = 25;
+    pub const TYPOGRAPHIC_FAMILY: u16 = 16;
+    pub const TYPOGRAPHIC_SUBFAMILY: u16 = 17;
+    pub const COMPATIBLE_FULL: u16 = 18;
+    pub const SAMPLE_TEXT: u16 = 19;
+    pub const POST_SCRIPT_CID: u16 = 20;
+    pub const WWS_FAMILY: u16 = 21;
+    pub const WWS_SUBFAMILY: u16 = 22;
+    pub const LIGHT_BACKGROUND_PALETTE: u16 = 23;
+    pub const DARK_BACKGROUND_PALETTE: u16 = 24;
+    pub const VARIATIONS_POST_SCRIPT_NAME_PREFIX: u16 = 25;
 }
-
 
 /// A [platform ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids).
 #[allow(missing_docs)]
@@ -66,7 +67,6 @@ impl FromData for PlatformId {
     }
 }
 
-
 #[inline]
 fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
@@ -76,14 +76,12 @@ fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
     match platform_id {
         PlatformId::Unicode => true,
         PlatformId::Windows => match encoding_id {
-            WINDOWS_SYMBOL_ENCODING_ID |
-            WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+            WINDOWS_SYMBOL_ENCODING_ID | WINDOWS_UNICODE_BMP_ENCODING_ID => true,
             _ => false,
-        }
+        },
         _ => false,
     }
 }
-
 
 #[derive(Clone, Copy)]
 struct NameRecord {
@@ -111,7 +109,6 @@ impl FromData for NameRecord {
         })
     }
 }
-
 
 /// A [Name Record](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-records).
 #[derive(Clone, Copy)]
@@ -177,8 +174,13 @@ impl<'a> core::fmt::Debug for Name<'a> {
 
         let name = self.to_string();
         f.debug_struct("Name")
-            .field("name", &name.as_ref().map(core::ops::Deref::deref)
-                                .unwrap_or("unsupported encoding"))
+            .field(
+                "name",
+                &name
+                    .as_ref()
+                    .map(core::ops::Deref::deref)
+                    .unwrap_or("unsupported encoding"),
+            )
             .field("platform_id", &self.platform_id)
             .field("encoding_id", &self.encoding_id)
             .field("language_id", &self.language_id)
@@ -199,7 +201,6 @@ impl<'a> core::fmt::Debug for Name<'a> {
             .finish()
     }
 }
-
 
 /// A list of face names.
 #[derive(Clone, Copy, Default)]
@@ -275,7 +276,6 @@ impl<'a> Iterator for NamesIter<'a> {
     }
 }
 
-
 /// A [Naming Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/name).
 #[derive(Clone, Copy, Default, Debug)]
@@ -314,6 +314,8 @@ impl<'a> Table<'a> {
 
         let storage = s.tail()?;
 
-        Some(Table { names: Names { records, storage } })
+        Some(Table {
+            names: Names { records, storage },
+        })
     }
 }

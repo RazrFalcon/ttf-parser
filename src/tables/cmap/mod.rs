@@ -8,26 +8,26 @@ This module provides a low-level alternative to
 methods.
 */
 
-use crate::{GlyphId, name::PlatformId};
 use crate::parser::{FromData, LazyArray16, Offset, Offset32, Stream};
+use crate::{name::PlatformId, GlyphId};
 
 mod format0;
-mod format2;
-mod format4;
-mod format6;
 mod format10;
 mod format12;
 mod format13;
 mod format14;
+mod format2;
+mod format4;
+mod format6;
 
 pub use format0::Subtable0;
-pub use format2::Subtable2;
-pub use format4::Subtable4;
-pub use format6::Subtable6;
 pub use format10::Subtable10;
 pub use format12::Subtable12;
 pub use format13::Subtable13;
-pub use format14::{Subtable14, GlyphVariationResult};
+pub use format14::{GlyphVariationResult, Subtable14};
+pub use format2::Subtable2;
+pub use format4::Subtable4;
+pub use format6::Subtable6;
 
 /// A character encoding subtable variant.
 #[allow(missing_docs)]
@@ -43,7 +43,6 @@ pub enum Format<'a> {
     ManyToOneRangeMappings(Subtable13<'a>),
     UnicodeVariationSequences(Subtable14<'a>),
 }
-
 
 /// A character encoding subtable.
 #[derive(Clone, Copy, Debug)]
@@ -70,14 +69,16 @@ impl<'a> Subtable<'a> {
             PlatformId::Windows => {
                 // "Note: Subtable format 13 has the same structure as format 12; it differs only
                 // in the interpretation of the startGlyphID/glyphID fields".
-                let is_format_12_compatible =
-                    matches!(self.format, Format::SegmentedCoverage(..) | Format::ManyToOneRangeMappings(..));
+                let is_format_12_compatible = matches!(
+                    self.format,
+                    Format::SegmentedCoverage(..) | Format::ManyToOneRangeMappings(..)
+                );
 
                 // "Fonts that support Unicode supplementary-plane characters (U+10000 to U+10FFFF)
                 // on the Windows platform must have a format 12 subtable for platform ID 3,
                 // encoding ID 10."
                 self.encoding_id == WINDOWS_UNICODE_FULL_REPERTOIRE_ENCODING_ID
-                && is_format_12_compatible
+                    && is_format_12_compatible
             }
             _ => false,
         }
@@ -115,7 +116,11 @@ impl<'a> Subtable<'a> {
     /// - when glyph ID is `0`.
     /// - when format is not `UnicodeVariationSequences`.
     #[inline]
-    pub fn glyph_variation_index(&self, code_point: u32, variation: u32) -> Option<GlyphVariationResult> {
+    pub fn glyph_variation_index(
+        &self,
+        code_point: u32,
+        variation: u32,
+    ) -> Option<GlyphVariationResult> {
         match self.format {
             Format::UnicodeVariationSequences(ref subtable) => {
                 subtable.glyph_index(code_point, variation)
@@ -152,7 +157,6 @@ impl<'a> Subtable<'a> {
     }
 }
 
-
 #[derive(Clone, Copy)]
 struct EncodingRecord {
     platform_id: PlatformId,
@@ -174,7 +178,6 @@ impl FromData for EncodingRecord {
     }
 }
 
-
 /// A list of subtables.
 #[derive(Clone, Copy, Default)]
 pub struct Subtables<'a> {
@@ -194,11 +197,11 @@ impl<'a> Subtables<'a> {
         let record = self.records.get(index)?;
         let data = self.data.get(record.offset.to_usize()..)?;
         let format = match Stream::read_at::<u16>(data, 0)? {
-            0  => Format::ByteEncodingTable(Subtable0::parse(data)?),
-            2  => Format::HighByteMappingThroughTable(Subtable2::parse(data)?),
-            4  => Format::SegmentMappingToDeltaValues(Subtable4::parse(data)?),
-            6  => Format::TrimmedTableMapping(Subtable6::parse(data)?),
-            8  => Format::MixedCoverage, // unsupported
+            0 => Format::ByteEncodingTable(Subtable0::parse(data)?),
+            2 => Format::HighByteMappingThroughTable(Subtable2::parse(data)?),
+            4 => Format::SegmentMappingToDeltaValues(Subtable4::parse(data)?),
+            6 => Format::TrimmedTableMapping(Subtable6::parse(data)?),
+            8 => Format::MixedCoverage, // unsupported
             10 => Format::TrimmedArray(Subtable10::parse(data)?),
             12 => Format::SegmentedCoverage(Subtable12::parse(data)?),
             13 => Format::ManyToOneRangeMappings(Subtable13::parse(data)?),
@@ -254,7 +257,6 @@ impl<'a> Iterator for SubtablesIter<'a> {
     }
 }
 
-
 /// A [Character to Glyph Index Mapping Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap).
 #[derive(Clone, Copy, Debug)]
@@ -270,6 +272,8 @@ impl<'a> Table<'a> {
         s.skip::<u16>(); // version
         let count = s.read::<u16>()?;
         let records = s.read_array16::<EncodingRecord>(count)?;
-        Some(Table { subtables: Subtables { data, records }})
+        Some(Table {
+            subtables: Subtables { data, records },
+        })
     }
 }

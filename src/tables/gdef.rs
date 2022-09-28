@@ -1,24 +1,24 @@
 //! A [Glyph Definition Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/gdef) implementation.
 
-use crate::GlyphId;
 use crate::opentype_layout::{Class, ClassDefinition, Coverage};
-use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream, FromSlice};
+use crate::parser::{FromSlice, LazyArray16, Offset, Offset16, Offset32, Stream};
+use crate::GlyphId;
 
-#[cfg(feature = "variable-fonts")] use crate::NormalizedCoordinate;
-#[cfg(feature = "variable-fonts")] use crate::var_store::ItemVariationStore;
-
+#[cfg(feature = "variable-fonts")]
+use crate::var_store::ItemVariationStore;
+#[cfg(feature = "variable-fonts")]
+use crate::NormalizedCoordinate;
 
 /// A [glyph class](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum GlyphClass {
-    Base      = 1,
-    Ligature  = 2,
-    Mark      = 3,
+    Base = 1,
+    Ligature = 2,
+    Mark = 3,
     Component = 4,
 }
-
 
 /// A [Glyph Definition Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gdef).
 #[allow(missing_debug_implementations)]
@@ -27,7 +27,8 @@ pub struct Table<'a> {
     glyph_classes: Option<ClassDefinition<'a>>,
     mark_attach_classes: Option<ClassDefinition<'a>>,
     mark_glyph_coverage_offsets: Option<(&'a [u8], LazyArray16<'a, Offset32>)>,
-    #[cfg(feature = "variable-fonts")] variation_store: Option<ItemVariationStore<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    variation_store: Option<ItemVariationStore<'a>>,
 }
 
 impl<'a> Table<'a> {
@@ -63,7 +64,6 @@ impl<'a> Table<'a> {
         let mut table = Table::default();
 
         if let Some(offset) = glyph_class_def_offset {
-
             if let Some(subdata) = data.get(offset.to_usize()..) {
                 table.glyph_classes = ClassDefinition::parse(subdata);
             }
@@ -167,11 +167,7 @@ impl<'a> Table<'a> {
 }
 
 #[inline(never)]
-fn is_mark_glyph_impl(
-    table: &Table,
-    glyph_id: GlyphId,
-    set_index: Option<u16>,
-) -> Option<()> {
+fn is_mark_glyph_impl(table: &Table, glyph_id: GlyphId, set_index: Option<u16>) -> Option<()> {
     let (data, offsets) = table.mark_glyph_coverage_offsets?;
 
     if let Some(set_index) = set_index {

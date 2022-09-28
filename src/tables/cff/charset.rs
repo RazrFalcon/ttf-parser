@@ -1,8 +1,9 @@
-use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
 use super::StringId;
+use crate::parser::{FromData, LazyArray16, Stream};
+use crate::GlyphId;
 
 /// The Expert Encoding conversion as defined in the Adobe Technical Note #5176 Appendix C.
+#[rustfmt::skip]
 #[cfg(feature = "glyph-names")]
 const EXPERT_ENCODING: &[u16] = &[
       0,    1,  229,  230,  231,  232,  233,  234,  235,  236,  237,  238,   13,   14,   15,   99,
@@ -19,6 +20,7 @@ const EXPERT_ENCODING: &[u16] = &[
 ];
 
 /// The Expert Subset Encoding conversion as defined in the Adobe Technical Note #5176 Appendix C.
+#[rustfmt::skip]
 #[cfg(feature = "glyph-names")]
 const EXPERT_SUBSET_ENCODING: &[u16] = &[
       0,    1,  231,  232,  235,  236,  237,  238,   13,   14,   15,   99,  239,  240,  241,  242,
@@ -28,7 +30,6 @@ const EXPERT_SUBSET_ENCODING: &[u16] = &[
     150,  164,  169,  327,  328,  329,  330,  331,  332,  333,  334,  335,  336,  337,  338,  339,
     340,  341,  342,  343,  344,  345,  346
 ];
-
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Format1Range {
@@ -49,7 +50,6 @@ impl FromData for Format1Range {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Format2Range {
     first: StringId,
@@ -68,7 +68,6 @@ impl FromData for Format2Range {
         })
     }
 }
-
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Charset<'a> {
@@ -90,7 +89,10 @@ impl Charset<'_> {
             Charset::ISOAdobe | Charset::Expert | Charset::ExpertSubset => None,
             Charset::Format0(ref array) => {
                 // First glyph is omitted, so we have to add 1.
-                array.into_iter().position(|n| n == sid).map(|n| GlyphId(n as u16 + 1))
+                array
+                    .into_iter()
+                    .position(|n| n == sid)
+                    .map(|n| GlyphId(n as u16 + 1))
             }
             Charset::Format1(array) => {
                 let mut glyph_id = GlyphId(1);
@@ -98,7 +100,7 @@ impl Charset<'_> {
                     let last = u32::from(range.first.0) + u32::from(range.left);
                     if range.first <= sid && u32::from(sid.0) <= last {
                         glyph_id.0 += sid.0 - range.first.0;
-                        return Some(glyph_id)
+                        return Some(glyph_id);
                     }
 
                     glyph_id.0 += u16::from(range.left) + 1;
@@ -113,7 +115,7 @@ impl Charset<'_> {
                     let last = u32::from(range.first.0) + u32::from(range.left);
                     if sid >= range.first && u32::from(sid.0) <= last {
                         glyph_id.0 += sid.0 - range.first.0;
-                        return Some(glyph_id)
+                        return Some(glyph_id);
                     }
 
                     glyph_id.0 += range.left + 1;
@@ -128,14 +130,20 @@ impl Charset<'_> {
     pub fn gid_to_sid(&self, gid: GlyphId) -> Option<StringId> {
         match self {
             Charset::ISOAdobe => {
-                if gid.0 <= 228 { Some(StringId(gid.0)) } else { None }
+                if gid.0 <= 228 {
+                    Some(StringId(gid.0))
+                } else {
+                    None
+                }
             }
-            Charset::Expert => {
-                EXPERT_ENCODING.get(usize::from(gid.0)).cloned().map(StringId)
-            }
-            Charset::ExpertSubset => {
-                EXPERT_SUBSET_ENCODING.get(usize::from(gid.0)).cloned().map(StringId)
-            }
+            Charset::Expert => EXPERT_ENCODING
+                .get(usize::from(gid.0))
+                .cloned()
+                .map(StringId),
+            Charset::ExpertSubset => EXPERT_SUBSET_ENCODING
+                .get(usize::from(gid.0))
+                .cloned()
+                .map(StringId),
             Charset::Format0(ref array) => {
                 if gid.0 == 0 {
                     Some(StringId(0))
@@ -189,7 +197,9 @@ pub(crate) fn parse_charset<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Op
     // -1 everywhere, since `.notdef` is omitted.
     let format = s.read::<u8>()?;
     match format {
-        0 => Some(Charset::Format0(s.read_array16::<StringId>(number_of_glyphs - 1)?)),
+        0 => Some(Charset::Format0(
+            s.read_array16::<StringId>(number_of_glyphs - 1)?,
+        )),
         1 => {
             // The number of ranges is not defined, so we have to
             // read until no glyphs are left.

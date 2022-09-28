@@ -23,7 +23,10 @@ impl<'a> Subtable6<'a> {
         let first_code_point = s.read::<u16>()?;
         let count = s.read::<u16>()?;
         let glyphs = s.read_array16::<GlyphId>(count)?;
-        Some(Self { first_code_point, glyphs })
+        Some(Self {
+            first_code_point,
+            glyphs,
+        })
     }
 
     /// Returns a glyph index for a code point.

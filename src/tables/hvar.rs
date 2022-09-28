@@ -3,9 +3,9 @@
 
 use core::convert::TryFrom;
 
-use crate::{GlyphId, NormalizedCoordinate};
-use crate::parser::{Stream, Offset, Offset32};
+use crate::parser::{Offset, Offset32, Stream};
 use crate::var_store::ItemVariationStore;
+use crate::{GlyphId, NormalizedCoordinate};
 
 struct DeltaSetIndexMap<'a> {
     data: &'a [u8],
@@ -48,11 +48,10 @@ impl<'a> DeltaSetIndexMap<'a> {
         let inner_index = n & ((1 << inner_index_bit_count) - 1);
         Some((
             u16::try_from(outer_index).ok()?,
-            u16::try_from(inner_index).ok()?
+            u16::try_from(inner_index).ok()?,
         ))
     }
 }
-
 
 /// A [Horizontal/Vertical Metrics Variations Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/hvar).
@@ -103,7 +102,8 @@ impl<'a> Table<'a> {
             (0, glyph_id.0)
         };
 
-        self.variation_store.parse_delta(outer_idx, inner_idx, coordinates)
+        self.variation_store
+            .parse_delta(outer_idx, inner_idx, coordinates)
     }
 
     /// Returns side bearing offset for a glyph.
@@ -115,7 +115,8 @@ impl<'a> Table<'a> {
     ) -> Option<f32> {
         let set_data = self.data.get(self.lsb_mapping_offset?.to_usize()..)?;
         let (outer_idx, inner_idx) = DeltaSetIndexMap::new(set_data).map(glyph_id)?;
-        self.variation_store.parse_delta(outer_idx, inner_idx, coordinates)
+        self.variation_store
+            .parse_delta(outer_idx, inner_idx, coordinates)
     }
 }
 

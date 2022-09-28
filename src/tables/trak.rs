@@ -1,7 +1,7 @@
 //! A [Tracking Table](
 //! https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6trak.html) implementation.
 
-use crate::parser::{FromData, LazyArray16, Offset, Offset16, Offset32, Fixed, Stream};
+use crate::parser::{Fixed, FromData, LazyArray16, Offset, Offset16, Offset32, Stream};
 
 #[derive(Clone, Copy, Debug)]
 struct TrackTableRecord {
@@ -34,7 +34,6 @@ pub struct Track<'a> {
     /// A list of tracking values for each size.
     pub values: LazyArray16<'a, i16>,
 }
-
 
 /// A list of tracks.
 #[derive(Clone, Copy, Default, Debug)]
@@ -95,7 +94,6 @@ impl<'a> Iterator for TracksIter<'a> {
     }
 }
 
-
 /// A track data.
 #[derive(Clone, Copy, Default, Debug)]
 pub struct TrackData<'a> {
@@ -128,7 +126,6 @@ impl<'a> TrackData<'a> {
         Some(TrackData { tracks, sizes })
     }
 }
-
 
 /// A [Tracking Table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6trak.html).

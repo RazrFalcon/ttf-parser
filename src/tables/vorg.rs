@@ -1,8 +1,8 @@
 //! A [Vertical Origin Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/vorg) implementation.
 
+use crate::parser::{FromData, LazyArray16, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
 
 /// Vertical origin metrics for the
 /// [Vertical Origin Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vorg).
@@ -26,7 +26,6 @@ impl FromData for VerticalOriginMetrics {
         })
     }
 }
-
 
 /// A [Vertical Origin Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vorg).
 #[derive(Clone, Copy, Debug)]
@@ -53,15 +52,13 @@ impl<'a> Table<'a> {
         let count = s.read::<u16>()?;
         let metrics = s.read_array16::<VerticalOriginMetrics>(count)?;
 
-        Some(Table {
-            default_y,
-            metrics,
-        })
+        Some(Table { default_y, metrics })
     }
 
     /// Returns glyph's Y origin.
     pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> i16 {
-        self.metrics.binary_search_by(|m| m.glyph_id.cmp(&glyph_id))
+        self.metrics
+            .binary_search_by(|m| m.glyph_id.cmp(&glyph_id))
             .map(|(_, m)| m.y)
             .unwrap_or(self.default_y)
     }

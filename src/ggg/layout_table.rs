@@ -1,11 +1,13 @@
 // Suppresses `minor_version` variable warning.
 #![allow(unused_variables)]
 
+#[cfg(feature = "variable-fonts")]
+use super::FeatureVariations;
 use super::LookupList;
+#[cfg(feature = "variable-fonts")]
+use crate::parser::Offset32;
 use crate::parser::{FromData, LazyArray16, Offset, Offset16, Stream};
 use crate::Tag;
-#[cfg(feature = "variable-fonts")] use super::FeatureVariations;
-#[cfg(feature = "variable-fonts")] use crate::parser::Offset32;
 
 /// A [Layout Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#table-organization).
 #[derive(Clone, Copy, Debug)]
@@ -36,22 +38,35 @@ impl<'a> LayoutTable<'a> {
         let features = FeatureList::parse(s.read_at_offset16(data)?)?;
         let lookups = LookupList::parse(s.read_at_offset16(data)?)?;
 
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             let mut variations_offset = None;
             if minor_version >= 1 {
                 variations_offset = s.read::<Option<Offset32>>()?;
             }
 
             let variations = match variations_offset {
-                Some(offset) => data.get(offset.to_usize()..).and_then(FeatureVariations::parse),
+                Some(offset) => data
+                    .get(offset.to_usize()..)
+                    .and_then(FeatureVariations::parse),
                 None => None,
             };
 
-            Some(Self { scripts, features, lookups, variations })
+            Some(Self {
+                scripts,
+                features,
+                lookups,
+                variations,
+            })
         }
 
-        #[cfg(not(feature = "variable-fonts"))] {
-            Some(Self { scripts, features, lookups })
+        #[cfg(not(feature = "variable-fonts"))]
+        {
+            Some(Self {
+                scripts,
+                features,
+                lookups,
+            })
         }
     }
 }
@@ -88,7 +103,11 @@ impl<'a, T: RecordListItem<'a>> RecordList<'a, T> {
         let mut s = Stream::new(data);
         let count = s.read::<u16>()?;
         let records = s.read_array16(count)?;
-        Some(Self { data, records, data_type: core::marker::PhantomData })
+        Some(Self {
+            data,
+            records,
+            data_type: core::marker::PhantomData,
+        })
     }
 
     /// Returns a number of items in the RecordList.
@@ -104,18 +123,27 @@ impl<'a, T: RecordListItem<'a>> RecordList<'a, T> {
     /// Returns RecordList value by index.
     pub fn get(&self, index: u16) -> Option<T> {
         let record = self.records.get(index)?;
-        self.data.get(record.offset.to_usize()..).and_then(|data| T::parse(record.tag, data))
+        self.data
+            .get(record.offset.to_usize()..)
+            .and_then(|data| T::parse(record.tag, data))
     }
 
     /// Returns RecordList value by [`Tag`].
     pub fn find(&self, tag: Tag) -> Option<T> {
-        let record = self.records.binary_search_by(|record| record.tag.cmp(&tag)).map(|p| p.1)?;
-        self.data.get(record.offset.to_usize()..).and_then(|data| T::parse(record.tag, data))
+        let record = self
+            .records
+            .binary_search_by(|record| record.tag.cmp(&tag))
+            .map(|p| p.1)?;
+        self.data
+            .get(record.offset.to_usize()..)
+            .and_then(|data| T::parse(record.tag, data))
     }
 
     /// Returns RecordList value index by [`Tag`].
     pub fn index(&self, tag: Tag) -> Option<u16> {
-        self.records.binary_search_by(|record| record.tag.cmp(&tag)).map(|p| p.0)
+        self.records
+            .binary_search_by(|record| record.tag.cmp(&tag))
+            .map(|p| p.0)
     }
 }
 
@@ -159,7 +187,6 @@ pub type LanguageSystemList<'a> = RecordList<'a, LanguageSystem<'a>>;
 /// A list of [`Feature`] records.
 pub type FeatureList<'a> = RecordList<'a, Feature<'a>>;
 
-
 #[derive(Clone, Copy, Debug)]
 struct TagRecord {
     tag: Tag,
@@ -195,15 +222,17 @@ impl<'a> RecordListItem<'a> for Script<'a> {
         let mut s = Stream::new(data);
         let mut default_language = None;
         if let Some(offset) = s.read::<Option<Offset16>>()? {
-            default_language = LanguageSystem::parse(
-                Tag::from_bytes(b"dflt"),
-                data.get(offset.to_usize()..)?
-            );
+            default_language =
+                LanguageSystem::parse(Tag::from_bytes(b"dflt"), data.get(offset.to_usize()..)?);
         }
         let mut languages = RecordList::parse(s.tail()?)?;
         // Offsets are relative to this table.
         languages.data = data;
-        Some(Self { tag, default_language, languages })
+        Some(Self {
+            tag,
+            default_language,
+            languages,
+        })
     }
 }
 
@@ -215,7 +244,7 @@ pub struct LanguageSystem<'a> {
     /// Index of a feature required for this language system.
     pub required_feature: Option<FeatureIndex>,
     /// Array of indices into the FeatureList, in arbitrary order.
-    pub feature_indices: LazyArray16<'a, FeatureIndex>
+    pub feature_indices: LazyArray16<'a, FeatureIndex>,
 }
 
 impl<'a> RecordListItem<'a> for LanguageSystem<'a> {
@@ -228,7 +257,11 @@ impl<'a> RecordListItem<'a> for LanguageSystem<'a> {
         };
         let count = s.read::<u16>()?;
         let feature_indices = s.read_array16(count)?;
-        Some(Self { tag, required_feature, feature_indices })
+        Some(Self {
+            tag,
+            required_feature,
+            feature_indices,
+        })
     }
 }
 
@@ -246,6 +279,9 @@ impl<'a> RecordListItem<'a> for Feature<'a> {
         let _params_offset = s.read::<Offset16>()?; // Unsupported.
         let count = s.read::<u16>()?;
         let lookup_indices = s.read_array16(count)?;
-        Some(Self { tag, lookup_indices })
+        Some(Self {
+            tag,
+            lookup_indices,
+        })
     }
 }

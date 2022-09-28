@@ -1,17 +1,20 @@
-use crate::parser::{Stream, U24, NumFrom, FromData};
+use crate::parser::{FromData, NumFrom, Stream, U24};
 
 pub trait IndexSize: FromData {
     fn to_u32(self) -> u32;
 }
 
 impl IndexSize for u16 {
-    fn to_u32(self) -> u32 { u32::from(self) }
+    fn to_u32(self) -> u32 {
+        u32::from(self)
+    }
 }
 
 impl IndexSize for u32 {
-    fn to_u32(self) -> u32 { self }
+    fn to_u32(self) -> u32 {
+        self
+    }
 }
-
 
 #[inline]
 pub fn parse_index<'a, T: IndexSize>(s: &mut Stream<'a>) -> Option<Index<'a>> {
@@ -38,9 +41,7 @@ fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<Index<'a>> {
             let data = s.read_bytes(usize::num_from(last_offset))?;
             Some(Index { data, offsets })
         }
-        None => {
-            Some(Index::default())
-        }
+        None => Some(Index::default()),
     }
 }
 
@@ -69,7 +70,6 @@ fn skip_index_impl(count: u32, s: &mut Stream) -> Option<()> {
 
     Some(())
 }
-
 
 #[derive(Clone, Copy, Debug)]
 pub struct VarOffsets<'a> {
@@ -117,7 +117,6 @@ impl<'a> VarOffsets<'a> {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub struct Index<'a> {
     pub data: &'a [u8],
@@ -129,7 +128,10 @@ impl<'a> Default for Index<'a> {
     fn default() -> Self {
         Index {
             data: b"",
-            offsets: VarOffsets { data: b"", offset_size: OffsetSize::Size1 },
+            offsets: VarOffsets {
+                data: b"",
+                offset_size: OffsetSize::Size1,
+            },
         }
     }
 }
@@ -182,7 +184,6 @@ impl<'a> Iterator for IndexIter<'a> {
     }
 }
 
-
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum OffsetSize {
     Size1 = 1,
@@ -192,8 +193,14 @@ pub enum OffsetSize {
 }
 
 impl OffsetSize {
-    #[inline] pub fn to_u32(self) -> u32 { self as u32 }
-    #[inline] pub fn to_usize(self) -> usize { self as usize }
+    #[inline]
+    pub fn to_u32(self) -> u32 {
+        self as u32
+    }
+    #[inline]
+    pub fn to_usize(self) -> usize {
+        self as usize
+    }
 }
 
 impl FromData for OffsetSize {
@@ -220,7 +227,10 @@ mod tests {
         assert_eq!(core::mem::size_of::<OffsetSize>(), 1);
 
         assert_eq!(Stream::new(&[0x00]).read::<OffsetSize>(), None);
-        assert_eq!(Stream::new(&[0x01]).read::<OffsetSize>(), Some(OffsetSize::Size1));
+        assert_eq!(
+            Stream::new(&[0x01]).read::<OffsetSize>(),
+            Some(OffsetSize::Size1)
+        );
         assert_eq!(Stream::new(&[0x05]).read::<OffsetSize>(), None);
     }
 }

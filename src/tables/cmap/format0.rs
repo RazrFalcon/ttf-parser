@@ -1,4 +1,4 @@
-use crate::parser::{Stream, NumFrom};
+use crate::parser::{NumFrom, Stream};
 use crate::GlyphId;
 
 /// A [format 0](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table)

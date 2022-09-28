@@ -6,10 +6,12 @@
 
 use core::convert::TryFrom;
 
-use crate::GlyphId;
-use crate::opentype_layout::{Class, ClassDefinition, ContextLookup, Coverage, LookupSubtable};
 use crate::opentype_layout::ChainedContextLookup;
-use crate::parser::{FromData, FromSlice, LazyArray16, LazyArray32, NumFrom, Offset, Offset16, Stream};
+use crate::opentype_layout::{Class, ClassDefinition, ContextLookup, Coverage, LookupSubtable};
+use crate::parser::{
+    FromData, FromSlice, LazyArray16, LazyArray32, NumFrom, Offset, Offset16, Stream,
+};
+use crate::GlyphId;
 
 /// A [Device Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#devVarIdxTbls)
@@ -73,7 +75,6 @@ pub struct VariationDevice {
     pub inner_index: u16,
 }
 
-
 /// A [Device Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#devVarIdxTbls).
 #[allow(missing_docs)]
@@ -102,21 +103,19 @@ impl<'a> Device<'a> {
                     delta_values,
                 }))
             }
-            0x8000 => {
-                Some(Self::Variation(VariationDevice {
-                    outer_index: first,
-                    inner_index: second,
-                }))
-            }
+            0x8000 => Some(Self::Variation(VariationDevice {
+                outer_index: first,
+                inner_index: second,
+            })),
             _ => None,
         }
     }
 }
 
-
 #[derive(Clone, Copy, Default, Debug)]
 struct ValueFormatFlags(u8);
 
+#[rustfmt::skip]
 impl ValueFormatFlags {
     #[inline] fn x_placement(self) -> bool { self.0 & 0x01 != 0 }
     #[inline] fn y_placement(self) -> bool { self.0 & 0x02 != 0 }
@@ -145,7 +144,6 @@ impl FromData for ValueFormatFlags {
     }
 }
 
-
 /// A [Value Record](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#value-record).
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ValueRecord<'a> {
@@ -170,7 +168,11 @@ pub struct ValueRecord<'a> {
 
 impl<'a> ValueRecord<'a> {
     // Returns `None` only on parsing error.
-    fn parse(table_data: &'a [u8], s: &mut Stream, flags: ValueFormatFlags) -> Option<ValueRecord<'a>> {
+    fn parse(
+        table_data: &'a [u8],
+        s: &mut Stream,
+        flags: ValueFormatFlags,
+    ) -> Option<ValueRecord<'a>> {
         let mut record = ValueRecord::default();
 
         if flags.x_placement() {
@@ -191,32 +193,35 @@ impl<'a> ValueRecord<'a> {
 
         if flags.x_placement_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
-                record.x_placement_device = table_data.get(offset.to_usize()..).and_then(Device::parse)
+                record.x_placement_device =
+                    table_data.get(offset.to_usize()..).and_then(Device::parse)
             }
         }
 
         if flags.y_placement_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
-                record.y_placement_device = table_data.get(offset.to_usize()..).and_then(Device::parse)
+                record.y_placement_device =
+                    table_data.get(offset.to_usize()..).and_then(Device::parse)
             }
         }
 
         if flags.x_advance_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
-                record.x_advance_device = table_data.get(offset.to_usize()..).and_then(Device::parse)
+                record.x_advance_device =
+                    table_data.get(offset.to_usize()..).and_then(Device::parse)
             }
         }
 
         if flags.y_advance_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
-                record.y_advance_device = table_data.get(offset.to_usize()..).and_then(Device::parse)
+                record.y_advance_device =
+                    table_data.get(offset.to_usize()..).and_then(Device::parse)
             }
         }
 
         Some(record)
     }
 }
-
 
 /// An array of
 /// [Value Records](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#value-record).
@@ -273,7 +278,6 @@ impl core::fmt::Debug for ValueRecordsArray<'_> {
     }
 }
 
-
 /// A [Single Adjustment Positioning Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#SP).
 #[allow(missing_docs)]
@@ -297,20 +301,14 @@ impl<'a> SingleAdjustment<'a> {
                 let coverage = Coverage::parse(s.read_at_offset16(data)?)?;
                 let flags = s.read::<ValueFormatFlags>()?;
                 let value = ValueRecord::parse(data, &mut s, flags)?;
-                Some(Self::Format1 {
-                    coverage,
-                    value,
-                })
+                Some(Self::Format1 { coverage, value })
             }
             2 => {
                 let coverage = Coverage::parse(s.read_at_offset16(data)?)?;
                 let flags = s.read::<ValueFormatFlags>()?;
                 let count = s.read::<u16>()?;
                 let values = ValueRecordsArray::parse(data, count, flags, &mut s)?;
-                Some(Self::Format2 {
-                    coverage,
-                    values,
-                })
+                Some(Self::Format2 { coverage, values })
             }
             _ => None,
         }
@@ -325,7 +323,6 @@ impl<'a> SingleAdjustment<'a> {
         }
     }
 }
-
 
 /// A [`ValueRecord`] pairs set used by [`PairAdjustment`].
 #[derive(Clone, Copy)]
@@ -342,7 +339,11 @@ impl<'a> PairSet<'a> {
         // Max len is 34, so u8 is just enough.
         let record_len = (GlyphId::SIZE + flags.0.size() + flags.1.size()) as u8;
         let data = s.read_bytes(usize::from(count) * usize::from(record_len))?;
-        Some(Self { data, flags, record_len })
+        Some(Self {
+            data,
+            flags,
+            record_len,
+        })
     }
 
     #[inline]
@@ -360,9 +361,7 @@ impl<'a> PairSet<'a> {
             self.data.get(start..end)
         };
 
-        let get_glyph = |data: &[u8]| {
-            GlyphId(u16::from_be_bytes([data[0], data[1]]))
-        };
+        let get_glyph = |data: &[u8]| GlyphId(u16::from_be_bytes([data[0], data[1]]));
 
         let mut base = 0;
         while size > 1 {
@@ -372,13 +371,21 @@ impl<'a> PairSet<'a> {
             // mid >= 0: by definition
             // mid < size: mid = size / 2 + size / 4 + size / 8 ...
             let cmp = get_glyph(get_record(mid)?).cmp(&second);
-            base = if cmp == core::cmp::Ordering::Greater { base } else { mid };
+            base = if cmp == core::cmp::Ordering::Greater {
+                base
+            } else {
+                mid
+            };
             size -= half;
         }
 
         // base is always in [0, size) because base <= mid.
         let value = get_record(base)?;
-        if get_glyph(value).cmp(&second) == core::cmp::Ordering::Equal { Some(value) } else { None }
+        if get_glyph(value).cmp(&second) == core::cmp::Ordering::Equal {
+            Some(value)
+        } else {
+            None
+        }
     }
 
     /// Returns a [`ValueRecord`] pair using the second glyph.
@@ -399,7 +406,6 @@ impl core::fmt::Debug for PairSet<'_> {
     }
 }
 
-
 // Essentially a `LazyOffsetArray16` but stores additional data required to parse [`PairSet`].
 
 /// A list of [`PairSet`]s.
@@ -417,14 +423,20 @@ impl<'a> PairSets<'a> {
         offsets: LazyArray16<'a, Option<Offset16>>,
         flags: (ValueFormatFlags, ValueFormatFlags),
     ) -> Self {
-        Self { data, offsets, flags }
+        Self {
+            data,
+            offsets,
+            flags,
+        }
     }
 
     /// Returns a value at `index`.
     #[inline]
     pub fn get(&self, index: u16) -> Option<PairSet<'a>> {
         let offset = self.offsets.get(index)??.to_usize();
-        self.data.get(offset..).and_then(|data| PairSet::parse(data, self.flags))
+        self.data
+            .get(offset..)
+            .and_then(|data| PairSet::parse(data, self.flags))
     }
 
     /// Returns array's length.
@@ -439,7 +451,6 @@ impl core::fmt::Debug for PairSets<'_> {
         write!(f, "PairSets {{ ... }}")
     }
 }
-
 
 /// A [`ValueRecord`] pairs matrix used by [`PairAdjustment`].
 #[derive(Clone, Copy)]
@@ -464,7 +475,13 @@ impl<'a> ClassMatrix<'a> {
         // Max len is 32, so u8 is just enough.
         let record_len = (flags.0.size() + flags.1.size()) as u8;
         let matrix = s.read_bytes(usize::from(count) * usize::from(record_len))?;
-        Some(Self { table_data, matrix, counts, flags, record_len })
+        Some(Self {
+            table_data,
+            matrix,
+            counts,
+            flags,
+            record_len,
+        })
     }
 
     /// Returns a [`ValueRecord`] pair using specified classes.
@@ -490,7 +507,6 @@ impl core::fmt::Debug for ClassMatrix<'_> {
     }
 }
 
-
 /// A [Pair Adjustment Positioning Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#PP).
 #[allow(missing_docs)]
@@ -513,37 +529,28 @@ impl<'a> PairAdjustment<'a> {
         match s.read::<u16>()? {
             1 => {
                 let coverage = Coverage::parse(s.read_at_offset16(data)?)?;
-                let flags = (
-                    s.read::<ValueFormatFlags>()?,
-                    s.read::<ValueFormatFlags>()?,
-                );
+                let flags = (s.read::<ValueFormatFlags>()?, s.read::<ValueFormatFlags>()?);
                 let count = s.read::<u16>()?;
                 let offsets = s.read_array16(count)?;
                 Some(Self::Format1 {
                     coverage,
-                    sets: PairSets::new(data, offsets, flags)
+                    sets: PairSets::new(data, offsets, flags),
                 })
             }
             2 => {
                 let coverage = Coverage::parse(s.read_at_offset16(data)?)?;
-                let flags = (
-                    s.read::<ValueFormatFlags>()?,
-                    s.read::<ValueFormatFlags>()?,
-                );
+                let flags = (s.read::<ValueFormatFlags>()?, s.read::<ValueFormatFlags>()?);
                 let classes = (
                     ClassDefinition::parse(s.read_at_offset16(data)?)?,
                     ClassDefinition::parse(s.read_at_offset16(data)?)?,
                 );
-                let counts = (
-                    s.read::<u16>()?,
-                    s.read::<u16>()?,
-                );
+                let counts = (s.read::<u16>()?, s.read::<u16>()?);
                 Some(Self::Format2 {
                     coverage,
                     classes,
                     matrix: ClassMatrix::parse(data, counts, flags, &mut s)?,
                 })
-            },
+            }
             _ => None,
         }
     }
@@ -557,7 +564,6 @@ impl<'a> PairAdjustment<'a> {
         }
     }
 }
-
 
 #[derive(Clone, Copy)]
 struct EntryExitRecord {
@@ -577,7 +583,6 @@ impl FromData for EntryExitRecord {
         })
     }
 }
-
 
 /// A list of entry and exit [`Anchor`] pairs.
 #[derive(Clone, Copy)]
@@ -611,7 +616,6 @@ impl core::fmt::Debug for CursiveAnchorSet<'_> {
     }
 }
 
-
 /// A [Cursive Attachment Positioning Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#CAP).
 #[allow(missing_docs)]
@@ -631,14 +635,13 @@ impl<'a> CursiveAdjustment<'a> {
                 let records = s.read_array16(count)?;
                 Some(Self {
                     coverage,
-                    sets: CursiveAnchorSet { data, records }
+                    sets: CursiveAnchorSet { data, records },
                 })
             }
             _ => None,
         }
     }
 }
-
 
 /// A [Mark-to-Base Attachment Positioning Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#MBP).
@@ -664,7 +667,12 @@ impl<'a> MarkToBaseAdjustment<'a> {
                 let class_count = s.read::<u16>()?;
                 let marks = MarkArray::parse(s.read_at_offset16(data)?)?;
                 let anchors = AnchorMatrix::parse(s.read_at_offset16(data)?, class_count)?;
-                Some(Self { mark_coverage, base_coverage, marks, anchors })
+                Some(Self {
+                    mark_coverage,
+                    base_coverage,
+                    marks,
+                    anchors,
+                })
             }
             _ => None,
         }
@@ -692,7 +700,12 @@ impl<'a> MarkToLigatureAdjustment<'a> {
                 let class_count = s.read::<u16>()?;
                 let marks = MarkArray::parse(s.read_at_offset16(data)?)?;
                 let ligature_array = LigatureArray::parse(s.read_at_offset16(data)?, class_count)?;
-                Some(Self { mark_coverage, ligature_coverage, marks, ligature_array })
+                Some(Self {
+                    mark_coverage,
+                    ligature_coverage,
+                    marks,
+                    ligature_array,
+                })
             }
             _ => None,
         }
@@ -712,7 +725,11 @@ impl<'a> LigatureArray<'a> {
         let mut s = Stream::new(data);
         let count = s.read::<u16>()?;
         let offsets = s.read_array16(count)?;
-        Some(Self { data, class_count, offsets })
+        Some(Self {
+            data,
+            class_count,
+            offsets,
+        })
     }
 
     /// Returns an [`AnchorMatrix`] at index.
@@ -734,7 +751,6 @@ impl core::fmt::Debug for LigatureArray<'_> {
     }
 }
 
-
 #[derive(Clone, Copy)]
 struct MarkRecord {
     class: Class,
@@ -754,7 +770,6 @@ impl FromData for MarkRecord {
     }
 }
 
-
 /// A [Mark Array](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table).
 #[derive(Clone, Copy)]
 pub struct MarkArray<'a> {
@@ -773,7 +788,10 @@ impl<'a> MarkArray<'a> {
     /// Returns contained data at index.
     pub fn get(&self, index: u16) -> Option<(Class, Anchor<'a>)> {
         let record = self.array.get(index)?;
-        let anchor = self.data.get(record.mark_anchor.to_usize()..).and_then(Anchor::parse)?;
+        let anchor = self
+            .data
+            .get(record.mark_anchor.to_usize()..)
+            .and_then(Anchor::parse)?;
         Some((record.class, anchor))
     }
 
@@ -788,7 +806,6 @@ impl core::fmt::Debug for MarkArray<'_> {
         write!(f, "MarkArray {{ ... }}")
     }
 }
-
 
 /// An [Anchor Table](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#anchor-tables).
 ///
@@ -824,11 +841,13 @@ impl<'a> Anchor<'a> {
         // get a glyph contour point by index.
 
         if format == 3 {
-            table.x_device = s.read::<Option<Offset16>>()?
+            table.x_device = s
+                .read::<Option<Offset16>>()?
                 .and_then(|offset| data.get(offset.to_usize()..))
                 .and_then(Device::parse);
 
-            table.y_device = s.read::<Option<Offset16>>()?
+            table.y_device = s
+                .read::<Option<Offset16>>()?
                 .and_then(|offset| data.get(offset.to_usize()..))
                 .and_then(Device::parse);
         }
@@ -836,7 +855,6 @@ impl<'a> Anchor<'a> {
         Some(table)
     }
 }
-
 
 /// An [`Anchor`] parsing helper.
 #[derive(Clone, Copy)]
@@ -855,7 +873,12 @@ impl<'a> AnchorMatrix<'a> {
         let rows = s.read::<u16>()?;
         let count = u32::from(rows) * u32::from(cols);
         let matrix = s.read_array32(count)?;
-        Some(Self { data, rows, cols, matrix })
+        Some(Self {
+            data,
+            rows,
+            cols,
+            matrix,
+        })
     }
 
     /// Returns an [`Anchor`] at position.
@@ -871,7 +894,6 @@ impl core::fmt::Debug for AnchorMatrix<'_> {
         write!(f, "AnchorMatrix {{ ... }}")
     }
 }
-
 
 /// A [Mark-to-Mark Attachment Positioning Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#MMP).
@@ -894,13 +916,17 @@ impl<'a> MarkToMarkAdjustment<'a> {
                 let class_count = s.read::<u16>()?;
                 let marks = MarkArray::parse(s.read_at_offset16(data)?)?;
                 let mark2_matrix = AnchorMatrix::parse(s.read_at_offset16(data)?, class_count)?;
-                Some(Self { mark1_coverage, mark2_coverage, marks, mark2_matrix })
+                Some(Self {
+                    mark1_coverage,
+                    mark2_coverage,
+                    marks,
+                    mark2_matrix,
+                })
             }
             _ => None,
         }
     }
 }
-
 
 /// A glyph positioning
 /// [lookup subtable](https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#table-organization)

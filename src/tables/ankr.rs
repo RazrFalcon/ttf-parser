@@ -3,9 +3,9 @@
 
 use core::num::NonZeroU16;
 
-use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray32};
 use crate::aat;
+use crate::parser::{FromData, LazyArray32, Stream};
+use crate::GlyphId;
 
 /// An anchor point.
 #[allow(missing_docs)]
@@ -27,7 +27,6 @@ impl FromData for Point {
         })
     }
 }
-
 
 /// An [Anchor Point Table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6ankr.html).
@@ -59,6 +58,7 @@ impl<'a> Table<'a> {
         }
 
         s.skip::<u16>(); // reserved
+
         // TODO: we should probably check that offset is larger than the header size (8)
         let lookup_table = s.read_at_offset32(data)?;
         let glyphs_data = s.read_at_offset32(data)?;

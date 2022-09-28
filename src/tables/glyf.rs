@@ -3,8 +3,8 @@
 
 use core::num::NonZeroU16;
 
-use crate::parser::{Stream, F2DOT14, LazyArray16, NumFrom};
-use crate::{loca, GlyphId, OutlineBuilder, Rect, BBox};
+use crate::parser::{LazyArray16, NumFrom, Stream, F2DOT14};
+use crate::{loca, BBox, GlyphId, OutlineBuilder, Rect};
 
 pub(crate) struct Builder<'a> {
     pub builder: &'a mut dyn OutlineBuilder,
@@ -20,11 +20,7 @@ pub(crate) struct Builder<'a> {
 
 impl<'a> Builder<'a> {
     #[inline]
-    pub fn new(
-        transform: Transform,
-        bbox: BBox,
-        builder: &'a mut dyn OutlineBuilder,
-    ) -> Self {
+    pub fn new(transform: Transform, bbox: BBox, builder: &'a mut dyn OutlineBuilder) -> Self {
         Builder {
             builder,
             transform,
@@ -141,18 +137,28 @@ impl<'a> Builder<'a> {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub(crate) struct Transform {
-    pub a: f32, pub b: f32, pub c: f32,
-    pub d: f32, pub e: f32, pub f: f32,
+    pub a: f32,
+    pub b: f32,
+    pub c: f32,
+    pub d: f32,
+    pub e: f32,
+    pub f: f32,
 }
 
 impl Transform {
     #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn new_translate(tx: f32, ty: f32) -> Self {
-        Transform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: tx, f: ty }
+        Transform {
+            a: 1.0,
+            b: 0.0,
+            c: 0.0,
+            d: 1.0,
+            e: tx,
+            f: ty,
+        }
     }
 
     #[inline]
@@ -178,37 +184,47 @@ impl Transform {
     #[inline]
     fn is_default(&self) -> bool {
         // A direct float comparison is fine in our case.
-           self.a == 1.0
-        && self.b == 0.0
-        && self.c == 0.0
-        && self.d == 1.0
-        && self.e == 0.0
-        && self.f == 0.0
+        self.a == 1.0
+            && self.b == 0.0
+            && self.c == 0.0
+            && self.d == 1.0
+            && self.e == 0.0
+            && self.f == 0.0
     }
 }
 
 impl Default for Transform {
     #[inline]
     fn default() -> Self {
-        Transform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }
+        Transform {
+            a: 1.0,
+            b: 0.0,
+            c: 0.0,
+            d: 1.0,
+            e: 0.0,
+            f: 0.0,
+        }
     }
 }
 
 impl core::fmt::Debug for Transform {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "Transform({} {} {} {} {} {})", self.a, self.b, self.c, self.d, self.e, self.f)
+        write!(
+            f,
+            "Transform({} {} {} {} {} {})",
+            self.a, self.b, self.c, self.d, self.e, self.f
+        )
     }
 }
-
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CompositeGlyphInfo {
     pub glyph_id: GlyphId,
     pub transform: Transform,
-    #[allow(dead_code)] pub flags: CompositeGlyphFlags,
+    #[allow(dead_code)]
+    pub flags: CompositeGlyphFlags,
 }
-
 
 #[derive(Clone)]
 pub(crate) struct CompositeGlyphIter<'a> {
@@ -218,7 +234,9 @@ pub(crate) struct CompositeGlyphIter<'a> {
 impl<'a> CompositeGlyphIter<'a> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
-        CompositeGlyphIter { stream: Stream::new(data) }
+        CompositeGlyphIter {
+            stream: Stream::new(data),
+        }
     }
 }
 
@@ -268,7 +286,6 @@ impl<'a> Iterator for CompositeGlyphIter<'a> {
     }
 }
 
-
 // Due to some optimization magic, using f32 instead of i16
 // makes the code ~10% slower. At least on my machine.
 // I guess it's due to the fact that with i16 the struct
@@ -282,7 +299,6 @@ pub(crate) struct GlyphPoint {
     pub on_curve_point: bool,
     pub last_point: bool,
 }
-
 
 #[derive(Clone, Default)]
 pub(crate) struct GlyphPointsIter<'a> {
@@ -313,14 +329,17 @@ impl<'a> Iterator for GlyphPointsIter<'a> {
         let last_point = self.endpoints.next();
         let flags = self.flags.next()?;
         Some(GlyphPoint {
-            x: self.x_coords.next(flags.x_short(), flags.x_is_same_or_positive_short()),
-            y: self.y_coords.next(flags.y_short(), flags.y_is_same_or_positive_short()),
+            x: self
+                .x_coords
+                .next(flags.x_short(), flags.x_is_same_or_positive_short()),
+            y: self
+                .y_coords
+                .next(flags.y_short(), flags.y_is_same_or_positive_short()),
             on_curve_point: flags.on_curve_point(),
             last_point,
         })
     }
 }
-
 
 /// A simple flattening iterator for glyph's endpoints.
 ///
@@ -367,7 +386,6 @@ impl<'a> EndpointsIter<'a> {
     }
 }
 
-
 #[derive(Clone, Default)]
 struct FlagsIter<'a> {
     stream: Stream<'a>,
@@ -406,7 +424,6 @@ impl<'a> Iterator for FlagsIter<'a> {
     }
 }
 
-
 #[derive(Clone, Default)]
 struct CoordsIter<'a> {
     stream: Stream<'a>,
@@ -444,7 +461,6 @@ impl<'a> CoordsIter<'a> {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 struct Point {
     x: f32,
@@ -461,11 +477,11 @@ impl Point {
     }
 }
 
-
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#simple-glyph-description
 #[derive(Clone, Copy, Default)]
 struct SimpleGlyphFlags(u8);
 
+#[rustfmt::skip]
 impl SimpleGlyphFlags {
     #[inline] fn on_curve_point(self) -> bool { self.0 & 0x01 != 0 }
     #[inline] fn x_short(self) -> bool { self.0 & 0x02 != 0 }
@@ -475,11 +491,11 @@ impl SimpleGlyphFlags {
     #[inline] fn y_is_same_or_positive_short(self) -> bool { self.0 & 0x20 != 0 }
 }
 
-
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CompositeGlyphFlags(u16);
 
+#[rustfmt::skip]
 impl CompositeGlyphFlags {
     #[inline] pub fn arg_1_and_2_are_words(self) -> bool { self.0 & 0x0001 != 0 }
     #[inline] pub fn args_are_xy_values(self) -> bool { self.0 & 0x0002 != 0 }
@@ -488,7 +504,6 @@ impl CompositeGlyphFlags {
     #[inline] pub fn we_have_an_x_and_y_scale(self) -> bool { self.0 & 0x0040 != 0 }
     #[inline] pub fn we_have_a_two_by_two(self) -> bool { self.0 & 0x0080 != 0 }
 }
-
 
 // It's not defined in the spec, so we are using our own value.
 pub(crate) const MAX_COMPONENTS: u8 = 32;
@@ -515,8 +530,12 @@ fn outline_impl(
         // u16 casting is safe, since we already checked that the value is positive.
         let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
         for point in parse_simple_outline(s.tail()?, number_of_contours)? {
-            builder.push_point(f32::from(point.x), f32::from(point.y),
-                               point.on_curve_point, point.last_point);
+            builder.push_point(
+                f32::from(point.x),
+                f32::from(point.y),
+                point.on_curve_point,
+                point.last_point,
+            );
         }
     } else if number_of_contours < 0 {
         // Composite glyph.
@@ -579,10 +598,7 @@ pub(crate) fn parse_simple_outline(
 /// Resolves coordinate arrays length.
 ///
 /// The length depends on *Simple Glyph Flags*, so we have to process them all to find it.
-fn resolve_coords_len(
-    s: &mut Stream,
-    points_total: u16,
-) -> Option<(u32, u32)> {
+fn resolve_coords_len(s: &mut Stream, points_total: u16) -> Option<(u32, u32)> {
     let mut flags_left = u32::from(points_total);
     let mut repeats;
     let mut x_coords_len = 0;
@@ -628,13 +644,11 @@ fn resolve_coords_len(
         y_coords_len += (flags.0 & 0x04 != 0) as u32 * repeats;
         y_coords_len += (flags.0 & (0x04 | 0x20) == 0) as u32 * (repeats * 2);
 
-
         flags_left -= repeats;
     }
 
     Some((x_coords_len, y_coords_len))
 }
-
 
 /// A [Glyph Data Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf).
@@ -659,11 +673,7 @@ impl<'a> Table<'a> {
 
     /// Outlines a glyph.
     #[inline]
-    pub fn outline(
-        &self,
-        glyph_id: GlyphId,
-        builder: &mut dyn OutlineBuilder,
-    ) -> Option<Rect> {
+    pub fn outline(&self, glyph_id: GlyphId, builder: &mut dyn OutlineBuilder) -> Option<Rect> {
         let mut b = Builder::new(Transform::default(), BBox::new(), builder);
         let glyph_data = self.get(glyph_id)?;
         outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)?

@@ -2,9 +2,8 @@
 //!
 //! <https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store>
 
+use crate::parser::{FromData, LazyArray16, NumFrom, Stream};
 use crate::NormalizedCoordinate;
-use crate::parser::{Stream, FromData, LazyArray16, NumFrom};
-
 
 #[derive(Clone, Copy)]
 pub(crate) struct ItemVariationStore<'a> {
@@ -22,7 +21,7 @@ impl<'a> Default for ItemVariationStore<'a> {
             regions: VariationRegionList {
                 axis_count: 0,
                 regions: LazyArray16::new(&[]),
-            }
+            },
         }
     }
 }
@@ -54,7 +53,11 @@ impl<'a> ItemVariationStore<'a> {
             }
         };
 
-        Some(ItemVariationStore { data, data_offsets: offsets, regions })
+        Some(ItemVariationStore {
+            data,
+            data_offsets: offsets,
+            regions,
+        })
     }
 
     pub fn region_indices(&self, index: u16) -> Option<LazyArray16<u16>> {
@@ -106,7 +109,6 @@ impl<'a> ItemVariationStore<'a> {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub struct VariationRegionList<'a> {
     axis_count: u16,
@@ -115,11 +117,7 @@ pub struct VariationRegionList<'a> {
 
 impl<'a> VariationRegionList<'a> {
     #[inline]
-    pub(crate) fn evaluate_region(
-        &self,
-        index: u16,
-        coordinates: &[NormalizedCoordinate],
-    ) -> f32 {
+    pub(crate) fn evaluate_region(&self, index: u16, coordinates: &[NormalizedCoordinate]) -> f32 {
         let mut v = 1.0;
         for (i, coord) in coordinates.iter().enumerate() {
             let region = match self.regions.get(index * self.axis_count + i as u16) {
@@ -138,7 +136,6 @@ impl<'a> VariationRegionList<'a> {
         v
     }
 }
-
 
 #[derive(Clone, Copy)]
 struct RegionAxisCoordinatesRecord {

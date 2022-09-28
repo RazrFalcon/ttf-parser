@@ -2,8 +2,8 @@
 
 use core::convert::TryFrom;
 
-use crate::parser::{LazyArray32, Stream};
 use super::format12::SequentialMapGroup;
+use crate::parser::{LazyArray32, Stream};
 use crate::GlyphId;
 
 /// A [format 13](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-13-segmented-coverage)

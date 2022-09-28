@@ -24,7 +24,6 @@ impl FromData for SequentialMapGroup {
     }
 }
 
-
 /// A [format 12](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage)
 /// subtable.
 #[derive(Clone, Copy)]
@@ -59,7 +58,10 @@ impl<'a> Subtable12<'a> {
             }
         })?;
 
-        let id = group.start_glyph_id.checked_add(code_point)?.checked_sub(group.start_char_code)?;
+        let id = group
+            .start_glyph_id
+            .checked_add(code_point)?
+            .checked_sub(group.start_char_code)?;
         return u16::try_from(id).ok().map(GlyphId);
     }
 

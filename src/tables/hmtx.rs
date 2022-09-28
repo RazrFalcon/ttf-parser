@@ -3,8 +3,8 @@
 
 use core::num::NonZeroU16;
 
+use crate::parser::{FromData, LazyArray16, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, LazyArray16};
 
 /// Horizontal/Vertical Metrics.
 #[derive(Clone, Copy, Debug)]
@@ -27,7 +27,6 @@ impl FromData for Metrics {
         })
     }
 }
-
 
 /// A [Horizontal/Vertical Metrics Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/hmtx).
@@ -108,7 +107,8 @@ impl<'a> Table<'a> {
             // 'If the number_of_metrics is less than the total number of glyphs,
             // then that array is followed by an array for the side bearing values
             // of the remaining glyphs.'
-            self.bearings.get(glyph_id.0.checked_sub(self.metrics.len())?)
+            self.bearings
+                .get(glyph_id.0.checked_sub(self.metrics.len())?)
         }
     }
 }

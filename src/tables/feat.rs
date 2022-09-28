@@ -31,7 +31,6 @@ impl FromData for FeatureNameRecord {
     }
 }
 
-
 /// A setting name.
 #[derive(Clone, Copy, Debug)]
 pub struct SettingName {
@@ -54,7 +53,6 @@ impl FromData for SettingName {
     }
 }
 
-
 /// A feature names.
 #[derive(Clone, Copy, Debug)]
 pub struct FeatureName<'a> {
@@ -69,7 +67,6 @@ pub struct FeatureName<'a> {
     /// The `name` table index for the feature's name in a 256..32768 range.
     pub name_index: u16,
 }
-
 
 /// A list fo feature names.
 #[derive(Clone, Copy)]
@@ -88,8 +85,11 @@ impl<'a> FeatureNames<'a> {
         Some(FeatureName {
             feature: record.feature,
             setting_names,
-            default_setting_index:
-                if record.flags & 0x40 != 0 { record.default_setting_index } else { 0 },
+            default_setting_index: if record.flags & 0x40 != 0 {
+                record.default_setting_index
+            } else {
+                0
+            },
             exclusive: record.flags & 0x80 != 0,
             name_index: record.name_index,
         })
@@ -97,8 +97,10 @@ impl<'a> FeatureNames<'a> {
 
     /// Finds a feature name by ID.
     pub fn find(&self, feature: u16) -> Option<FeatureName<'a>> {
-        let index = self.records
-            .binary_search_by(|name| name.feature.cmp(&feature)).map(|(i, _)| i)?;
+        let index = self
+            .records
+            .binary_search_by(|name| name.feature.cmp(&feature))
+            .map(|(i, _)| i)?;
         self.get(index)
     }
 
@@ -147,7 +149,6 @@ impl<'a> Iterator for FeatureNamesIter<'a> {
     }
 }
 
-
 /// A [Feature Name Table](
 /// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6feat.html).
 #[derive(Clone, Copy, Debug)]
@@ -171,10 +172,7 @@ impl<'a> Table<'a> {
         let records = s.read_array16::<FeatureNameRecord>(count)?;
 
         Some(Table {
-            names: FeatureNames {
-                data,
-                records,
-            }
+            names: FeatureNames { data, records },
         })
     }
 }

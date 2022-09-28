@@ -1,8 +1,8 @@
 //! A [Font Header Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/head) implementation.
 
+use crate::parser::{Fixed, Stream};
 use crate::Rect;
-use crate::parser::{Stream, Fixed};
 
 /// An index format used by the [Index to Location Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/loca).
@@ -12,7 +12,6 @@ pub enum IndexToLocationFormat {
     Short,
     Long,
 }
-
 
 /// A [Font Header Table](https://docs.microsoft.com/en-us/typography/opentype/spec/head).
 #[derive(Clone, Copy, Debug)]
@@ -34,7 +33,7 @@ impl Table {
         // Do not check the exact length, because some fonts include
         // padding in table's length in table records, which is incorrect.
         if data.len() < 54 {
-            return None
+            return None;
         }
 
         let mut s = Stream::new(data);
@@ -67,7 +66,12 @@ impl Table {
 
         Some(Table {
             units_per_em,
-            global_bbox: Rect { x_min, y_min, x_max, y_max },
+            global_bbox: Rect {
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+            },
             index_to_location_format,
         })
     }

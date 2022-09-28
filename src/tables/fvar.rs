@@ -3,8 +3,8 @@
 
 use core::num::NonZeroU16;
 
-use crate::{Tag, NormalizedCoordinate};
-use crate::parser::{Stream, FromData, Fixed, Offset16, Offset, LazyArray16, f32_bound};
+use crate::parser::{f32_bound, Fixed, FromData, LazyArray16, Offset, Offset16, Stream};
+use crate::{NormalizedCoordinate, Tag};
 
 /// A [variation axis](https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord).
 #[repr(C)]
@@ -61,7 +61,6 @@ impl VariationAxis {
         NormalizedCoordinate::from(v)
     }
 }
-
 
 /// A [Font Variations Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/fvar).

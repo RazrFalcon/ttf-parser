@@ -1,5 +1,5 @@
-use crate::parser::{FromSlice, LazyArray16, LazyOffsetArray16, Stream};
 use super::{ClassDefinition, Coverage, SequenceLookupRecord};
+use crate::parser::{FromSlice, LazyArray16, LazyOffsetArray16, Stream};
 
 /// A [Chained Contextual Lookup Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chseqctxt1).
@@ -125,6 +125,11 @@ impl<'a> FromSlice<'a> for ChainedSequenceRule<'a> {
         let lookahead = s.read_array16(lookahead_count)?;
         let lookup_count = s.read::<u16>()?;
         let lookups = s.read_array16(lookup_count)?;
-        Some(Self { backtrack, input, lookahead, lookups })
+        Some(Self {
+            backtrack,
+            input,
+            lookahead,
+            lookups,
+        })
     }
 }

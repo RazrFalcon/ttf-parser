@@ -1,4 +1,6 @@
-use crate::parser::{FromData, FromSlice, LazyArray16, LazyOffsetArray16, Offset, Offset16, Offset32, Stream};
+use crate::parser::{
+    FromData, FromSlice, LazyArray16, LazyOffsetArray16, Offset, Offset16, Offset32, Stream,
+};
 
 /// A list of [`Lookup`] values.
 pub type LookupList<'a> = LazyOffsetArray16<'a, Lookup<'a>>;
@@ -29,7 +31,11 @@ impl<'a> FromSlice<'a> for Lookup<'a> {
 
         Some(Self {
             flags,
-            subtables: LookupSubtables { kind, data, offsets },
+            subtables: LookupSubtables {
+                kind,
+                data,
+                offsets,
+            },
             mark_filtering_set,
         })
     }
@@ -115,6 +121,7 @@ impl<'a, T: LookupSubtable<'a>> Iterator for LookupSubtablesIter<'a, T> {
 #[derive(Clone, Copy, Debug)]
 pub struct LookupFlags(pub u16);
 
+#[rustfmt::skip]
 #[allow(missing_docs)]
 impl LookupFlags {
     #[inline] pub fn right_to_left(self) -> bool { self.0 & 0x0001 != 0 }

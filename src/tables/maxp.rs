@@ -23,8 +23,6 @@ impl Table {
 
         let n = s.read::<u16>()?;
         let number_of_glyphs = NonZeroU16::new(n)?;
-        Some(Table {
-            number_of_glyphs
-        })
+        Some(Table { number_of_glyphs })
     }
 }

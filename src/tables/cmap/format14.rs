@@ -1,5 +1,5 @@
-use crate::GlyphId;
 use crate::parser::{FromData, LazyArray32, Offset, Offset32, Stream, U24};
+use crate::GlyphId;
 
 #[derive(Clone, Copy)]
 struct VariationSelectorRecord {
@@ -22,7 +22,6 @@ impl FromData for VariationSelectorRecord {
     }
 }
 
-
 #[derive(Clone, Copy)]
 struct UVSMappingRecord {
     unicode_value: u32,
@@ -41,7 +40,6 @@ impl FromData for UVSMappingRecord {
         })
     }
 }
-
 
 #[derive(Clone, Copy)]
 struct UnicodeRangeRecord {
@@ -70,7 +68,6 @@ impl FromData for UnicodeRangeRecord {
     }
 }
 
-
 /// A result of a variation glyph mapping.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum GlyphVariationResult {
@@ -82,7 +79,6 @@ pub enum GlyphVariationResult {
     /// in this case.
     UseDefault,
 }
-
 
 /// A [format 14](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-14-unicode-variation-sequences)
 /// subtable.
@@ -106,7 +102,9 @@ impl<'a> Subtable14<'a> {
 
     /// Returns a glyph index for a code point.
     pub fn glyph_index(&self, code_point: u32, variation: u32) -> Option<GlyphVariationResult> {
-        let (_, record) = self.records.binary_search_by(|v| v.var_selector.cmp(&variation))?;
+        let (_, record) = self
+            .records
+            .binary_search_by(|v| v.var_selector.cmp(&variation))?;
 
         if let Some(offset) = record.default_uvs_offset {
             let data = self.data.get(offset.to_usize()..)?;
@@ -125,7 +123,8 @@ impl<'a> Subtable14<'a> {
             let mut s = Stream::new(data);
             let count = s.read::<u32>()?;
             let uvs_mappings = s.read_array32::<UVSMappingRecord>(count)?;
-            let (_, mapping) = uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&code_point))?;
+            let (_, mapping) =
+                uvs_mappings.binary_search_by(|v| v.unicode_value.cmp(&code_point))?;
             return Some(GlyphVariationResult::Found(mapping.glyph_id));
         }
 

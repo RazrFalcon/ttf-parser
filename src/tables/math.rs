@@ -1,9 +1,11 @@
 //! A [Math Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math) implementation.
 
-use crate::GlyphId;
 use crate::gpos::Device;
 use crate::opentype_layout::Coverage;
-use crate::parser::{Offset16, Stream, FromSlice, FromData, Offset, LazyArray16, LazyOffsetArray16};
+use crate::parser::{
+    FromData, FromSlice, LazyArray16, LazyOffsetArray16, Offset, Offset16, Stream,
+};
+use crate::GlyphId;
 
 /// A [Math Value](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord)
 /// with optional device corrections.
@@ -21,7 +23,6 @@ impl<'a> MathValue<'a> {
     }
 }
 
-
 /// A math value record with unresolved offset.
 #[derive(Clone, Copy)]
 struct MathValueRecord {
@@ -36,19 +37,25 @@ impl FromData for MathValueRecord {
         let mut s = Stream::new(data);
         let value = s.read::<i16>()?;
         let device_offset = s.read::<Option<Offset16>>()?;
-        Some(MathValueRecord { value, device_offset })
+        Some(MathValueRecord {
+            value,
+            device_offset,
+        })
     }
 }
 
 impl MathValueRecord {
     fn get(self, data: &[u8]) -> MathValue {
-        let device = self.device_offset
+        let device = self
+            .device_offset
             .and_then(|offset| data.get(offset.to_usize()..))
             .and_then(Device::parse);
-        MathValue { value: self.value, device }
+        MathValue {
+            value: self.value,
+            device,
+        }
     }
 }
-
 
 /// A mapping from glyphs to
 /// [Math Values](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathvaluerecord).
@@ -65,7 +72,11 @@ impl<'a> FromSlice<'a> for MathValues<'a> {
         let coverage = s.parse_at_offset16::<Coverage>(data)?;
         let count = s.read::<u16>()?;
         let records = s.read_array16::<MathValueRecord>(count)?;
-        Some(MathValues {data, coverage, records })
+        Some(MathValues {
+            data,
+            coverage,
+            records,
+        })
     }
 }
 
@@ -84,7 +95,6 @@ impl core::fmt::Debug for MathValues<'_> {
     }
 }
 
-
 /// A [Math Constants Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathconstants-table).
 #[derive(Clone, Copy)]
 pub struct Constants<'a> {
@@ -102,7 +112,6 @@ impl core::fmt::Debug for Constants<'_> {
         write!(f, "Constants {{ ... }}")
     }
 }
-
 
 const SCRIPT_PERCENT_SCALE_DOWN_OFFSET: usize = 0;
 const SCRIPT_SCRIPT_PERCENT_SCALE_DOWN_OFFSET: usize = 2;
@@ -160,7 +169,6 @@ const RADICAL_EXTRA_ASCENDER_OFFSET: usize = 200;
 const RADICAL_KERN_BEFORE_DEGREE_OFFSET: usize = 204;
 const RADICAL_KERN_AFTER_DEGREE_OFFSET: usize = 208;
 const RADICAL_DEGREE_BOTTOM_RAISE_PERCENT_OFFSET: usize = 212;
-
 
 impl<'a> Constants<'a> {
     /// Percentage of scaling down for level 1 superscripts and subscripts.
@@ -528,12 +536,15 @@ impl<'a> Constants<'a> {
     /// Read a `MathValueRecord` at an offset into the table.
     #[inline]
     fn read_record(&self, offset: usize) -> MathValue<'a> {
-        self.data.get(offset..)
+        self.data
+            .get(offset..)
             .and_then(|data| MathValue::parse(data, self.data))
-            .unwrap_or(MathValue { value: 0, device: None })
+            .unwrap_or(MathValue {
+                value: 0,
+                device: None,
+            })
     }
 }
-
 
 /// A [Math Kern Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathkern-table).
 #[derive(Clone)]
@@ -570,7 +581,11 @@ impl<'a> FromSlice<'a> for Kern<'a> {
         let count = s.read::<u16>()?;
         let heights = s.read_array16::<MathValueRecord>(count)?;
         let kerns = s.read_array16::<MathValueRecord>(count + 1)?;
-        Some(Kern { data, heights, kerns })
+        Some(Kern {
+            data,
+            heights,
+            kerns,
+        })
     }
 }
 
@@ -579,7 +594,6 @@ impl core::fmt::Debug for Kern<'_> {
         write!(f, "Kern {{ ... }}")
     }
 }
-
 
 #[derive(Clone, Copy)]
 struct KernInfoRecord {
@@ -605,9 +619,11 @@ impl FromData for KernInfoRecord {
 
 impl KernInfoRecord {
     fn get<'a>(&self, data: &'a [u8]) -> KernInfo<'a> {
-        let parse_field = |offset: Option<Offset16>| offset
-            .and_then(|offset| data.get(offset.to_usize()..))
-            .and_then(Kern::parse);
+        let parse_field = |offset: Option<Offset16>| {
+            offset
+                .and_then(|offset| data.get(offset.to_usize()..))
+                .and_then(Kern::parse)
+        };
         KernInfo {
             top_right: parse_field(self.top_right),
             top_left: parse_field(self.top_left),
@@ -616,7 +632,6 @@ impl KernInfoRecord {
         }
     }
 }
-
 
 /// An [entry in a Math Kern Info Table](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathkerninforecord).
@@ -632,7 +647,6 @@ pub struct KernInfo<'a> {
     pub bottom_left: Option<Kern<'a>>,
 }
 
-
 /// A [Math Kern Info Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math#mathkerninfo-table).
 #[derive(Clone, Copy)]
 pub struct KernInfos<'a> {
@@ -647,7 +661,11 @@ impl<'a> FromSlice<'a> for KernInfos<'a> {
         let coverage = s.parse_at_offset16::<Coverage>(data)?;
         let count = s.read::<u16>()?;
         let records = s.read_array16::<KernInfoRecord>(count)?;
-        Some(KernInfos { data, coverage, records })
+        Some(KernInfos {
+            data,
+            coverage,
+            records,
+        })
     }
 }
 
@@ -665,7 +683,6 @@ impl core::fmt::Debug for KernInfos<'_> {
         write!(f, "KernInfos {{ ... }}")
     }
 }
-
 
 /// A [Math Glyph Info Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathglyphinfo-table).
 #[derive(Clone, Copy, Debug)]
@@ -692,14 +709,16 @@ impl<'a> FromSlice<'a> for GlyphInfo<'a> {
     }
 }
 
-
 /// Glyph part flags.
 #[derive(Clone, Copy, Debug)]
 pub struct PartFlags(pub u16);
 
 #[allow(missing_docs)]
 impl PartFlags {
-    #[inline] pub fn extender(self) -> bool { self.0 & 0x0001 != 0 }
+    #[inline]
+    pub fn extender(self) -> bool {
+        self.0 & 0x0001 != 0
+    }
 }
 
 impl FromData for PartFlags {
@@ -709,7 +728,6 @@ impl FromData for PartFlags {
         u16::parse(data).map(PartFlags)
     }
 }
-
 
 /// Details for a glyph part in an assembly.
 #[derive(Clone, Copy, Debug)]
@@ -741,7 +759,6 @@ impl FromData for GlyphPart {
     }
 }
 
-
 /// A [Glyph Assembly Table](https://learn.microsoft.com/en-us/typography/opentype/spec/math#glyphassembly-table).
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphAssembly<'a> {
@@ -757,10 +774,12 @@ impl<'a> FromSlice<'a> for GlyphAssembly<'a> {
         let italics_correction = s.read::<MathValueRecord>()?.get(data);
         let count = s.read::<u16>()?;
         let parts = s.read_array16::<GlyphPart>(count)?;
-        Some(GlyphAssembly { italics_correction, parts })
+        Some(GlyphAssembly {
+            italics_correction,
+            parts,
+        })
     }
 }
-
 
 /// Description of math glyph variants.
 #[derive(Clone, Copy, Debug)]
@@ -778,11 +797,10 @@ impl FromData for GlyphVariant {
         let mut s = Stream::new(data);
         Some(GlyphVariant {
             variant_glyph: s.read::<GlyphId>()?,
-            advance_measurement:s.read::<u16>()?,
+            advance_measurement: s.read::<u16>()?,
         })
     }
 }
-
 
 /// A [Math Glyph Construction Table](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathglyphconstruction-table).
@@ -804,7 +822,6 @@ impl<'a> FromSlice<'a> for GlyphConstruction<'a> {
     }
 }
 
-
 /// A mapping from glyphs to
 /// [Math Glyph Construction Tables](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathglyphconstruction-table).
@@ -822,7 +839,7 @@ impl<'a> GlyphConstructions<'a> {
     ) -> Self {
         GlyphConstructions {
             coverage: coverage.unwrap_or(Coverage::Format1 {
-                glyphs: LazyArray16::new(&[])
+                glyphs: LazyArray16::new(&[]),
             }),
             constructions: LazyOffsetArray16::new(data, offsets),
         }
@@ -841,7 +858,6 @@ impl core::fmt::Debug for GlyphConstructions<'_> {
         write!(f, "GlyphConstructions {{ ... }}")
     }
 }
-
 
 /// A [Math Variants Table](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/math#mathvariants-table).
@@ -867,12 +883,19 @@ impl<'a> FromSlice<'a> for Variants<'a> {
         let horizontal_offsets = s.read_array16::<Option<Offset16>>(horizontal_count)?;
         Some(Variants {
             min_connector_overlap,
-            vertical_constructions: GlyphConstructions::new(data, vertical_coverage, vertical_offsets),
-            horizontal_constructions: GlyphConstructions::new(data, horizontal_coverage, horizontal_offsets),
+            vertical_constructions: GlyphConstructions::new(
+                data,
+                vertical_coverage,
+                vertical_offsets,
+            ),
+            horizontal_constructions: GlyphConstructions::new(
+                data,
+                horizontal_coverage,
+                horizontal_offsets,
+            ),
         })
     }
 }
-
 
 /// A [Math Table](https://docs.microsoft.com/en-us/typography/opentype/spec/math).
 #[derive(Clone, Copy, Debug)]

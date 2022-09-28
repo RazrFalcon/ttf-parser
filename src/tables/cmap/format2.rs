@@ -99,8 +99,7 @@ impl<'a> Subtable2<'a> {
 
         // 'The value of the idRangeOffset is the number of bytes
         // past the actual location of the idRangeOffset'.
-        let offset =
-            self.sub_headers_offset
+        let offset = self.sub_headers_offset
                 // Advance to required subheader.
                 + SubHeaderRecord::SIZE * usize::from(i + 1)
                 // Move back to idRangeOffset start.
@@ -115,7 +114,9 @@ impl<'a> Subtable2<'a> {
             return None;
         }
 
-        u16::try_from((i32::from(glyph) + i32::from(sub_header.id_delta)) % 65536).ok().map(GlyphId)
+        u16::try_from((i32::from(glyph) + i32::from(sub_header.id_delta)) % 65536)
+            .ok()
+            .map(GlyphId)
     }
 
     /// Calls `f` for each codepoint defined in this table.

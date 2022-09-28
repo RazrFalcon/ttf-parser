@@ -1,9 +1,10 @@
 //! A [PostScript Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/post) implementation.
 
+use crate::parser::{Fixed, LazyArray16, Stream};
+#[cfg(feature = "glyph-names")]
+use crate::GlyphId;
 use crate::LineMetrics;
-use crate::parser::{Stream, Fixed, LazyArray16};
-#[cfg(feature = "glyph-names")] use crate::GlyphId;
 
 const ITALIC_ANGLE_OFFSET: usize = 4;
 const UNDERLINE_POSITION_OFFSET: usize = 8;
@@ -274,7 +275,6 @@ const MACINTOSH_NAMES: &[&str] = &[
     "dcroat",
 ];
 
-
 /// An iterator over glyph names.
 ///
 /// The `post` table doesn't provide the glyph names count,
@@ -310,12 +310,11 @@ impl<'a> Iterator for Names<'a> {
             return None;
         }
 
-        let name = self.data.get(self.offset .. self.offset + usize::from(len))?;
+        let name = self.data.get(self.offset..self.offset + usize::from(len))?;
         self.offset += usize::from(len);
         core::str::from_utf8(name).ok()
     }
 }
-
 
 /// A [PostScript Table](https://docs.microsoft.com/en-us/typography/opentype/spec/post).
 #[derive(Clone, Copy, Debug)]
@@ -331,7 +330,6 @@ pub struct Table<'a> {
     names_data: &'a [u8],
 }
 
-
 impl<'a> Table<'a> {
     /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
@@ -342,9 +340,11 @@ impl<'a> Table<'a> {
         }
 
         let version = Stream::new(data).read::<u32>()?;
-        if !(version == 0x00010000 || version == 0x00020000 ||
-             version == 0x00025000 || version == 0x00030000 ||
-             version == 0x00040000)
+        if !(version == 0x00010000
+            || version == 0x00020000
+            || version == 0x00025000
+            || version == 0x00030000
+            || version == 0x00040000)
         {
             return None;
         }
@@ -398,11 +398,15 @@ impl<'a> Table<'a> {
     #[cfg(feature = "glyph-names")]
     pub fn glyph_index_by_name(&self, name: &str) -> Option<GlyphId> {
         let id = if let Some(index) = MACINTOSH_NAMES.iter().position(|n| *n == name) {
-            self.glyph_indexes.into_iter().position(|i| usize::from(i) == index)?
+            self.glyph_indexes
+                .into_iter()
+                .position(|i| usize::from(i) == index)?
         } else {
             let mut index = self.names().position(|n| n == name)?;
             index += MACINTOSH_NAMES.len();
-            self.glyph_indexes.into_iter().position(|i| usize::from(i) == index)?
+            self.glyph_indexes
+                .into_iter()
+                .position(|i| usize::from(i) == index)?
         };
 
         Some(GlyphId(id as u16))
@@ -412,6 +416,9 @@ impl<'a> Table<'a> {
     ///
     /// Default/predefined names are not included. Just the one in the font file.
     pub fn names(&self) -> Names<'a> {
-        Names { data: self.names_data, offset: 0 }
+        Names {
+            data: self.names_data,
+            offset: 0,
+        }
     }
 }

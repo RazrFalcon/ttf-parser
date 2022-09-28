@@ -17,23 +17,38 @@ pub mod svg;
 pub mod vhea;
 pub mod vorg;
 
-#[cfg(feature = "opentype-layout")] pub mod gdef;
-#[cfg(feature = "opentype-layout")] pub mod gsub;
-#[cfg(feature = "opentype-layout")] pub mod gpos;
-#[cfg(feature = "opentype-layout")] pub mod math;
+#[cfg(feature = "opentype-layout")]
+pub mod gdef;
+#[cfg(feature = "opentype-layout")]
+pub mod gpos;
+#[cfg(feature = "opentype-layout")]
+pub mod gsub;
+#[cfg(feature = "opentype-layout")]
+pub mod math;
 
-#[cfg(feature = "apple-layout")] pub mod ankr;
-#[cfg(feature = "apple-layout")] pub mod feat;
-#[cfg(feature = "apple-layout")] pub mod kerx;
-#[cfg(feature = "apple-layout")] pub mod morx;
-#[cfg(feature = "apple-layout")] pub mod trak;
+#[cfg(feature = "apple-layout")]
+pub mod ankr;
+#[cfg(feature = "apple-layout")]
+pub mod feat;
+#[cfg(feature = "apple-layout")]
+pub mod kerx;
+#[cfg(feature = "apple-layout")]
+pub mod morx;
+#[cfg(feature = "apple-layout")]
+pub mod trak;
 
-#[cfg(feature = "variable-fonts")] pub mod avar;
-#[cfg(feature = "variable-fonts")] pub mod fvar;
-#[cfg(feature = "variable-fonts")] pub mod gvar;
-#[cfg(feature = "variable-fonts")] pub mod hvar;
-#[cfg(feature = "variable-fonts")] pub mod mvar;
+#[cfg(feature = "variable-fonts")]
+pub mod avar;
+#[cfg(feature = "variable-fonts")]
+pub mod fvar;
+#[cfg(feature = "variable-fonts")]
+pub mod gvar;
+#[cfg(feature = "variable-fonts")]
+pub mod hvar;
+#[cfg(feature = "variable-fonts")]
+pub mod mvar;
 
 pub use cff::cff1;
+#[cfg(feature = "variable-fonts")]
+pub use cff::cff2;
 pub use cff::CFFError;
-#[cfg(feature = "variable-fonts")] pub use cff::cff2;

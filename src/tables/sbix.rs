@@ -4,8 +4,8 @@
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
+use crate::parser::{FromData, LazyArray16, LazyArray32, Offset, Offset32, Stream};
 use crate::{GlyphId, RasterGlyphImage, RasterImageFormat, Tag};
-use crate::parser::{Stream, FromData, Offset, Offset32, LazyArray16, LazyArray32};
 
 /// A strike of glyphs.
 #[derive(Clone, Copy)]
@@ -106,7 +106,6 @@ impl core::fmt::Debug for Strike<'_> {
     }
 }
 
-
 /// A list of [`Strike`]s.
 #[derive(Clone, Copy)]
 pub struct Strikes<'a> {
@@ -172,7 +171,6 @@ impl<'a> Iterator for StrikesIter<'a> {
     }
 }
 
-
 /// A [Standard Bitmap Graphics Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/sbix).
 #[derive(Clone, Copy, Debug)]
@@ -218,8 +216,8 @@ impl<'a> Table<'a> {
         let mut idx = 0;
         let mut max_ppem = 0;
         for (i, strike) in self.strikes.into_iter().enumerate() {
-            if (pixels_per_em <= strike.pixels_per_em && strike.pixels_per_em < max_ppem) ||
-                (pixels_per_em > max_ppem && strike.pixels_per_em > max_ppem)
+            if (pixels_per_em <= strike.pixels_per_em && strike.pixels_per_em < max_ppem)
+                || (pixels_per_em > max_ppem && strike.pixels_per_em > max_ppem)
             {
                 idx = i as u32;
                 max_ppem = strike.pixels_per_em;
@@ -240,8 +238,5 @@ fn png_size(data: &[u8]) -> Option<(u16, u16)> {
     let height = s.read::<u32>()?;
 
     // PNG size larger than u16::MAX is an error.
-    Some((
-        u16::try_from(width).ok()?,
-        u16::try_from(height).ok()?,
-    ))
+    Some((u16::try_from(width).ok()?, u16::try_from(height).ok()?))
 }

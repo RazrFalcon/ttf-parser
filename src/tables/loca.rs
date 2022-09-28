@@ -1,12 +1,12 @@
 //! An [Index to Location Table](https://docs.microsoft.com/en-us/typography/opentype/spec/loca)
 //! implementation.
 
+use core::convert::TryFrom;
 use core::num::NonZeroU16;
 use core::ops::Range;
-use core::convert::TryFrom;
 
+use crate::parser::{LazyArray16, NumFrom, Stream};
 use crate::{GlyphId, IndexToLocationFormat};
-use crate::parser::{Stream, LazyArray16, NumFrom};
 
 /// An [Index to Location Table](https://docs.microsoft.com/en-us/typography/opentype/spec/loca).
 #[derive(Clone, Copy, Debug)]
@@ -52,12 +52,8 @@ impl<'a> Table<'a> {
 
         let mut s = Stream::new(data);
         match format {
-            IndexToLocationFormat::Short => {
-                Some(Table::Short(s.read_array16::<u16>(total)?))
-            }
-            IndexToLocationFormat::Long => {
-                Some(Table::Long(s.read_array16::<u32>(total)?))
-            }
+            IndexToLocationFormat::Short => Some(Table::Short(s.read_array16::<u16>(total)?)),
+            IndexToLocationFormat::Long => Some(Table::Long(s.read_array16::<u32>(total)?)),
         }
     }
 
@@ -86,10 +82,10 @@ impl<'a> Table<'a> {
         let range = match self {
             Table::Short(ref array) => {
                 // 'The actual local offset divided by 2 is stored.'
-                usize::from(array.get(glyph_id)?) * 2 .. usize::from(array.get(glyph_id + 1)?) * 2
+                usize::from(array.get(glyph_id)?) * 2..usize::from(array.get(glyph_id + 1)?) * 2
             }
             Table::Long(ref array) => {
-                usize::num_from(array.get(glyph_id)?) .. usize::num_from(array.get(glyph_id + 1)?)
+                usize::num_from(array.get(glyph_id)?)..usize::num_from(array.get(glyph_id + 1)?)
             }
         };
 

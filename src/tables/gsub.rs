@@ -4,9 +4,9 @@
 // A heavily modified port of https://github.com/RazrFalcon/rustybuzz implementation
 // originally written by https://github.com/laurmaedje
 
-use crate::GlyphId;
 use crate::opentype_layout::{ChainedContextLookup, ContextLookup, Coverage, LookupSubtable};
 use crate::parser::{FromSlice, LazyArray16, LazyOffsetArray16, Stream};
+use crate::GlyphId;
 
 /// A [Single Substitution Subtable](https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#SS).
 #[allow(missing_docs)]
@@ -35,7 +35,10 @@ impl<'a> SingleSubstitution<'a> {
                 let coverage = Coverage::parse(s.read_at_offset16(data)?)?;
                 let count = s.read::<u16>()?;
                 let substitutes = s.read_array16(count)?;
-                Some(Self::Format2 { coverage, substitutes })
+                Some(Self::Format2 {
+                    coverage,
+                    substitutes,
+                })
             }
             _ => None,
         }
@@ -50,7 +53,6 @@ impl<'a> SingleSubstitution<'a> {
         }
     }
 }
-
 
 /// A sequence of glyphs for
 /// [Multiple Substitution Subtable](https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#MS).
@@ -98,7 +100,6 @@ impl<'a> MultipleSubstitution<'a> {
     }
 }
 
-
 /// A list of glyphs for
 /// [Alternate Substitution Subtable](https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#AS).
 #[derive(Clone, Copy, Debug)]
@@ -144,7 +145,6 @@ impl<'a> AlternateSubstitution<'a> {
         }
     }
 }
-
 
 /// Glyph components for one ligature.
 #[derive(Clone, Copy, Debug)]
@@ -203,7 +203,6 @@ impl<'a> LigatureSubstitution<'a> {
     }
 }
 
-
 /// A [Reverse Chaining Contextual Single Substitution Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#RCCS).
 #[allow(missing_docs)]
@@ -238,7 +237,6 @@ impl<'a> ReverseChainSingleSubstitution<'a> {
         }
     }
 }
-
 
 /// A glyph substitution
 /// [lookup subtable](https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#table-organization)

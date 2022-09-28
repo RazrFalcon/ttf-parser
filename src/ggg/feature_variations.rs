@@ -1,7 +1,7 @@
-use crate::{NormalizedCoordinate, Tag};
+use super::{Feature, FeatureIndex, RecordListItem, VariationIndex};
 use crate::parser::{FromData, LazyArray16, LazyArray32};
 use crate::parser::{Offset, Offset32, Stream};
-use super::{Feature, FeatureIndex, VariationIndex, RecordListItem};
+use crate::{NormalizedCoordinate, Tag};
 
 /// A [Feature Variations Table](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#featurevariations-table).
 #[derive(Clone, Copy, Debug)]
@@ -84,7 +84,8 @@ impl<'a> ConditionSet<'a> {
 
     fn evaluate(&self, coords: &[NormalizedCoordinate]) -> bool {
         self.conditions.into_iter().all(|offset| {
-            self.data.get(offset.to_usize()..)
+            self.data
+                .get(offset.to_usize()..)
                 .and_then(Condition::parse)
                 .map_or(false, |c| c.evaluate(coords))
         })
@@ -97,7 +98,7 @@ enum Condition {
         axis_index: u16,
         filter_range_min: i16,
         filter_range_max: i16,
-    }
+    },
 }
 
 impl Condition {
@@ -109,15 +110,26 @@ impl Condition {
                 let axis_index = s.read::<u16>()?;
                 let filter_range_min = s.read::<i16>()?;
                 let filter_range_max = s.read::<i16>()?;
-                Some(Self::Format1 { axis_index, filter_range_min, filter_range_max })
+                Some(Self::Format1 {
+                    axis_index,
+                    filter_range_min,
+                    filter_range_max,
+                })
             }
             _ => None,
         }
     }
 
     fn evaluate(&self, coords: &[NormalizedCoordinate]) -> bool {
-        let Self::Format1 { axis_index, filter_range_min, filter_range_max } = *self;
-        let coord = coords.get(usize::from(axis_index)).map(|c| c.get()).unwrap_or(0);
+        let Self::Format1 {
+            axis_index,
+            filter_range_min,
+            filter_range_max,
+        } = *self;
+        let coord = coords
+            .get(usize::from(axis_index))
+            .map(|c| c.get())
+            .unwrap_or(0);
         filter_range_min <= coord && coord <= filter_range_max
     }
 }

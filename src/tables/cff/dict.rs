@@ -13,9 +13,10 @@ pub struct Operator(pub u16);
 
 impl Operator {
     #[inline]
-    pub fn get(self) -> u16 { self.0 }
+    pub fn get(self) -> u16 {
+        self.0
+    }
 }
-
 
 pub struct DictionaryParser<'a> {
     data: &'a [u8],
@@ -147,10 +148,10 @@ impl<'a> DictionaryParser<'a> {
 pub fn is_dict_one_byte_op(b: u8) -> bool {
     match b {
         0..=27 => true,
-        28..=30 => false, // numbers
-        31 => true, // Reserved
+        28..=30 => false,  // numbers
+        31 => true,        // Reserved
         32..=254 => false, // numbers
-        255 => true, // Reserved
+        255 => true,       // Reserved
     }
 }
 
@@ -165,9 +166,7 @@ pub fn parse_number(b0: u8, s: &mut Stream) -> Option<f64> {
             let n = s.read::<i32>()?;
             Some(f64::from(n))
         }
-        30 => {
-            parse_float(s)
-        }
+        30 => parse_float(s),
         32..=246 => {
             let n = i32::from(b0) - 139;
             Some(f64::from(n))
@@ -277,18 +276,35 @@ pub fn skip_number(b0: u8, s: &mut Stream) -> Option<()> {
     Some(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn parse_dict_number() {
-        assert_eq!(parse_number(0xFA, &mut Stream::new(&[0x7C])).unwrap(), 1000.0);
-        assert_eq!(parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(), -1000.0);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(), 10000.0);
-        assert_eq!(parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(), -10000.0);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(), 100000.0);
-        assert_eq!(parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(), -100000.0);
+        assert_eq!(
+            parse_number(0xFA, &mut Stream::new(&[0x7C])).unwrap(),
+            1000.0
+        );
+        assert_eq!(
+            parse_number(0xFE, &mut Stream::new(&[0x7C])).unwrap(),
+            -1000.0
+        );
+        assert_eq!(
+            parse_number(0x1C, &mut Stream::new(&[0x27, 0x10])).unwrap(),
+            10000.0
+        );
+        assert_eq!(
+            parse_number(0x1C, &mut Stream::new(&[0xD8, 0xF0])).unwrap(),
+            -10000.0
+        );
+        assert_eq!(
+            parse_number(0x1D, &mut Stream::new(&[0x00, 0x01, 0x86, 0xA0])).unwrap(),
+            100000.0
+        );
+        assert_eq!(
+            parse_number(0x1D, &mut Stream::new(&[0xFF, 0xFE, 0x79, 0x60])).unwrap(),
+            -100000.0
+        );
     }
 }

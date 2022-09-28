@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use std::io::Write;
+use std::path::PathBuf;
 
 use ttf_parser as ttf;
 
@@ -13,7 +13,8 @@ Usage:
 ";
 
 struct Args {
-    #[allow(dead_code)] variations: Vec<ttf::Variation>,
+    #[allow(dead_code)]
+    variations: Vec<ttf::Variation>,
     ttf_path: PathBuf,
     svg_path: PathBuf,
 }
@@ -81,7 +82,8 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     #[allow(unused_mut)]
     let mut face = ttf::Face::parse(&font_data, 0)?;
     if face.is_variable() {
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             for variation in args.variations {
                 face.set_variation(variation.axis, variation.value)
                     .ok_or("failed to create variation coordinates")?;
@@ -104,7 +106,13 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     svg.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
     svg.write_attribute_fmt(
         "viewBox",
-        format_args!("{} {} {} {}", 0, 0, cell_size * COLUMNS as f64, cell_size * rows as f64),
+        format_args!(
+            "{} {} {} {}",
+            0,
+            0,
+            cell_size * COLUMNS as f64,
+            cell_size * rows as f64
+        ),
     );
 
     draw_grid(face.number_of_glyphs(), cell_size, &mut svg);
@@ -179,11 +187,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn draw_grid(
-    n_glyphs: u16,
-    cell_size: f64,
-    svg: &mut xmlwriter::XmlWriter,
-) {
+fn draw_grid(n_glyphs: u16, cell_size: f64, svg: &mut xmlwriter::XmlWriter) {
     let columns = COLUMNS;
     let rows = (n_glyphs as f64 / columns as f64).ceil() as u32;
 

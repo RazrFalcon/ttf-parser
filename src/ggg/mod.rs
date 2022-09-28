@@ -5,20 +5,22 @@
 // A heavily modified port of https://github.com/RazrFalcon/rustybuzz implementation
 // originally written by https://github.com/laurmaedje
 
+use crate::parser::{FromData, FromSlice, LazyArray16, Stream};
 use crate::GlyphId;
-use crate::parser::{Stream, FromData, FromSlice, LazyArray16};
 
-mod context;
 mod chained_context;
-mod lookup;
+mod context;
+#[cfg(feature = "variable-fonts")]
+mod feature_variations;
 mod layout_table;
-#[cfg(feature = "variable-fonts")] mod feature_variations;
+mod lookup;
 
-pub use context::*;
 pub use chained_context::*;
-pub use lookup::*;
+pub use context::*;
+#[cfg(feature = "variable-fonts")]
+pub use feature_variations::*;
 pub use layout_table::*;
-#[cfg(feature = "variable-fonts")] pub use feature_variations::*;
+pub use lookup::*;
 
 /// A record that describes a range of glyph IDs.
 #[derive(Clone, Copy, Debug)]
@@ -42,7 +44,8 @@ impl LazyArray16<'_, RangeRecord> {
             } else {
                 core::cmp::Ordering::Less
             }
-        }).map(|p| p.1)
+        })
+        .map(|p| p.1)
     }
 }
 
@@ -59,7 +62,6 @@ impl FromData for RangeRecord {
         })
     }
 }
-
 
 /// A [Coverage Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-table).
@@ -104,9 +106,7 @@ impl<'a> Coverage<'a> {
     /// Returns the coverage index of the glyph or `None` if it is not covered.
     pub fn get(&self, glyph: GlyphId) -> Option<u16> {
         match self {
-            Self::Format1 { glyphs } => {
-                glyphs.binary_search(&glyph).map(|p| p.0)
-            }
+            Self::Format1 { glyphs } => glyphs.binary_search(&glyph).map(|p| p.0),
             Self::Format2 { records } => {
                 let record = records.range(glyph)?;
                 let offset = glyph.0 - record.start.0;
@@ -144,12 +144,12 @@ impl<'a> ClassDefinition<'a> {
                 let count = s.read::<u16>()?;
                 let classes = s.read_array16(count)?;
                 Some(Self::Format1 { start, classes })
-            },
+            }
             2 => {
                 let count = s.read::<u16>()?;
                 let records = s.read_array16(count)?;
                 Some(Self::Format2 { records })
-            },
+            }
             _ => None,
         }
     }
@@ -157,12 +157,12 @@ impl<'a> ClassDefinition<'a> {
     /// Returns the glyph class of the glyph (zero if it is not defined).
     pub fn get(&self, glyph: GlyphId) -> Class {
         match self {
-            Self::Format1 { start, classes } => {
-                glyph.0.checked_sub(start.0).and_then(|index| classes.get(index))
-            }
-            Self::Format2 { records } => {
-                records.range(glyph).map(|record| record.value)
-            }
-        }.unwrap_or(0)
+            Self::Format1 { start, classes } => glyph
+                .0
+                .checked_sub(start.0)
+                .and_then(|index| classes.get(index)),
+            Self::Format2 { records } => records.range(glyph).map(|record| record.value),
+        }
+        .unwrap_or(0)
     }
 }

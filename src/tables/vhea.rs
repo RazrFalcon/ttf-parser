@@ -22,7 +22,7 @@ impl Table {
         // Do not check the exact length, because some fonts include
         // padding in table's length in table records, which is incorrect.
         if data.len() < 36 {
-            return None
+            return None;
         }
 
         let mut s = Stream::new(data);

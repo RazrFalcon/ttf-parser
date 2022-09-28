@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.17.0] - 2022-09-28
+### Added
+- `MATH` table support. Thanks to [ruifengx](https://github.com/ruifengx)
+  and [laurmaedje](https://github.com/laurmaedje).
+
 ### Fixed
 - (CFF) Fix large tables parsing.
 
@@ -352,7 +358,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.0...v0.15.1

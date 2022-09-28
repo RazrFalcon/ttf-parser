@@ -100,7 +100,7 @@ There are roughly three types of TrueType tables:
 | `VORG` table      | ✓                      | ✓                   |                                |
 | `VVAR` table      | ✓                      | ✓                   |                                |
 | Language          | Rust + C API           | C                   | C                              |
-| Tested version    | 0.15.0                 | 2.12.0              | 1.24                           |
+| Tested version    | 0.17.0                 | 2.12.0              | 1.24                           |
 | License           | MIT / Apache-2.0       | FTL / GPLv2         | public domain                  |
 
 Legend:

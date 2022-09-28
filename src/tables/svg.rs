@@ -60,6 +60,11 @@ impl<'a> SvgDocumentsList<'a> {
     pub fn len(&self) -> u16 {
         self.records.len()
     }
+
+    /// Checks if the list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
 }
 
 impl core::fmt::Debug for SvgDocumentsList<'_> {
@@ -104,7 +109,7 @@ impl<'a> Iterator for SvgDocumentsListIter<'a> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::from(self.list.len().checked_sub(self.index).unwrap_or(0))
+        usize::from(self.list.len().saturating_sub(self.index))
     }
 }
 

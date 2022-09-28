@@ -31,7 +31,7 @@ fn parse_index_impl<'a>(count: u32, s: &mut Stream<'a>) -> Option<Index<'a>> {
     let offset_size = s.read::<OffsetSize>()?;
     let offsets_len = (count + 1).checked_mul(offset_size.to_u32())?;
     let offsets = VarOffsets {
-        data: &s.read_bytes(usize::num_from(offsets_len))?,
+        data: s.read_bytes(usize::num_from(offsets_len))?,
         offset_size,
     };
 
@@ -60,7 +60,7 @@ fn skip_index_impl(count: u32, s: &mut Stream) -> Option<()> {
     let offset_size = s.read::<OffsetSize>()?;
     let offsets_len = (count + 1).checked_mul(offset_size.to_u32())?;
     let offsets = VarOffsets {
-        data: &s.read_bytes(usize::num_from(offsets_len))?,
+        data: s.read_bytes(usize::num_from(offsets_len))?,
         offset_size,
     };
 
@@ -153,7 +153,7 @@ impl<'a> Index<'a> {
     #[inline]
     pub fn len(&self) -> u32 {
         // Last offset points to the byte after the `Object data`. We should skip it.
-        self.offsets.len().checked_sub(1).unwrap_or(0)
+        self.offsets.len().saturating_sub(1)
     }
 
     pub fn get(&self, index: u32) -> Option<&'a [u8]> {
@@ -184,7 +184,7 @@ impl<'a> Iterator for IndexIter<'a> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum OffsetSize {
     Size1 = 1,
     Size2 = 2,

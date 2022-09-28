@@ -51,7 +51,7 @@ impl HintingDevice<'_> {
         let mask = 0xFFFF >> (16 - (1 << f));
 
         let mut delta = i64::from(bits & mask);
-        if delta >= i64::from(mask + 1 >> 1) {
+        if delta >= i64::from((mask + 1) >> 1) {
             delta -= i64::from(mask + 1);
         }
 
@@ -94,7 +94,7 @@ impl<'a> Device<'a> {
             1..=3 => {
                 let start_size = first;
                 let end_size = second;
-                let count = 1 + (end_size - start_size) >> (4 - format);
+                let count = (1 + (end_size - start_size)) >> (4 - format);
                 let delta_values = s.read_array16(count)?;
                 Some(Self::Hinting(HintingDevice {
                     start_size,
@@ -260,6 +260,11 @@ impl<'a> ValueRecordsArray<'a> {
     #[inline]
     pub fn len(&self) -> u16 {
         self.len
+    }
+
+    /// Checks if the array is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     /// Returns a [`ValueRecord`] at index.
@@ -444,6 +449,11 @@ impl<'a> PairSets<'a> {
     pub fn len(&self) -> u16 {
         self.offsets.len()
     }
+
+    /// Checks if the array is empty.
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
+    }
 }
 
 impl core::fmt::Debug for PairSets<'_> {
@@ -474,7 +484,7 @@ impl<'a> ClassMatrix<'a> {
         let count = usize::num_from(u32::from(counts.0) * u32::from(counts.1));
         // Max len is 32, so u8 is just enough.
         let record_len = (flags.0.size() + flags.1.size()) as u8;
-        let matrix = s.read_bytes(usize::from(count) * usize::from(record_len))?;
+        let matrix = s.read_bytes(count * usize::from(record_len))?;
         Some(Self {
             table_data,
             matrix,
@@ -607,6 +617,11 @@ impl<'a> CursiveAnchorSet<'a> {
     /// Returns the number of items.
     pub fn len(&self) -> u16 {
         self.records.len()
+    }
+
+    /// Checks if the set is empty.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
     }
 }
 
@@ -743,6 +758,11 @@ impl<'a> LigatureArray<'a> {
     pub fn len(&self) -> u16 {
         self.offsets.len()
     }
+
+    /// Checks if the array is empty.
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
+    }
 }
 
 impl core::fmt::Debug for LigatureArray<'_> {
@@ -798,6 +818,11 @@ impl<'a> MarkArray<'a> {
     /// Returns the array length.
     pub fn len(&self) -> u16 {
         self.array.len()
+    }
+
+    /// Checks if the array is empty.
+    pub fn is_empty(&self) -> bool {
+        self.array.is_empty()
     }
 }
 

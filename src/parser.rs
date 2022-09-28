@@ -124,7 +124,7 @@ pub struct F2DOT14(pub i16);
 impl F2DOT14 {
     /// Converts i16 to f32.
     #[inline]
-    pub fn to_f32(&self) -> f32 {
+    pub fn to_f32(self) -> f32 {
         f32::from(self.0) / 16384.0
     }
 }
@@ -213,6 +213,7 @@ impl TryNumFrom<f32> for u16 {
     }
 }
 
+#[allow(clippy::manual_range_contains)]
 impl TryNumFrom<f32> for i32 {
     #[inline]
     fn try_num_from(v: f32) -> Option<Self> {
@@ -403,7 +404,7 @@ impl<'a, T: FromData> Iterator for LazyArrayIter16<'a, T> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::from(self.data.len().checked_sub(self.index).unwrap_or(0))
+        usize::from(self.data.len().saturating_sub(self.index))
     }
 }
 
@@ -452,6 +453,11 @@ impl<'a, T: FromData> LazyArray32<'a, T> {
     #[inline]
     pub fn len(&self) -> u32 {
         (self.data.len() / T::SIZE) as u32
+    }
+
+    /// Checks if the array is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Performs a binary search by specified `key`.
@@ -538,7 +544,7 @@ impl<'a, T: FromData> Iterator for LazyArrayIter32<'a, T> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::num_from(self.data.len().checked_sub(self.index).unwrap_or(0))
+        usize::num_from(self.data.len().saturating_sub(self.index))
     }
 }
 
@@ -641,12 +647,12 @@ impl<'a, T: FromSlice<'a>> Iterator for LazyOffsetArrayIter16<'a, T> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::from(self.array.len().checked_sub(self.index).unwrap_or(0))
+        usize::from(self.array.len().saturating_sub(self.index))
     }
 }
 
 /// A streaming binary parser.
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Stream<'a> {
     data: &'a [u8],
     offset: usize,

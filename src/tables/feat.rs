@@ -108,6 +108,11 @@ impl<'a> FeatureNames<'a> {
     pub fn len(&self) -> u16 {
         self.records.len()
     }
+
+    /// Checks if there are any feature names.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
 }
 
 impl<'a> core::fmt::Debug for FeatureNames<'a> {

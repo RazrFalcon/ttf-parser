@@ -7,7 +7,7 @@ use crate::Rect;
 /// An index format used by the [Index to Location Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/loca).
 #[allow(missing_docs)]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum IndexToLocationFormat {
     Short,
     Long,
@@ -54,7 +54,7 @@ impl Table {
         s.skip::<i16>(); // font direction hint
         let index_to_location_format = s.read::<u16>()?;
 
-        if !(units_per_em >= 16 && units_per_em <= 16384) {
+        if !(16..=16384).contains(&units_per_em) {
             return None;
         }
 

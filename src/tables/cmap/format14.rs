@@ -69,7 +69,7 @@ impl FromData for UnicodeRangeRecord {
 }
 
 /// A result of a variation glyph mapping.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GlyphVariationResult {
     /// Glyph was found in the variation encoding table.
     Found(GlyphId),

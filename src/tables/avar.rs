@@ -45,6 +45,11 @@ impl<'a> SegmentMaps<'a> {
     pub fn len(&self) -> u16 {
         self.count
     }
+
+    /// Checks if there are any segments.
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
 }
 
 impl core::fmt::Debug for SegmentMaps<'_> {
@@ -76,7 +81,7 @@ impl<'a> Iterator for SegmentMapsIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let count = self.stream.read::<u16>()?;
-        return self.stream.read_array16::<AxisValueMap>(count);
+        self.stream.read_array16::<AxisValueMap>(count)
     }
 }
 
@@ -126,7 +131,7 @@ impl<'a> Table<'a> {
 fn map_value(map: &LazyArray16<AxisValueMap>, value: i16) -> Option<i16> {
     // This code is based on harfbuzz implementation.
 
-    if map.len() == 0 {
+    if map.is_empty() {
         return Some(value);
     } else if map.len() == 1 {
         let record = map.get(0)?;

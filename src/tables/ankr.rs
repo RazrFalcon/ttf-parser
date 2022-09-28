@@ -9,7 +9,7 @@ use crate::GlyphId;
 
 /// An anchor point.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, PartialEq, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub struct Point {
     pub x: i16,
     pub y: i16,

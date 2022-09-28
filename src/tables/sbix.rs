@@ -98,6 +98,11 @@ impl<'a> Strike<'a> {
         // The last offset simply indicates the glyph data end. We don't need it.
         self.offsets.len() - 1
     }
+
+    /// Checks if there are any glyphs.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl core::fmt::Debug for Strike<'_> {
@@ -129,6 +134,11 @@ impl<'a> Strikes<'a> {
     #[inline]
     pub fn len(&self) -> u32 {
         self.offsets.len()
+    }
+
+    /// Checks if there are any strikes.
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
     }
 }
 

@@ -270,7 +270,7 @@ impl core::fmt::Debug for Subtables<'_> {
 
 /// An iterator over a metamorphosis chain subtables.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct SubtablesIter<'a> {
     index: u32,
     count: u32,
@@ -396,7 +396,7 @@ impl core::fmt::Debug for Chains<'_> {
 
 /// An iterator over metamorphosis chains.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ChainsIter<'a> {
     index: u32,
     count: u32,

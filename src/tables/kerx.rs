@@ -398,7 +398,7 @@ impl<'a> IntoIterator for Subtables<'a> {
 
 /// An iterator over extended kerning subtables.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct SubtablesIter<'a> {
     /// The number of glyphs from the `maxp` table.
     number_of_glyphs: NonZeroU16,

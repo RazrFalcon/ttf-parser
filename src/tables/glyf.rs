@@ -369,8 +369,8 @@ impl<'a> EndpointsIter<'a> {
                 let prev = self.endpoints.get(self.index - 1).unwrap_or(0);
                 // Malformed font can have endpoints not in increasing order,
                 // so we have to use checked_sub.
-                self.left = end.checked_sub(prev).unwrap_or(0);
-                self.left = self.left.checked_sub(1).unwrap_or(0);
+                self.left = end.saturating_sub(prev);
+                self.left = self.left.saturating_sub(1);
             }
 
             // Always advance the index, so we can check the current contour number.
@@ -508,6 +508,7 @@ impl CompositeGlyphFlags {
 // It's not defined in the spec, so we are using our own value.
 pub(crate) const MAX_COMPONENTS: u8 = 32;
 
+#[allow(clippy::comparison_chain)]
 #[inline]
 fn outline_impl(
     loca_table: loca::Table,

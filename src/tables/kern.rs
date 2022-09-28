@@ -159,6 +159,11 @@ impl<'a> Subtables<'a> {
     pub fn len(&self) -> u32 {
         self.count
     }
+
+    /// Checks if there are any subtables.
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
 }
 
 impl core::fmt::Debug for Subtables<'_> {
@@ -184,7 +189,7 @@ impl<'a> IntoIterator for Subtables<'a> {
 
 /// An iterator over kerning subtables.
 #[allow(missing_debug_implementations)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 pub struct SubtablesIter<'a> {
     /// Indicates an Apple Advanced Typography format.
     is_aat: bool,

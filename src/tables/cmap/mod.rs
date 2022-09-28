@@ -216,10 +216,15 @@ impl<'a> Subtables<'a> {
         })
     }
 
-    /// Returns the number
+    /// Returns the number of subtables.
     #[inline]
     pub fn len(&self) -> u16 {
         self.records.len()
+    }
+
+    /// Checks if there are any subtables.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
     }
 }
 

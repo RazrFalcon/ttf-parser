@@ -3,6 +3,10 @@
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuple-variation-store
 
+// We do have to call clone for readability on some types.
+#![allow(clippy::clone_on_copy)]
+#![allow(clippy::neg_cmp_op_on_partial_ord)]
+
 use core::cmp;
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
@@ -1756,7 +1760,8 @@ impl core::fmt::Debug for Table<'_> {
     }
 }
 
-fn outline_var_impl<'a>(
+#[allow(clippy::comparison_chain)]
+fn outline_var_impl(
     glyf_table: glyf::Table,
     gvar_table: &Table,
     glyph_id: GlyphId,
@@ -1809,11 +1814,11 @@ fn outline_var_impl<'a>(
         // Details:
         // https://docs.microsoft.com/en-us/typography/opentype/spec/gvar#point-numbers-and-processing-for-composite-glyphs
 
-        let mut components = glyf::CompositeGlyphIter::new(s.tail()?);
+        let components = glyf::CompositeGlyphIter::new(s.tail()?);
         let components_count = components.clone().count() as u16;
         gvar_table.parse_variation_data(glyph_id, coordinates, components_count, &mut tuples)?;
 
-        while let Some(component) = components.next() {
+        for component in components {
             let (tx, ty) = tuples.apply_null()?;
 
             let mut transform = builder.transform;

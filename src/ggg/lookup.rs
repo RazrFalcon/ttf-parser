@@ -70,6 +70,11 @@ impl<'a> LookupSubtables<'a> {
         self.offsets.len()
     }
 
+    /// Checks if there are any items.
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
+    }
+
     /// Parses a subtable at index.
     ///
     /// Accepts either
@@ -86,6 +91,7 @@ impl<'a> LookupSubtables<'a> {
     /// Creates an iterator over subtables.
     ///
     /// We cannot use `IntoIterator` here, because we have to use user-provided base type.
+    #[allow(clippy::should_implement_trait)]
     pub fn into_iter<T: LookupSubtable<'a>>(self) -> LookupSubtablesIter<'a, T> {
         LookupSubtablesIter {
             data: self,

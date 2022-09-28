@@ -57,13 +57,18 @@ impl<'a> Table<'a> {
         }
     }
 
-    /// Returns offsets length.
+    /// Returns the number of offsets.
     #[inline]
     pub fn len(&self) -> u16 {
         match self {
             Table::Short(ref array) => array.len(),
             Table::Long(ref array) => array.len(),
         }
+    }
+
+    /// Checks if there are any offsets.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Returns glyph's range in the `glyf` table.

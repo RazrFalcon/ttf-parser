@@ -59,6 +59,11 @@ impl<'a> Tracks<'a> {
     pub fn len(&self) -> u16 {
         self.records.len()
     }
+
+    /// Checks if there are any tracks.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
 }
 
 impl<'a> IntoIterator for Tracks<'a> {

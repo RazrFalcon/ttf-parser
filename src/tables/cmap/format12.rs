@@ -62,7 +62,7 @@ impl<'a> Subtable12<'a> {
             .start_glyph_id
             .checked_add(code_point)?
             .checked_sub(group.start_char_code)?;
-        return u16::try_from(id).ok().map(GlyphId);
+        u16::try_from(id).ok().map(GlyphId)
     }
 
     /// Calls `f` for each codepoint defined in this table.

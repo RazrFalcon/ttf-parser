@@ -38,6 +38,12 @@ Font parsing starts with a [`Face`].
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
+#![allow(clippy::get_first)] // we use it for readability
+#![allow(clippy::identity_op)] // we use it for readability
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::collapsible_else_if)]
+#![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::upper_case_acronyms)]
 
 #[cfg(feature = "std")]
 #[macro_use]
@@ -144,7 +150,7 @@ impl FromData for Magic {
 ///
 /// The number is stored as f2.16
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub struct NormalizedCoordinate(i16);
 
 impl From<i16> for NormalizedCoordinate {
@@ -305,7 +311,7 @@ impl FromData for Tag {
 ///
 /// Used for underline and strikeout.
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct LineMetrics {
     /// Line position.
     pub position: i16,
@@ -319,7 +325,7 @@ pub struct LineMetrics {
 /// Doesn't guarantee that `x_min` <= `x_max` and/or `y_min` <= `y_max`.
 #[repr(C)]
 #[allow(missing_docs)]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Rect {
     pub x_min: i16,
     pub y_min: i16,
@@ -377,7 +383,7 @@ impl BBox {
     }
 
     #[inline]
-    fn to_rect(&self) -> Option<Rect> {
+    fn to_rect(self) -> Option<Rect> {
         Some(Rect {
             x_min: i16::try_num_from(self.x_min)?,
             y_min: i16::try_num_from(self.y_min)?,
@@ -420,7 +426,7 @@ impl OutlineBuilder for DummyOutline {
 
 /// A glyph raster image format.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RasterImageFormat {
     PNG,
 }
@@ -428,7 +434,7 @@ pub enum RasterImageFormat {
 /// A glyph's raster image.
 ///
 /// Note, that glyph metrics are in pixels and not in font units.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RasterGlyphImage<'a> {
     /// Horizontal offset.
     pub x: i16,
@@ -507,7 +513,7 @@ impl VarCoords {
 }
 
 /// A list of font face parsing errors.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FaceParsingError {
     /// An attempt to read out of bounds detected.
     ///

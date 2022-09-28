@@ -42,7 +42,7 @@ pub mod name_id {
 
 /// A [platform ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids).
 #[allow(missing_docs)]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PlatformId {
     Unicode,
     Macintosh,
@@ -75,10 +75,10 @@ fn is_unicode_encoding(platform_id: PlatformId, encoding_id: u16) -> bool {
 
     match platform_id {
         PlatformId::Unicode => true,
-        PlatformId::Windows => match encoding_id {
-            WINDOWS_SYMBOL_ENCODING_ID | WINDOWS_UNICODE_BMP_ENCODING_ID => true,
-            _ => false,
-        },
+        PlatformId::Windows => matches!(
+            encoding_id,
+            WINDOWS_SYMBOL_ENCODING_ID | WINDOWS_UNICODE_BMP_ENCODING_ID
+        ),
         _ => false,
     }
 }
@@ -170,17 +170,9 @@ impl<'a> Name<'a> {
 #[cfg(feature = "std")]
 impl<'a> core::fmt::Debug for Name<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        // TODO: https://github.com/rust-lang/rust/issues/50264
-
         let name = self.to_string();
         f.debug_struct("Name")
-            .field(
-                "name",
-                &name
-                    .as_ref()
-                    .map(core::ops::Deref::deref)
-                    .unwrap_or("unsupported encoding"),
-            )
+            .field("name", &name.as_deref().unwrap_or("unsupported encoding"))
             .field("platform_id", &self.platform_id)
             .field("encoding_id", &self.encoding_id)
             .field("language_id", &self.language_id)
@@ -229,6 +221,11 @@ impl<'a> Names<'a> {
     pub fn len(&self) -> u16 {
         self.records.len()
     }
+
+    /// Checks if there are any name records.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
 }
 
 impl core::fmt::Debug for Names<'_> {
@@ -272,7 +269,7 @@ impl<'a> Iterator for NamesIter<'a> {
 
     #[inline]
     fn count(self) -> usize {
-        usize::from(self.names.len().checked_sub(self.index).unwrap_or(0))
+        usize::from(self.names.len().saturating_sub(self.index))
     }
 }
 

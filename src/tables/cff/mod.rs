@@ -17,7 +17,7 @@ use crate::{BBox, OutlineBuilder};
 
 /// A list of errors that can occur during a CFF glyph outlining.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CFFError {
     NoGlyph,
     ReadOutOfBounds,
@@ -75,7 +75,7 @@ impl<'a> Builder<'a> {
 }
 
 /// A type-safe wrapper for string ID.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug)]
 pub struct StringId(u16);
 
 impl FromData for StringId {

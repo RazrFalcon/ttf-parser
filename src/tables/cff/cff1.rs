@@ -784,7 +784,7 @@ impl FDSelect<'_> {
     fn font_dict_index(&self, glyph_id: GlyphId) -> Option<u8> {
         match self {
             FDSelect::Format0(ref array) => array.get(glyph_id.0),
-            FDSelect::Format3(ref data) => {
+            FDSelect::Format3(data) => {
                 let mut s = Stream::new(data);
                 let number_of_ranges = s.read::<u16>()?;
                 if number_of_ranges == 0 {
@@ -842,20 +842,17 @@ fn parse_sid_metadata<'a>(
     metadata.default_width = private_dict.default_width.unwrap_or(0.0);
     metadata.nominal_width = private_dict.nominal_width.unwrap_or(0.0);
 
-    match (
+    if let (Some(private_dict_range), Some(subroutines_offset)) = (
         top_dict.private_dict_range,
         private_dict.local_subroutines_offset,
     ) {
-        (Some(private_dict_range), Some(subroutines_offset)) => {
-            // 'The local subroutines offset is relative to the beginning
-            // of the Private DICT data.'
-            if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
-                let data = data.get(start..data.len())?;
-                let mut s = Stream::new(data);
-                metadata.local_subrs = parse_index::<u16>(&mut s)?;
-            }
+        // 'The local subroutines offset is relative to the beginning
+        // of the Private DICT data.'
+        if let Some(start) = private_dict_range.start.checked_add(subroutines_offset) {
+            let data = data.get(start..data.len())?;
+            let mut s = Stream::new(data);
+            metadata.local_subrs = parse_index::<u16>(&mut s)?;
         }
-        _ => {}
     }
 
     Some(FontKind::SID(metadata))

@@ -11,6 +11,8 @@
 
 use ttf_parser::{fonts_in_collection, Face, FaceParsingError};
 
+const FONT: &[u8] = include_bytes!("../fonts/demo.ttf");
+
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum Unit {
@@ -152,6 +154,17 @@ fn font_index_overflow() {
     assert_eq!(fonts_in_collection(&data), Some(1));
     assert_eq!(
         Face::parse(&data, std::u32::MAX).unwrap_err(),
+        FaceParsingError::FaceIndexOutOfBounds
+    );
+}
+
+#[test]
+fn font_index_overflow_on_regular_font() {
+    let data = FONT;
+
+    assert_eq!(fonts_in_collection(&data), None);
+    assert_eq!(
+        Face::parse(&data, 1).unwrap_err(),
         FaceParsingError::FaceIndexOutOfBounds
     );
 }

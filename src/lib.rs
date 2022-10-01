@@ -621,6 +621,12 @@ impl<'a> RawFace<'a> {
             if magic == Magic::FontCollection {
                 return Err(FaceParsingError::UnknownMagic);
             }
+        } else {
+            // When reading from a regular font (not a collection) disallow index to be non-zero
+            // Basically treat the font as a one-element collection
+            if index != 0 {
+                return Err(FaceParsingError::FaceIndexOutOfBounds);
+            }
         }
 
         let num_tables = s.read::<u16>().ok_or(FaceParsingError::MalformedFont)?;

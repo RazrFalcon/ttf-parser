@@ -155,3 +155,21 @@ fn font_index_overflow() {
         FaceParsingError::FaceIndexOutOfBounds
     );
 }
+
+#[test]
+fn font_index_overflow_on_regular_font() {
+    use Unit::*;
+    let data = convert(&[
+        Raw(&[0x00, 0x01, 0x00, 0x00]), // magic
+        UInt16(0),                      // numTables
+        UInt16(0),                      // searchRange
+        UInt16(0),                      // entrySelector
+        UInt16(0),                      // rangeShift
+    ]);
+
+    assert_eq!(fonts_in_collection(&data), None);
+    assert_eq!(
+        Face::parse(&data, 1).unwrap_err(),
+        FaceParsingError::FaceIndexOutOfBounds
+    );
+}

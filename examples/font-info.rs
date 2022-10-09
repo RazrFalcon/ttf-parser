@@ -48,6 +48,7 @@ fn main() {
     println!("Strikeout: {:?}", face.strikeout_metrics());
     println!("Subscript: {:?}", face.subscript_metrics());
     println!("Superscript: {:?}", face.superscript_metrics());
+    println!("Permissions: {:?}", face.permissions());
     println!("Variable: {:?}", face.is_variable());
 
     #[cfg(feature = "opentype-layout")]

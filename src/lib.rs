@@ -75,7 +75,7 @@ use parser::{NumFrom, Offset, Offset32, Stream, TryNumFrom};
 pub use fvar::VariationAxis;
 
 pub use name::{name_id, PlatformId};
-pub use os2::{ScriptMetrics, Style, Weight, Width};
+pub use os2::{Permissions, ScriptMetrics, Style, UnicodeRanges, Weight, Width};
 pub use tables::CFFError;
 #[cfg(feature = "apple-layout")]
 pub use tables::{ankr, feat, kerx, morx, trak};
@@ -1488,6 +1488,41 @@ impl<'a> Face<'a> {
         }
 
         Some(metrics)
+    }
+
+    /// Returns face permissions.
+    ///
+    /// Returns `None` in case of a malformed value.
+    #[inline]
+    pub fn permissions(&self) -> Option<Permissions> {
+        self.tables.os2?.permissions()
+    }
+
+    /// Checks if the face subsetting is allowed.
+    #[inline]
+    pub fn is_subsetting_allowed(&self) -> bool {
+        self.tables
+            .os2
+            .map(|t| t.is_subsetting_allowed())
+            .unwrap_or(false)
+    }
+
+    /// Checks if the face bitmaps embedding is allowed.
+    #[inline]
+    pub fn is_bitmap_embedding_allowed(&self) -> bool {
+        self.tables
+            .os2
+            .map(|t| t.is_bitmap_embedding_allowed())
+            .unwrap_or(false)
+    }
+
+    /// Checks if the face bitmaps embedding is allowed.
+    #[inline]
+    pub fn unicode_ranges(&self) -> UnicodeRanges {
+        self.tables
+            .os2
+            .map(|t| t.unicode_ranges())
+            .unwrap_or_default()
     }
 
     /// Returns a total number of glyphs in the face.

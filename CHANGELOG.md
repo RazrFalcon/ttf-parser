@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `Face::permissions`
+- `Face::is_subsetting_allowed`
+- `Face::is_bitmap_embedding_allowed`
+- `Face::unicode_ranges`
+- `os2::Table::permissions`
+- `os2::Table::is_subsetting_allowed`
+- `os2::Table::is_bitmap_embedding_allowed`
+- `os2::Table::unicode_ranges`
 
 ## [0.17.0] - 2022-09-28
 ### Added

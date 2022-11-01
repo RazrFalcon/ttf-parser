@@ -46,12 +46,31 @@ impl<'a> SvgDocumentsList<'a> {
         self.data.get(offset..offset + usize::num_from(record.svg_doc_length))
     }
 
+    /// Returns SVG document data and glyph indices represented by the same svg data at an index.
+    ///
+    /// `index` is not a GlyphId. You should use [`find_image_and_glyph_indices()`](SvgDocumentsList::find_image_and_glyph_indices) instead.
+    #[inline]
+    pub fn get_image_and_glyph_indices(&self, index: u16) -> Option<(&'a [u8], core::ops::RangeInclusive<GlyphId>)> {
+        let record = self.records.get(index)?;
+        let offset = record.svg_doc_offset?.to_usize();
+        let data = self.data.get(offset..offset + usize::num_from(record.svg_doc_length))?;
+        Some((data, (record.start_glyph_id..=record.end_glyph_id)))
+    }
+
     /// Returns a SVG document data by glyph ID.
     #[inline]
     pub fn find(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
         let index = self.records.into_iter()
             .position(|v| (v.start_glyph_id..=v.end_glyph_id).contains(&glyph_id))?;
         self.get(index as u16)
+    }
+
+    /// For a glyph ID, returns the SVG document data and list of glyph indices represented by the same svg data
+    #[inline]
+    pub fn find_image_and_glyph_indices(&self, glyph_id: GlyphId) -> Option<(&'a [u8], core::ops::RangeInclusive<GlyphId>)> {
+        let index = self.records.into_iter()
+            .position(|v| (v.start_glyph_id..=v.end_glyph_id).contains(&glyph_id))?;
+        self.get_image_and_glyph_indices(index as u16)
     }
 
     /// Returns the number of SVG documents in the list.

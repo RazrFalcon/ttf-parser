@@ -1673,6 +1673,15 @@ impl<'a> Face<'a> {
         self.tables.svg.and_then(|svg| svg.documents.find(glyph_id))
     }
 
+    /// Returns a reference to a glyph's SVG image and a range of glyph ids that are
+    /// represented using the same svg document
+    /// 
+    /// Read documentation for 'glyph_svg_image()' to get more info.
+    #[inline]
+    pub fn glyph_svg_image_and_glyph_ids(&self, glyph_id: GlyphId) -> Option<(&'a [u8], core::ops::RangeInclusive<GlyphId>)> {
+        self.tables.svg.and_then(|svg| svg.documents.find_image_and_glyph_indices(glyph_id))
+    }
+
     /// Returns an iterator over variation axes.
     #[cfg(feature = "variable-fonts")]
     #[inline]

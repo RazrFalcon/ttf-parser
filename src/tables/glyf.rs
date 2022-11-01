@@ -78,6 +78,9 @@ impl<'a> Builder<'a> {
     #[inline]
     pub fn push_point(&mut self, x: f32, y: f32, on_curve_point: bool, last_point: bool) {
         let p = Point { x, y };
+        if self.first_on_curve.is_none() && last_point {
+            return; // Ignore "singularity contours"
+        }
         if self.first_on_curve.is_none() {
             if on_curve_point {
                 self.first_on_curve = Some(p);

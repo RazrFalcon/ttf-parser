@@ -62,6 +62,7 @@ macro_rules! try_opt_or {
 mod aat;
 #[cfg(feature = "opentype-layout")]
 mod ggg;
+mod language;
 mod parser;
 mod tables;
 #[cfg(feature = "variable-fonts")]
@@ -74,6 +75,7 @@ use parser::{NumFrom, Offset, Offset32, Stream, TryNumFrom};
 #[cfg(feature = "variable-fonts")]
 pub use fvar::VariationAxis;
 
+pub use language::Language;
 pub use name::{name_id, PlatformId};
 pub use os2::{Permissions, ScriptMetrics, Style, UnicodeRanges, Weight, Width};
 pub use tables::CFFError;

@@ -17,11 +17,20 @@ fn main() {
         }
     };
 
-    let family_name = face
-        .names()
-        .into_iter()
-        .find(|name| name.name_id == ttf_parser::name_id::FULL_NAME && name.is_unicode())
-        .and_then(|name| name.to_string());
+    let mut family_names = Vec::new();
+    for name in face.names() {
+        if name.name_id == ttf_parser::name_id::FULL_NAME && name.is_unicode() {
+            if let Some(family_name) = name.to_string() {
+                let language = name.language();
+                family_names.push(format!(
+                    "{} ({}, {})",
+                    family_name,
+                    language.primary_language(),
+                    language.region()
+                ));
+            }
+        }
+    }
 
     let post_script_name = face
         .names()
@@ -29,7 +38,7 @@ fn main() {
         .find(|name| name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME && name.is_unicode())
         .and_then(|name| name.to_string());
 
-    println!("Family name: {:?}", family_name);
+    println!("Family names: {:?}", family_names);
     println!("PostScript name: {:?}", post_script_name);
     println!("Units per EM: {:?}", face.units_per_em());
     println!("Ascender: {}", face.ascender());

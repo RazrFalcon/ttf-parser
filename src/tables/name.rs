@@ -7,6 +7,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use crate::parser::{FromData, LazyArray16, Offset, Offset16, Stream};
+use crate::Language;
 
 /// A list of [name ID](https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids)'s.
 pub mod name_id {
@@ -165,6 +166,20 @@ impl<'a> Name<'a> {
 
         String::from_utf16(&name).ok()
     }
+
+    /// Returns a Name language.
+    pub fn language(&self) -> Language {
+        if self.platform_id == PlatformId::Windows {
+            Language::windows_language(self.language_id)
+        } else if self.platform_id == PlatformId::Macintosh
+            && self.encoding_id == 0
+            && self.language_id == 0
+        {
+            Language::English_UnitedStates
+        } else {
+            Language::Unknown
+        }
+    }
 }
 
 #[cfg(feature = "std")]
@@ -176,6 +191,7 @@ impl<'a> core::fmt::Debug for Name<'a> {
             .field("platform_id", &self.platform_id)
             .field("encoding_id", &self.encoding_id)
             .field("language_id", &self.language_id)
+            .field("language", &self.language())
             .field("name_id", &self.name_id)
             .finish()
     }
@@ -189,6 +205,7 @@ impl<'a> core::fmt::Debug for Name<'a> {
             .field("platform_id", &self.platform_id)
             .field("encoding_id", &self.encoding_id)
             .field("language_id", &self.language_id)
+            .field("language", &self.language())
             .field("name_id", &self.name_id)
             .finish()
     }

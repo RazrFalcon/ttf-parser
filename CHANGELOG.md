@@ -14,9 +14,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `os2::Table::is_subsetting_allowed`
 - `os2::Table::is_bitmap_embedding_allowed`
 - `os2::Table::unicode_ranges`
+- `name::Name::language`
+- `Language` enum with all Windows languages.
 
 ### Changed
-
 - Using a non-zero index in `Face::parse` for a regular font will return
   `FaceParsingError::FaceIndexOutOfBounds` now. Thanks to [Pietrek14](https://github.com/Pietrek14).
 

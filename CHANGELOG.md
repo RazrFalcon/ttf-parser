@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.18.0] - 2022-12-25
 ### Added
 - `Face::permissions`
 - `Face::is_subsetting_allowed`
@@ -373,7 +375,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.1...v0.15.2

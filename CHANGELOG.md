@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.1] - 2023-01-10
+### Fixed
+- (`MATH`) Handle NULL offsets.
+  Thanks to [laurmaedje](https://github.com/laurmaedje).
+
 ## [0.18.0] - 2022-12-25
 ### Added
 - `Face::permissions`
@@ -375,7 +380,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.15.2...v0.16.0

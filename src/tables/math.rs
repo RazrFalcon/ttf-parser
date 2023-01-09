@@ -925,3 +925,14 @@ impl<'a> Table<'a> {
         })
     }
 }
+
+trait StreamExt<'a> {
+    fn parse_at_offset16<T: FromSlice<'a>>(&mut self, data: &'a [u8]) -> Option<T>;
+}
+
+impl<'a> StreamExt<'a> for Stream<'a> {
+    fn parse_at_offset16<T: FromSlice<'a>>(&mut self, data: &'a [u8]) -> Option<T> {
+        let offset = self.read::<Option<Offset16>>()??.to_usize();
+        data.get(offset..).and_then(T::parse)
+    }
+}

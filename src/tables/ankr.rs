@@ -4,7 +4,7 @@
 use core::num::NonZeroU16;
 
 use crate::aat;
-use crate::parser::{FromData, LazyArray32, Stream};
+use crate::parser::{FromData, LazyArray32, Offset, Offset32, Stream};
 use crate::GlyphId;
 
 /// An anchor point.
@@ -76,5 +76,16 @@ impl<'a> Table<'a> {
         let mut s = Stream::new_at(self.glyphs_data, usize::from(offset))?;
         let number_of_points = s.read::<u32>()?;
         s.read_array32::<Point>(number_of_points)
+    }
+}
+
+trait StreamExt<'a> {
+    fn read_at_offset32(&mut self, data: &'a [u8]) -> Option<&'a [u8]>;
+}
+
+impl<'a> StreamExt<'a> for Stream<'a> {
+    fn read_at_offset32(&mut self, data: &'a [u8]) -> Option<&'a [u8]> {
+        let offset = self.read::<Offset32>()?.to_usize();
+        data.get(offset..)
     }
 }

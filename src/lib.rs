@@ -752,6 +752,7 @@ pub struct FaceTables<'a> {
     pub glyf: Option<glyf::Table<'a>>,
     pub hmtx: Option<hmtx::Table<'a>>,
     pub kern: Option<kern::Table<'a>>,
+    pub loca: Option<loca::Table<'a>>,
     pub name: Option<name::Table<'a>>,
     pub os2: Option<os2::Table<'a>>,
     pub post: Option<post::Table<'a>>,

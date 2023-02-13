@@ -1014,6 +1014,7 @@ impl<'a> Face<'a> {
             glyf,
             hmtx,
             kern: raw_tables.kern.and_then(kern::Table::parse),
+            loca,
             name: raw_tables.name.and_then(name::Table::parse),
             os2: raw_tables.os2.and_then(os2::Table::parse),
             post: raw_tables.post.and_then(post::Table::parse),

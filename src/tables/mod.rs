@@ -2,6 +2,8 @@ pub mod cbdt;
 pub mod cblc;
 mod cff;
 pub mod cmap;
+pub mod ebdt;
+pub mod eblc;
 pub mod glyf;
 pub mod head;
 pub mod hhea;

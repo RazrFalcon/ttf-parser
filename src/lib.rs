@@ -83,7 +83,7 @@ pub use tables::CFFError;
 pub use tables::{ankr, feat, kerx, morx, trak};
 #[cfg(feature = "variable-fonts")]
 pub use tables::{avar, cff2, fvar, gvar, hvar, mvar};
-pub use tables::{cbdt, cblc, cff1 as cff, vhea};
+pub use tables::{cbdt, cblc, ebdt, eblc, cff1 as cff, vhea};
 pub use tables::{
     cmap, glyf, head, hhea, hmtx, kern, loca, maxp, name, os2, post, sbix, svg, vorg,
 };
@@ -431,6 +431,51 @@ impl OutlineBuilder for DummyOutline {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RasterImageFormat {
     PNG,
+
+    /// A monochrome bitmap. The most significant bit of the first byte corresponds to the top-left
+    /// pixel, proceeding through succeeding bits moving left to right. The data for each row is
+    /// padded to a byte boundary, so the next row begins with the most significant bit of a new
+    /// byte. 1 corresponds to black, and 0 to white.
+    BitmapMono,
+
+    /// A monochrome bitmap. The most significant bit of the first byte corresponds to the top-left
+    /// pixel, proceeding through succeeding bits moving left to right. Data is tightly packed
+    /// with no padding. 1 corresponds to black, and 0 to white.
+    BitmapMonoPacked,
+
+    /// A grayscale bitmap with 2 bits per pixel. The most significant bits of the first byte
+    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
+    /// The data for each row is padded to a byte boundary, so the next row begins with the most
+    /// significant bit of a new byte.
+    BitmapGray2,
+
+    /// A grayscale bitmap with 2 bits per pixel. The most significant bits of the first byte
+    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
+    /// Data is tightly packed with no padding.
+    BitmapGray2Packed,
+
+    /// A grayscale bitmap with 4 bits per pixel. The most significant bits of the first byte
+    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
+    /// The data for each row is padded to a byte boundary, so the next row begins with the most
+    /// significant bit of a new byte.
+    BitmapGray4,
+    
+    /// A grayscale bitmap with 4 bits per pixel. The most significant bits of the first byte
+    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
+    /// Data is tightly packed with no padding.
+    BitmapGray4Packed,
+
+    /// A grayscale bitmap with 8 bits per pixel. The first byte corresponds to the top-left pixel,
+    /// proceeding through succeeding bytes moving left to right.
+    BitmapGray8,
+
+    /// A color bitmap with 32 bits per pixel. The first group of four bytes corresponds to the
+    /// top-left pixel, proceeding through succeeding pixels moving left to right. Each byte
+    /// corresponds to a color channel and the channels within a pixel are in blue, green, red,
+    /// alpha order. Color values are pre-multiplied by the alpha. For example, the color
+    /// "full-green with half translucency" is encoded as `\x00\x80\x00\x80`, and not
+    /// `\x00\xFF\x00\x80`.
+    BitmapBgra32
 }
 
 /// A glyph's raster image.
@@ -681,6 +726,8 @@ pub struct RawFaceTables<'a> {
     pub cblc: Option<&'a [u8]>,
     pub cff: Option<&'a [u8]>,
     pub cmap: Option<&'a [u8]>,
+    pub ebdt: Option<&'a [u8]>,
+    pub eblc: Option<&'a [u8]>,
     pub glyf: Option<&'a [u8]>,
     pub hmtx: Option<&'a [u8]>,
     pub kern: Option<&'a [u8]>,
@@ -749,6 +796,7 @@ pub struct FaceTables<'a> {
     pub cbdt: Option<cbdt::Table<'a>>,
     pub cff: Option<cff::Table<'a>>,
     pub cmap: Option<cmap::Table<'a>>,
+    pub ebdt: Option<ebdt::Table<'a>>,
     pub glyf: Option<glyf::Table<'a>>,
     pub hmtx: Option<hmtx::Table<'a>>,
     pub kern: Option<kern::Table<'a>>,
@@ -889,6 +937,8 @@ impl<'a> Face<'a> {
                 b"CFF " => tables.cff = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"CFF2" => tables.cff2 = table_data,
+                b"EBDT" => tables.ebdt = table_data,
+                b"EBLC" => tables.eblc = table_data,
                 #[cfg(feature = "opentype-layout")]
                 b"GDEF" => tables.gdef = table_data,
                 #[cfg(feature = "opentype-layout")]
@@ -1002,6 +1052,14 @@ impl<'a> Face<'a> {
             None
         };
 
+        let ebdt = if let Some(eblc) = raw_tables.eblc.and_then(eblc::Table::parse) {
+            raw_tables
+                .ebdt
+                .and_then(|data| ebdt::Table::parse(eblc, data))
+        } else {
+            None
+        };
+
         Ok(FaceTables {
             head,
             hhea,
@@ -1010,6 +1068,7 @@ impl<'a> Face<'a> {
             cbdt,
             cff: raw_tables.cff.and_then(cff::Table::parse),
             cmap: raw_tables.cmap.and_then(cmap::Table::parse),
+            ebdt,
             glyf,
             hmtx,
             kern: raw_tables.kern.and_then(kern::Table::parse),
@@ -1873,13 +1932,11 @@ impl<'a> Face<'a> {
     /// Note that this method will return an encoded image. It should be decoded
     /// by the caller. We don't validate or preprocess it in any way.
     ///
-    /// Currently, only PNG images are supported.
-    ///
     /// Also, a font can contain both: images and outlines. So when this method returns `None`
     /// you should also try `outline_glyph()` afterwards.
     ///
     /// There are multiple ways an image can be stored in a TrueType font
-    /// and this method supports only `sbix`, `CBLC`+`CBDT`.
+    /// and this method supports only `sbix`, `CBLC`+`CBDT`, `EBLC + EBDT`.
     /// Font's tables be accesses in this specific order.
     #[inline]
     pub fn glyph_raster_image(
@@ -1895,6 +1952,10 @@ impl<'a> Face<'a> {
 
         if let Some(cbdt) = self.tables.cbdt {
             return cbdt.get(glyph_id, pixels_per_em);
+        }
+
+        if let Some(ebdt) = self.tables.ebdt {
+            return ebdt.get(glyph_id, pixels_per_em);
         }
 
         None

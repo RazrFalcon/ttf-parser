@@ -5,10 +5,23 @@ use crate::parser::{FromData, NumFrom, Offset, Offset16, Offset32, Stream};
 use crate::GlyphId;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub(crate) enum BitmapFormat {
-    Format17,
-    Format18,
-    Format19,
+pub(crate) struct BitmapFormat {
+    pub metrics: MetricsFormat,
+    pub data: BitmapDataFormat,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(crate) enum MetricsFormat {
+    Small,
+    Big,
+    Shared,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(crate) enum BitmapDataFormat {
+    ByteAligned { bit_depth: u8 },
+    BitAligned { bit_depth: u8 },
+    PNG,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -32,6 +45,7 @@ struct BitmapSizeTable {
     subtable_array_offset: Offset32,
     number_of_subtables: u32,
     ppem: u16,
+    bit_depth: u8,
     // Many fields are omitted.
 }
 
@@ -45,24 +59,28 @@ fn select_bitmap_size_table(
 
     let mut idx = None;
     let mut max_ppem = 0;
+    let mut max_bit_depth = 0;
     for i in 0..subtable_count {
         // Check that the current subtable contains a provided glyph id.
         s.advance(40); // Jump to `start_glyph_index`.
         let start_glyph_id = s.read::<GlyphId>()?;
         let end_glyph_id = s.read::<GlyphId>()?;
-        let ppem = u16::from(s.read::<u8>()?);
+        let ppem_x = u16::from(s.read::<u8>()?);
+        s.advance(1); // ppem_y
+        let bit_depth = s.read::<u8>()?;
+        s.advance(1); // flags
 
         if !(start_glyph_id..=end_glyph_id).contains(&glyph_id) {
-            s.advance(4); // Jump to the end of the subtable.
             continue;
         }
 
         // Select a best matching subtable based on `pixels_per_em`.
-        if (pixels_per_em <= ppem && ppem < max_ppem)
-            || (pixels_per_em > max_ppem && ppem > max_ppem)
+        if (pixels_per_em <= ppem_x && ppem_x < max_ppem)
+            || (pixels_per_em > max_ppem && ppem_x > max_ppem)
         {
             idx = Some(usize::num_from(i));
-            max_ppem = ppem;
+            max_ppem = ppem_x;
+            max_bit_depth = bit_depth;
         }
     }
 
@@ -77,6 +95,7 @@ fn select_bitmap_size_table(
         subtable_array_offset,
         number_of_subtables,
         ppem: max_ppem,
+        bit_depth: max_bit_depth,
     })
 }
 
@@ -161,17 +180,47 @@ impl<'a> Table<'a> {
         let image_format = s.read::<u16>()?;
         let mut image_offset = s.read::<Offset32>()?.to_usize();
 
+        let bit_depth = size_table.bit_depth;
         let image_format = match image_format {
-            17 => BitmapFormat::Format17,
-            18 => BitmapFormat::Format18,
-            19 => BitmapFormat::Format19,
+            1 => BitmapFormat {
+                metrics: MetricsFormat::Small,
+                data: BitmapDataFormat::ByteAligned { bit_depth },
+            },
+            2 => BitmapFormat {
+                metrics: MetricsFormat::Small,
+                data: BitmapDataFormat::BitAligned { bit_depth },
+            },
+            5 => BitmapFormat {
+                metrics: MetricsFormat::Shared,
+                data: BitmapDataFormat::BitAligned { bit_depth },
+            },
+            6 => BitmapFormat {
+                metrics: MetricsFormat::Big,
+                data: BitmapDataFormat::ByteAligned { bit_depth },
+            },
+            7 => BitmapFormat {
+                metrics: MetricsFormat::Big,
+                data: BitmapDataFormat::BitAligned { bit_depth },
+            },
+            17 => BitmapFormat {
+                metrics: MetricsFormat::Small,
+                data: BitmapDataFormat::PNG,
+            },
+            18 => BitmapFormat {
+                metrics: MetricsFormat::Big,
+                data: BitmapDataFormat::PNG,
+            },
+            19 => BitmapFormat {
+                metrics: MetricsFormat::Shared,
+                data: BitmapDataFormat::PNG,
+            },
             _ => return None, // Invalid format.
         };
 
         // TODO: I wasn't able to find fonts with index 4 and 5, so they are untested.
 
         let glyph_diff = glyph_id.0.checked_sub(info.start_glyph_id.0)?;
-        let metrics = Metrics::default();
+        let mut metrics = Metrics::default();
         match index_format {
             1 => {
                 s.advance(usize::from(glyph_diff) * Offset32::SIZE);
@@ -181,6 +230,10 @@ impl<'a> Table<'a> {
             2 => {
                 let image_size = s.read::<u32>()?;
                 image_offset += usize::from(glyph_diff).checked_mul(usize::num_from(image_size))?;
+                metrics.height = s.read::<u8>()?;
+                metrics.width = s.read::<u8>()?;
+                metrics.x = s.read::<i8>()?;
+                metrics.y = s.read::<i8>()?;
             }
             3 => {
                 s.advance(usize::from(glyph_diff) * Offset16::SIZE);
@@ -196,7 +249,14 @@ impl<'a> Table<'a> {
             }
             5 => {
                 let image_size = s.read::<u32>()?;
-                s.advance(8); // big metrics
+                metrics.height = s.read::<u8>()?;
+                metrics.width = s.read::<u8>()?;
+                metrics.x = s.read::<i8>()?;
+                metrics.y = s.read::<i8>()?;
+                s.skip::<u8>(); // hor_advance
+                s.skip::<i8>(); // ver_bearing_x
+                s.skip::<i8>(); // ver_bearing_y
+                s.skip::<u8>(); // ver_advance
                 let num_glyphs = s.read::<u32>()?;
                 let glyphs = s.read_array32::<GlyphId>(num_glyphs)?;
                 let (index, _) = glyphs.binary_search(&glyph_id)?;

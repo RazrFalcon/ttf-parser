@@ -1,5 +1,7 @@
 use ttf_parser::{RasterGlyphImage, RasterImageFormat};
 
+// NOTE: Bitmap.otb is an incomplete example font that was created specifically for this test.
+// It is under the same license as the other source files in the project. 
 static FONT_DATA: &[u8] = include_bytes!("fonts/bitmap.otb");
 
 #[test]

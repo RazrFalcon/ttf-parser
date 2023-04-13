@@ -59,7 +59,7 @@ fn select_bitmap_size_table(
 
     let mut idx = None;
     let mut max_ppem = 0;
-    let mut max_bit_depth = 0;
+    let mut bit_depth_for_max_ppem = 0;
     for i in 0..subtable_count {
         // Check that the current subtable contains a provided glyph id.
         s.advance(40); // Jump to `start_glyph_index`.
@@ -80,7 +80,7 @@ fn select_bitmap_size_table(
         {
             idx = Some(usize::num_from(i));
             max_ppem = ppem_x;
-            max_bit_depth = bit_depth;
+            bit_depth_for_max_ppem = bit_depth;
         }
     }
 
@@ -95,7 +95,7 @@ fn select_bitmap_size_table(
         subtable_array_offset,
         number_of_subtables,
         ppem: max_ppem,
-        bit_depth: max_bit_depth,
+        bit_depth: bit_depth_for_max_ppem,
     })
 }
 

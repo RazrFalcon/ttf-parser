@@ -475,7 +475,7 @@ pub enum RasterImageFormat {
     /// alpha order. Color values are pre-multiplied by the alpha. For example, the color
     /// "full-green with half translucency" is encoded as `\x00\x80\x00\x80`, and not
     /// `\x00\xFF\x00\x80`.
-    BitmapBgra32
+    BitmapPremulBgra32
 }
 
 /// A glyph's raster image.

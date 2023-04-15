@@ -60,17 +60,17 @@ There are roughly three types of TrueType tables:
 | Rendering         | -<sup>1</sup>          | ✓                   | ~ (very primitive)             |
 | `ankr` table      | ✓                      |                     |                                |
 | `avar` table      | ✓                      | ✓                   |                                |
-| `bdat` table      |                        | ✓                   |                                |
-| `bloc` table      |                        | ✓                   |                                |
-| `CBDT` table      | ✓                      | ✓                   |                                |
+| `bdat` table      | ~ (no 4)               | ✓                   |                                |
+| `bloc` table      | ✓                      | ✓                   |                                |
+| `CBDT` table      | ~ (no 8, 9)            | ✓                   |                                |
 | `CBLC` table      | ✓                      | ✓                   |                                |
 | `COLR` table      |                        | ✓                   |                                |
 | `CPAL` table      |                        | ✓                   |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ~ (no `seac` support)          |
 | `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8)               | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
-| `EBDT` table      |                        | ✓                   |                                |
-| `EBLC` table      |                        | ✓                   |                                |
+| `EBDT` table      | ~ (no 8, 9)            | ✓                   |                                |
+| `EBLC` table      | ✓                      | ✓                   |                                |
 | `feat` table      | ✓                      |                     |                                |
 | `fvar` table      | ✓                      | ✓                   |                                |
 | `gasp` table      |                        | ✓                   |                                |

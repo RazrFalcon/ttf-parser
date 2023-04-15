@@ -8,6 +8,8 @@ use crate::{GlyphId, RasterGlyphImage, RasterImageFormat};
 
 /// A [Color Bitmap Data Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/cbdt).
+/// 
+/// EBDT and bdat also share the same structure, so this is re-used for them.
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
     locations: cblc::Table<'a>,

@@ -83,7 +83,7 @@ pub use tables::CFFError;
 pub use tables::{ankr, feat, kerx, morx, trak};
 #[cfg(feature = "variable-fonts")]
 pub use tables::{avar, cff2, fvar, gvar, hvar, mvar};
-pub use tables::{cbdt, cblc, ebdt, eblc, cff1 as cff, vhea};
+pub use tables::{cbdt, cblc, cff1 as cff, vhea};
 pub use tables::{
     cmap, glyf, head, hhea, hmtx, kern, loca, maxp, name, os2, post, sbix, svg, vorg,
 };
@@ -432,49 +432,60 @@ impl OutlineBuilder for DummyOutline {
 pub enum RasterImageFormat {
     PNG,
 
-    /// A monochrome bitmap. The most significant bit of the first byte corresponds to the top-left
-    /// pixel, proceeding through succeeding bits moving left to right. The data for each row is
-    /// padded to a byte boundary, so the next row begins with the most significant bit of a new
-    /// byte. 1 corresponds to black, and 0 to white.
+    /// A monochrome bitmap.
+    /// 
+    /// The most significant bit of the first byte corresponds to the top-left pixel, proceeding
+    /// through succeeding bits moving left to right. The data for each row is padded to a byte
+    /// boundary, so the next row begins with the most significant bit of a new byte. 1 corresponds
+    /// to black, and 0 to white.
     BitmapMono,
 
-    /// A monochrome bitmap. The most significant bit of the first byte corresponds to the top-left
-    /// pixel, proceeding through succeeding bits moving left to right. Data is tightly packed
-    /// with no padding. 1 corresponds to black, and 0 to white.
+    /// A packed monochrome bitmap.
+    /// 
+    /// The most significant bit of the first byte corresponds to the top-left pixel, proceeding
+    /// through succeeding bits moving left to right. Data is tightly packed with no padding. 1
+    /// corresponds to black, and 0 to white.
     BitmapMonoPacked,
 
-    /// A grayscale bitmap with 2 bits per pixel. The most significant bits of the first byte
-    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
-    /// The data for each row is padded to a byte boundary, so the next row begins with the most
-    /// significant bit of a new byte.
+    /// A grayscale bitmap with 2 bits per pixel.
+    /// 
+    /// The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+    /// through succeeding bits moving left to right. The data for each row is padded to a byte
+    /// boundary, so the next row begins with the most significant bit of a new byte.
     BitmapGray2,
 
-    /// A grayscale bitmap with 2 bits per pixel. The most significant bits of the first byte
-    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
-    /// Data is tightly packed with no padding.
+    /// A packed grayscale bitmap with 2 bits per pixel.
+    /// 
+    /// The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+    /// through succeeding bits moving left to right. Data is tightly packed with no padding.
     BitmapGray2Packed,
 
-    /// A grayscale bitmap with 4 bits per pixel. The most significant bits of the first byte
-    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
-    /// The data for each row is padded to a byte boundary, so the next row begins with the most
-    /// significant bit of a new byte.
+    /// A grayscale bitmap with 4 bits per pixel.
+    /// 
+    /// The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+    /// through succeeding bits moving left to right. The data for each row is padded to a byte
+    /// boundary, so the next row begins with the most significant bit of a new byte.
     BitmapGray4,
     
-    /// A grayscale bitmap with 4 bits per pixel. The most significant bits of the first byte
-    /// corresponds to the top-left pixel, proceeding through succeeding bits moving left to right.
-    /// Data is tightly packed with no padding.
+    /// A packed grayscale bitmap with 4 bits per pixel.
+    /// 
+    /// The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+    /// through succeeding bits moving left to right. Data is tightly packed with no padding.
     BitmapGray4Packed,
 
-    /// A grayscale bitmap with 8 bits per pixel. The first byte corresponds to the top-left pixel,
-    /// proceeding through succeeding bytes moving left to right.
+    /// A grayscale bitmap with 8 bits per pixel.
+    /// 
+    /// The first byte corresponds to the top-left pixel, proceeding through succeeding bytes
+    /// moving left to right.
     BitmapGray8,
 
-    /// A color bitmap with 32 bits per pixel. The first group of four bytes corresponds to the
-    /// top-left pixel, proceeding through succeeding pixels moving left to right. Each byte
-    /// corresponds to a color channel and the channels within a pixel are in blue, green, red,
-    /// alpha order. Color values are pre-multiplied by the alpha. For example, the color
-    /// "full-green with half translucency" is encoded as `\x00\x80\x00\x80`, and not
-    /// `\x00\xFF\x00\x80`.
+    /// A color bitmap with 32 bits per pixel.
+    /// 
+    /// The first group of four bytes corresponds to the top-left pixel, proceeding through
+    /// succeeding pixels moving left to right. Each byte corresponds to a color channel and the
+    /// channels within a pixel are in blue, green, red, alpha order. Color values are
+    /// pre-multiplied by the alpha. For example, the color "full-green with half translucency"
+    /// is encoded as `\x00\x80\x00\x80`, and not `\x00\xFF\x00\x80`.
     BitmapPremulBgra32
 }
 
@@ -722,6 +733,8 @@ pub struct RawFaceTables<'a> {
     pub hhea: &'a [u8],
     pub maxp: &'a [u8],
 
+    pub bdat: Option<&'a [u8]>,
+    pub bloc: Option<&'a [u8]>,
     pub cbdt: Option<&'a [u8]>,
     pub cblc: Option<&'a [u8]>,
     pub cff: Option<&'a [u8]>,
@@ -793,10 +806,11 @@ pub struct FaceTables<'a> {
     pub hhea: hhea::Table,
     pub maxp: maxp::Table,
 
+    pub bdat: Option<cbdt::Table<'a>>,
     pub cbdt: Option<cbdt::Table<'a>>,
     pub cff: Option<cff::Table<'a>>,
     pub cmap: Option<cmap::Table<'a>>,
-    pub ebdt: Option<ebdt::Table<'a>>,
+    pub ebdt: Option<cbdt::Table<'a>>,
     pub glyf: Option<glyf::Table<'a>>,
     pub hmtx: Option<hmtx::Table<'a>>,
     pub kern: Option<kern::Table<'a>>,
@@ -932,6 +946,8 @@ impl<'a> Face<'a> {
 
             let table_data = raw_face.data.get(start..end);
             match &record.tag.to_bytes() {
+                b"bdat" => tables.bdat = table_data,
+                b"bloc" => tables.bloc = table_data,
                 b"CBDT" => tables.cbdt = table_data,
                 b"CBLC" => tables.cblc = table_data,
                 b"CFF " => tables.cff = table_data,
@@ -1044,6 +1060,14 @@ impl<'a> Face<'a> {
             None
         };
 
+        let bdat = if let Some(bloc) = raw_tables.bloc.and_then(cblc::Table::parse) {
+            raw_tables
+                .bdat
+                .and_then(|data| cbdt::Table::parse(bloc, data))
+        } else {
+            None
+        };
+
         let cbdt = if let Some(cblc) = raw_tables.cblc.and_then(cblc::Table::parse) {
             raw_tables
                 .cbdt
@@ -1052,10 +1076,10 @@ impl<'a> Face<'a> {
             None
         };
 
-        let ebdt = if let Some(eblc) = raw_tables.eblc.and_then(eblc::Table::parse) {
+        let ebdt = if let Some(eblc) = raw_tables.eblc.and_then(cblc::Table::parse) {
             raw_tables
                 .ebdt
-                .and_then(|data| ebdt::Table::parse(eblc, data))
+                .and_then(|data| cbdt::Table::parse(eblc, data))
         } else {
             None
         };
@@ -1065,6 +1089,7 @@ impl<'a> Face<'a> {
             hhea,
             maxp,
 
+            bdat,
             cbdt,
             cff: raw_tables.cff.and_then(cff::Table::parse),
             cmap: raw_tables.cmap.and_then(cmap::Table::parse),
@@ -1948,6 +1973,9 @@ impl<'a> Face<'a> {
             if let Some(strike) = table.best_strike(pixels_per_em) {
                 return strike.get(glyph_id);
             }
+        }
+        if let Some(bdat) = self.tables.bdat {
+            return bdat.get(glyph_id, pixels_per_em);
         }
 
         if let Some(cbdt) = self.tables.cbdt {

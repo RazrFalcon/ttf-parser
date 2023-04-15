@@ -20,6 +20,78 @@
  */
 typedef enum {
     TTFP_RASTER_IMAGE_FORMAT_PNG = 0,
+
+    /**
+     * @brief A monochrome bitmap.
+     * 
+     * The most significant bit of the first byte corresponds to the top-left pixel, proceeding
+     * through succeeding bits moving left to right. The data for each row is padded to a byte
+     * boundary, so the next row begins with the most significant bit of a new byte. 1 corresponds
+     * to black, and 0 to white.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_MONO = 1,
+
+    /**
+     * @brief A packed monochrome bitmap.
+     * 
+     * The most significant bit of the first byte corresponds to the top-left pixel, proceeding
+     * through succeeding bits moving left to right. Data is tightly packed with no padding. 1
+     * corresponds to black, and 0 to white.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_MONO_PACKED = 2,
+
+    /**
+     * @brief A grayscale bitmap with 2 bits per pixel.
+     * 
+     * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+     * through succeeding bits moving left to right. The data for each row is padded to a byte
+     * boundary, so the next row begins with the most significant bit of a new byte.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_GRAY_2 = 3,
+
+    /**
+     * @brief A packed grayscale bitmap with 2 bits per pixel.
+     * 
+     * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+     * through succeeding bits moving left to right. Data is tightly packed with no padding.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_GRAY_2_PACKED = 4,
+
+    /**
+     * @brief A grayscale bitmap with 4 bits per pixel.
+     * 
+     * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+     * through succeeding bits moving left to right. The data for each row is padded to a byte
+     * boundary, so the next row begins with the most significant bit of a new byte.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_GRAY_4 = 5,
+
+    /**
+     * @brief A packed grayscale bitmap with 4 bits per pixel.
+     * 
+     * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
+     * through succeeding bits moving left to right. Data is tightly packed with no padding.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_GRAY_4_PACKED = 6,
+
+    /**
+     * @brief A grayscale bitmap with 8 bits per pixel.
+     * 
+     * The first byte corresponds to the top-left pixel, proceeding through succeeding bytes
+     * moving left to right.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_GRAY_8 = 7,
+
+    /**
+     * @brief A color bitmap with 32 bits per pixel.
+     * 
+     * The first group of four bytes corresponds to the top-left pixel, proceeding through
+     * succeeding pixels moving left to right. Each byte corresponds to a color channel and the
+     * channels within a pixel are in blue, green, red, alpha order. Color values are
+     * pre-multiplied by the alpha. For example, the color "full-green with half translucency"
+     * is encoded as `\x00\x80\x00\x80`, and not `\x00\xFF\x00\x80`.
+     */
+    TTFP_RASTER_IMAGE_FORMAT_BITMAP_PREMUL_BGRA_32 = 8,
 } ttfp_raster_image_format;
 
 /**

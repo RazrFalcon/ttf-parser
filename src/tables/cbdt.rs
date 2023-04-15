@@ -1,8 +1,7 @@
 //! A [Color Bitmap Data Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/cbdt) implementation.
 
-use super::cblc;
-use crate::cblc::{Metrics, MetricsFormat, BitmapDataFormat};
+use crate::cblc::{self, Metrics, MetricsFormat, BitmapDataFormat};
 use crate::parser::{NumFrom, Stream};
 use crate::{GlyphId, RasterGlyphImage, RasterImageFormat};
 

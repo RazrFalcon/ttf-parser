@@ -11,19 +11,22 @@
 #include <stdint.h>
 
 #define TTFP_MAJOR_VERSION 0
-#define TTFP_MINOR_VERSION 15
+#define TTFP_MINOR_VERSION 19
 #define TTFP_PATCH_VERSION 0
-#define TTFP_VERSION "0.15.0"
+#define TTFP_VERSION "0.19.0"
 
 /**
  * @brief A glyph image format.
  */
 typedef enum {
+    /**
+     * @brief A PNG.
+     */
     TTFP_RASTER_IMAGE_FORMAT_PNG = 0,
 
     /**
      * @brief A monochrome bitmap.
-     * 
+     *
      * The most significant bit of the first byte corresponds to the top-left pixel, proceeding
      * through succeeding bits moving left to right. The data for each row is padded to a byte
      * boundary, so the next row begins with the most significant bit of a new byte. 1 corresponds
@@ -33,7 +36,7 @@ typedef enum {
 
     /**
      * @brief A packed monochrome bitmap.
-     * 
+     *
      * The most significant bit of the first byte corresponds to the top-left pixel, proceeding
      * through succeeding bits moving left to right. Data is tightly packed with no padding. 1
      * corresponds to black, and 0 to white.
@@ -42,7 +45,7 @@ typedef enum {
 
     /**
      * @brief A grayscale bitmap with 2 bits per pixel.
-     * 
+     *
      * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
      * through succeeding bits moving left to right. The data for each row is padded to a byte
      * boundary, so the next row begins with the most significant bit of a new byte.
@@ -51,7 +54,7 @@ typedef enum {
 
     /**
      * @brief A packed grayscale bitmap with 2 bits per pixel.
-     * 
+     *
      * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
      * through succeeding bits moving left to right. Data is tightly packed with no padding.
      */
@@ -59,7 +62,7 @@ typedef enum {
 
     /**
      * @brief A grayscale bitmap with 4 bits per pixel.
-     * 
+     *
      * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
      * through succeeding bits moving left to right. The data for each row is padded to a byte
      * boundary, so the next row begins with the most significant bit of a new byte.
@@ -68,7 +71,7 @@ typedef enum {
 
     /**
      * @brief A packed grayscale bitmap with 4 bits per pixel.
-     * 
+     *
      * The most significant bits of the first byte corresponds to the top-left pixel, proceeding
      * through succeeding bits moving left to right. Data is tightly packed with no padding.
      */
@@ -76,7 +79,7 @@ typedef enum {
 
     /**
      * @brief A grayscale bitmap with 8 bits per pixel.
-     * 
+     *
      * The first byte corresponds to the top-left pixel, proceeding through succeeding bytes
      * moving left to right.
      */
@@ -84,7 +87,7 @@ typedef enum {
 
     /**
      * @brief A color bitmap with 32 bits per pixel.
-     * 
+     *
      * The first group of four bytes corresponds to the top-left pixel, proceeding through
      * succeeding pixels moving left to right. Each byte corresponds to a color channel and the
      * channels within a pixel are in blue, green, red, alpha order. Color values are
@@ -638,13 +641,13 @@ ttfp_rect ttfp_get_global_bounding_box(const ttfp_face *face);
  * Note that this method will return an encoded image. It should be decoded
  * by the caller. We don't validate or preprocess it in any way.
  *
- * Currently, only PNG images are supported.
- *
- * Also, a font can contain both: images and outlines. So when this method returns `false`
+ * Also, a font can contain both: images and outlines. So when this method returns `None`
  * you should also try `ttfp_outline_glyph()` afterwards.
  *
  * There are multiple ways an image can be stored in a TrueType font
- * and this method supports only `sbix`, `CBLC`+`CBDT`.
+ * and this method supports most of them.
+ * This includes `sbix`, `bloc` + `bdat`, `EBLC` + `EBDT`, `CBLC` + `CBDT`.
+ * And font's tables will be accesses in this specific order.
  */
 bool ttfp_get_glyph_raster_image(const ttfp_face *face,
                                  uint16_t glyph_id,

@@ -60,6 +60,7 @@ pub struct ttfp_name_record {
 /// @brief A glyph image format.
 #[repr(C)]
 pub enum ttfp_raster_image_format {
+    /// @brief A PNG.
     PNG = 0,
 
     /// @brief A monochrome bitmap.
@@ -783,13 +784,13 @@ pub extern "C" fn ttfp_get_global_bounding_box(
 /// Note that this method will return an encoded image. It should be decoded
 /// by the caller. We don't validate or preprocess it in any way.
 ///
-/// Currently, only PNG images are supported.
-///
-/// Also, a font can contain both: images and outlines. So when this method returns `false`
+/// Also, a font can contain both: images and outlines. So when this method returns `None`
 /// you should also try `ttfp_outline_glyph()` afterwards.
 ///
 /// There are multiple ways an image can be stored in a TrueType font
-/// and this method supports only `sbix`, `CBLC`+`CBDT`.
+/// and this method supports most of them.
+/// This includes `sbix`, `bloc` + `bdat`, `EBLC` + `EBDT`, `CBLC` + `CBDT`.
+/// And font's tables will be accesses in this specific order.
 #[no_mangle]
 pub extern "C" fn ttfp_get_glyph_raster_image(
     face: *const ttfp_face,

@@ -1961,8 +1961,9 @@ impl<'a> Face<'a> {
     /// you should also try `outline_glyph()` afterwards.
     ///
     /// There are multiple ways an image can be stored in a TrueType font
-    /// and this method supports only `sbix`, `CBLC`+`CBDT`, `EBLC + EBDT`.
-    /// Font's tables be accesses in this specific order.
+    /// and this method supports most of them.
+    /// This includes `sbix`, `bloc` + `bdat`, `EBLC` + `EBDT`, `CBLC` + `CBDT`.
+    /// And font's tables will be accesses in this specific order.
     #[inline]
     pub fn glyph_raster_image(
         &self,
@@ -1978,12 +1979,12 @@ impl<'a> Face<'a> {
             return bdat.get(glyph_id, pixels_per_em);
         }
 
-        if let Some(cbdt) = self.tables.cbdt {
-            return cbdt.get(glyph_id, pixels_per_em);
-        }
-
         if let Some(ebdt) = self.tables.ebdt {
             return ebdt.get(glyph_id, pixels_per_em);
+        }
+
+        if let Some(cbdt) = self.tables.cbdt {
+            return cbdt.get(glyph_id, pixels_per_em);
         }
 
         None

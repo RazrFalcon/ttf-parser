@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2023-04-17
+### Added
+- `bdat`, `bloc`, `EBDT` and `EBLC` tables support.
+  Thanks to [dzamkov](https://github.com/dzamkov).
+- `BitmapMono`, `BitmapMonoPacked`, `BitmapGray2`, `BitmapGray2Packed`, `BitmapGray4`,
+  `BitmapGray4Packed`, `BitmapGray8` and `BitmapPremulBgra32` variants to `RasterImageFormat`.
+
+### Fixed
+- `CBLC` table parsing.
+  Thanks to [dzamkov](https://github.com/dzamkov).
+
 ## [0.18.1] - 2023-01-10
 ### Fixed
 - (`MATH`) Handle NULL offsets.
@@ -380,7 +391,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.16.0...v0.17.0

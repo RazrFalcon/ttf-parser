@@ -151,7 +151,7 @@ impl FromData for GlyphIdOffsetPair {
 
 /// A [Color Bitmap Location Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/cblc).
-/// 
+///
 /// EBLC and bloc also share the same structure, so this is re-used for them.
 #[derive(Clone, Copy)]
 pub struct Table<'a> {

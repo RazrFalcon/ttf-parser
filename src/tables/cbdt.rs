@@ -1,13 +1,13 @@
 //! A [Color Bitmap Data Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/cbdt) implementation.
 
-use crate::cblc::{self, Metrics, MetricsFormat, BitmapDataFormat};
+use crate::cblc::{self, BitmapDataFormat, Metrics, MetricsFormat};
 use crate::parser::{NumFrom, Stream};
 use crate::{GlyphId, RasterGlyphImage, RasterImageFormat};
 
 /// A [Color Bitmap Data Table](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/cbdt).
-/// 
+///
 /// EBDT and bdat also share the same structure, so this is re-used for them.
 #[derive(Clone, Copy)]
 pub struct Table<'a> {
@@ -55,9 +55,7 @@ impl<'a> Table<'a> {
                     height,
                 }
             }
-            MetricsFormat::Shared => {
-                location.metrics
-            }
+            MetricsFormat::Shared => location.metrics,
         };
         match location.format.data {
             BitmapDataFormat::ByteAligned { bit_depth } => {
@@ -83,9 +81,13 @@ impl<'a> Table<'a> {
                 })
             }
             BitmapDataFormat::BitAligned { bit_depth } => {
-                let data_len = (u32::from(metrics.width) 
-                    * u32::from(metrics.height)
-                    * u32::from(bit_depth) + 7) / 8;
+                let data_len = {
+                    let w = u32::from(metrics.width);
+                    let h = u32::from(metrics.height);
+                    let d = u32::from(bit_depth);
+                    (w * h * d + 7) / 8
+                };
+
                 let data = s.read_bytes(usize::num_from(data_len))?;
                 Some(RasterGlyphImage {
                     x: i16::from(metrics.x),

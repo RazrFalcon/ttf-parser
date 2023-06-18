@@ -336,6 +336,16 @@ pub struct Rect {
 }
 
 impl Rect {
+    #[inline]
+    fn zero() -> Self {
+        Self {
+            x_min: 0,
+            y_min: 0,
+            x_max: 0,
+            y_max: 0,
+        }
+    }
+
     /// Returns rect's width.
     #[inline]
     pub fn width(&self) -> i16 {

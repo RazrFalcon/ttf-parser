@@ -264,6 +264,7 @@ fn parse_char_string(
         y: 0.0,
         has_move_to: false,
         is_first_move_to: true,
+        width_only: false,
     };
     _parse_char_string(&mut ctx, data, 0, &mut parser)?;
     // let _ = _parse_char_string(&mut ctx, data, 0.0, 0.0, &mut stack, 0, &mut inner_builder)?;

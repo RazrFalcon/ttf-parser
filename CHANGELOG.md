@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.19.1] - 2023-06-20
 ### Fixed
 - `cff::Table::glyph_width` returns a correct width when subroutines are present.
 
@@ -393,7 +395,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.17.0...v0.18.0

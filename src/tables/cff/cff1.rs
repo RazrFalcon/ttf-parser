@@ -1032,6 +1032,17 @@ impl<'a> Table<'a> {
             FontKind::CID(_) => None,
         }
     }
+
+    /// Returns the CID corresponding to a glyph ID.
+    ///
+    /// Returns `None` if this is not a CIDFont.
+    #[cfg(feature = "glyph-names")]
+    pub fn glyph_cid(&self, glyph_id: GlyphId) -> Option<u16> {
+        match self.kind {
+            FontKind::SID(_) => None,
+            FontKind::CID(_) => self.charset.gid_to_sid(glyph_id).map(|id| id.0),
+        }
+    }
 }
 
 impl core::fmt::Debug for Table<'_> {

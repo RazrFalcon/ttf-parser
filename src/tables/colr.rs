@@ -90,6 +90,13 @@ impl<'a> Table<'a> {
         })
     }
 
+    /// Whether the table contains a definition for the given glyph.
+    pub fn contains(&self, glyph_id: GlyphId) -> bool {
+        self.base_glyphs
+            .binary_search_by(|base| base.glyph_id.cmp(&glyph_id))
+            .is_some()
+    }
+
     /// Paints the color glyph.
     pub fn paint(
         &self,

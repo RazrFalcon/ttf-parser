@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+- `COLR` / `CPAL` v0 parsing.
 
 ## [0.19.2] - 2023-09-13
 ### Added

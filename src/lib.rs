@@ -71,6 +71,7 @@ mod var_store;
 use head::IndexToLocationFormat;
 pub use parser::{Fixed, FromData, LazyArray16, LazyArray32, LazyArrayIter16, LazyArrayIter32};
 use parser::{NumFrom, Offset, Offset32, Stream, TryNumFrom};
+use tables::colr::ColorGlyphPainter;
 
 #[cfg(feature = "variable-fonts")]
 pub use fvar::VariationAxis;
@@ -85,7 +86,7 @@ pub use tables::{ankr, feat, kerx, morx, trak};
 pub use tables::{avar, cff2, fvar, gvar, hvar, mvar};
 pub use tables::{cbdt, cblc, cff1 as cff, vhea};
 pub use tables::{
-    cmap, glyf, head, hhea, hmtx, kern, loca, maxp, name, os2, post, sbix, svg, vorg,
+    cmap, colr, cpal, glyf, head, hhea, hmtx, kern, loca, maxp, name, os2, post, sbix, svg, vorg,
 };
 #[cfg(feature = "opentype-layout")]
 pub use tables::{gdef, gpos, gsub, math};
@@ -749,6 +750,8 @@ pub struct RawFaceTables<'a> {
     pub cblc: Option<&'a [u8]>,
     pub cff: Option<&'a [u8]>,
     pub cmap: Option<&'a [u8]>,
+    pub colr: Option<&'a [u8]>,
+    pub cpal: Option<&'a [u8]>,
     pub ebdt: Option<&'a [u8]>,
     pub eblc: Option<&'a [u8]>,
     pub glyf: Option<&'a [u8]>,
@@ -820,6 +823,7 @@ pub struct FaceTables<'a> {
     pub cbdt: Option<cbdt::Table<'a>>,
     pub cff: Option<cff::Table<'a>>,
     pub cmap: Option<cmap::Table<'a>>,
+    pub colr: Option<colr::Table<'a>>,
     pub ebdt: Option<cbdt::Table<'a>>,
     pub glyf: Option<glyf::Table<'a>>,
     pub hmtx: Option<hmtx::Table<'a>>,
@@ -963,6 +967,8 @@ impl<'a> Face<'a> {
                 b"CFF " => tables.cff = table_data,
                 #[cfg(feature = "variable-fonts")]
                 b"CFF2" => tables.cff2 = table_data,
+                b"COLR" => tables.colr = table_data,
+                b"CPAL" => tables.cpal = table_data,
                 b"EBDT" => tables.ebdt = table_data,
                 b"EBLC" => tables.eblc = table_data,
                 #[cfg(feature = "opentype-layout")]
@@ -1094,6 +1100,14 @@ impl<'a> Face<'a> {
             None
         };
 
+        let colr = if let Some(cpal) = raw_tables.cpal.and_then(cpal::Table::parse) {
+            raw_tables
+                .colr
+                .and_then(|data| colr::Table::parse(cpal, data))
+        } else {
+            None
+        };
+
         Ok(FaceTables {
             head,
             hhea,
@@ -1103,6 +1117,7 @@ impl<'a> Face<'a> {
             cbdt,
             cff: raw_tables.cff.and_then(cff::Table::parse),
             cmap: raw_tables.cmap.and_then(cmap::Table::parse),
+            colr,
             ebdt,
             glyf,
             hmtx,
@@ -1925,6 +1940,33 @@ impl<'a> Face<'a> {
         }
 
         None
+    }
+
+    /// Paints a color glyph from the COLR table.
+    ///
+    /// **Warning**: since `ttf-parser` is a pull parser, `ColorGlyphPainter`
+    /// will emit instructions even when the glyph is partially malformed. You
+    /// must check `paint_color_glyph()` result before using
+    /// `ColorGlyphPainter`'s output.
+    ///
+    /// A font can define a glyph using layers of colored shapes instead of a
+    /// simple outline. Which is primarily used for emojis. This method should
+    /// be used to access glyphs defines in the COLR table.
+    ///
+    /// Also, a font can contain both: a layered definition and outlines. So
+    /// when this method returns `None` you should also try `outline_glyph()`
+    /// afterwards.
+    ///
+    /// Returns `None` if the glyph has no COLR definition or if the glyph
+    /// definition is malformed.
+    #[inline]
+    pub fn paint_color_glyph(
+        &self,
+        glyph_id: GlyphId,
+        palette: u16,
+        painter: &mut dyn ColorGlyphPainter,
+    ) -> Option<()> {
+        self.tables.colr?.paint(glyph_id, palette, painter)
     }
 
     /// Returns a tight glyph bounding box.

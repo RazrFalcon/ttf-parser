@@ -824,6 +824,7 @@ pub struct FaceTables<'a> {
     pub cff: Option<cff::Table<'a>>,
     pub cmap: Option<cmap::Table<'a>>,
     pub colr: Option<colr::Table<'a>>,
+    pub cpal: Option<cpal::Table<'a>>,
     pub ebdt: Option<cbdt::Table<'a>>,
     pub glyf: Option<glyf::Table<'a>>,
     pub hmtx: Option<hmtx::Table<'a>>,
@@ -1100,7 +1101,8 @@ impl<'a> Face<'a> {
             None
         };
 
-        let colr = if let Some(cpal) = raw_tables.cpal.and_then(cpal::Table::parse) {
+        let cpal = raw_tables.cpal.and_then(cpal::Table::parse);
+        let colr = if let Some(cpal) = cpal {
             raw_tables
                 .colr
                 .and_then(|data| colr::Table::parse(cpal, data))
@@ -1118,6 +1120,7 @@ impl<'a> Face<'a> {
             cff: raw_tables.cff.and_then(cff::Table::parse),
             cmap: raw_tables.cmap.and_then(cmap::Table::parse),
             colr,
+            cpal,
             ebdt,
             glyf,
             hmtx,

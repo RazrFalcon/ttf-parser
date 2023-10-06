@@ -156,7 +156,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 buf.extend_from_slice(b"data:image/svg+xml;base64, ");
 
                 let mut enc = base64::write::EncoderWriter::new(buf, base64::STANDARD);
-                enc.write_all(img).unwrap();
+                enc.write_all(img.data).unwrap();
                 enc.finish().unwrap();
             });
             svg.end_element();

@@ -2057,7 +2057,7 @@ impl<'a> Face<'a> {
     /// Also, a font can contain both: images and outlines. So when this method returns `None`
     /// you should also try `outline_glyph()` afterwards.
     #[inline]
-    pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
+    pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<svg::SvgDocument<'a>> {
         self.tables.svg.and_then(|svg| svg.documents.find(glyph_id))
     }
 

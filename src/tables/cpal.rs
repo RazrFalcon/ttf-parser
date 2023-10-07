@@ -1,6 +1,8 @@
 //! A [Color Palette Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/cpal) implementation.
 
+use core::num::NonZeroU16;
+
 use crate::parser::{FromData, LazyArray16, Offset, Offset32, Stream};
 
 /// A [Color Palette Table](
@@ -8,7 +10,7 @@ use crate::parser::{FromData, LazyArray16, Offset, Offset32, Stream};
 #[derive(Clone, Copy, Debug)]
 pub struct Table<'a> {
     color_indices: LazyArray16<'a, u16>,
-    colors: LazyArray16<'a, Color>,
+    colors: LazyArray16<'a, BgraColor>,
 }
 
 impl<'a> Table<'a> {
@@ -24,12 +26,16 @@ impl<'a> Table<'a> {
         s.skip::<u16>(); // number of palette entries
 
         let num_palettes = s.read::<u16>()?;
+        if num_palettes == 0 {
+            return None; // zero palettes is an error
+        }
+
         let num_colors = s.read::<u16>()?;
         let color_records_offset = s.read::<Offset32>()?;
         let color_indices = s.read_array16::<u16>(num_palettes)?;
 
         let colors = Stream::new_at(data, color_records_offset.to_usize())?
-            .read_array16::<Color>(num_colors)?;
+            .read_array16::<BgraColor>(num_colors)?;
 
         Some(Self {
             color_indices,
@@ -37,27 +43,33 @@ impl<'a> Table<'a> {
         })
     }
 
+    /// Returns the number of palettes.
+    pub fn palettes(&self) -> NonZeroU16 {
+        // Already checked during parsing.
+        NonZeroU16::new(self.color_indices.len() as u16).unwrap()
+    }
+
     /// Returns the color at the given index into the given palette.
-    pub fn get(&self, palette: u16, palette_entry: u16) -> Option<Color> {
+    pub fn get(&self, palette_index: u16, palette_entry: u16) -> Option<BgraColor> {
         let index = self
             .color_indices
-            .get(palette)?
+            .get(palette_index)?
             .checked_add(palette_entry)?;
         self.colors.get(index)
     }
 }
 
-/// A BGRA color in sRGB.
+/// A BGRA color in the sRGB color space.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Color {
+pub struct BgraColor {
     pub blue: u8,
     pub green: u8,
     pub red: u8,
     pub alpha: u8,
 }
 
-impl FromData for Color {
+impl FromData for BgraColor {
     const SIZE: usize = 4;
 
     fn parse(data: &[u8]) -> Option<Self> {

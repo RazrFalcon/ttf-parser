@@ -71,7 +71,6 @@ mod var_store;
 use head::IndexToLocationFormat;
 pub use parser::{Fixed, FromData, LazyArray16, LazyArray32, LazyArrayIter16, LazyArrayIter32};
 use parser::{NumFrom, Offset, Offset32, Stream, TryNumFrom};
-use tables::colr::ColorGlyphPainter;
 
 #[cfg(feature = "variable-fonts")]
 pub use fvar::VariationAxis;
@@ -824,7 +823,6 @@ pub struct FaceTables<'a> {
     pub cff: Option<cff::Table<'a>>,
     pub cmap: Option<cmap::Table<'a>>,
     pub colr: Option<colr::Table<'a>>,
-    pub cpal: Option<cpal::Table<'a>>,
     pub ebdt: Option<cbdt::Table<'a>>,
     pub glyf: Option<glyf::Table<'a>>,
     pub hmtx: Option<hmtx::Table<'a>>,
@@ -1120,7 +1118,6 @@ impl<'a> Face<'a> {
             cff: raw_tables.cff.and_then(cff::Table::parse),
             cmap: raw_tables.cmap.and_then(cmap::Table::parse),
             colr,
-            cpal,
             ebdt,
             glyf,
             hmtx,
@@ -1945,33 +1942,6 @@ impl<'a> Face<'a> {
         None
     }
 
-    /// Paints a color glyph from the COLR table.
-    ///
-    /// **Warning**: since `ttf-parser` is a pull parser, `ColorGlyphPainter`
-    /// will emit instructions even when the glyph is partially malformed. You
-    /// must check `paint_color_glyph()` result before using
-    /// `ColorGlyphPainter`'s output.
-    ///
-    /// A font can define a glyph using layers of colored shapes instead of a
-    /// simple outline. Which is primarily used for emojis. This method should
-    /// be used to access glyphs defines in the COLR table.
-    ///
-    /// Also, a font can contain both: a layered definition and outlines. So
-    /// when this method returns `None` you should also try `outline_glyph()`
-    /// afterwards.
-    ///
-    /// Returns `None` if the glyph has no COLR definition or if the glyph
-    /// definition is malformed.
-    #[inline]
-    pub fn paint_color_glyph(
-        &self,
-        glyph_id: GlyphId,
-        palette: u16,
-        painter: &mut dyn ColorGlyphPainter,
-    ) -> Option<()> {
-        self.tables.colr?.paint(glyph_id, palette, painter)
-    }
-
     /// Returns a tight glyph bounding box.
     ///
     /// This is just a shorthand for `outline_glyph()` since only the `glyf` table stores
@@ -2059,6 +2029,51 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<svg::SvgDocument<'a>> {
         self.tables.svg.and_then(|svg| svg.documents.find(glyph_id))
+    }
+
+    /// Returns `true` if the glyph can be colored/painted using the `COLR`+`CPAL` tables.
+    ///
+    /// See [`paint_color_glyph`](Face::paint_color_glyph) for details.
+    pub fn is_color_glyph(&self, glyph_id: GlyphId) -> bool {
+        self.tables()
+            .colr
+            .map(|colr| colr.contains(glyph_id))
+            .unwrap_or(false)
+    }
+
+    /// Returns the number of palettes stored in the `COLR`+`CPAL` tables.
+    ///
+    /// See [`paint_color_glyph`](Face::paint_color_glyph) for details.
+    pub fn color_palettes(&self) -> Option<core::num::NonZeroU16> {
+        Some(self.tables().colr?.palettes.palettes())
+    }
+
+    /// Paints a color glyph from the `COLR` table.
+    ///
+    /// A font can have multiple palettes, which you can check via
+    /// [`color_palettes`](Face::color_palettes).
+    /// If unsure, just pass 0 to the `palette` argument, which is the default.
+    ///
+    /// A font can define a glyph using layers of colored shapes instead of a
+    /// simple outline. Which is primarily used for emojis. This method should
+    /// be used to access glyphs defined in the `COLR` table.
+    ///
+    /// Also, a font can contain both: a layered definition and outlines. So
+    /// when this method returns `None` you should also try
+    /// [`outline_glyph`](Face::outline_glyph) afterwards.
+    ///
+    /// Returns `None` if the glyph has no `COLR` definition or if the glyph
+    /// definition is malformed.
+    ///
+    /// See `examples/font2svg.rs` for usage examples.
+    #[inline]
+    pub fn paint_color_glyph(
+        &self,
+        glyph_id: GlyphId,
+        palette: u16,
+        painter: &mut dyn colr::Painter,
+    ) -> Option<()> {
+        self.tables.colr?.paint(glyph_id, palette, painter)
     }
 
     /// Returns an iterator over variation axes.

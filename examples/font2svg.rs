@@ -10,11 +10,13 @@ const HELP: &str = "\
 Usage:
     font2svg font.ttf out.svg
     font2svg --variations 'wght:500;wdth:200' font.ttf out.svg
+    font2svg --colr-palette 1 colr-font.ttf out.svg
 ";
 
 struct Args {
     #[allow(dead_code)]
     variations: Vec<ttf::Variation>,
+    colr_palette: u16,
     ttf_path: PathBuf,
     svg_path: PathBuf,
 }
@@ -44,6 +46,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     }
 
     let variations = args.opt_value_from_fn("--variations", parse_variations)?;
+    let colr_palette: u16 = args.opt_value_from_str("--colr-palette")?.unwrap_or(0);
     let free = args.finish();
     if free.len() != 2 {
         return Err("invalid number of arguments".into());
@@ -51,6 +54,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
 
     Ok(Args {
         variations: variations.unwrap_or_default(),
+        colr_palette,
         ttf_path: PathBuf::from(&free[0]),
         svg_path: PathBuf::from(&free[1]),
     })
@@ -91,6 +95,14 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    if face.tables().colr.is_some() {
+        if let Some(total) = face.color_palettes() {
+            if args.colr_palette >= total.get() {
+                return Err(format!("only {} palettes are available", total).into());
+            }
+        }
+    }
+
     let units_per_em = face.units_per_em();
     let scale = FONT_SIZE / units_per_em as f64;
 
@@ -121,6 +133,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut row = 0;
     let mut column = 0;
     for id in 0..face.number_of_glyphs() {
+        let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
         let y = row as f64 * cell_size;
 
@@ -132,7 +145,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         svg.write_text_fmt(format_args!("{}", &id));
         svg.end_element();
 
-        if let Some(img) = face.glyph_raster_image(ttf::GlyphId(id), std::u16::MAX) {
+        if let Some(img) = face.glyph_raster_image(gid, std::u16::MAX) {
             svg.start_element("image");
             svg.write_attribute("x", &(x + 2.0 + img.x as f64));
             svg.write_attribute("y", &(y - img.y as f64));
@@ -146,7 +159,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 enc.finish().unwrap();
             });
             svg.end_element();
-        } else if let Some(img) = face.glyph_svg_image(ttf::GlyphId(id)) {
+        } else if let Some(img) = face.glyph_svg_image(gid) {
             svg.start_element("image");
             svg.write_attribute("x", &(x + 2.0));
             svg.write_attribute("y", &(y + cell_size));
@@ -160,17 +173,22 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 enc.finish().unwrap();
             });
             svg.end_element();
+        } else if face.tables().colr.is_some() {
+            if face.is_color_glyph(gid) {
+                color_glyph(
+                    x,
+                    y,
+                    &face,
+                    args.colr_palette,
+                    gid,
+                    cell_size,
+                    scale,
+                    &mut svg,
+                    &mut path_buf,
+                );
+            }
         } else {
-            glyph_to_path(
-                x,
-                y,
-                &face,
-                ttf::GlyphId(id),
-                cell_size,
-                scale,
-                &mut svg,
-                &mut path_buf,
-            );
+            glyph_to_path(x, y, &face, gid, cell_size, scale, &mut svg, &mut path_buf);
         }
 
         column += 1;
@@ -265,6 +283,75 @@ fn glyph_to_path(
         svg.write_attribute("stroke", "green");
         svg.end_element();
     }
+}
+
+struct GlyphPainter<'a> {
+    face: &'a ttf::Face<'a>,
+    svg: &'a mut xmlwriter::XmlWriter,
+    path_buf: &'a mut String,
+}
+
+impl ttf::colr::Painter for GlyphPainter<'_> {
+    fn color(&mut self, glyph_id: ttf::GlyphId, color: ttf::colr::BgraColor) {
+        self.path_buf.clear();
+        let mut builder = Builder(self.path_buf);
+        match self.face.outline_glyph(glyph_id, &mut builder) {
+            Some(v) => v,
+            None => return,
+        };
+        if !self.path_buf.is_empty() {
+            self.path_buf.pop(); // remove trailing space
+        }
+
+        self.svg.start_element("path");
+        self.svg.write_attribute(
+            "fill",
+            &format!("rgb({}, {}, {})", color.red, color.green, color.blue),
+        );
+        let opacity = f32::from(color.alpha) / 255.0;
+        self.svg.write_attribute("fill-opacity", &opacity);
+        self.svg.write_attribute("d", self.path_buf);
+        self.svg.end_element();
+    }
+
+    fn foreground(&mut self, id: ttf::GlyphId) {
+        self.color(
+            id,
+            ttf::colr::BgraColor {
+                blue: 0,
+                green: 0,
+                red: 0,
+                alpha: 255,
+            },
+        )
+    }
+}
+
+fn color_glyph(
+    x: f64,
+    y: f64,
+    face: &ttf::Face,
+    palette_index: u16,
+    glyph_id: ttf::GlyphId,
+    cell_size: f64,
+    scale: f64,
+    svg: &mut xmlwriter::XmlWriter,
+    path_buf: &mut String,
+) {
+    let y = y + cell_size + face.descender() as f64 * scale;
+    let transform = format!("matrix({} 0 0 {} {} {})", scale, -scale, x, y);
+
+    svg.start_element("g");
+    svg.write_attribute("transform", &transform);
+
+    let mut painter = GlyphPainter {
+        face,
+        svg,
+        path_buf,
+    };
+    face.paint_color_glyph(glyph_id, palette_index, &mut painter);
+
+    svg.end_element();
 }
 
 struct Builder<'a>(&'a mut String);

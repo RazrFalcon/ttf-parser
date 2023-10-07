@@ -1,6 +1,6 @@
 use crate::{convert, Unit::*};
-use ttf_parser::colr::{self, ColorGlyphPainter};
-use ttf_parser::cpal::{self, Color};
+use ttf_parser::colr::{self, Painter};
+use ttf_parser::cpal::{self, BgraColor};
 use ttf_parser::GlyphId;
 
 #[test]
@@ -39,9 +39,9 @@ fn basic() {
         colr.paint(GlyphId(id), 0, &mut painter).map(|_| painter.0)
     };
 
-    let a = Color { blue: 10, green: 15, red: 20, alpha: 25 };
-    let b = Color { blue: 30, green: 35, red: 40, alpha: 45 };
-    let c = Color { blue: 50, green: 55, red: 60, alpha: 65 };
+    let a = BgraColor { blue: 10, green: 15, red: 20, alpha: 25 };
+    let b = BgraColor { blue: 30, green: 35, red: 40, alpha: 45 };
+    let c = BgraColor { blue: 50, green: 55, red: 60, alpha: 65 };
 
     assert_eq!(cpal.get(0, 0), Some(a));
     assert_eq!(cpal.get(0, 1), Some(b));
@@ -63,10 +63,14 @@ fn basic() {
     assert_eq!(paint(7), Some(vec![(11, b)]));
 }
 
-struct VecPainter(Vec<(u16, Color)>);
+struct VecPainter(Vec<(u16, BgraColor)>);
 
-impl ColorGlyphPainter for VecPainter {
-    fn glyph(&mut self, id: GlyphId, color: Color) {
+impl Painter for VecPainter {
+    fn color(&mut self, id: GlyphId, color: BgraColor) {
         self.0.push((id.0, color));
+    }
+
+    fn foreground(&mut self, id: GlyphId) {
+        self.0.push((id.0, BgraColor { blue: 0, green: 0, red: 0, alpha: 255 }));
     }
 }

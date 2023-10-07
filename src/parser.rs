@@ -771,7 +771,7 @@ impl<'a> Stream<'a> {
 
     #[allow(dead_code)]
     #[inline]
-    pub(crate) fn read_at_offset16(&mut self, data: &'a [u8]) -> Option<&'a [u8]> {
+    pub fn read_at_offset16(&mut self, data: &'a [u8]) -> Option<&'a [u8]> {
         let offset = self.read::<Offset16>()?.to_usize();
         data.get(offset..)
     }
@@ -857,13 +857,13 @@ impl FromData for Option<Offset32> {
 }
 
 #[inline]
-pub(crate) fn i16_bound(min: i16, val: i16, max: i16) -> i16 {
+pub fn i16_bound(min: i16, val: i16, max: i16) -> i16 {
     use core::cmp;
     cmp::max(min, cmp::min(max, val))
 }
 
 #[inline]
-pub(crate) fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
+pub fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
     debug_assert!(min.is_finite());
     debug_assert!(val.is_finite());
     debug_assert!(max.is_finite());

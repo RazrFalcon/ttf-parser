@@ -1,11 +1,14 @@
 //! A [Color Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/colr) implementation.
 
-use crate::cpal::{self, Color};
+use crate::cpal;
 use crate::parser::{FromData, LazyArray16, Offset, Offset32, Stream};
 use crate::GlyphId;
 
-/// A [base glyph](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
+pub use cpal::BgraColor;
+
+/// A [base glyph](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
 #[derive(Clone, Copy, Debug)]
 struct BaseGlyphRecord {
     glyph_id: GlyphId,
@@ -26,7 +29,8 @@ impl FromData for BaseGlyphRecord {
     }
 }
 
-/// A [layer](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
+/// A [layer](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
 #[derive(Clone, Copy, Debug)]
 struct LayerRecord {
     glyph_id: GlyphId,
@@ -46,9 +50,12 @@ impl FromData for LayerRecord {
 }
 
 /// A trait for color glyph painting.
-pub trait ColorGlyphPainter {
-    /// Paints an outline glyph in the given color.
-    fn glyph(&mut self, id: GlyphId, color: Color);
+pub trait Painter {
+    /// Paints an outline glyph using the given color.
+    fn color(&mut self, id: GlyphId, color: BgraColor);
+
+    /// Paints an outline glyph using the application provided text foreground color.
+    fn foreground(&mut self, id: GlyphId);
 }
 
 /// A [Color Table](
@@ -57,7 +64,7 @@ pub trait ColorGlyphPainter {
 /// Currently, only version 0 is supported.
 #[derive(Clone, Copy, Debug)]
 pub struct Table<'a> {
-    palettes: cpal::Table<'a>,
+    pub(crate) palettes: cpal::Table<'a>,
     base_glyphs: LazyArray16<'a, BaseGlyphRecord>,
     layers: LazyArray16<'a, LayerRecord>,
 }
@@ -90,31 +97,32 @@ impl<'a> Table<'a> {
         })
     }
 
-    /// Whether the table contains a definition for the given glyph.
-    pub fn contains(&self, glyph_id: GlyphId) -> bool {
+    fn get(&self, glyph_id: GlyphId) -> Option<BaseGlyphRecord> {
         self.base_glyphs
             .binary_search_by(|base| base.glyph_id.cmp(&glyph_id))
-            .is_some()
+            .map(|v| v.1)
+    }
+
+    /// Whether the table contains a definition for the given glyph.
+    pub fn contains(&self, glyph_id: GlyphId) -> bool {
+        self.get(glyph_id).is_some()
     }
 
     /// Paints the color glyph.
-    pub fn paint(
-        &self,
-        glyph_id: GlyphId,
-        palette: u16,
-        painter: &mut dyn ColorGlyphPainter,
-    ) -> Option<()> {
-        let (_, base) = self
-            .base_glyphs
-            .binary_search_by(|base| base.glyph_id.cmp(&glyph_id))?;
-
+    pub fn paint(&self, glyph_id: GlyphId, palette: u16, painter: &mut dyn Painter) -> Option<()> {
+        let base = self.get(glyph_id)?;
         let start = base.first_layer_index;
         let end = start.checked_add(base.num_layers)?;
         let layers = self.layers.slice(start..end)?;
 
         for layer in layers {
-            let color = self.palettes.get(palette, layer.palette_index)?;
-            painter.glyph(layer.glyph_id, color);
+            if layer.palette_index == 0xFFFF {
+                // A special case.
+                painter.foreground(layer.glyph_id);
+            } else {
+                let color = self.palettes.get(palette, layer.palette_index)?;
+                painter.color(layer.glyph_id, color);
+            }
         }
 
         Some(())

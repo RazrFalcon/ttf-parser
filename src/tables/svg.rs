@@ -3,15 +3,25 @@
 use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset32, Stream};
 use crate::GlyphId;
 
-#[derive(Debug, Clone, Copy)]
-/// An SvgDocument can include multi glyphs
+/// An [SVG documents](
+/// https://docs.microsoft.com/en-us/typography/opentype/spec/svg#svg-document-list).
+#[derive(Clone, Copy, Debug)]
 pub struct SvgDocument<'a> {
-    /// The SVG document data.The detail of data can see https://learn.microsoft.com/en-us/typography/opentype/spec/svg#svg-document-list
+    /// The SVG document data.
+    ///
+    /// Can be stored as a string or as a gzip compressed data, aka SVGZ.
     pub data: &'a [u8],
     /// The first glyph ID for the range covered by this record.
     pub start_glyph_id: GlyphId,
-    /// The last glyph ID for the range covered by this record.
+    /// The last glyph ID, *inclusive*, for the range covered by this record.
     pub end_glyph_id: GlyphId,
+}
+
+impl SvgDocument<'_> {
+    /// Returns the glyphs range.
+    pub fn glyphs_range(&self) -> core::ops::RangeInclusive<GlyphId> {
+        self.start_glyph_id..=self.end_glyph_id
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -20,6 +30,12 @@ struct SvgDocumentRecord {
     end_glyph_id: GlyphId,
     svg_doc_offset: Option<Offset32>,
     svg_doc_length: u32,
+}
+
+impl SvgDocumentRecord {
+    fn glyphs_range(&self) -> core::ops::RangeInclusive<GlyphId> {
+        self.start_glyph_id..=self.end_glyph_id
+    }
 }
 
 impl FromData for SvgDocumentRecord {
@@ -68,7 +84,7 @@ impl<'a> SvgDocumentsList<'a> {
         let index = self
             .records
             .into_iter()
-            .position(|v| (v.start_glyph_id..=v.end_glyph_id).contains(&glyph_id))?;
+            .position(|v| v.glyphs_range().contains(&glyph_id))?;
         self.get(index as u16)
     }
 

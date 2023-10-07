@@ -5,7 +5,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
-- `COLR` / `CPAL` v0 parsing.
+### Added
+- `COLR` / `CPAL` v0 support.
+  Thanks to [laurmaedje](https://github.com/laurmaedje).
+
+### Changed
+- `svg::SvgDocumentsList` returns `svg::SvgDocument` and not just `&[u8]` now.
+  Thanks to [wjian23](https://github.com/wjian23).
 
 ## [0.19.2] - 2023-09-13
 ### Added

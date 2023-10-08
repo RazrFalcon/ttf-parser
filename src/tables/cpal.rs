@@ -69,6 +69,21 @@ pub struct BgraColor {
     pub alpha: u8,
 }
 
+impl BgraColor {
+    pub fn new(blue: u8, green: u8, red: u8, alpha: u8) -> Self {
+        Self {
+            blue,
+            green,
+            red,
+            alpha,
+        }
+    }
+
+    pub(crate) fn apply_alpha(&mut self, alpha: f32) {
+        self.alpha = (((f32::from(self.alpha) / 255.0) * alpha) * 255.0) as u8;
+    }
+}
+
 impl FromData for BgraColor {
     const SIZE: usize = 4;
 

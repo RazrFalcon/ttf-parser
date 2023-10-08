@@ -35,7 +35,7 @@ Font parsing starts with a [`Face`].
 
 #![no_std]
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
 #![allow(clippy::get_first)] // we use it for readability
@@ -402,6 +402,84 @@ impl BBox {
             x_max: i16::try_num_from(self.x_max)?,
             y_max: i16::try_num_from(self.y_max)?,
         })
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct Transform {
+    pub a: f32,
+    pub b: f32,
+    pub c: f32,
+    pub d: f32,
+    pub e: f32,
+    pub f: f32,
+}
+
+impl Transform {
+    #[inline]
+    pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Self {
+        Transform { a, b, c, d, e, f }
+    }
+
+    #[cfg(feature = "variable-fonts")]
+    #[inline]
+    pub fn new_translate(tx: f32, ty: f32) -> Self {
+        Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty)
+    }
+
+    #[inline]
+    pub fn combine(ts1: Self, ts2: Self) -> Self {
+        Transform {
+            a: ts1.a * ts2.a + ts1.c * ts2.b,
+            b: ts1.b * ts2.a + ts1.d * ts2.b,
+            c: ts1.a * ts2.c + ts1.c * ts2.d,
+            d: ts1.b * ts2.c + ts1.d * ts2.d,
+            e: ts1.a * ts2.e + ts1.c * ts2.f + ts1.e,
+            f: ts1.b * ts2.e + ts1.d * ts2.f + ts1.f,
+        }
+    }
+
+    #[inline]
+    fn apply_to(&self, x: &mut f32, y: &mut f32) {
+        let tx = *x;
+        let ty = *y;
+        *x = self.a * tx + self.c * ty + self.e;
+        *y = self.b * tx + self.d * ty + self.f;
+    }
+
+    #[inline]
+    pub fn is_default(&self) -> bool {
+        // A direct float comparison is fine in our case.
+        self.a == 1.0
+            && self.b == 0.0
+            && self.c == 0.0
+            && self.d == 1.0
+            && self.e == 0.0
+            && self.f == 0.0
+    }
+}
+
+impl Default for Transform {
+    #[inline]
+    fn default() -> Self {
+        Transform {
+            a: 1.0,
+            b: 0.0,
+            c: 0.0,
+            d: 1.0,
+            e: 0.0,
+            f: 0.0,
+        }
+    }
+}
+
+impl core::fmt::Debug for Transform {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(
+            f,
+            "Transform({} {} {} {} {} {})",
+            self.a, self.b, self.c, self.d, self.e, self.f
+        )
     }
 }
 
@@ -2071,7 +2149,7 @@ impl<'a> Face<'a> {
         &self,
         glyph_id: GlyphId,
         palette: u16,
-        painter: &mut dyn colr::Painter,
+        painter: &mut dyn colr::Painter<'a>,
     ) -> Option<()> {
         self.tables.colr?.paint(glyph_id, palette, painter)
     }

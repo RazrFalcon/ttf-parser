@@ -58,19 +58,61 @@ fn basic() {
     assert!(colr.contains(GlyphId(7)));
 
     assert_eq!(paint(1), None);
-    assert_eq!(paint(2), Some(vec![(12, c), (13, a)]));
-    assert_eq!(paint(3), Some(vec![(10, c), (11, b), (12, c)]));
-    assert_eq!(paint(7), Some(vec![(11, b)]));
+
+    assert_eq!(paint(2).unwrap(), vec![
+        Command::Outline(12),
+        Command::PaintColor(c),
+        Command::Outline(13),
+        Command::PaintColor(a),
+    ]);
+
+    assert_eq!(paint(3).unwrap(), vec![
+        Command::Outline(10),
+        Command::PaintColor(c),
+        Command::Outline(11),
+        Command::PaintColor(b),
+        Command::Outline(12),
+        Command::PaintColor(c),
+    ]);
+
+    assert_eq!(paint(7).unwrap(), vec![
+        Command::Outline(11),
+        Command::PaintColor(b),
+    ]);
 }
 
-struct VecPainter(Vec<(u16, BgraColor)>);
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Command {
+    Outline(u16),
+    Foreground,
+    PaintColor(BgraColor),
+}
 
-impl Painter for VecPainter {
-    fn color(&mut self, id: GlyphId, color: BgraColor) {
-        self.0.push((id.0, color));
+struct VecPainter(Vec<Command>);
+
+impl Painter<'_> for VecPainter {
+    fn outline(&mut self, glyph_id: GlyphId) {
+        self.0.push(Command::Outline(glyph_id.0));
     }
 
-    fn foreground(&mut self, id: GlyphId) {
-        self.0.push((id.0, BgraColor { blue: 0, green: 0, red: 0, alpha: 255 }));
+    fn paint_foreground(&mut self) {
+        self.0.push(Command::Foreground);
     }
+
+    fn paint_color(&mut self, color: BgraColor) {
+        self.0.push(Command::PaintColor(color));
+    }
+
+    // TODO: test v1
+    fn paint_linear_gradient(&mut self, _gradient: colr::LinearGradient) {}
+    fn paint_radial_gradient(&mut self, _gradient: colr::RadialGradient) {}
+    fn paint_sweep_gradient(&mut self, _gradient: colr::SweepGradient) {}
+    fn push_group(&mut self, _mode: colr::CompositeMode) {}
+    fn pop_group(&mut self) {}
+    fn translate(&mut self, _tx: f32, _ty: f32) {}
+    fn scale(&mut self, _sx: f32, _sy: f32) {}
+    fn rotate(&mut self, _angle: f32) {}
+    fn skew(&mut self, _skew_x: f32, _skew_y: f32) {}
+    fn transform(&mut self, _transform: ttf_parser::Transform) {}
+    fn pop_transform(&mut self) {}
 }

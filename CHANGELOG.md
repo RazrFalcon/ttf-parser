@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - `svg::SvgDocumentsList` returns `svg::SvgDocument` and not just `&[u8]` now.
   Thanks to [wjian23](https://github.com/wjian23).
+- `Face::set_variation` allows duplicated axes now.
 
 ## [0.19.2] - 2023-09-13
 ### Added

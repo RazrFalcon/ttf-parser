@@ -2098,19 +2098,14 @@ impl<'a> Face<'a> {
             return None;
         }
 
-        let v = self
-            .variation_axes()
-            .into_iter()
-            .enumerate()
-            .find(|(_, a)| a.tag == axis);
-        if let Some((idx, a)) = v {
-            if idx >= MAX_VAR_COORDS {
-                return None;
-            }
-
-            self.coordinates.data[idx] = a.normalized_value(value);
-        } else {
+        if usize::from(self.variation_axes().len()) >= MAX_VAR_COORDS {
             return None;
+        }
+
+        for (i, var_axis) in self.variation_axes().into_iter().enumerate() {
+            if var_axis.tag == axis {
+                self.coordinates.data[i] = var_axis.normalized_value(value);
+            }
         }
 
         // TODO: optimize

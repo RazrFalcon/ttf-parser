@@ -342,7 +342,7 @@ impl FromData for CompositeMode {
     }
 }
 
-/// A trait for color glyph painting
+/// A trait for color glyph painting.
 ///
 /// See [COLR](https://learn.microsoft.com/en-us/typography/opentype/spec/colr) for details.
 pub trait Painter<'a> {
@@ -393,7 +393,7 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
 
         let version = s.read::<u16>()?;
-        if version != 0 {
+        if version > 1 {
             return None;
         }
 

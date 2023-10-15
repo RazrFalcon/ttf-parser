@@ -1,7 +1,6 @@
 use crate::{convert, Unit::*};
 use ttf_parser::colr::{self, Painter};
-use ttf_parser::cpal::{self, BgraColor};
-use ttf_parser::GlyphId;
+use ttf_parser::{cpal, GlyphId, RgbaColor};
 
 #[test]
 fn basic() {
@@ -39,9 +38,9 @@ fn basic() {
         colr.paint(GlyphId(id), 0, &mut painter).map(|_| painter.0)
     };
 
-    let a = BgraColor { blue: 10, green: 15, red: 20, alpha: 25 };
-    let b = BgraColor { blue: 30, green: 35, red: 40, alpha: 45 };
-    let c = BgraColor { blue: 50, green: 55, red: 60, alpha: 65 };
+    let a = RgbaColor::new(20, 15, 10, 25);
+    let b = RgbaColor::new(40, 35, 30, 45);
+    let c = RgbaColor::new(60, 55, 50, 65);
 
     assert_eq!(cpal.get(0, 0), Some(a));
     assert_eq!(cpal.get(0, 1), Some(b));
@@ -58,19 +57,48 @@ fn basic() {
     assert!(colr.contains(GlyphId(7)));
 
     assert_eq!(paint(1), None);
-    assert_eq!(paint(2), Some(vec![(12, c), (13, a)]));
-    assert_eq!(paint(3), Some(vec![(10, c), (11, b), (12, c)]));
-    assert_eq!(paint(7), Some(vec![(11, b)]));
+
+    assert_eq!(paint(2).unwrap(), vec![
+        Command::Outline(12),
+        Command::PaintColor(c),
+        Command::Outline(13),
+        Command::PaintColor(a),
+    ]);
+
+    assert_eq!(paint(3).unwrap(), vec![
+        Command::Outline(10),
+        Command::PaintColor(c),
+        Command::Outline(11),
+        Command::PaintColor(b),
+        Command::Outline(12),
+        Command::PaintColor(c),
+    ]);
+
+    assert_eq!(paint(7).unwrap(), vec![
+        Command::Outline(11),
+        Command::PaintColor(b),
+    ]);
 }
 
-struct VecPainter(Vec<(u16, BgraColor)>);
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Command {
+    Outline(u16),
+    Foreground,
+    PaintColor(RgbaColor),
+}
+
+struct VecPainter(Vec<Command>);
 
 impl Painter for VecPainter {
-    fn color(&mut self, id: GlyphId, color: BgraColor) {
-        self.0.push((id.0, color));
+    fn outline(&mut self, glyph_id: GlyphId) {
+        self.0.push(Command::Outline(glyph_id.0));
     }
 
-    fn foreground(&mut self, id: GlyphId) {
-        self.0.push((id.0, BgraColor { blue: 0, green: 0, red: 0, alpha: 255 }));
+    fn paint_foreground(&mut self) {
+        self.0.push(Command::Foreground);
+    }
+
+    fn paint_color(&mut self, color: RgbaColor) {
+        self.0.push(Command::PaintColor(color));
     }
 }

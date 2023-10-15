@@ -145,7 +145,21 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         svg.write_text_fmt(format_args!("{}", &id));
         svg.end_element();
 
-        if let Some(img) = face.glyph_raster_image(gid, std::u16::MAX) {
+        if face.tables().colr.is_some() {
+            if face.is_color_glyph(gid) {
+                color_glyph(
+                    x,
+                    y,
+                    &face,
+                    args.colr_palette,
+                    gid,
+                    cell_size,
+                    scale,
+                    &mut svg,
+                    &mut path_buf,
+                );
+            }
+        } else if let Some(img) = face.glyph_raster_image(gid, std::u16::MAX) {
             svg.start_element("image");
             svg.write_attribute("x", &(x + 2.0 + img.x as f64));
             svg.write_attribute("y", &(y - img.y as f64));
@@ -173,20 +187,6 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 enc.finish().unwrap();
             });
             svg.end_element();
-        } else if face.tables().colr.is_some() {
-            if face.is_color_glyph(gid) {
-                color_glyph(
-                    x,
-                    y,
-                    &face,
-                    args.colr_palette,
-                    gid,
-                    cell_size,
-                    scale,
-                    &mut svg,
-                    &mut path_buf,
-                );
-            }
         } else {
             glyph_to_path(x, y, &face, gid, cell_size, scale, &mut svg, &mut path_buf);
         }
@@ -238,6 +238,42 @@ fn draw_grid(n_glyphs: u16, cell_size: f64, svg: &mut xmlwriter::XmlWriter) {
     svg.end_element();
 }
 
+struct Builder<'a>(&'a mut String);
+
+impl Builder<'_> {
+    fn finish(&mut self) {
+        if !self.0.is_empty() {
+            self.0.pop(); // remove trailing space
+        }
+    }
+}
+
+impl ttf::OutlineBuilder for Builder<'_> {
+    fn move_to(&mut self, x: f32, y: f32) {
+        use std::fmt::Write;
+        write!(self.0, "M {} {} ", x, y).unwrap()
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        use std::fmt::Write;
+        write!(self.0, "L {} {} ", x, y).unwrap()
+    }
+
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+        use std::fmt::Write;
+        write!(self.0, "Q {} {} {} {} ", x1, y1, x, y).unwrap()
+    }
+
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        use std::fmt::Write;
+        write!(self.0, "C {} {} {} {} {} {} ", x1, y1, x2, y2, x, y).unwrap()
+    }
+
+    fn close(&mut self) {
+        self.0.push_str("Z ")
+    }
+}
+
 fn glyph_to_path(
     x: f64,
     y: f64,
@@ -254,9 +290,7 @@ fn glyph_to_path(
         Some(v) => v,
         None => return,
     };
-    if !path_buf.is_empty() {
-        path_buf.pop(); // remove trailing space
-    }
+    builder.finish();
 
     let bbox_w = (bbox.x_max as f64 - bbox.x_min as f64) * scale;
     let dx = (cell_size - bbox_w) / 2.0;
@@ -292,38 +326,28 @@ struct GlyphPainter<'a> {
 }
 
 impl ttf::colr::Painter for GlyphPainter<'_> {
-    fn color(&mut self, glyph_id: ttf::GlyphId, color: ttf::colr::BgraColor) {
+    fn outline(&mut self, glyph_id: ttf::GlyphId) {
         self.path_buf.clear();
         let mut builder = Builder(self.path_buf);
         match self.face.outline_glyph(glyph_id, &mut builder) {
             Some(v) => v,
             None => return,
         };
-        if !self.path_buf.is_empty() {
-            self.path_buf.pop(); // remove trailing space
-        }
+        builder.finish();
+    }
 
+    fn paint_foreground(&mut self) {
+        // The caller must provide this color. We simply fallback to black.
+        self.paint_color(ttf::RgbaColor::new(0, 0, 0, 255));
+    }
+
+    fn paint_color(&mut self, color: ttf::RgbaColor) {
         self.svg.start_element("path");
-        self.svg.write_attribute(
-            "fill",
-            &format!("rgb({}, {}, {})", color.red, color.green, color.blue),
-        );
+        self.svg.write_color_attribute("fill", color);
         let opacity = f32::from(color.alpha) / 255.0;
         self.svg.write_attribute("fill-opacity", &opacity);
         self.svg.write_attribute("d", self.path_buf);
         self.svg.end_element();
-    }
-
-    fn foreground(&mut self, id: ttf::GlyphId) {
-        self.color(
-            id,
-            ttf::colr::BgraColor {
-                blue: 0,
-                green: 0,
-                red: 0,
-                alpha: 255,
-            },
-        )
     }
 }
 
@@ -354,30 +378,15 @@ fn color_glyph(
     svg.end_element();
 }
 
-struct Builder<'a>(&'a mut String);
+trait XmlWriterExt {
+    fn write_color_attribute(&mut self, name: &str, ts: ttf::RgbaColor);
+}
 
-impl ttf::OutlineBuilder for Builder<'_> {
-    fn move_to(&mut self, x: f32, y: f32) {
-        use std::fmt::Write;
-        write!(self.0, "M {} {} ", x, y).unwrap()
-    }
-
-    fn line_to(&mut self, x: f32, y: f32) {
-        use std::fmt::Write;
-        write!(self.0, "L {} {} ", x, y).unwrap()
-    }
-
-    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-        use std::fmt::Write;
-        write!(self.0, "Q {} {} {} {} ", x1, y1, x, y).unwrap()
-    }
-
-    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        use std::fmt::Write;
-        write!(self.0, "C {} {} {} {} {} {} ", x1, y1, x2, y2, x, y).unwrap()
-    }
-
-    fn close(&mut self) {
-        self.0.push_str("Z ")
+impl XmlWriterExt for xmlwriter::XmlWriter {
+    fn write_color_attribute(&mut self, name: &str, color: ttf::RgbaColor) {
+        self.write_attribute_fmt(
+            name,
+            format_args!("rgb({}, {}, {})", color.red, color.green, color.blue),
+        );
     }
 }

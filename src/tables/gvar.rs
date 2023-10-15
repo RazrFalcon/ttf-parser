@@ -11,9 +11,9 @@ use core::cmp;
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
-use crate::glyf::{self, Transform};
+use crate::glyf;
 use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream, F2DOT14};
-use crate::{BBox, GlyphId, NormalizedCoordinate, OutlineBuilder, Rect};
+use crate::{BBox, GlyphId, NormalizedCoordinate, OutlineBuilder, Rect, Transform};
 
 /// 'The TrueType rasterizer dynamically generates 'phantom' points for each glyph
 /// that represent horizontal and vertical advance widths and side bearings,

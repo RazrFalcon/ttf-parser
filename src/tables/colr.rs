@@ -3,9 +3,7 @@
 
 use crate::cpal;
 use crate::parser::{FromData, LazyArray16, Offset, Offset32, Stream};
-use crate::GlyphId;
-
-pub use cpal::BgraColor;
+use crate::{GlyphId, RgbaColor};
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -50,12 +48,15 @@ impl FromData for LayerRecord {
 }
 
 /// A trait for color glyph painting.
+///
+/// See [COLR](https://learn.microsoft.com/en-us/typography/opentype/spec/colr) for details.
 pub trait Painter {
-    /// Paints an outline glyph using the given color.
-    fn color(&mut self, id: GlyphId, color: BgraColor);
-
-    /// Paints an outline glyph using the application provided text foreground color.
-    fn foreground(&mut self, id: GlyphId);
+    /// Outlines a glyph and stores it until the next paint command.
+    fn outline(&mut self, glyph_id: GlyphId);
+    /// Paints the current glyph outline using the application provided text foreground color.
+    fn paint_foreground(&mut self);
+    /// Paints the current glyph outline using the provided color.
+    fn paint_color(&mut self, color: RgbaColor);
 }
 
 /// A [Color Table](
@@ -75,7 +76,7 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
 
         let version = s.read::<u16>()?;
-        if version > 1 {
+        if version != 0 {
             return None;
         }
 
@@ -118,10 +119,12 @@ impl<'a> Table<'a> {
         for layer in layers {
             if layer.palette_index == 0xFFFF {
                 // A special case.
-                painter.foreground(layer.glyph_id);
+                painter.outline(layer.glyph_id);
+                painter.paint_foreground();
             } else {
                 let color = self.palettes.get(palette, layer.palette_index)?;
-                painter.color(layer.glyph_id, color);
+                painter.outline(layer.glyph_id);
+                painter.paint_color(color);
             }
         }
 

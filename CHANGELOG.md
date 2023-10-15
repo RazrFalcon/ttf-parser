@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.20.0] - 2023-10-15
 ### Added
 - `COLR` / `CPAL` v0 support.
   Thanks to [laurmaedje](https://github.com/laurmaedje).
@@ -407,7 +409,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.2...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.18.1...v0.19.0

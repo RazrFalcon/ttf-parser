@@ -1,7 +1,6 @@
 use crate::{convert, Unit::*};
 use ttf_parser::colr::{self, Painter};
-use ttf_parser::cpal::{self, BgraColor};
-use ttf_parser::GlyphId;
+use ttf_parser::{cpal, GlyphId, RgbaColor};
 
 #[test]
 fn basic() {
@@ -39,9 +38,9 @@ fn basic() {
         colr.paint(GlyphId(id), 0, &mut painter).map(|_| painter.0)
     };
 
-    let a = BgraColor { blue: 10, green: 15, red: 20, alpha: 25 };
-    let b = BgraColor { blue: 30, green: 35, red: 40, alpha: 45 };
-    let c = BgraColor { blue: 50, green: 55, red: 60, alpha: 65 };
+    let a = RgbaColor::new(20, 15, 10, 25);
+    let b = RgbaColor::new(40, 35, 30, 45);
+    let c = RgbaColor::new(60, 55, 50, 65);
 
     assert_eq!(cpal.get(0, 0), Some(a));
     assert_eq!(cpal.get(0, 1), Some(b));
@@ -85,7 +84,7 @@ fn basic() {
 enum Command {
     Outline(u16),
     Foreground,
-    PaintColor(BgraColor),
+    PaintColor(RgbaColor),
 }
 
 struct VecPainter(Vec<Command>);
@@ -99,7 +98,7 @@ impl Painter<'_> for VecPainter {
         self.0.push(Command::Foreground);
     }
 
-    fn paint_color(&mut self, color: BgraColor) {
+    fn paint_color(&mut self, color: RgbaColor) {
         self.0.push(Command::PaintColor(color));
     }
 

@@ -362,10 +362,10 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
 
     fn paint_foreground(&mut self) {
         // The caller must provide this color. We simply fallback to black.
-        self.paint_color(ttf::colr::BgraColor::new(0, 0, 0, 255));
+        self.paint_color(ttf::RgbaColor::new(0, 0, 0, 255));
     }
 
-    fn paint_color(&mut self, color: ttf::colr::BgraColor) {
+    fn paint_color(&mut self, color: ttf::RgbaColor) {
         self.svg.start_element("path");
         self.svg.write_color_attribute("fill", color);
         let opacity = f32::from(color.alpha) / 255.0;
@@ -536,13 +536,13 @@ fn color_glyph(
 }
 
 trait XmlWriterExt {
-    fn write_color_attribute(&mut self, name: &str, ts: ttf::colr::BgraColor);
+    fn write_color_attribute(&mut self, name: &str, ts: ttf::RgbaColor);
     fn write_transform_attribute(&mut self, name: &str, ts: ttf::Transform);
     fn write_spread_method_attribute(&mut self, method: ttf::colr::GradientExtend);
 }
 
 impl XmlWriterExt for xmlwriter::XmlWriter {
-    fn write_color_attribute(&mut self, name: &str, color: ttf::colr::BgraColor) {
+    fn write_color_attribute(&mut self, name: &str, color: ttf::RgbaColor) {
         self.write_attribute_fmt(
             name,
             format_args!("rgb({}, {}, {})", color.red, color.green, color.blue),

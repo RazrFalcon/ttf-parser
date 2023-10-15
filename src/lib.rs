@@ -483,6 +483,33 @@ impl core::fmt::Debug for Transform {
     }
 }
 
+/// A RGBA color in the sRGB color space.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RgbaColor {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+    pub alpha: u8,
+}
+
+impl RgbaColor {
+    /// Creates a new `RgbaColor`.
+    #[inline]
+    pub fn new(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        Self {
+            blue,
+            green,
+            red,
+            alpha,
+        }
+    }
+
+    pub(crate) fn apply_alpha(&mut self, alpha: f32) {
+        self.alpha = (((f32::from(self.alpha) / 255.0) * alpha) * 255.0) as u8;
+    }
+}
+
 /// A trait for glyph outline construction.
 pub trait OutlineBuilder {
     /// Appends a MoveTo segment.
@@ -2176,19 +2203,14 @@ impl<'a> Face<'a> {
             return None;
         }
 
-        let v = self
-            .variation_axes()
-            .into_iter()
-            .enumerate()
-            .find(|(_, a)| a.tag == axis);
-        if let Some((idx, a)) = v {
-            if idx >= MAX_VAR_COORDS {
-                return None;
-            }
-
-            self.coordinates.data[idx] = a.normalized_value(value);
-        } else {
+        if usize::from(self.variation_axes().len()) >= MAX_VAR_COORDS {
             return None;
+        }
+
+        for (i, var_axis) in self.variation_axes().into_iter().enumerate() {
+            if var_axis.tag == axis {
+                self.coordinates.data[i] = var_axis.normalized_value(value);
+            }
         }
 
         // TODO: optimize

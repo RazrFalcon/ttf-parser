@@ -1,13 +1,9 @@
 //! A [Color Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/colr) implementation.
 
-use crate::parser::{
-    FromData, LazyArray16, LazyArray32, Offset, Offset24, Offset32, Stream, F2DOT14,
-};
-use crate::GlyphId;
-use crate::{cpal, Fixed, Transform};
-
-pub use cpal::BgraColor;
+use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
+use crate::{cpal, Fixed, LazyArray32, Transform};
+use crate::{GlyphId, RgbaColor};
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -139,7 +135,7 @@ impl ColorLine<'_> {
 #[derive(Clone, Copy, Debug)]
 pub struct ColorStop {
     pub stop_offset: f32,
-    pub color: BgraColor,
+    pub color: RgbaColor,
 }
 
 #[derive(Clone)]
@@ -350,12 +346,12 @@ impl FromData for CompositeMode {
 ///
 /// See [COLR](https://learn.microsoft.com/en-us/typography/opentype/spec/colr) for details.
 pub trait Painter<'a> {
-    /// Paints an outline glyph using the given color.
+    /// Outlines a glyph and stores it until the next paint command.
     fn outline(&mut self, glyph_id: GlyphId);
-
-    /// Paints an outline glyph using the application provided text foreground color.
+    /// Paints the current glyph outline using the application provided text foreground color.
     fn paint_foreground(&mut self);
-    fn paint_color(&mut self, color: BgraColor);
+    /// Paints the current glyph outline using the provided color.
+    fn paint_color(&mut self, color: RgbaColor);
     fn paint_linear_gradient(&mut self, gradient: LinearGradient<'a>);
     fn paint_radial_gradient(&mut self, gradient: RadialGradient<'a>);
     fn paint_sweep_gradient(&mut self, gradient: SweepGradient<'a>);
@@ -397,7 +393,7 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
 
         let version = s.read::<u16>()?;
-        if version > 1 {
+        if version != 0 {
             return None;
         }
 

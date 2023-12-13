@@ -5,14 +5,12 @@
 [![Rust 1.42+](https://img.shields.io/badge/rust-1.42+-orange.svg)](https://www.rust-lang.org)
 ![](https://img.shields.io/badge/unsafe-forbidden-brightgreen.svg)
 
-A high-level, safe, zero-allocation TrueType font parser.
+A high-level, safe, zero-allocation font parser for
+[TrueType](https://docs.microsoft.com/en-us/typography/truetype/),
+[OpenType](https://docs.microsoft.com/en-us/typography/opentype/spec/), and
+[AAT](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6AATIntro.html).
 
-Supports [TrueType](https://docs.microsoft.com/en-us/typography/truetype/),
-[OpenType](https://docs.microsoft.com/en-us/typography/opentype/spec/)
-and [AAT](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6AATIntro.html)
-fonts.
-
-Can be used as Rust and as C library.
+Can be used as a Rust or C library.
 
 ### Features
 

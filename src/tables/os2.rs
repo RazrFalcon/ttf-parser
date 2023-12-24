@@ -433,16 +433,19 @@ impl<'a> Table<'a> {
         }
     }
 
-    /// Checks if the face subsetting is allowed.
+    /// Checks if the face allows embedding a subset, further restricted by [`Self::permissions`].
     #[inline]
     pub fn is_subsetting_allowed(&self) -> bool {
         let n = Stream::read_at::<u16>(self.data, TYPE_OFFSET).unwrap_or(0);
         n & 0x0100 == 0
     }
 
-    /// Checks if the face bitmaps embedding is allowed.
+    /// Checks if the face allows outline data to be embedded.
+    /// If false, only bitmaps may be embedded in accordance with [`Self::permissions`].
+    ///
+    /// If the font contains no bitmaps and this flag is not set, it implies no embedding is allowed.
     #[inline]
-    pub fn is_bitmap_embedding_allowed(&self) -> bool {
+    pub fn is_outline_embedding_allowed(&self) -> bool {
         let n = Stream::read_at::<u16>(self.data, TYPE_OFFSET).unwrap_or(0);
         n & 0x0200 == 0
     }

@@ -25,7 +25,7 @@ pub struct LayoutTable<'a> {
 }
 
 impl<'a> LayoutTable<'a> {
-    pub(crate) fn parse(data: &'a [u8]) -> Option<Self> {
+    pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
 
         let major_version = s.read::<u16>()?;

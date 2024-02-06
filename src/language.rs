@@ -1,3 +1,6 @@
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 #[rustfmt::skip]
 static TABLE: &[(u16, Language, &str, &str)] = &[
     (0x0000, Language::Unknown, "Unknown", "Unknown"),
@@ -216,6 +219,7 @@ static TABLE: &[(u16, Language, &str, &str)] = &[
 #[allow(missing_docs)]
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Language {
     Unknown = 0,
     Afrikaans_SouthAfrica,

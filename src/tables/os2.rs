@@ -4,6 +4,9 @@
 use crate::parser::Stream;
 use crate::LineMetrics;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 const WEIGHT_CLASS_OFFSET: usize = 4;
 const WIDTH_CLASS_OFFSET: usize = 6;
 const TYPE_OFFSET: usize = 8;
@@ -24,6 +27,7 @@ const CAP_HEIGHT_OFFSET: usize = 88;
 /// A face [weight](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Weight {
     Thin,
     ExtraLight,
@@ -84,6 +88,7 @@ impl Default for Weight {
 /// A face [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Width {
     UltraCondensed,
     ExtraCondensed,
@@ -133,6 +138,7 @@ pub enum Permissions {
 
 /// A face style.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Style {
     /// A face that is neither italic not obliqued.
     Normal,

@@ -15,7 +15,7 @@ exclude = ["benches/**"]
 [features]
 default = ["std", "opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
 serde = ["dep:serde"]
-std = []
+std = ["serde?/std"]
 # Enables variable fonts support. Increases binary size almost twice.
 # Includes avar, CFF2, fvar, gvar, HVAR, MVAR and VVAR tables.
 variable-fonts = []

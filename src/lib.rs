@@ -48,15 +48,6 @@ Font parsing starts with a [`Face`].
 #[macro_use]
 extern crate std;
 
-macro_rules! try_opt_or {
-    ($value:expr, $ret:expr) => {
-        match $value {
-            Some(v) => v,
-            None => return $ret,
-        }
-    };
-}
-
 #[cfg(feature = "apple-layout")]
 mod aat;
 #[cfg(feature = "opentype-layout")]
@@ -1342,7 +1333,7 @@ impl<'a> Face<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_bold(&self) -> bool {
-        try_opt_or!(self.tables.os2, false).is_bold()
+        self.tables.os2.map(|os2| os2.is_bold()).unwrap_or(false)
     }
 
     /// Checks that face is marked as *Oblique*.
@@ -1359,7 +1350,7 @@ impl<'a> Face<'a> {
     /// Returns face style.
     #[inline]
     pub fn style(&self) -> Style {
-        try_opt_or!(self.tables.os2, Style::Normal).style()
+        self.tables.os2.map(|os2| os2.style()).unwrap_or_default()
     }
 
     /// Checks that face is marked as *Monospaced*.
@@ -1367,7 +1358,10 @@ impl<'a> Face<'a> {
     /// Returns `false` when `post` table is not present.
     #[inline]
     pub fn is_monospaced(&self) -> bool {
-        try_opt_or!(self.tables.post, false).is_monospaced
+        self.tables
+            .post
+            .map(|post| post.is_monospaced)
+            .unwrap_or(false)
     }
 
     /// Checks that face is variable.
@@ -1392,7 +1386,7 @@ impl<'a> Face<'a> {
     /// Returns `Weight::Normal` when OS/2 table is not present.
     #[inline]
     pub fn weight(&self) -> Weight {
-        try_opt_or!(self.tables.os2, Weight::default()).weight()
+        self.tables.os2.map(|os2| os2.weight()).unwrap_or_default()
     }
 
     /// Returns face's width.
@@ -1400,7 +1394,7 @@ impl<'a> Face<'a> {
     /// Returns `Width::Normal` when OS/2 table is not present or when value is invalid.
     #[inline]
     pub fn width(&self) -> Width {
-        try_opt_or!(self.tables.os2, Width::default()).width()
+        self.tables.os2.map(|os2| os2.width()).unwrap_or_default()
     }
 
     /// Returns face's italic angle.

@@ -822,6 +822,40 @@ impl FromData for Option<Offset16> {
     }
 }
 
+/// A type-safe u24 offset.
+#[derive(Clone, Copy, Debug)]
+pub struct Offset24(pub u32);
+
+impl Offset for Offset24 {
+    #[inline]
+    fn to_usize(&self) -> usize {
+        usize::num_from(self.0)
+    }
+}
+
+impl FromData for Offset24 {
+    const SIZE: usize = 3;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        U24::parse(data).map(|n| Offset24(n.0))
+    }
+}
+
+impl FromData for Option<Offset24> {
+    const SIZE: usize = Offset24::SIZE;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let offset = Offset24::parse(data)?;
+        if offset.0 != 0 {
+            Some(Some(offset))
+        } else {
+            Some(None)
+        }
+    }
+}
+
 /// A type-safe u32 offset.
 #[derive(Clone, Copy, Debug)]
 pub struct Offset32(pub u32);

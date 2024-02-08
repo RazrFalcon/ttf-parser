@@ -34,7 +34,7 @@ Font parsing starts with a [`Face`].
 
 #![no_std]
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
 #![allow(clippy::get_first)] // we use it for readability
@@ -396,7 +396,7 @@ impl BBox {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub(crate) struct Transform {
+pub struct Transform {
     pub a: f32,
     pub b: f32,
     pub c: f32,
@@ -493,6 +493,10 @@ impl RgbaColor {
             red,
             alpha,
         }
+    }
+
+    pub(crate) fn apply_alpha(&mut self, alpha: f32) {
+        self.alpha = (((f32::from(self.alpha) / 255.0) * alpha) * 255.0) as u8;
     }
 }
 
@@ -2168,7 +2172,7 @@ impl<'a> Face<'a> {
         &self,
         glyph_id: GlyphId,
         palette: u16,
-        painter: &mut dyn colr::Painter,
+        painter: &mut dyn colr::Painter<'a>,
     ) -> Option<()> {
         self.tables.colr?.paint(glyph_id, palette, painter)
     }

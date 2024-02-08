@@ -89,7 +89,7 @@ enum Command {
 
 struct VecPainter(Vec<Command>);
 
-impl Painter for VecPainter {
+impl Painter<'_> for VecPainter {
     fn outline(&mut self, glyph_id: GlyphId) {
         self.0.push(Command::Outline(glyph_id.0));
     }
@@ -101,4 +101,17 @@ impl Painter for VecPainter {
     fn paint_color(&mut self, color: RgbaColor) {
         self.0.push(Command::PaintColor(color));
     }
+
+    // TODO: test v1
+    fn paint_linear_gradient(&mut self, _gradient: colr::LinearGradient) {}
+    fn paint_radial_gradient(&mut self, _gradient: colr::RadialGradient) {}
+    fn paint_sweep_gradient(&mut self, _gradient: colr::SweepGradient) {}
+    fn push_group(&mut self, _mode: colr::CompositeMode) {}
+    fn pop_group(&mut self) {}
+    fn translate(&mut self, _tx: f32, _ty: f32) {}
+    fn scale(&mut self, _sx: f32, _sy: f32) {}
+    fn rotate(&mut self, _angle: f32) {}
+    fn skew(&mut self, _skew_x: f32, _skew_y: f32) {}
+    fn transform(&mut self, _transform: ttf_parser::Transform) {}
+    fn pop_transform(&mut self) {}
 }

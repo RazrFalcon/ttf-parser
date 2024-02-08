@@ -132,6 +132,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut path_buf = String::with_capacity(256);
     let mut row = 0;
     let mut column = 0;
+    let mut gradient_index = 1;
     for id in 0..face.number_of_glyphs() {
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
@@ -155,6 +156,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                     gid,
                     cell_size,
                     scale,
+                    &mut gradient_index,
                     &mut svg,
                     &mut path_buf,
                 );
@@ -319,13 +321,32 @@ fn glyph_to_path(
     }
 }
 
+// NOTE: this is not a feature-full implementation and just a demo.
 struct GlyphPainter<'a> {
     face: &'a ttf::Face<'a>,
     svg: &'a mut xmlwriter::XmlWriter,
     path_buf: &'a mut String,
+    gradient_index: usize,
+    palette_index: u16,
+    transform: ttf::Transform,
+    outline_transform: ttf::Transform,
+    transforms_stack: Vec<ttf::Transform>,
 }
 
-impl ttf::colr::Painter for GlyphPainter<'_> {
+impl GlyphPainter<'_> {
+    fn write_gradient_stops(&mut self, stops: ttf::colr::GradientStopsIter) {
+        for stop in stops {
+            self.svg.start_element("stop");
+            self.svg.write_attribute("offset", &stop.stop_offset);
+            self.svg.write_color_attribute("stop-color", stop.color);
+            let opacity = f32::from(stop.color.alpha) / 255.0;
+            self.svg.write_attribute("stop-opacity", &opacity);
+            self.svg.end_element();
+        }
+    }
+}
+
+impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
     fn outline(&mut self, glyph_id: ttf::GlyphId) {
         self.path_buf.clear();
         let mut builder = Builder(self.path_buf);
@@ -334,6 +355,9 @@ impl ttf::colr::Painter for GlyphPainter<'_> {
             None => return,
         };
         builder.finish();
+
+        // We have to write outline using the current transform.
+        self.outline_transform = self.transform;
     }
 
     fn paint_foreground(&mut self) {
@@ -346,8 +370,134 @@ impl ttf::colr::Painter for GlyphPainter<'_> {
         self.svg.write_color_attribute("fill", color);
         let opacity = f32::from(color.alpha) / 255.0;
         self.svg.write_attribute("fill-opacity", &opacity);
+        self.svg
+            .write_transform_attribute("transform", self.outline_transform);
         self.svg.write_attribute("d", self.path_buf);
         self.svg.end_element();
+    }
+
+    fn paint_linear_gradient(&mut self, gradient: ttf::colr::LinearGradient<'a>) {
+        let gradient_id = format!("lg{}", self.gradient_index);
+        self.gradient_index += 1;
+
+        // TODO: We ignore x2, y2. Have to apply them somehow.
+        self.svg.start_element("linearGradient");
+        self.svg.write_attribute("id", &gradient_id);
+        self.svg.write_attribute("x1", &gradient.x0);
+        self.svg.write_attribute("y1", &gradient.y0);
+        self.svg.write_attribute("x2", &gradient.x1);
+        self.svg.write_attribute("y2", &gradient.y1);
+        self.svg.write_attribute("gradientUnits", &"userSpaceOnUse");
+        self.svg.write_spread_method_attribute(gradient.extend);
+        self.svg
+            .write_transform_attribute("gradientTransform", self.transform);
+        self.write_gradient_stops(gradient.stops(self.palette_index));
+        self.svg.end_element();
+
+        self.svg.start_element("path");
+        self.svg
+            .write_attribute_fmt("fill", format_args!("url(#{})", gradient_id));
+        self.svg
+            .write_transform_attribute("transform", self.outline_transform);
+        self.svg.write_attribute("d", self.path_buf);
+        self.svg.end_element();
+    }
+
+    fn paint_radial_gradient(&mut self, gradient: ttf::colr::RadialGradient<'a>) {
+        let gradient_id = format!("rg{}", self.gradient_index);
+        self.gradient_index += 1;
+
+        self.svg.start_element("radialGradient");
+        self.svg.write_attribute("id", &gradient_id);
+        self.svg.write_attribute("cx", &gradient.x1);
+        self.svg.write_attribute("cy", &gradient.y1);
+        self.svg.write_attribute("r", &gradient.r1);
+        self.svg.write_attribute("fr", &gradient.r0);
+        self.svg.write_attribute("fx", &gradient.x0);
+        self.svg.write_attribute("fy", &gradient.y0);
+        self.svg.write_attribute("gradientUnits", &"userSpaceOnUse");
+        self.svg.write_spread_method_attribute(gradient.extend);
+        self.svg
+            .write_transform_attribute("gradientTransform", self.transform);
+        self.write_gradient_stops(gradient.stops(self.palette_index));
+        self.svg.end_element();
+
+        self.svg.start_element("path");
+        self.svg
+            .write_attribute_fmt("fill", format_args!("url(#{})", gradient_id));
+        self.svg
+            .write_transform_attribute("transform", self.outline_transform);
+        self.svg.write_attribute("d", self.path_buf);
+        self.svg.end_element();
+    }
+
+    fn paint_sweep_gradient(&mut self, _: ttf::colr::SweepGradient<'a>) {
+        println!("Warning: sweep gradients are not supported.")
+    }
+
+    fn push_group(&mut self, mode: ttf::colr::CompositeMode) {
+        self.svg.start_element("g");
+
+        use ttf::colr::CompositeMode;
+        let mode = match mode {
+            CompositeMode::SourceOver => "normal",
+            CompositeMode::Screen => "screen",
+            CompositeMode::Overlay => "overlay",
+            CompositeMode::Darken => "darken",
+            CompositeMode::Lighten => "lighten",
+            CompositeMode::ColorDodge => "color-dodge",
+            CompositeMode::ColorBurn => "color-burn",
+            CompositeMode::HardLight => "hard-light",
+            CompositeMode::SoftLight => "soft-light",
+            CompositeMode::Difference => "difference",
+            CompositeMode::Exclusion => "exclusion",
+            CompositeMode::Multiply => "multiply",
+            CompositeMode::Hue => "hue",
+            CompositeMode::Saturation => "saturation",
+            CompositeMode::Color => "color",
+            CompositeMode::Luminosity => "luminosity",
+            _ => {
+                println!("Warning: unsupported blend mode: {:?}", mode);
+                "normal"
+            }
+        };
+        self.svg
+            .write_attribute_fmt("style", format_args!("mix-blend-mode: {}", mode));
+    }
+
+    fn pop_group(&mut self) {
+        self.svg.end_element(); // g
+    }
+
+    fn translate(&mut self, tx: f32, ty: f32) {
+        self.transform(ttf::Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty));
+    }
+
+    fn scale(&mut self, sx: f32, sy: f32) {
+        self.transform(ttf::Transform::new(sx, 0.0, 0.0, sy, 0.0, 0.0));
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        let cc = (angle * std::f32::consts::PI).cos();
+        let ss = (angle * std::f32::consts::PI).sin();
+        self.transform(ttf::Transform::new(cc, ss, -ss, cc, 0.0, 0.0));
+    }
+
+    fn skew(&mut self, skew_x: f32, skew_y: f32) {
+        let x = (-skew_x * std::f32::consts::PI).tan();
+        let y = (skew_y * std::f32::consts::PI).tan();
+        self.transform(ttf::Transform::new(1.0, y, x, 1.0, 0.0, 0.0));
+    }
+
+    fn transform(&mut self, transform: ttf::Transform) {
+        self.transforms_stack.push(self.transform);
+        self.transform = ttf::Transform::combine(self.transform, transform);
+    }
+
+    fn pop_transform(&mut self) {
+        if let Some(ts) = self.transforms_stack.pop() {
+            self.transform = ts
+        }
     }
 }
 
@@ -359,6 +509,7 @@ fn color_glyph(
     glyph_id: ttf::GlyphId,
     cell_size: f64,
     scale: f64,
+    gradient_index: &mut usize,
     svg: &mut xmlwriter::XmlWriter,
     path_buf: &mut String,
 ) {
@@ -372,14 +523,22 @@ fn color_glyph(
         face,
         svg,
         path_buf,
+        gradient_index: *gradient_index,
+        palette_index,
+        transform: ttf::Transform::default(),
+        outline_transform: ttf::Transform::default(),
+        transforms_stack: vec![ttf::Transform::default()],
     };
     face.paint_color_glyph(glyph_id, palette_index, &mut painter);
+    *gradient_index = painter.gradient_index;
 
     svg.end_element();
 }
 
 trait XmlWriterExt {
     fn write_color_attribute(&mut self, name: &str, ts: ttf::RgbaColor);
+    fn write_transform_attribute(&mut self, name: &str, ts: ttf::Transform);
+    fn write_spread_method_attribute(&mut self, method: ttf::colr::GradientExtend);
 }
 
 impl XmlWriterExt for xmlwriter::XmlWriter {
@@ -387,6 +546,31 @@ impl XmlWriterExt for xmlwriter::XmlWriter {
         self.write_attribute_fmt(
             name,
             format_args!("rgb({}, {}, {})", color.red, color.green, color.blue),
+        );
+    }
+
+    fn write_transform_attribute(&mut self, name: &str, ts: ttf::Transform) {
+        if ts.is_default() {
+            return;
+        }
+
+        self.write_attribute_fmt(
+            name,
+            format_args!(
+                "matrix({} {} {} {} {} {})",
+                ts.a, ts.b, ts.c, ts.d, ts.e, ts.f
+            ),
+        );
+    }
+
+    fn write_spread_method_attribute(&mut self, extend: ttf::colr::GradientExtend) {
+        self.write_attribute(
+            "spreadMethod",
+            match extend {
+                ttf::colr::GradientExtend::Pad => &"pad",
+                ttf::colr::GradientExtend::Repeat => &"repeat",
+                ttf::colr::GradientExtend::Reflect => &"reflect",
+            },
         );
     }
 }

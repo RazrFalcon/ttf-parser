@@ -113,27 +113,45 @@ impl<'a> Device<'a> {
 }
 
 #[derive(Clone, Copy, Default, Debug)]
+/// The format flag for a [Value Record](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#value-record)
 pub struct ValueFormatFlags(u8);
 
 #[rustfmt::skip]
 impl ValueFormatFlags {
+    /// Returns true if the current flag is equal to `X_PLACEMENT`
     #[inline] fn is_x_placement(self) -> bool { self.0 & Self::x_placement() != 0 }
+    /// Returns true if the current flag is equal to `Y_PLACEMENT`
     #[inline] fn is_y_placement(self) -> bool { self.0 & Self::y_placement() != 0 }
+    /// Returns true if the current flag is equal to `X_ADVANCE`
     #[inline] fn is_x_advance(self) -> bool { self.0 & Self::x_advance() != 0 }
+    /// Returns true if the current flag is equal to `Y_ADVANCE`
     #[inline] fn is_y_advance(self) -> bool { self.0 & & Self::y_advance() != 0 }
+    /// Returns true if the current flag is equal to `X_PLACEMENT_DEVICE`
     #[inline] fn is_x_placement_device(self) -> bool { self.0 & Self::x_placement_device() != 0 }
+    /// Returns true if the current flag is equal to `Y_PLACEMENT_DEVICE`
     #[inline] fn is_y_placement_device(self) -> bool { self.0 & Self::y_placement_device() != 0 }
+    /// Returns true if the current flag is equal to `X_ADVANCE_DEVICE`
     #[inline] fn is_x_advance_device(self) -> bool { self.0 & Self::x_advance_device() != 0 }
+    /// Returns true if the current flag is equal to `Y_ADVANCE_DEVICE`
     #[inline] fn is_y_advance_device(self) -> bool { self.0 & Self::y_advance_device() != 0 }
 
+    /// Returns the flag value for `X_PLACEMENT`
     #[inline] pub fn x_placement() -> u8 { 0x01 }
+    /// Returns the flag value for `Y_PLACEMENT`
     #[inline] pub fn y_placement() -> u8 {0x02}
+    /// Returns the flag value for `X_PLACEMENT`
     #[inline] pub fn x_advance() -> u8 {0x04}
+    /// Returns the flag value for `Y_ADVANCE`
     #[inline] pub fn y_advance() -> u8 {0x08}
+    /// Returns the flag value for `X_PLACEMENT_DEVICE`
     #[inline] pub fn x_placement_device() -> u8 {0x10}
+    /// Returns the flag value for `Y_PLACEMENT_DEVICE`
     #[inline] pub fn y_placement_device() -> u8 {0x20}
+    /// Returns the flag value for `X_ADVANCE_DEVICE`
     #[inline] pub fn x_advance_device() -> u8 {0x40}
+    /// Returns the flag value for `Y_ADVANCE_DEVICE`
     #[inline] pub fn y_advance_device() -> u8 {0x80}
+    /// The size of the underlying `ValueFormatFlag`.
     // The ValueRecord struct constrain either i16 values or Offset16 offsets
     // and the total size depend on how many flags are enabled.
     pub fn size(self) -> usize {
@@ -141,10 +159,12 @@ impl ValueFormatFlags {
         u16::SIZE * self.len()
     }
 
+    /// The number of ones in the underlying `ValueFormatFlag`.
     pub fn len(self) -> usize {
         usize::num_from(self.0.count_ones())
     }
 
+    /// Returns the bits of the underlying `ValueFormatFlag`.
     pub fn bits(&self) -> u8 {
         self.0
     }
@@ -466,7 +486,8 @@ impl<'a> PairSets<'a> {
         self.offsets.len()
     }
 
-    pub fn flags(&self) -> (ValueFormatFlags, ValueFormatFlags) {
+    /// Returns the value format flags of the `PairSet`.
+    pub fn value_format_flags(&self) -> (ValueFormatFlags, ValueFormatFlags) {
         self.flags
     }
 
@@ -530,10 +551,12 @@ impl<'a> ClassMatrix<'a> {
         ))
     }
 
+    /// Returns the value format flags of the class matrix.
     pub fn value_format_flags(&self) -> (ValueFormatFlags, ValueFormatFlags) {
         self.flags
     }
 
+    /// Returns the counts of the class matrix.
     pub fn counts(&self) -> (u16, u16) {
         self.counts
     }

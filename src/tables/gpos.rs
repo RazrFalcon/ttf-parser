@@ -113,24 +113,40 @@ impl<'a> Device<'a> {
 }
 
 #[derive(Clone, Copy, Default, Debug)]
-struct ValueFormatFlags(u8);
+pub struct ValueFormatFlags(u8);
 
 #[rustfmt::skip]
 impl ValueFormatFlags {
-    #[inline] fn x_placement(self) -> bool { self.0 & 0x01 != 0 }
-    #[inline] fn y_placement(self) -> bool { self.0 & 0x02 != 0 }
-    #[inline] fn x_advance(self) -> bool { self.0 & 0x04 != 0 }
-    #[inline] fn y_advance(self) -> bool { self.0 & 0x08 != 0 }
-    #[inline] fn x_placement_device(self) -> bool { self.0 & 0x10 != 0 }
-    #[inline] fn y_placement_device(self) -> bool { self.0 & 0x20 != 0 }
-    #[inline] fn x_advance_device(self) -> bool { self.0 & 0x40 != 0 }
-    #[inline] fn y_advance_device(self) -> bool { self.0 & 0x80 != 0 }
+    #[inline] fn is_x_placement(self) -> bool { self.0 & Self::x_placement() != 0 }
+    #[inline] fn is_y_placement(self) -> bool { self.0 & Self::y_placement() != 0 }
+    #[inline] fn is_x_advance(self) -> bool { self.0 & Self::x_advance() != 0 }
+    #[inline] fn is_y_advance(self) -> bool { self.0 & & Self::y_advance() != 0 }
+    #[inline] fn is_x_placement_device(self) -> bool { self.0 & Self::x_placement_device() != 0 }
+    #[inline] fn is_y_placement_device(self) -> bool { self.0 & Self::y_placement_device() != 0 }
+    #[inline] fn is_x_advance_device(self) -> bool { self.0 & Self::x_advance_device() != 0 }
+    #[inline] fn is_y_advance_device(self) -> bool { self.0 & Self::y_advance_device() != 0 }
 
+    #[inline] pub fn x_placement() -> u8 { 0x01 }
+    #[inline] pub fn y_placement() -> u8 {0x02}
+    #[inline] pub fn x_advance() -> u8 {0x04}
+    #[inline] pub fn y_advance() -> u8 {0x08}
+    #[inline] pub fn x_placement_device() -> u8 {0x10}
+    #[inline] pub fn y_placement_device() -> u8 {0x20}
+    #[inline] pub fn x_advance_device() -> u8 {0x40}
+    #[inline] pub fn y_advance_device() -> u8 {0x80}
     // The ValueRecord struct constrain either i16 values or Offset16 offsets
     // and the total size depend on how many flags are enabled.
-    fn size(self) -> usize {
+    pub fn size(self) -> usize {
         // The high 8 bits are not used, so make sure we ignore them using 0xFF.
-        u16::SIZE * usize::num_from(self.0.count_ones())
+        u16::SIZE * self.len()
+    }
+
+    pub fn len(self) -> usize {
+        usize::num_from(self.0.count_ones())
+    }
+
+    pub fn bits(&self) -> u8 {
+        self.0
     }
 }
 
@@ -175,44 +191,44 @@ impl<'a> ValueRecord<'a> {
     ) -> Option<ValueRecord<'a>> {
         let mut record = ValueRecord::default();
 
-        if flags.x_placement() {
+        if flags.is_x_placement() {
             record.x_placement = s.read::<i16>()?;
         }
 
-        if flags.y_placement() {
+        if flags.is_y_placement() {
             record.y_placement = s.read::<i16>()?;
         }
 
-        if flags.x_advance() {
+        if flags.is_x_advance() {
             record.x_advance = s.read::<i16>()?;
         }
 
-        if flags.y_advance() {
+        if flags.is_y_advance() {
             record.y_advance = s.read::<i16>()?;
         }
 
-        if flags.x_placement_device() {
+        if flags.is_x_placement_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
                 record.x_placement_device =
                     table_data.get(offset.to_usize()..).and_then(Device::parse)
             }
         }
 
-        if flags.y_placement_device() {
+        if flags.is_y_placement_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
                 record.y_placement_device =
                     table_data.get(offset.to_usize()..).and_then(Device::parse)
             }
         }
 
-        if flags.x_advance_device() {
+        if flags.is_x_advance_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
                 record.x_advance_device =
                     table_data.get(offset.to_usize()..).and_then(Device::parse)
             }
         }
 
-        if flags.y_advance_device() {
+        if flags.is_y_advance_device() {
             if let Some(offset) = s.read::<Option<Offset16>>()? {
                 record.y_advance_device =
                     table_data.get(offset.to_usize()..).and_then(Device::parse)
@@ -450,6 +466,10 @@ impl<'a> PairSets<'a> {
         self.offsets.len()
     }
 
+    pub fn flags(&self) -> (ValueFormatFlags, ValueFormatFlags) {
+        self.flags
+    }
+
     /// Checks if the array is empty.
     pub fn is_empty(&self) -> bool {
         self.offsets.is_empty()
@@ -508,6 +528,14 @@ impl<'a> ClassMatrix<'a> {
             ValueRecord::parse(self.table_data, &mut s, self.flags.0)?,
             ValueRecord::parse(self.table_data, &mut s, self.flags.1)?,
         ))
+    }
+
+    pub fn value_format_flags(&self) -> (ValueFormatFlags, ValueFormatFlags) {
+        self.flags
+    }
+
+    pub fn counts(&self) -> (u16, u16) {
+        self.counts
     }
 }
 

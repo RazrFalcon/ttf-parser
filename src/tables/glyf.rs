@@ -599,6 +599,12 @@ impl<'a> Table<'a> {
         outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)?
     }
 
+    /// Whether a glyph has any contours.
+    #[inline]
+    pub fn has_contours(&self, glyph_id: GlyphId) -> bool {
+        self.get(glyph_id).is_some()
+    }
+
     #[inline]
     pub(crate) fn get(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
         let range = self.loca_table.glyph_range(glyph_id)?;

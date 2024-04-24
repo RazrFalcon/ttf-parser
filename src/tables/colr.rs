@@ -356,6 +356,9 @@ pub trait Painter<'a> {
     fn paint_radial_gradient(&mut self, gradient: RadialGradient<'a>);
     fn paint_sweep_gradient(&mut self, gradient: SweepGradient<'a>);
 
+    fn push_isolate(&mut self);
+    fn pop_isolate(&mut self);
+
     fn push_group(&mut self, mode: CompositeMode);
     fn pop_group(&mut self);
 
@@ -607,7 +610,7 @@ impl<'a> Table<'a> {
             }
             11 => {
                 // PaintColrGlyph
-                unimplemented!();
+                // unimplemented!();
             }
             12 => {
                 // PaintTransform
@@ -743,10 +746,12 @@ impl<'a> Table<'a> {
                 let composite_mode = s.read::<CompositeMode>()?;
                 let backdrop_paint_offset = s.read::<Offset24>()?;
 
+                painter.push_isolate();
                 self.parse_paint(offset + backdrop_paint_offset.to_usize(), palette, painter);
                 painter.push_group(composite_mode);
                 self.parse_paint(offset + source_paint_offset.to_usize(), palette, painter);
                 painter.pop_group();
+                painter.pop_isolate();
             }
             _ => {}
         }

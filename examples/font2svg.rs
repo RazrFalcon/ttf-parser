@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use ttf_parser as ttf;
 
 const FONT_SIZE: f64 = 128.0;
-const COLUMNS: u32 = 100;
+const COLUMNS: u32 = 10;
 
 const HELP: &str = "\
 Usage:
@@ -133,7 +133,8 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut row = 0;
     let mut column = 0;
     let mut gradient_index = 1;
-    for id in 0..face.number_of_glyphs() {
+    for id in 133..135 {
+        println!("{:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
         let y = row as f64 * cell_size;
@@ -146,21 +147,19 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         svg.write_text_fmt(format_args!("{}", &id));
         svg.end_element();
 
-        if face.tables().colr.is_some() {
-            if face.is_color_glyph(gid) {
-                color_glyph(
-                    x,
-                    y,
-                    &face,
-                    args.colr_palette,
-                    gid,
-                    cell_size,
-                    scale,
-                    &mut gradient_index,
-                    &mut svg,
-                    &mut path_buf,
-                );
-            }
+        if face.is_color_glyph(gid) {
+            color_glyph(
+                x,
+                y,
+                &face,
+                args.colr_palette,
+                gid,
+                cell_size,
+                scale,
+                &mut gradient_index,
+                &mut svg,
+                &mut path_buf,
+            );
         } else if let Some(img) = face.glyph_raster_image(gid, std::u16::MAX) {
             svg.start_element("image");
             svg.write_attribute("x", &(x + 2.0 + img.x as f64));
@@ -348,6 +347,7 @@ impl GlyphPainter<'_> {
 
 impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
     fn outline(&mut self, glyph_id: ttf::GlyphId) {
+        println!("OUTLINE");
         self.path_buf.clear();
         let mut builder = Builder(self.path_buf);
         match self.face.outline_glyph(glyph_id, &mut builder) {
@@ -366,6 +366,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
     }
 
     fn paint_color(&mut self, color: ttf::RgbaColor) {
+        println!("COLOR");
         self.svg.start_element("path");
         self.svg.write_color_attribute("fill", color);
         let opacity = f32::from(color.alpha) / 255.0;
@@ -381,6 +382,11 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.gradient_index += 1;
 
         // TODO: We ignore x2, y2. Have to apply them somehow.
+        // TODO: The way spreadMode works in ttf and svg is a bit different. In SVG, the spreadMode
+        // will always be applied based on x1/y1 and x2/y2. However, in TTF the spreadMode will
+        // be applied from the first/last stop. So if we have a gradient with x1=0 x2=1, and
+        // a stop at x=0.4 and x=0.6, then in SVG we will always see a padding, while in ttf
+        // we will see the actual spreadMode. We need to account for that somehow.
         self.svg.start_element("linearGradient");
         self.svg.write_attribute("id", &gradient_id);
         self.svg.write_attribute("x1", &gradient.x0);
@@ -435,10 +441,18 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         println!("Warning: sweep gradients are not supported.")
     }
 
+    fn push_isolate(&mut self) {
+        self.svg.start_element("g");
+        self.svg
+            .write_attribute("style","isolation: isolate");
+    }
+
     fn push_group(&mut self, mode: ttf::colr::CompositeMode) {
         self.svg.start_element("g");
 
         use ttf::colr::CompositeMode;
+        // TODO: Need to figure out how to represent the other blend modes
+        // in SVG.
         let mode = match mode {
             CompositeMode::SourceOver => "normal",
             CompositeMode::Screen => "screen",
@@ -467,6 +481,10 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
 
     fn pop_group(&mut self) {
         self.svg.end_element(); // g
+    }
+
+    fn pop_isolate(&mut self) {
+        self.svg.end_element();
     }
 
     fn translate(&mut self, tx: f32, ty: f32) {

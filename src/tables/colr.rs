@@ -205,14 +205,15 @@ struct ColorLine<'a> {
     extend: GradientExtend,
     colors: LazyArray16<'a, ColorStopRaw>,
     palettes: cpal::Table<'a>,
+    foreground_color: RgbaColor
 }
 
 impl ColorLine<'_> {
-    fn get(&self, palette: u16, foreground_color: RgbaColor, index: u16) -> Option<ColorStop> {
+    fn get(&self, palette: u16, index: u16) -> Option<ColorStop> {
         let info = self.colors.get(index)?;
 
         let mut color = if info.palette_index == u16::MAX {
-            foreground_color
+            self.foreground_color
         } else {
             self.palettes.get(palette, info.palette_index)?
         };
@@ -256,7 +257,7 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
             .field("y2", &self.y2)
             .field("extend", &self.extend)
             // TODO: Avoid hardcoding foregrounf color here?
-            .field("stops", &self.stops(0, RgbaColor::new(0, 0, 0, 255)))
+            .field("stops", &self.stops(0))
             .finish()
     }
 }
@@ -265,11 +266,9 @@ impl<'a> LinearGradient<'a> {
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        foreground_color: RgbaColor,
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
-            foreground_color,
             palette,
             index: 0,
         }
@@ -299,7 +298,7 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
             .field("y1", &self.y1)
             .field("extend", &self.extend)
             // TODO: Avoid hardcoding foregrounf color here?
-            .field("stops", &self.stops(0, RgbaColor::new(0, 0, 0, 255)))
+            .field("stops", &self.stops(0))
             .finish()
     }
 }
@@ -308,12 +307,10 @@ impl<'a> RadialGradient<'a> {
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        foreground_color: RgbaColor,
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
-            foreground_color,
             index: 0,
         }
     }
@@ -338,7 +335,7 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
             .field("end_angle", &self.end_angle)
             .field("extend", &self.extend)
             // TODO: Avoid hardcoding foregrounf color here?
-            .field("stops", &self.stops(0, RgbaColor::new(0, 0, 0, 255)))
+            .field("stops", &self.stops(0))
             .finish()
     }
 }
@@ -347,12 +344,10 @@ impl<'a> SweepGradient<'a> {
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        foreground_color: RgbaColor,
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
-            foreground_color,
             index: 0,
         }
     }
@@ -362,7 +357,6 @@ impl<'a> SweepGradient<'a> {
 pub struct GradientStopsIter<'a, 'b> {
     color_line: &'b ColorLine<'a>,
     palette: u16,
-    foreground_color: RgbaColor,
     index: u16,
 }
 
@@ -377,7 +371,7 @@ impl Iterator for GradientStopsIter<'_, '_> {
         let index = self.index;
         self.index = self.index.checked_add(1)?;
         self.color_line
-            .get(self.palette, self.foreground_color, index)
+            .get(self.palette, index)
     }
 }
 
@@ -463,8 +457,6 @@ impl FromData for CompositeMode {
 pub trait Painter<'a> {
     /// Outlines a glyph and stores it until the next paint command.
     fn outline(&mut self, glyph_id: GlyphId);
-    /// Paints the current glyph outline using the application provided text foreground color.
-    fn paint_foreground(&mut self);
     /// Paints the current glyph outline using the provided color.
     fn paint_color(&mut self, color: RgbaColor);
     fn paint_linear_gradient(&mut self, gradient: LinearGradient<'a>);
@@ -479,6 +471,8 @@ pub trait Painter<'a> {
 
     fn push_isolate(&mut self);
     fn pop_isolate(&mut self);
+
+    fn foreground_color(&self) -> RgbaColor;
 
     fn push_group(&mut self, mode: CompositeMode);
     fn pop_group(&mut self);
@@ -640,7 +634,7 @@ impl<'a> Table<'a> {
             if layer.palette_index == 0xFFFF {
                 // A special case.
                 painter.outline(layer.glyph_id);
-                painter.paint_foreground();
+                painter.paint_color(painter.foreground_color());
             } else {
                 let color = self.palettes.get(palette, layer.palette_index)?;
                 painter.outline(layer.glyph_id);
@@ -708,14 +702,19 @@ impl<'a> Table<'a> {
                 // PaintSolid
                 let palette_index = s.read::<u16>()?;
                 let alpha = s.read::<F2DOT14>()?;
-                let mut color = self.palettes.get(palette, palette_index)?;
+                let mut color = if palette_index == u16::MAX {
+                    painter.foreground_color()
+                }   else {
+                    self.palettes.get(palette, palette_index)?
+                };
+
                 color.apply_alpha(alpha.to_f32());
                 painter.paint_color(color);
             }
             4 => {
                 // PaintLinearGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(offset + color_line_offset.to_usize())?;
+                let color_line = self.parse_color_line(offset + color_line_offset.to_usize(), painter.foreground_color())?;
                 painter.paint_linear_gradient(LinearGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
@@ -730,7 +729,7 @@ impl<'a> Table<'a> {
             6 => {
                 // PaintRadialGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(offset + color_line_offset.to_usize())?;
+                let color_line = self.parse_color_line(offset + color_line_offset.to_usize(), painter.foreground_color())?;
                 painter.paint_radial_gradient(RadialGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
@@ -745,7 +744,7 @@ impl<'a> Table<'a> {
             8 => {
                 // PaintSweepGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(offset + color_line_offset.to_usize())?;
+                let color_line = self.parse_color_line(offset + color_line_offset.to_usize(), painter.foreground_color())?;
                 painter.paint_sweep_gradient(SweepGradient {
                     center_x: s.read::<i16>()?,
                     center_y: s.read::<i16>()?,
@@ -916,7 +915,7 @@ impl<'a> Table<'a> {
         Some(())
     }
 
-    fn parse_color_line(&self, offset: usize) -> Option<ColorLine<'a>> {
+    fn parse_color_line(&self, offset: usize, foreground_color: RgbaColor) -> Option<ColorLine<'a>> {
         let mut s = Stream::new_at(self.data, offset)?;
         let extend = s.read::<GradientExtend>()?;
         let count = s.read::<u16>()?;
@@ -924,6 +923,7 @@ impl<'a> Table<'a> {
         Some(ColorLine {
             extend,
             colors,
+            foreground_color,
             palettes: self.palettes,
         })
     }

@@ -2,7 +2,6 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use ttf_parser as ttf;
-use ttf_parser::colr::Painter;
 use ttf_parser::RgbaColor;
 
 const FONT_SIZE: f64 = 128.0;
@@ -14,10 +13,6 @@ Usage:
     font2svg --variations 'wght:500;wdth:200' font.ttf out.svg
     font2svg --colr-palette 1 colr-font.ttf out.svg
 ";
-
-fn get_foreground_color() -> RgbaColor {
-    ttf::RgbaColor::new(0, 0, 0, 255)
-}
 
 struct Args {
     #[allow(dead_code)]
@@ -369,11 +364,6 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.outline_transform = self.transform;
     }
 
-    fn paint_foreground(&mut self) {
-        // The caller must provide this color. We simply fallback to black.
-        self.paint_color(get_foreground_color());
-    }
-
     fn paint_color(&mut self, color: ttf::RgbaColor) {
         // println!("COLOR");
         self.svg.start_element("path");
@@ -406,7 +396,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", self.transform);
-        self.write_gradient_stops(gradient.stops(self.palette_index, get_foreground_color()));
+        self.write_gradient_stops(gradient.stops(self.palette_index));
         self.svg.end_element();
 
         self.svg.start_element("path");
@@ -434,7 +424,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", self.transform);
-        self.write_gradient_stops(gradient.stops(self.palette_index, get_foreground_color()));
+        self.write_gradient_stops(gradient.stops(self.palette_index));
         self.svg.end_element();
 
         self.svg.start_element("path");
@@ -555,6 +545,10 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
 
     fn pop_clip_box(&mut self) {
         self.svg.end_element();
+    }
+
+    fn foreground_color(&self) -> RgbaColor {
+        RgbaColor::new(0, 0, 0, 255)
     }
 }
 

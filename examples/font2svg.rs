@@ -133,8 +133,8 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut row = 0;
     let mut column = 0;
     let mut gradient_index = 1;
-    for id in 133..135 {
-        println!("{:?}", id);
+    for id in 156..161 {
+        println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
         let y = row as f64 * cell_size;
@@ -347,7 +347,7 @@ impl GlyphPainter<'_> {
 
 impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
     fn outline(&mut self, glyph_id: ttf::GlyphId) {
-        println!("OUTLINE");
+        // println!("OUTLINE");
         self.path_buf.clear();
         let mut builder = Builder(self.path_buf);
         match self.face.outline_glyph(glyph_id, &mut builder) {
@@ -366,7 +366,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
     }
 
     fn paint_color(&mut self, color: ttf::RgbaColor) {
-        println!("COLOR");
+        // println!("COLOR");
         self.svg.start_element("path");
         self.svg.write_color_attribute("fill", color);
         let opacity = f32::from(color.alpha) / 255.0;
@@ -443,8 +443,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
 
     fn push_isolate(&mut self) {
         self.svg.start_element("g");
-        self.svg
-            .write_attribute("style","isolation: isolate");
+        self.svg.write_attribute("style", "isolation: isolate");
     }
 
     fn push_group(&mut self, mode: ttf::colr::CompositeMode) {
@@ -516,6 +515,18 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         if let Some(ts) = self.transforms_stack.pop() {
             self.transform = ts
         }
+    }
+
+    fn clip(&mut self) {
+        // todo!()
+    }
+
+    fn clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16) {
+        // todo!()
+        println!(
+            "clip box: {:?}, {:?}, {:?}, {:?}",
+            x_min, y_min, x_max, y_max
+        );
     }
 }
 

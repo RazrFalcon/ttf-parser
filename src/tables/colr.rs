@@ -1,9 +1,11 @@
 //! A [Color Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/colr) implementation.
 
-use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
+use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset24, Offset32, Stream, F2DOT14};
+use crate::svg::SvgDocument;
 use crate::{cpal, Fixed, LazyArray32, Transform};
 use crate::{GlyphId, RgbaColor};
+use std::vec::Vec;
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -12,6 +14,93 @@ struct BaseGlyphRecord {
     glyph_id: GlyphId,
     first_layer_index: u16,
     num_layers: u16,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ClipBox {
+    pub x_min: i16,
+    pub y_min: i16,
+    pub x_max: i16,
+    pub y_max: i16,
+}
+
+/// A [clip record](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
+#[derive(Clone, Copy, Debug)]
+struct ClipRecord {
+    /// The first glyph ID for the range covered by this record.
+    pub start_glyph_id: GlyphId,
+    /// The last glyph ID, *inclusive*, for the range covered by this record.
+    pub end_glyph_id: GlyphId,
+    pub clip_box_offset: Offset24,
+}
+
+impl FromData for ClipRecord {
+    const SIZE: usize = 7;
+
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(ClipRecord {
+            start_glyph_id: s.read::<GlyphId>()?,
+            end_glyph_id: s.read::<GlyphId>()?,
+            clip_box_offset: s.read::<Offset24>()?,
+        })
+    }
+}
+
+impl ClipRecord {
+    /// Returns the glyphs range.
+    pub fn glyphs_range(&self) -> core::ops::RangeInclusive<GlyphId> {
+        self.start_glyph_id..=self.end_glyph_id
+    }
+}
+
+/// A [clip list](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
+#[derive(Clone, Copy, Debug)]
+struct ClipList<'a> {
+    data: &'a [u8],
+    records: LazyArray32<'a, ClipRecord>,
+}
+
+impl Default for ClipList<'_> {
+    fn default() -> Self {
+        Self {
+            data: &[],
+            records: LazyArray32::default(),
+        }
+    }
+}
+
+impl<'a> ClipList<'a> {
+    #[inline]
+    pub fn get(&self, index: u32) -> Option<ClipBox> {
+        let record = self.records.get(index)?;
+        let offset = record.clip_box_offset.to_usize();
+        self.data.get(offset..).and_then(|data| {
+            let mut s = Stream::new(data);
+            // TODO: Add format 2
+            // Format = 1
+            s.read::<u8>()?;
+
+            Some(ClipBox {
+                x_min: s.read::<i16>()?,
+                y_min: s.read::<i16>()?,
+                x_max: s.read::<i16>()?,
+                y_max: s.read::<i16>()?,
+            })
+        })
+    }
+
+    /// Returns a ClipBox by glyph ID.
+    #[inline]
+    pub fn find(&self, glyph_id: GlyphId) -> Option<ClipBox> {
+        let index = self
+            .records
+            .into_iter()
+            .position(|v| v.glyphs_range().contains(&glyph_id))?;
+        self.get(index as u32)
+    }
 }
 
 impl FromData for BaseGlyphRecord {
@@ -356,6 +445,10 @@ pub trait Painter<'a> {
     fn paint_radial_gradient(&mut self, gradient: RadialGradient<'a>);
     fn paint_sweep_gradient(&mut self, gradient: SweepGradient<'a>);
 
+    fn clip(&mut self);
+
+    fn clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16);
+
     fn push_isolate(&mut self);
     fn pop_isolate(&mut self);
 
@@ -388,6 +481,8 @@ pub struct Table<'a> {
     base_glyph_paints: LazyArray32<'a, BaseGlyphPaintRecord>,
     layer_paint_offsets_offset: Offset32,
     layer_paint_offsets: LazyArray32<'a, Offset32>,
+    clip_list_offsets_offset: Offset32,
+    clip_list: ClipList<'a>,
 }
 
 impl<'a> Table<'a> {
@@ -421,6 +516,8 @@ impl<'a> Table<'a> {
             base_glyph_paints: LazyArray32::default(),
             layer_paint_offsets_offset: Offset32(0),
             layer_paint_offsets: LazyArray32::default(),
+            clip_list_offsets_offset: Offset32(0),
+            clip_list: ClipList::default(),
         };
 
         if version == 0 {
@@ -429,6 +526,7 @@ impl<'a> Table<'a> {
 
         table.base_glyph_paints_offset = s.read::<Offset32>()?;
         let layer_list_offset = s.read::<Option<Offset32>>()?;
+        let clip_list_offset = s.read::<Option<Offset32>>()?;
 
         {
             let mut s = Stream::new_at(data, table.base_glyph_paints_offset.to_usize())?;
@@ -441,6 +539,19 @@ impl<'a> Table<'a> {
             let mut s = Stream::new_at(data, offset.to_usize())?;
             let count = s.read::<u32>()?;
             table.layer_paint_offsets = s.read_array32::<Offset32>(count)?;
+        }
+
+        if let Some(offset) = clip_list_offset {
+            table.clip_list_offsets_offset = offset;
+            let clip_data = data.get(offset.to_usize()..)?;
+            let mut s = Stream::new(clip_data);
+            // Format
+            s.read::<u8>()?;
+            let count = s.read::<u32>()?;
+            table.clip_list = ClipList {
+                data: clip_data,
+                records: s.read_array32::<ClipRecord>(count)?,
+            };
         }
 
         Some(table)
@@ -518,6 +629,15 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
     ) -> Option<()> {
+        if let Some(clip_box) = self.clip_list.find(base.glyph_id) {
+            painter.clip_box(
+                clip_box.x_min,
+                clip_box.y_min,
+                clip_box.x_max,
+                clip_box.y_max,
+            );
+        }
+
         self.parse_paint(
             self.base_glyph_paints_offset.to_usize() + base.paint_table_offset.to_usize(),
             palette,
@@ -606,11 +726,14 @@ impl<'a> Table<'a> {
                 let paint_offset = s.read::<Offset24>()?;
                 let glyph_id = s.read::<GlyphId>()?;
                 painter.outline(glyph_id);
+                painter.clip();
+
                 self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
             }
             11 => {
                 // PaintColrGlyph
-                // unimplemented!();
+                let glyph_id = s.read::<GlyphId>()?;
+                self.paint(glyph_id, palette, painter);
             }
             12 => {
                 // PaintTransform

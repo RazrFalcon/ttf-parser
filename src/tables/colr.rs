@@ -1,11 +1,9 @@
 //! A [Color Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/colr) implementation.
 
-use crate::parser::{FromData, LazyArray16, NumFrom, Offset, Offset24, Offset32, Stream, F2DOT14};
-use crate::svg::SvgDocument;
+use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
 use crate::{cpal, Fixed, LazyArray32, Transform};
 use crate::{GlyphId, RgbaColor};
-use std::vec::Vec;
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -205,7 +203,7 @@ struct ColorLine<'a> {
     extend: GradientExtend,
     colors: LazyArray16<'a, ColorStopRaw>,
     palettes: cpal::Table<'a>,
-    foreground_color: RgbaColor
+    foreground_color: RgbaColor,
 }
 
 impl ColorLine<'_> {
@@ -263,10 +261,7 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
 }
 
 impl<'a> LinearGradient<'a> {
-    pub fn stops<'b>(
-        &'b self,
-        palette: u16,
-    ) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
@@ -304,10 +299,7 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
 }
 
 impl<'a> RadialGradient<'a> {
-    pub fn stops<'b>(
-        &'b self,
-        palette: u16,
-    ) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
@@ -341,10 +333,7 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
 }
 
 impl<'a> SweepGradient<'a> {
-    pub fn stops<'b>(
-        &'b self,
-        palette: u16,
-    ) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
@@ -370,8 +359,7 @@ impl Iterator for GradientStopsIter<'_, '_> {
 
         let index = self.index;
         self.index = self.index.checked_add(1)?;
-        self.color_line
-            .get(self.palette, index)
+        self.color_line.get(self.palette, index)
     }
 }
 
@@ -463,11 +451,13 @@ pub trait Painter<'a> {
     fn paint_radial_gradient(&mut self, gradient: RadialGradient<'a>);
     fn paint_sweep_gradient(&mut self, gradient: SweepGradient<'a>);
 
-    fn clip(&mut self);
+    fn push_clip(&mut self, glyph_id: GlyphId);
 
     fn push_clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16);
 
     fn pop_clip_box(&mut self);
+
+    fn pop_clip(&mut self);
 
     fn push_isolate(&mut self);
     fn pop_isolate(&mut self);
@@ -604,6 +594,9 @@ impl<'a> Table<'a> {
         self.get_v1(glyph_id).is_some() || self.get_v0(glyph_id).is_some()
     }
 
+    // This method should only be called from outside, not from within `colr.rs`.
+    // From inside, you always should call paint_impl, so that the recursion stack can
+    // be passed on and any kind of recursion can be prevented.
     /// Paints the color glyph.
     pub fn paint(
         &self,
@@ -611,8 +604,23 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
     ) -> Option<()> {
+        let mut recursion_stack = RecursionStack {
+            stack: [0; 64],
+            len: 0,
+        };
+
+        self.paint_impl(glyph_id, palette, painter, &mut recursion_stack)
+    }
+
+    fn paint_impl(
+        &self,
+        glyph_id: GlyphId,
+        palette: u16,
+        painter: &mut dyn Painter<'a>,
+        recusion_stack: &mut RecursionStack,
+    ) -> Option<()> {
         if let Some(base) = self.get_v1(glyph_id) {
-            self.paint_v1(base, palette, painter)
+            self.paint_v1(base, palette, painter, recusion_stack)
         } else if let Some(base) = self.get_v0(glyph_id) {
             self.paint_v0(base, palette, painter)
         } else {
@@ -650,6 +658,7 @@ impl<'a> Table<'a> {
         base: BaseGlyphPaintRecord,
         palette: u16,
         painter: &mut dyn Painter<'a>,
+        recursion_stack: &mut RecursionStack,
     ) -> Option<()> {
         let clip_box = self.clip_list.find(base.glyph_id);
         if let Some(clip_box) = clip_box {
@@ -665,7 +674,8 @@ impl<'a> Table<'a> {
             self.base_glyph_paints_offset.to_usize() + base.paint_table_offset.to_usize(),
             palette,
             painter,
-        )?;
+            recursion_stack,
+        );
 
         if clip_box.is_some() {
             painter.pop_clip_box();
@@ -679,9 +689,32 @@ impl<'a> Table<'a> {
         offset: usize,
         palette: u16,
         painter: &mut dyn Painter<'a>,
+        recursion_stack: &mut RecursionStack,
     ) -> Option<()> {
         let mut s = Stream::new_at(self.data, offset)?;
         let format = s.read::<u8>()?;
+
+        if recursion_stack.contains(offset) {
+            return None;
+        }
+
+        recursion_stack.push(offset).ok()?;
+        let result =
+            self.parse_paint_impl(offset, palette, painter, recursion_stack, &mut s, format);
+        recursion_stack.pop();
+
+        result
+    }
+
+    fn parse_paint_impl(
+        &self,
+        offset: usize,
+        palette: u16,
+        painter: &mut dyn Painter<'a>,
+        recursion_stack: &mut RecursionStack,
+        s: &mut Stream,
+        format: u8,
+    ) -> Option<()> {
         match format {
             1 => {
                 // PaintColrLayers
@@ -695,6 +728,7 @@ impl<'a> Table<'a> {
                         self.layer_paint_offsets_offset.to_usize() + paint_offset.to_usize(),
                         palette,
                         painter,
+                        recursion_stack,
                     );
                 }
             }
@@ -704,7 +738,7 @@ impl<'a> Table<'a> {
                 let alpha = s.read::<F2DOT14>()?;
                 let mut color = if palette_index == u16::MAX {
                     painter.foreground_color()
-                }   else {
+                } else {
                     self.palettes.get(palette, palette_index)?
                 };
 
@@ -714,7 +748,10 @@ impl<'a> Table<'a> {
             4 => {
                 // PaintLinearGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(offset + color_line_offset.to_usize(), painter.foreground_color())?;
+                let color_line = self.parse_color_line(
+                    offset + color_line_offset.to_usize(),
+                    painter.foreground_color(),
+                )?;
                 painter.paint_linear_gradient(LinearGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
@@ -729,7 +766,10 @@ impl<'a> Table<'a> {
             6 => {
                 // PaintRadialGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(offset + color_line_offset.to_usize(), painter.foreground_color())?;
+                let color_line = self.parse_color_line(
+                    offset + color_line_offset.to_usize(),
+                    painter.foreground_color(),
+                )?;
                 painter.paint_radial_gradient(RadialGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
@@ -744,7 +784,10 @@ impl<'a> Table<'a> {
             8 => {
                 // PaintSweepGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(offset + color_line_offset.to_usize(), painter.foreground_color())?;
+                let color_line = self.parse_color_line(
+                    offset + color_line_offset.to_usize(),
+                    painter.foreground_color(),
+                )?;
                 painter.paint_sweep_gradient(SweepGradient {
                     center_x: s.read::<i16>()?,
                     center_y: s.read::<i16>()?,
@@ -759,14 +802,21 @@ impl<'a> Table<'a> {
                 let paint_offset = s.read::<Offset24>()?;
                 let glyph_id = s.read::<GlyphId>()?;
                 painter.outline(glyph_id);
-                painter.clip();
+                painter.push_clip(glyph_id);
 
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
+
+                painter.pop_clip();
             }
             11 => {
                 // PaintColrGlyph
                 let glyph_id = s.read::<GlyphId>()?;
-                self.paint(glyph_id, palette, painter);
+                self.paint_impl(glyph_id, palette, painter, recursion_stack);
             }
             12 => {
                 // PaintTransform
@@ -783,7 +833,12 @@ impl<'a> Table<'a> {
                 };
 
                 painter.transform(ts);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
             }
             14 => {
@@ -793,7 +848,12 @@ impl<'a> Table<'a> {
                 let ty = f32::from(s.read::<i16>()?);
 
                 painter.translate(tx, ty);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
             }
             16 => {
@@ -803,7 +863,12 @@ impl<'a> Table<'a> {
                 let sy = s.read::<F2DOT14>()?.to_f32();
 
                 painter.scale(sx, sy);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
             }
             18 => {
@@ -817,7 +882,12 @@ impl<'a> Table<'a> {
                 painter.translate(center_x, center_y);
                 painter.scale(sx, sy);
                 painter.translate(-center_x, -center_y);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
                 painter.pop_transform();
                 painter.pop_transform();
@@ -828,7 +898,12 @@ impl<'a> Table<'a> {
                 let scale = s.read::<F2DOT14>()?.to_f32();
 
                 painter.scale(scale, scale);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
             }
             22 => {
@@ -841,7 +916,12 @@ impl<'a> Table<'a> {
                 painter.translate(center_x, center_y);
                 painter.scale(scale, scale);
                 painter.translate(-center_x, -center_y);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
                 painter.pop_transform();
                 painter.pop_transform();
@@ -852,7 +932,12 @@ impl<'a> Table<'a> {
                 let angle = s.read::<F2DOT14>()?.to_f32();
 
                 painter.rotate(angle);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
             }
             26 => {
@@ -865,7 +950,12 @@ impl<'a> Table<'a> {
                 painter.translate(center_x, center_y);
                 painter.rotate(angle);
                 painter.translate(-center_x, -center_y);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
                 painter.pop_transform();
                 painter.pop_transform();
@@ -877,7 +967,12 @@ impl<'a> Table<'a> {
                 let skew_y = s.read::<F2DOT14>()?.to_f32();
 
                 painter.skew(skew_x, skew_y);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
             }
             30 => {
@@ -891,7 +986,12 @@ impl<'a> Table<'a> {
                 painter.translate(center_x, center_y);
                 painter.skew(skew_x, skew_y);
                 painter.translate(-center_x, -center_y);
-                self.parse_paint(offset + paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_transform();
                 painter.pop_transform();
                 painter.pop_transform();
@@ -903,9 +1003,19 @@ impl<'a> Table<'a> {
                 let backdrop_paint_offset = s.read::<Offset24>()?;
 
                 painter.push_isolate();
-                self.parse_paint(offset + backdrop_paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + backdrop_paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.push_group(composite_mode);
-                self.parse_paint(offset + source_paint_offset.to_usize(), palette, painter);
+                self.parse_paint(
+                    offset + source_paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                );
                 painter.pop_group();
                 painter.pop_isolate();
             }
@@ -915,7 +1025,11 @@ impl<'a> Table<'a> {
         Some(())
     }
 
-    fn parse_color_line(&self, offset: usize, foreground_color: RgbaColor) -> Option<ColorLine<'a>> {
+    fn parse_color_line(
+        &self,
+        offset: usize,
+        foreground_color: RgbaColor,
+    ) -> Option<ColorLine<'a>> {
         let mut s = Stream::new_at(self.data, offset)?;
         let extend = s.read::<GradientExtend>()?;
         let count = s.read::<u16>()?;
@@ -926,5 +1040,44 @@ impl<'a> Table<'a> {
             foreground_color,
             palettes: self.palettes,
         })
+    }
+}
+
+struct RecursionStack {
+    // The limit of 64 is chosen arbitrarily and not from the spec. But we have to stop somewhere...
+    stack: [usize; 64],
+    len: usize,
+}
+
+impl RecursionStack {
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[inline]
+    pub fn push(&mut self, offset: usize) -> Result<(), ()> {
+        if self.len == self.stack.len() {
+            Err(())
+        } else {
+            self.stack[self.len] = offset;
+            self.len += 1;
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn contains(&self, offset: usize) -> bool {
+        if let Some(offsets) = self.stack.get(..self.len) {
+            return offsets.contains(&offset);
+        }
+
+        false
+    }
+
+    #[inline]
+    pub fn pop(&mut self) {
+        debug_assert!(!self.is_empty());
+        self.len -= 1;
     }
 }

@@ -208,9 +208,15 @@ struct ColorLine<'a> {
 }
 
 impl ColorLine<'_> {
-    fn get(&self, palette: u16, index: u16) -> Option<ColorStop> {
+    fn get(&self, palette: u16, foreground_color: RgbaColor, index: u16) -> Option<ColorStop> {
         let info = self.colors.get(index)?;
-        let mut color = self.palettes.get(palette, info.palette_index)?;
+
+        let mut color = if info.palette_index == u16::MAX {
+            foreground_color
+        } else {
+            self.palettes.get(palette, info.palette_index)?
+        };
+
         color.apply_alpha(info.alpha.to_f32());
         Some(ColorStop {
             stop_offset: info.stop_offset.to_f32(),
@@ -249,15 +255,21 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
             .field("x2", &self.x2)
             .field("y2", &self.y2)
             .field("extend", &self.extend)
-            .field("stops", &self.stops(0))
+            // TODO: Avoid hardcoding foregrounf color here?
+            .field("stops", &self.stops(0, RgbaColor::new(0, 0, 0, 255)))
             .finish()
     }
 }
 
 impl<'a> LinearGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(
+        &'b self,
+        palette: u16,
+        foreground_color: RgbaColor,
+    ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
+            foreground_color,
             palette,
             index: 0,
         }
@@ -286,16 +298,22 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
             .field("x1", &self.x1)
             .field("y1", &self.y1)
             .field("extend", &self.extend)
-            .field("stops", &self.stops(0))
+            // TODO: Avoid hardcoding foregrounf color here?
+            .field("stops", &self.stops(0, RgbaColor::new(0, 0, 0, 255)))
             .finish()
     }
 }
 
 impl<'a> RadialGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(
+        &'b self,
+        palette: u16,
+        foreground_color: RgbaColor,
+    ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
+            foreground_color,
             index: 0,
         }
     }
@@ -319,16 +337,22 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
             .field("start_angle", &self.start_angle)
             .field("end_angle", &self.end_angle)
             .field("extend", &self.extend)
-            .field("stops", &self.stops(0))
+            // TODO: Avoid hardcoding foregrounf color here?
+            .field("stops", &self.stops(0, RgbaColor::new(0, 0, 0, 255)))
             .finish()
     }
 }
 
 impl<'a> SweepGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(
+        &'b self,
+        palette: u16,
+        foreground_color: RgbaColor,
+    ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
+            foreground_color,
             index: 0,
         }
     }
@@ -338,6 +362,7 @@ impl<'a> SweepGradient<'a> {
 pub struct GradientStopsIter<'a, 'b> {
     color_line: &'b ColorLine<'a>,
     palette: u16,
+    foreground_color: RgbaColor,
     index: u16,
 }
 
@@ -351,7 +376,8 @@ impl Iterator for GradientStopsIter<'_, '_> {
 
         let index = self.index;
         self.index = self.index.checked_add(1)?;
-        self.color_line.get(self.palette, index)
+        self.color_line
+            .get(self.palette, self.foreground_color, index)
     }
 }
 
@@ -447,7 +473,9 @@ pub trait Painter<'a> {
 
     fn clip(&mut self);
 
-    fn clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16);
+    fn push_clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16);
+
+    fn pop_clip_box(&mut self);
 
     fn push_isolate(&mut self);
     fn pop_isolate(&mut self);
@@ -629,8 +657,9 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
     ) -> Option<()> {
-        if let Some(clip_box) = self.clip_list.find(base.glyph_id) {
-            painter.clip_box(
+        let clip_box = self.clip_list.find(base.glyph_id);
+        if let Some(clip_box) = clip_box {
+            painter.push_clip_box(
                 clip_box.x_min,
                 clip_box.y_min,
                 clip_box.x_max,
@@ -643,6 +672,11 @@ impl<'a> Table<'a> {
             palette,
             painter,
         )?;
+
+        if clip_box.is_some() {
+            painter.pop_clip_box();
+        }
+
         Some(())
     }
 

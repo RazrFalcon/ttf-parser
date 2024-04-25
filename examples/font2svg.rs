@@ -2,6 +2,8 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use ttf_parser as ttf;
+use ttf_parser::colr::Painter;
+use ttf_parser::RgbaColor;
 
 const FONT_SIZE: f64 = 128.0;
 const COLUMNS: u32 = 10;
@@ -12,6 +14,10 @@ Usage:
     font2svg --variations 'wght:500;wdth:200' font.ttf out.svg
     font2svg --colr-palette 1 colr-font.ttf out.svg
 ";
+
+fn get_foreground_color() -> RgbaColor {
+    ttf::RgbaColor::new(0, 0, 0, 255)
+}
 
 struct Args {
     #[allow(dead_code)]
@@ -133,7 +139,8 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut row = 0;
     let mut column = 0;
     let mut gradient_index = 1;
-    for id in 156..161 {
+    let mut clip_path_index = 1;
+    for id in 150..170 {
         println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
@@ -157,6 +164,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 cell_size,
                 scale,
                 &mut gradient_index,
+                &mut clip_path_index,
                 &mut svg,
                 &mut path_buf,
             );
@@ -326,6 +334,7 @@ struct GlyphPainter<'a> {
     svg: &'a mut xmlwriter::XmlWriter,
     path_buf: &'a mut String,
     gradient_index: usize,
+    clip_path_index: usize,
     palette_index: u16,
     transform: ttf::Transform,
     outline_transform: ttf::Transform,
@@ -362,7 +371,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
 
     fn paint_foreground(&mut self) {
         // The caller must provide this color. We simply fallback to black.
-        self.paint_color(ttf::RgbaColor::new(0, 0, 0, 255));
+        self.paint_color(get_foreground_color());
     }
 
     fn paint_color(&mut self, color: ttf::RgbaColor) {
@@ -397,7 +406,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", self.transform);
-        self.write_gradient_stops(gradient.stops(self.palette_index));
+        self.write_gradient_stops(gradient.stops(self.palette_index, get_foreground_color()));
         self.svg.end_element();
 
         self.svg.start_element("path");
@@ -425,7 +434,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", self.transform);
-        self.write_gradient_stops(gradient.stops(self.palette_index));
+        self.write_gradient_stops(gradient.stops(self.palette_index, get_foreground_color()));
         self.svg.end_element();
 
         self.svg.start_element("path");
@@ -521,12 +530,31 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         // todo!()
     }
 
-    fn clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16) {
-        // todo!()
-        println!(
-            "clip box: {:?}, {:?}, {:?}, {:?}",
-            x_min, y_min, x_max, y_max
+    fn push_clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16) {
+        let clip_id = format!("cp{}", self.clip_path_index);
+        self.clip_path_index += 1;
+
+        let clip_path = format!(
+            "M {} {} L {} {} L {} {} L {} {} Z",
+            x_min, y_min, x_max, y_min, x_max, y_max, x_min, y_max
         );
+
+        self.svg.start_element("clipPath");
+        self.svg.write_attribute("id", &clip_id);
+        self.svg.start_element("path");
+        self.svg
+            .write_transform_attribute("transform", self.outline_transform);
+        self.svg.write_attribute("d", &clip_path);
+        self.svg.end_element();
+        self.svg.end_element();
+
+        self.svg.start_element("g");
+        self.svg
+            .write_attribute_fmt("clip-path", format_args!("url(#{})", clip_id));
+    }
+
+    fn pop_clip_box(&mut self) {
+        self.svg.end_element();
     }
 }
 
@@ -539,6 +567,7 @@ fn color_glyph(
     cell_size: f64,
     scale: f64,
     gradient_index: &mut usize,
+    clip_path_index: &mut usize,
     svg: &mut xmlwriter::XmlWriter,
     path_buf: &mut String,
 ) {
@@ -553,6 +582,7 @@ fn color_glyph(
         svg,
         path_buf,
         gradient_index: *gradient_index,
+        clip_path_index: *clip_path_index,
         palette_index,
         transform: ttf::Transform::default(),
         outline_transform: ttf::Transform::default(),
@@ -560,6 +590,7 @@ fn color_glyph(
     };
     face.paint_color_glyph(glyph_id, palette_index, &mut painter);
     *gradient_index = painter.gradient_index;
+    *clip_path_index = painter.clip_path_index;
 
     svg.end_element();
 }

@@ -546,7 +546,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         }
     }
 
-    fn push_clip(&mut self, glyph_id: GlyphId) {
+    fn push_clip_glyph(&mut self, glyph_id: GlyphId) {
         let mut path_buf = String::new();
         let mut builder = Builder(&mut path_buf);
         match self.face.outline_glyph(glyph_id, &mut builder) {
@@ -574,10 +574,6 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         );
 
         self.clip_with_path(&clip_path);
-    }
-
-    fn pop_clip_box(&mut self) {
-        self.svg.end_element();
     }
 
     fn foreground_color(&self) -> RgbaColor {

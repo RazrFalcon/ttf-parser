@@ -41,6 +41,7 @@ struct ClipRecord {
     pub start_glyph_id: GlyphId,
     /// The last glyph ID, *inclusive*, for the range covered by this record.
     pub end_glyph_id: GlyphId,
+    /// The offset to the clip box.
     pub clip_box_offset: Offset24,
 }
 
@@ -459,12 +460,9 @@ pub trait Painter<'a> {
     /// Paints the current glyph outline using the provided color.
     fn paint_glyph(&mut self, paint: Paint<'a>);
 
-    fn push_clip(&mut self, glyph_id: GlyphId);
+    fn push_clip_glyph(&mut self, glyph_id: GlyphId);
 
     fn push_clip_box(&mut self, clipbox: ClipBox);
-
-    fn pop_clip_box(&mut self);
-
     fn pop_clip(&mut self);
 
     fn push_isolate(&mut self);
@@ -681,7 +679,7 @@ impl<'a> Table<'a> {
         );
 
         if clip_box.is_some() {
-            painter.pop_clip_box();
+            painter.pop_clip();
         }
 
         Some(())
@@ -805,7 +803,7 @@ impl<'a> Table<'a> {
                 let paint_offset = s.read::<Offset24>()?;
                 let glyph_id = s.read::<GlyphId>()?;
                 painter.outline_glyph(glyph_id);
-                painter.push_clip(glyph_id);
+                painter.push_clip_glyph(glyph_id);
 
                 self.parse_paint(
                     offset + paint_offset.to_usize(),

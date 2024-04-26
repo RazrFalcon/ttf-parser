@@ -465,13 +465,10 @@ pub trait Painter<'a> {
     fn push_clip_box(&mut self, clipbox: ClipBox);
     fn pop_clip(&mut self);
 
-    fn push_isolate(&mut self);
-    fn pop_isolate(&mut self);
-
     fn foreground_color(&self) -> RgbaColor;
 
-    fn push_group(&mut self, mode: CompositeMode);
-    fn pop_group(&mut self);
+    fn push_layer(&mut self, mode: CompositeMode);
+    fn pop_layer(&mut self);
 
     fn translate(&mut self, tx: f32, ty: f32);
     fn scale(&mut self, sx: f32, sy: f32);
@@ -1003,22 +1000,22 @@ impl<'a> Table<'a> {
                 let composite_mode = s.read::<CompositeMode>()?;
                 let backdrop_paint_offset = s.read::<Offset24>()?;
 
-                painter.push_isolate();
+                painter.push_layer(CompositeMode::SourceOver);
                 self.parse_paint(
                     offset + backdrop_paint_offset.to_usize(),
                     palette,
                     painter,
                     recursion_stack,
                 );
-                painter.push_group(composite_mode);
+                painter.push_layer(composite_mode);
                 self.parse_paint(
                     offset + source_paint_offset.to_usize(),
                     palette,
                     painter,
                     recursion_stack,
                 );
-                painter.pop_group();
-                painter.pop_isolate();
+                painter.pop_layer();
+                painter.pop_layer();
             }
             _ => {}
         }

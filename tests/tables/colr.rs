@@ -101,8 +101,8 @@ impl Painter<'_> for VecPainter {
     }
 
     // TODO: test v1
-    fn push_group(&mut self, _mode: colr::CompositeMode) {}
-    fn pop_group(&mut self) {}
+    fn push_layer(&mut self, _mode: colr::CompositeMode) {}
+    fn pop_layer(&mut self) {}
     fn translate(&mut self, _tx: f32, _ty: f32) {}
     fn scale(&mut self, _sx: f32, _sy: f32) {}
     fn rotate(&mut self, _angle: f32) {}

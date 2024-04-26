@@ -490,18 +490,12 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.outline_transform = self.transform;
     }
 
-    fn push_isolate(&mut self) {
-        self.svg.start_element("g");
-        self.svg.write_attribute("style", "isolation: isolate");
-    }
-
-    fn push_group(&mut self, mode: ttf::colr::CompositeMode) {
+    fn push_layer(&mut self, mode: ttf::colr::CompositeMode) {
         self.svg.start_element("g");
 
         use ttf::colr::CompositeMode;
-        // TODO: Need to figurepaint_glyph_nested_translate_identity out how to represent the other blend modes
+        // TODO: Need to figure out how to represent the other blend modes
         // in SVG.
-        println!("{:?}", mode);
         let mode = match mode {
             CompositeMode::SourceOver => "normal",
             CompositeMode::Screen => "screen",
@@ -525,15 +519,11 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
             }
         };
         self.svg
-            .write_attribute_fmt("style", format_args!("mix-blend-mode: {}", mode));
+            .write_attribute_fmt("style", format_args!("mix-blend-mode: {}; isolation: isolate", mode));
     }
 
-    fn pop_group(&mut self) {
+    fn pop_layer(&mut self) {
         self.svg.end_element(); // g
-    }
-
-    fn pop_isolate(&mut self) {
-        self.svg.end_element();
     }
 
     fn translate(&mut self, tx: f32, ty: f32) {

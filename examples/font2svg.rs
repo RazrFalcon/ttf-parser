@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use ttf_parser as ttf;
 use ttf_parser::colr::{ClipBox, Paint};
-use ttf_parser::{GlyphId, RgbaColor};
+use ttf_parser::{GlyphId, RgbaColor, Transform};
 
 const FONT_SIZE: f64 = 128.0;
 const COLUMNS: u32 = 10;
@@ -136,7 +136,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut column = 0;
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
-    for id in 0..221 {
+    for id in 0..face.number_of_glyphs() {
         println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
@@ -364,6 +364,9 @@ impl<'a> GlyphPainter<'a> {
         let gradient_id = format!("lg{}", self.gradient_index);
         self.gradient_index += 1;
 
+        let gradient_transform = paint_transform(self.outline_transform, self.transform);
+
+
         // TODO: We ignore x2, y2. Have to apply them somehow.
         // TODO: The way spreadMode works in ttf and svg is a bit different. In SVG, the spreadMode
         // will always be applied based on x1/y1 and x2/y2. However, in TTF the spreadMode will
@@ -379,7 +382,7 @@ impl<'a> GlyphPainter<'a> {
         self.svg.write_attribute("gradientUnits", &"userSpaceOnUse");
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
-            .write_transform_attribute("gradientTransform", self.transform);
+            .write_transform_attribute("gradientTransform", gradient_transform);
         self.write_gradient_stops(gradient.stops(self.palette_index));
         self.svg.end_element();
 
@@ -422,6 +425,33 @@ impl<'a> GlyphPainter<'a> {
 
     fn paint_sweep_gradient(&mut self, _: ttf::colr::SweepGradient<'a>) {
         println!("Warning: sweep gradients are not supported.")
+    }
+
+
+}
+
+fn paint_transform(outline_transform: Transform, transform: Transform) -> Transform {
+    let outline_transform = tiny_skia_path::Transform::from_row(
+        outline_transform.a, outline_transform.c, outline_transform.b, outline_transform.d,
+        outline_transform.e, outline_transform.f
+    );
+
+    let gradient_transform = tiny_skia_path::Transform::from_row(
+        transform.a, transform.c, transform.b, transform.d,
+        transform.e, transform.f
+    );
+
+    let gradient_transform = outline_transform
+        .invert().unwrap()
+        .pre_concat(gradient_transform);
+
+    ttf_parser::Transform {
+        a: gradient_transform.sx,
+        b: gradient_transform.kx,
+        c: gradient_transform.ky,
+        d: gradient_transform.sy,
+        e: gradient_transform.tx,
+        f: gradient_transform.ty,
     }
 }
 

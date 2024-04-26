@@ -2,6 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use ttf_parser as ttf;
+use ttf_parser::colr::{ClipBox, Paint};
 use ttf_parser::{GlyphId, RgbaColor};
 
 const FONT_SIZE: f64 = 128.0;
@@ -135,7 +136,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut column = 0;
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
-    for id in 205..face.number_of_glyphs() {
+    for id in 0..face.number_of_glyphs() {
         println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
@@ -336,7 +337,7 @@ struct GlyphPainter<'a> {
     transforms_stack: Vec<ttf::Transform>,
 }
 
-impl GlyphPainter<'_> {
+impl<'a> GlyphPainter<'a> {
     fn write_gradient_stops(&mut self, stops: ttf::colr::GradientStopsIter) {
         for stop in stops {
             self.svg.start_element("stop");
@@ -347,44 +348,8 @@ impl GlyphPainter<'_> {
             self.svg.end_element();
         }
     }
-}
 
-impl GlyphPainter<'_> {
-    fn clip_with_path(&mut self, path: &str) {
-        let clip_id = format!("cp{}", self.clip_path_index);
-        self.clip_path_index += 1;
-
-        self.svg.start_element("clipPath");
-        self.svg.write_attribute("id", &clip_id);
-        self.svg.start_element("path");
-        self.svg
-            .write_transform_attribute("transform", self.outline_transform);
-        self.svg.write_attribute("d", &path);
-        self.svg.end_element();
-        self.svg.end_element();
-
-        self.svg.start_element("g");
-        self.svg
-            .write_attribute_fmt("clip-path", format_args!("url(#{})", clip_id));
-    }
-}
-
-impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
-    fn outline(&mut self, glyph_id: ttf::GlyphId) {
-        // println!("OUTLINE");
-        self.path_buf.clear();
-        let mut builder = Builder(self.path_buf);
-        match self.face.outline_glyph(glyph_id, &mut builder) {
-            Some(v) => v,
-            None => return,
-        };
-        builder.finish();
-
-        // We have to write outline using the current transform.
-        self.outline_transform = self.transform;
-    }
-
-    fn paint_color(&mut self, color: ttf::RgbaColor) {
+    fn paint_solid(&mut self, color: ttf::RgbaColor) {
         self.svg.start_element("path");
         self.svg.write_color_attribute("fill", color);
         let opacity = f32::from(color.alpha) / 255.0;
@@ -458,6 +423,42 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
     fn paint_sweep_gradient(&mut self, _: ttf::colr::SweepGradient<'a>) {
         println!("Warning: sweep gradients are not supported.")
     }
+}
+
+impl GlyphPainter<'_> {
+    fn clip_with_path(&mut self, path: &str) {
+        let clip_id = format!("cp{}", self.clip_path_index);
+        self.clip_path_index += 1;
+
+        self.svg.start_element("clipPath");
+        self.svg.write_attribute("id", &clip_id);
+        self.svg.start_element("path");
+        self.svg
+            .write_transform_attribute("transform", self.outline_transform);
+        self.svg.write_attribute("d", &path);
+        self.svg.end_element();
+        self.svg.end_element();
+
+        self.svg.start_element("g");
+        self.svg
+            .write_attribute_fmt("clip-path", format_args!("url(#{})", clip_id));
+    }
+}
+
+impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
+    fn outline_glyph(&mut self, glyph_id: ttf::GlyphId) {
+        // println!("OUTLINE");
+        self.path_buf.clear();
+        let mut builder = Builder(self.path_buf);
+        match self.face.outline_glyph(glyph_id, &mut builder) {
+            Some(v) => v,
+            None => return,
+        };
+        builder.finish();
+
+        // We have to write outline using the current transform.
+        self.outline_transform = self.transform;
+    }
 
     fn push_isolate(&mut self) {
         self.svg.start_element("g");
@@ -468,7 +469,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.start_element("g");
 
         use ttf::colr::CompositeMode;
-        // TODO: Need to figure out how to represent the other blend modes
+        // TODO: Need to figurepaint_glyph_nested_translate_identity out how to represent the other blend modes
         // in SVG.
         println!("{:?}", mode);
         let mode = match mode {
@@ -530,6 +531,15 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.transform = ttf::Transform::combine(self.transform, transform);
     }
 
+    fn paint_glyph(&mut self, paint: Paint<'a>) {
+        match paint {
+            Paint::Solid(color) => self.paint_solid(color),
+            Paint::LinearGradient(lg) => self.paint_linear_gradient(lg),
+            Paint::RadialGradient(rg) => self.paint_radial_gradient(rg),
+            Paint::SweepGradient(sg) => self.paint_sweep_gradient(sg),
+        }
+    }
+
     fn pop_transform(&mut self) {
         if let Some(ts) = self.transforms_stack.pop() {
             self.transform = ts
@@ -552,7 +562,12 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.end_element();
     }
 
-    fn push_clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16) {
+    fn push_clip_box(&mut self, clipbox: ClipBox) {
+        let x_min = clipbox.x_min;
+        let x_max = clipbox.x_max;
+        let y_min = clipbox.y_min;
+        let y_max = clipbox.y_max;
+
         let clip_path = format!(
             "M {} {} L {} {} L {} {} L {} {} Z",
             x_min, y_min, x_max, y_min, x_max, y_max, x_min, y_max

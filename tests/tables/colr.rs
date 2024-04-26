@@ -1,5 +1,5 @@
 use crate::{convert, Unit::*};
-use ttf_parser::colr::{self, Painter};
+use ttf_parser::colr::{self, ClipBox, Paint, Painter};
 use ttf_parser::{cpal, GlyphId, RgbaColor};
 
 #[test]
@@ -83,29 +83,24 @@ fn basic() {
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Command {
     Outline(u16),
-    Foreground,
     PaintColor(RgbaColor),
 }
 
 struct VecPainter(Vec<Command>);
 
 impl Painter<'_> for VecPainter {
-    fn outline(&mut self, glyph_id: GlyphId) {
+    fn outline_glyph(&mut self, glyph_id: GlyphId) {
         self.0.push(Command::Outline(glyph_id.0));
     }
 
-    fn paint_foreground(&mut self) {
-        self.0.push(Command::Foreground);
-    }
-
-    fn paint_color(&mut self, color: RgbaColor) {
-        self.0.push(Command::PaintColor(color));
+    fn paint_glyph(&mut self, paint: Paint) {
+        match paint {
+            Paint::Solid(color) => self.0.push(Command::PaintColor(color)),
+            _ => {}
+        }
     }
 
     // TODO: test v1
-    fn paint_linear_gradient(&mut self, _gradient: colr::LinearGradient) {}
-    fn paint_radial_gradient(&mut self, _gradient: colr::RadialGradient) {}
-    fn paint_sweep_gradient(&mut self, _gradient: colr::SweepGradient) {}
     fn push_group(&mut self, _mode: colr::CompositeMode) {}
     fn pop_group(&mut self) {}
     fn translate(&mut self, _tx: f32, _ty: f32) {}
@@ -114,4 +109,11 @@ impl Painter<'_> for VecPainter {
     fn skew(&mut self, _skew_x: f32, _skew_y: f32) {}
     fn transform(&mut self, _transform: ttf_parser::Transform) {}
     fn pop_transform(&mut self) {}
+    fn push_clip(&mut self, _glyph_id: GlyphId) {}
+    fn push_clip_box(&mut self, _clipbox: ClipBox) {}
+    fn pop_clip_box(&mut self) {}
+    fn pop_clip(&mut self) {}
+    fn push_isolate(&mut self) {}
+    fn pop_isolate(&mut self) {}
+    fn foreground_color(&self) -> RgbaColor {RgbaColor::new(128, 128, 128, 255)}
 }

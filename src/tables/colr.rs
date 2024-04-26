@@ -1,6 +1,9 @@
 //! A [Color Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/colr) implementation.
 
+// NOTE: Parts of the implementation have been inspired by
+// [skrifa](https://github.com/googlefonts/fontations/tree/main/skrifa).
+
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
 use crate::{cpal, Fixed, LazyArray32, Transform};
 use crate::{GlyphId, RgbaColor};
@@ -15,11 +18,19 @@ struct BaseGlyphRecord {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct ClipBox {
+pub struct ClipBox {
     pub x_min: i16,
     pub y_min: i16,
     pub x_max: i16,
     pub y_max: i16,
+}
+
+#[derive(Clone)]
+pub enum Paint<'a> {
+    Solid(RgbaColor),
+    LinearGradient(LinearGradient<'a>),
+    RadialGradient(RadialGradient<'a>),
+    SweepGradient(SweepGradient<'a>),
 }
 
 /// A [clip record](
@@ -444,16 +455,13 @@ impl FromData for CompositeMode {
 /// See [COLR](https://learn.microsoft.com/en-us/typography/opentype/spec/colr) for details.
 pub trait Painter<'a> {
     /// Outlines a glyph and stores it until the next paint command.
-    fn outline(&mut self, glyph_id: GlyphId);
+    fn outline_glyph(&mut self, glyph_id: GlyphId);
     /// Paints the current glyph outline using the provided color.
-    fn paint_color(&mut self, color: RgbaColor);
-    fn paint_linear_gradient(&mut self, gradient: LinearGradient<'a>);
-    fn paint_radial_gradient(&mut self, gradient: RadialGradient<'a>);
-    fn paint_sweep_gradient(&mut self, gradient: SweepGradient<'a>);
+    fn paint_glyph(&mut self, paint: Paint<'a>);
 
     fn push_clip(&mut self, glyph_id: GlyphId);
 
-    fn push_clip_box(&mut self, x_min: i16, y_min: i16, x_max: i16, y_max: i16);
+    fn push_clip_box(&mut self, clipbox: ClipBox);
 
     fn pop_clip_box(&mut self);
 
@@ -641,12 +649,12 @@ impl<'a> Table<'a> {
         for layer in layers {
             if layer.palette_index == 0xFFFF {
                 // A special case.
-                painter.outline(layer.glyph_id);
-                painter.paint_color(painter.foreground_color());
+                painter.outline_glyph(layer.glyph_id);
+                painter.paint_glyph(Paint::Solid(painter.foreground_color()));
             } else {
                 let color = self.palettes.get(palette, layer.palette_index)?;
-                painter.outline(layer.glyph_id);
-                painter.paint_color(color);
+                painter.outline_glyph(layer.glyph_id);
+                painter.paint_glyph(Paint::Solid(color));
             }
         }
 
@@ -662,12 +670,7 @@ impl<'a> Table<'a> {
     ) -> Option<()> {
         let clip_box = self.clip_list.find(base.glyph_id);
         if let Some(clip_box) = clip_box {
-            painter.push_clip_box(
-                clip_box.x_min,
-                clip_box.y_min,
-                clip_box.x_max,
-                clip_box.y_max,
-            );
+            painter.push_clip_box(clip_box);
         }
 
         self.parse_paint(
@@ -743,7 +746,7 @@ impl<'a> Table<'a> {
                 };
 
                 color.apply_alpha(alpha.to_f32());
-                painter.paint_color(color);
+                painter.paint_glyph(Paint::Solid(color));
             }
             4 => {
                 // PaintLinearGradient
@@ -752,7 +755,7 @@ impl<'a> Table<'a> {
                     offset + color_line_offset.to_usize(),
                     painter.foreground_color(),
                 )?;
-                painter.paint_linear_gradient(LinearGradient {
+                painter.paint_glyph(Paint::LinearGradient(LinearGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
                     x1: s.read::<i16>()?,
@@ -761,7 +764,7 @@ impl<'a> Table<'a> {
                     y2: s.read::<i16>()?,
                     extend: color_line.extend,
                     color_line,
-                })
+                }))
             }
             6 => {
                 // PaintRadialGradient
@@ -770,7 +773,7 @@ impl<'a> Table<'a> {
                     offset + color_line_offset.to_usize(),
                     painter.foreground_color(),
                 )?;
-                painter.paint_radial_gradient(RadialGradient {
+                painter.paint_glyph(Paint::RadialGradient(RadialGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
                     r0: s.read::<u16>()?,
@@ -779,7 +782,7 @@ impl<'a> Table<'a> {
                     r1: s.read::<u16>()?,
                     extend: color_line.extend,
                     color_line,
-                })
+                }))
             }
             8 => {
                 // PaintSweepGradient
@@ -788,20 +791,20 @@ impl<'a> Table<'a> {
                     offset + color_line_offset.to_usize(),
                     painter.foreground_color(),
                 )?;
-                painter.paint_sweep_gradient(SweepGradient {
+                painter.paint_glyph(Paint::SweepGradient(SweepGradient {
                     center_x: s.read::<i16>()?,
                     center_y: s.read::<i16>()?,
                     start_angle: s.read::<F2DOT14>()?.to_f32(),
                     end_angle: s.read::<F2DOT14>()?.to_f32(),
                     extend: color_line.extend,
                     color_line,
-                })
+                }))
             }
             10 => {
                 // PaintGlyph
                 let paint_offset = s.read::<Offset24>()?;
                 let glyph_id = s.read::<GlyphId>()?;
-                painter.outline(glyph_id);
+                painter.outline_glyph(glyph_id);
                 painter.push_clip(glyph_id);
 
                 self.parse_paint(

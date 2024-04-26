@@ -136,7 +136,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut column = 0;
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
-    for id in 0..face.number_of_glyphs() {
+    for id in 0..221 {
         println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
@@ -531,7 +531,7 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.transform = ttf::Transform::combine(self.transform, transform);
     }
 
-    fn paint_glyph(&mut self, paint: Paint<'a>) {
+    fn paint(&mut self, paint: Paint<'a>) {
         match paint {
             Paint::Solid(color) => self.paint_solid(color),
             Paint::LinearGradient(lg) => self.paint_linear_gradient(lg),
@@ -546,16 +546,8 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         }
     }
 
-    fn push_clip_glyph(&mut self, glyph_id: GlyphId) {
-        let mut path_buf = String::new();
-        let mut builder = Builder(&mut path_buf);
-        match self.face.outline_glyph(glyph_id, &mut builder) {
-            Some(v) => v,
-            None => return,
-        };
-        builder.finish();
-
-        self.clip_with_path(&path_buf);
+    fn push_clip(&mut self) {
+        self.clip_with_path(&self.path_buf.clone());
     }
 
     fn pop_clip(&mut self) {

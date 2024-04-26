@@ -93,7 +93,7 @@ impl Painter<'_> for VecPainter {
         self.0.push(Command::Outline(glyph_id.0));
     }
 
-    fn paint_glyph(&mut self, paint: Paint) {
+    fn paint(&mut self, paint: Paint) {
         match paint {
             Paint::Solid(color) => self.0.push(Command::PaintColor(color)),
             _ => {}
@@ -109,7 +109,7 @@ impl Painter<'_> for VecPainter {
     fn skew(&mut self, _skew_x: f32, _skew_y: f32) {}
     fn transform(&mut self, _transform: ttf_parser::Transform) {}
     fn pop_transform(&mut self) {}
-    fn push_clip_glyph(&mut self, _glyph_id: GlyphId) {}
+    fn push_clip(&mut self) {}
     fn push_clip_box(&mut self, _clipbox: ClipBox) {}
     fn pop_clip(&mut self) {}
     fn push_isolate(&mut self) {}

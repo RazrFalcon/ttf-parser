@@ -432,12 +432,12 @@ impl<'a> GlyphPainter<'a> {
 
 fn paint_transform(outline_transform: Transform, transform: Transform) -> Transform {
     let outline_transform = tiny_skia_path::Transform::from_row(
-        outline_transform.a, outline_transform.c, outline_transform.b, outline_transform.d,
+        outline_transform.a, outline_transform.b, outline_transform.c, outline_transform.d,
         outline_transform.e, outline_transform.f
     );
 
     let gradient_transform = tiny_skia_path::Transform::from_row(
-        transform.a, transform.c, transform.b, transform.d,
+        transform.a, transform.b, transform.c, transform.d,
         transform.e, transform.f
     );
 
@@ -447,8 +447,8 @@ fn paint_transform(outline_transform: Transform, transform: Transform) -> Transf
 
     ttf_parser::Transform {
         a: gradient_transform.sx,
-        b: gradient_transform.kx,
-        c: gradient_transform.ky,
+        b: gradient_transform.ky,
+        c: gradient_transform.kx,
         d: gradient_transform.sy,
         e: gradient_transform.tx,
         f: gradient_transform.ty,

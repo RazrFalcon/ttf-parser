@@ -662,13 +662,22 @@ impl FromData for TableRecord {
 }
 
 #[cfg(feature = "variable-fonts")]
-const MAX_VAR_COORDS: usize = 32;
+const MAX_VAR_COORDS: usize = 64;
 
 #[cfg(feature = "variable-fonts")]
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct VarCoords {
     data: [NormalizedCoordinate; MAX_VAR_COORDS],
     len: u8,
+}
+
+impl Default for VarCoords {
+    fn default() -> Self {
+        Self {
+            data: [NormalizedCoordinate::default(); MAX_VAR_COORDS],
+            len: u8::default()
+        }
+    }
 }
 
 #[cfg(feature = "variable-fonts")]

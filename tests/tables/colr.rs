@@ -112,7 +112,5 @@ impl Painter<'_> for VecPainter {
     fn push_clip(&mut self) {}
     fn push_clip_box(&mut self, _clipbox: ClipBox) {}
     fn pop_clip(&mut self) {}
-    fn push_isolate(&mut self) {}
-    fn pop_isolate(&mut self) {}
     fn foreground_color(&self) -> RgbaColor {RgbaColor::new(128, 128, 128, 255)}
 }

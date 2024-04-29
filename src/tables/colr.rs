@@ -5,8 +5,10 @@
 // [skrifa](https://github.com/googlefonts/fontations/tree/main/skrifa).
 
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
-use crate::{cpal, Fixed, LazyArray32, Transform};
+use crate::{cpal, Fixed, LazyArray32, Transform, VarCoords};
 use crate::{GlyphId, RgbaColor};
+use crate::hvar::DeltaSetIndexMap;
+use crate::var_store::ItemVariationStore;
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -188,8 +190,8 @@ impl FromData for GradientExtend {
     }
 }
 
-/// A [gradient extend](
-/// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
+/// A [color stop](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#color-references-colorstop-and-colorline).
 #[derive(Clone, Copy, Debug)]
 struct ColorStopRaw {
     stop_offset: F2DOT14,
@@ -210,6 +212,30 @@ impl FromData for ColorStopRaw {
     }
 }
 
+/// A [var color stop](
+/// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#color-references-colorstop-and-colorline).
+#[derive(Clone, Copy, Debug)]
+struct VarColorStopRaw {
+    stop_offset: F2DOT14,
+    palette_index: u16,
+    alpha: F2DOT14,
+    var_index_base: u32
+}
+
+impl FromData for VarColorStopRaw {
+    const SIZE: usize = 10;
+
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(Self {
+            stop_offset: s.read::<F2DOT14>()?,
+            palette_index: s.read::<u16>()?,
+            alpha: s.read::<F2DOT14>()?,
+            var_index_base: s.read::<u32>()?
+        })
+    }
+}
+
 #[derive(Clone)]
 struct ColorLine<'a> {
     extend: GradientExtend,
@@ -218,7 +244,48 @@ struct ColorLine<'a> {
     foreground_color: RgbaColor,
 }
 
-impl ColorLine<'_> {
+impl VarColorLine<'_> {
+    // TODO: Color stops should be sorted, but hard to do without allocations
+    fn get(&self, palette: u16, index: u16, variation_store: &ItemVariationStore,
+           delta_map: &DeltaSetIndexMap,
+           var_coords: &VarCoords) -> Option<ColorStop> {
+        let info = self.colors.get(index)?;
+
+        let mut color = if info.palette_index == u16::MAX {
+            self.foreground_color
+        } else {
+            self.palettes.get(palette, info.palette_index)?
+        };
+
+        color.apply_alpha(info.alpha.to_f32());
+
+        let stop_delta = delta_map.map(info.var_index_base)
+            .and_then(|d| variation_store.parse_delta(d.0, d.1, var_coords.as_slice()))
+            .unwrap_or(0.0);
+        let alpha_delta = delta_map.map(info.var_index_base + 1)
+            .and_then(|d| variation_store.parse_delta(d.0, d.1, var_coords.as_slice()))
+            .unwrap_or(0.0);
+
+        println!("{:?}", stop_delta);
+        println!("{:?}", alpha_delta);
+
+        Some(ColorStop {
+            stop_offset: info.stop_offset.to_f32(),
+            color,
+        })
+    }
+}
+
+#[derive(Clone)]
+struct VarColorLine<'a> {
+    extend: GradientExtend,
+    colors: LazyArray16<'a, VarColorStopRaw>,
+    palettes: cpal::Table<'a>,
+    foreground_color: RgbaColor,
+}
+
+impl crate::colr::ColorLine<'_> {
+    // TODO: Color stops should be sorted, but hard to do without allocations
     fn get(&self, palette: u16, index: u16) -> Option<ColorStop> {
         let info = self.colors.get(index)?;
 
@@ -483,7 +550,7 @@ pub trait Painter<'a> {
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/colr).
 ///
 /// Currently, only version 0 is supported.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Table<'a> {
     pub(crate) palettes: cpal::Table<'a>,
     data: &'a [u8],
@@ -498,6 +565,10 @@ pub struct Table<'a> {
     layer_paint_offsets: LazyArray32<'a, Offset32>,
     clip_list_offsets_offset: Offset32,
     clip_list: ClipList<'a>,
+    #[cfg(feature = "variable-fonts")]
+    var_index_map: Option<DeltaSetIndexMap<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    item_variation_store: Option<ItemVariationStore<'a>>
 }
 
 impl<'a> Table<'a> {
@@ -533,6 +604,8 @@ impl<'a> Table<'a> {
             layer_paint_offsets: LazyArray32::default(),
             clip_list_offsets_offset: Offset32(0),
             clip_list: ClipList::default(),
+            item_variation_store: None,
+            var_index_map: None
         };
 
         if version == 0 {
@@ -542,6 +615,8 @@ impl<'a> Table<'a> {
         table.base_glyph_paints_offset = s.read::<Offset32>()?;
         let layer_list_offset = s.read::<Option<Offset32>>()?;
         let clip_list_offset = s.read::<Option<Offset32>>()?;
+        let var_index_map_offset = s.read::<Option<Offset32>>()?;
+        let item_variation_offset = s.read::<Option<Offset32>>()?;
 
         {
             let mut s = Stream::new_at(data, table.base_glyph_paints_offset.to_usize())?;
@@ -567,6 +642,19 @@ impl<'a> Table<'a> {
                 data: clip_data,
                 records: s.read_array32::<ClipRecord>(count)?,
             };
+        }
+
+        if let Some(offset) = item_variation_offset {
+            let item_var_data = data.get(offset.to_usize()..)?;
+            let s = Stream::new(item_var_data);
+            let var_store = ItemVariationStore::parse(s)?;
+            table.item_variation_store = Some(var_store);
+        }
+
+        if let Some(offset) = var_index_map_offset {
+            let var_index_map_data= data.get(offset.to_usize()..)?;
+            let var_index_map = DeltaSetIndexMap::new(var_index_map_data);
+            table.var_index_map = Some(var_index_map);
         }
 
         Some(table)
@@ -743,6 +831,9 @@ impl<'a> Table<'a> {
                 color.apply_alpha(alpha.to_f32());
                 painter.paint(Paint::Solid(color));
             }
+            3 => {
+                // TODO:
+            }
             4 => {
                 // PaintLinearGradient
                 let color_line_offset = s.read::<Offset24>()?;
@@ -760,6 +851,10 @@ impl<'a> Table<'a> {
                     extend: color_line.extend,
                     color_line,
                 }))
+            }
+            5 => {
+                // PaintVarLinearGradient
+                let var_color_line_offset = s.read::<Offset24>()?;
             }
             6 => {
                 // PaintRadialGradient
@@ -1033,6 +1128,23 @@ impl<'a> Table<'a> {
         let count = s.read::<u16>()?;
         let colors = s.read_array16::<ColorStopRaw>(count)?;
         Some(ColorLine {
+            extend,
+            colors,
+            foreground_color,
+            palettes: self.palettes,
+        })
+    }
+
+    fn parse_var_color_line(
+        &self,
+        offset: usize,
+        foreground_color: RgbaColor,
+    ) -> Option<VarColorLine<'a>> {
+        let mut s = Stream::new_at(self.data, offset)?;
+        let extend = s.read::<GradientExtend>()?;
+        let count = s.read::<u16>()?;
+        let colors = s.read_array16::<VarColorStopRaw>(count)?;
+        Some(VarColorLine {
             extend,
             colors,
             foreground_color,

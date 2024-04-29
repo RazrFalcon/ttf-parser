@@ -7,37 +7,41 @@ use crate::parser::{Offset, Offset32, Stream};
 use crate::var_store::ItemVariationStore;
 use crate::{GlyphId, NormalizedCoordinate};
 
-struct DeltaSetIndexMap<'a> {
+#[derive(Clone, Copy)]
+pub(crate) struct DeltaSetIndexMap<'a> {
     data: &'a [u8],
 }
 
 impl<'a> DeltaSetIndexMap<'a> {
     #[inline]
-    fn new(data: &'a [u8]) -> Self {
+    pub(crate) fn new(data: &'a [u8]) -> Self {
         DeltaSetIndexMap { data }
     }
 
     #[inline]
-    fn map(&self, glyph_id: GlyphId) -> Option<(u16, u16)> {
-        let mut idx = glyph_id.0;
-
+    pub(crate) fn map(&self, mut index: u32) -> Option<(u16, u16)> {
         let mut s = Stream::new(self.data);
-        let entry_format = s.read::<u16>()?;
-        let map_count = s.read::<u16>()?;
+        let format = s.read::<u8>()?;
+        let entry_format = s.read::<u8>()?;
+        let map_count = if format == 0 {
+            s.read::<u16>()? as u32
+        }   else {
+            s.read::<u32>()?
+        };
 
         if map_count == 0 {
             return None;
         }
 
         // 'If a given glyph ID is greater than mapCount-1, then the last entry is used.'
-        if idx >= map_count {
-            idx = map_count - 1;
+        if index >= map_count {
+            index = map_count - 1;
         }
 
         let entry_size = ((entry_format >> 4) & 3) + 1;
         let inner_index_bit_count = u32::from((entry_format & 0xF) + 1);
 
-        s.advance(usize::from(entry_size) * usize::from(idx));
+        s.advance(usize::try_from(entry_size).ok()? * usize::try_from(index).ok()?);
 
         let mut n = 0u32;
         for b in s.read_bytes(usize::from(entry_size))? {
@@ -93,7 +97,7 @@ impl<'a> Table<'a> {
         coordinates: &[NormalizedCoordinate],
     ) -> Option<f32> {
         let (outer_idx, inner_idx) = if let Some(offset) = self.advance_width_mapping_offset {
-            DeltaSetIndexMap::new(self.data.get(offset.to_usize()..)?).map(glyph_id)?
+            DeltaSetIndexMap::new(self.data.get(offset.to_usize()..)?).map(glyph_id.0 as u32)?
         } else {
             // 'If there is no delta-set index mapping table for advance widths,
             // then glyph IDs implicitly provide the indices:
@@ -114,7 +118,7 @@ impl<'a> Table<'a> {
         coordinates: &[NormalizedCoordinate],
     ) -> Option<f32> {
         let set_data = self.data.get(self.lsb_mapping_offset?.to_usize()..)?;
-        let (outer_idx, inner_idx) = DeltaSetIndexMap::new(set_data).map(glyph_id)?;
+        let (outer_idx, inner_idx) = DeltaSetIndexMap::new(set_data).map(glyph_id.0 as u32)?;
         self.variation_store
             .parse_delta(outer_idx, inner_idx, coordinates)
     }

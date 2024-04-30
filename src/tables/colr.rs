@@ -5,7 +5,7 @@
 // [skrifa](https://github.com/googlefonts/fontations/tree/main/skrifa).
 
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
-use crate::{cpal, Fixed, LazyArray32, Transform, VarCoords};
+use crate::{cpal, Fixed, LazyArray32, NormalizedCoordinate, Transform, VarCoords};
 use crate::{GlyphId, RgbaColor};
 use crate::hvar::DeltaSetIndexMap;
 use crate::var_store::ItemVariationStore;
@@ -237,54 +237,14 @@ impl FromData for VarColorStopRaw {
 }
 
 #[derive(Clone)]
-struct ColorLine<'a> {
+struct NonVarColorLine<'a> {
     extend: GradientExtend,
     colors: LazyArray16<'a, ColorStopRaw>,
     palettes: cpal::Table<'a>,
     foreground_color: RgbaColor,
 }
 
-impl VarColorLine<'_> {
-    // TODO: Color stops should be sorted, but hard to do without allocations
-    fn get(&self, palette: u16, index: u16, variation_store: &ItemVariationStore,
-           delta_map: &DeltaSetIndexMap,
-           var_coords: &VarCoords) -> Option<ColorStop> {
-        let info = self.colors.get(index)?;
-
-        let mut color = if info.palette_index == u16::MAX {
-            self.foreground_color
-        } else {
-            self.palettes.get(palette, info.palette_index)?
-        };
-
-        color.apply_alpha(info.alpha.to_f32());
-
-        let stop_delta = delta_map.map(info.var_index_base)
-            .and_then(|d| variation_store.parse_delta(d.0, d.1, var_coords.as_slice()))
-            .unwrap_or(0.0);
-        let alpha_delta = delta_map.map(info.var_index_base + 1)
-            .and_then(|d| variation_store.parse_delta(d.0, d.1, var_coords.as_slice()))
-            .unwrap_or(0.0);
-
-        println!("{:?}", stop_delta);
-        println!("{:?}", alpha_delta);
-
-        Some(ColorStop {
-            stop_offset: info.stop_offset.to_f32(),
-            color,
-        })
-    }
-}
-
-#[derive(Clone)]
-struct VarColorLine<'a> {
-    extend: GradientExtend,
-    colors: LazyArray16<'a, VarColorStopRaw>,
-    palettes: cpal::Table<'a>,
-    foreground_color: RgbaColor,
-}
-
-impl crate::colr::ColorLine<'_> {
+impl NonVarColorLine<'_> {
     // TODO: Color stops should be sorted, but hard to do without allocations
     fn get(&self, palette: u16, index: u16) -> Option<ColorStop> {
         let info = self.colors.get(index)?;
@@ -301,6 +261,53 @@ impl crate::colr::ColorLine<'_> {
             color,
         })
     }
+}
+
+impl VarColorLine<'_> {
+    // TODO: Color stops should be sorted, but hard to do without allocations
+    fn get(&self, palette: u16, index: u16, variation_data: VariationData, coordinates: &[NormalizedCoordinate]) -> Option<ColorStop> {
+        let info = self.colors.get(index)?;
+
+        let mut color = if info.palette_index == u16::MAX {
+            self.foreground_color
+        } else {
+            self.palettes.get(palette, info.palette_index)?
+        };
+
+        color.apply_alpha(info.alpha.to_f32());
+
+        let stop_delta = variation_data.delta_map.map(info.var_index_base)
+            .and_then(|d| variation_data.variation_store.parse_delta(d.0, d.1, coordinates))
+            .unwrap_or(0.0);
+        let alpha_delta = variation_data.delta_map.map(info.var_index_base + 1)
+            .and_then(|d| variation_data.variation_store.parse_delta(d.0, d.1, coordinates))
+            .unwrap_or(0.0);
+
+        let stop_offset = info.stop_offset.to_f32() + stop_delta;
+        color.add_alpha(alpha_delta);
+
+        println!("{:?}", stop_delta);
+        println!("{:?}", alpha_delta);
+
+        Some(ColorStop {
+            stop_offset,
+            color,
+        })
+    }
+}
+
+#[derive(Clone)]
+struct VarColorLine<'a> {
+    extend: GradientExtend,
+    colors: LazyArray16<'a, VarColorStopRaw>,
+    palettes: cpal::Table<'a>,
+    foreground_color: RgbaColor,
+}
+
+#[derive(Clone)]
+enum ColorLine<'a> {
+    VarColorLine(VarColorLine<'a>),
+    NonVarColorLine(NonVarColorLine<'a>)
 }
 
 /// A [gradient extend](
@@ -321,6 +328,7 @@ pub struct LinearGradient<'a> {
     pub y2: i16,
     pub extend: GradientExtend,
     color_line: ColorLine<'a>,
+    variation_data: VariationData<'a>
 }
 
 impl<'a> core::fmt::Debug for LinearGradient<'a> {
@@ -334,17 +342,19 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
             .field("y2", &self.y2)
             .field("extend", &self.extend)
             // TODO: Avoid hardcoding foregrounf color here?
-            .field("stops", &self.stops(0))
+            // .field("stops", &self.stops(0))
             .finish()
     }
 }
 
 impl<'a> LinearGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(&'b self, palette: u16, coords: &'a [NormalizedCoordinate]) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
+            variation_data: self.variation_data,
+            coords
         }
     }
 }
@@ -372,17 +382,21 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
             .field("y1", &self.y1)
             .field("extend", &self.extend)
             // TODO: Avoid hardcoding foregrounf color here?
-            .field("stops", &self.stops(0))
+            // .field("stops", &self.stops(0))
             .finish()
     }
 }
 
 impl<'a> RadialGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(&'b self, palette: u16,
+                     variation_data: VariationData<'a>,
+                     coords: &'a [NormalizedCoordinate]) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
+            variation_data,
+            coords
         }
     }
 }
@@ -406,17 +420,20 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
             .field("end_angle", &self.end_angle)
             .field("extend", &self.extend)
             // TODO: Avoid hardcoding foregrounf color here?
-            .field("stops", &self.stops(0))
+            // .field("stops", &self.stops(0))
             .finish()
     }
 }
 
 impl<'a> SweepGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(&'b self, palette: u16,
+                     variation_data: VariationData<'a>, coords: &'a [NormalizedCoordinate]) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
+            variation_data,
+            coords
         }
     }
 }
@@ -426,19 +443,30 @@ pub struct GradientStopsIter<'a, 'b> {
     color_line: &'b ColorLine<'a>,
     palette: u16,
     index: u16,
+    variation_data: VariationData<'a>,
+    coords: &'a[NormalizedCoordinate]
 }
 
 impl Iterator for GradientStopsIter<'_, '_> {
     type Item = ColorStop;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index == self.color_line.colors.len() {
+        let len = match self.color_line {
+            ColorLine::VarColorLine(vcl) => vcl.colors.len(),
+            ColorLine::NonVarColorLine(nvcl) => nvcl.colors.len()
+        };
+
+        if self.index == len {
             return None;
         }
 
         let index = self.index;
         self.index = self.index.checked_add(1)?;
-        self.color_line.get(self.palette, index)
+
+        match self.color_line {
+            ColorLine::VarColorLine(vcl) => vcl.get(self.palette, index, self.variation_data, self.coords),
+            ColorLine::NonVarColorLine(nvcl) => nvcl.get(self.palette, index)
+        }
     }
 }
 
@@ -568,7 +596,7 @@ pub struct Table<'a> {
     #[cfg(feature = "variable-fonts")]
     var_index_map: Option<DeltaSetIndexMap<'a>>,
     #[cfg(feature = "variable-fonts")]
-    item_variation_store: Option<ItemVariationStore<'a>>
+    item_variation_store: Option<ItemVariationStore<'a>>,
 }
 
 impl<'a> Table<'a> {
@@ -679,6 +707,14 @@ impl<'a> Table<'a> {
             .binary_search_by(|base| base.glyph_id.cmp(&glyph_id))
             .map(|v| v.1)
     }
+
+    fn variation_data(&self) -> VariationData {
+        VariationData {
+            variation_store: self.item_variation_store.unwrap(),
+            delta_map: self.var_index_map.unwrap(),
+        }
+    }
+
 
     /// Whether the table contains a definition for the given glyph.
     pub fn contains(&self, glyph_id: GlyphId) -> bool {
@@ -841,6 +877,7 @@ impl<'a> Table<'a> {
                     offset + color_line_offset.to_usize(),
                     painter.foreground_color(),
                 )?;
+                let variation_data = self.variation_data();
                 painter.paint(Paint::LinearGradient(LinearGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
@@ -849,12 +886,29 @@ impl<'a> Table<'a> {
                     x2: s.read::<i16>()?,
                     y2: s.read::<i16>()?,
                     extend: color_line.extend,
-                    color_line,
+                    color_line: ColorLine::NonVarColorLine(color_line),
+                    variation_data
                 }))
             }
             5 => {
                 // PaintVarLinearGradient
                 let var_color_line_offset = s.read::<Offset24>()?;
+                let color_line = self.parse_var_color_line(
+                    offset + var_color_line_offset.to_usize(),
+                    painter.foreground_color()
+                )?;
+                let variation_data = self.variation_data();
+                painter.paint(Paint::LinearGradient(LinearGradient {
+                    x0: s.read::<i16>()?,
+                    y0: s.read::<i16>()?,
+                    x1: s.read::<i16>()?,
+                    y1: s.read::<i16>()?,
+                    x2: s.read::<i16>()?,
+                    y2: s.read::<i16>()?,
+                    extend: color_line.extend,
+                    color_line: ColorLine::VarColorLine(color_line),
+                    variation_data
+                }))
             }
             6 => {
                 // PaintRadialGradient
@@ -871,7 +925,7 @@ impl<'a> Table<'a> {
                     y1: s.read::<i16>()?,
                     r1: s.read::<u16>()?,
                     extend: color_line.extend,
-                    color_line,
+                    color_line: ColorLine::NonVarColorLine(color_line),
                 }))
             }
             8 => {
@@ -887,7 +941,7 @@ impl<'a> Table<'a> {
                     start_angle: s.read::<F2DOT14>()?.to_f32(),
                     end_angle: s.read::<F2DOT14>()?.to_f32(),
                     extend: color_line.extend,
-                    color_line,
+                    color_line: ColorLine::NonVarColorLine(color_line),
                 }))
             }
             10 => {
@@ -1122,12 +1176,12 @@ impl<'a> Table<'a> {
         &self,
         offset: usize,
         foreground_color: RgbaColor,
-    ) -> Option<ColorLine<'a>> {
+    ) -> Option<NonVarColorLine<'a>> {
         let mut s = Stream::new_at(self.data, offset)?;
         let extend = s.read::<GradientExtend>()?;
         let count = s.read::<u16>()?;
         let colors = s.read_array16::<ColorStopRaw>(count)?;
-        Some(ColorLine {
+        Some(NonVarColorLine {
             extend,
             colors,
             foreground_color,
@@ -1190,4 +1244,10 @@ impl RecursionStack {
         debug_assert!(!self.is_empty());
         self.len -= 1;
     }
+}
+
+#[derive(Clone, Copy)]
+struct VariationData<'a> {
+    variation_store: ItemVariationStore<'a>,
+    delta_map: DeltaSetIndexMap<'a>,
 }

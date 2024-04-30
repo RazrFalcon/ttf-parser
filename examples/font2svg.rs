@@ -139,7 +139,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
     for id in 2..face.number_of_glyphs() {
-        println!("GLYPH {:?}", id);
+        // println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
         let y = row as f64 * cell_size;

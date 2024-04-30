@@ -328,7 +328,6 @@ pub struct LinearGradient<'a> {
     pub y2: i16,
     pub extend: GradientExtend,
     color_line: ColorLine<'a>,
-    variation_data: VariationData<'a>
 }
 
 impl<'a> core::fmt::Debug for LinearGradient<'a> {
@@ -348,12 +347,13 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
 }
 
 impl<'a> LinearGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16, coords: &'a [NormalizedCoordinate]) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(&'b self, palette: u16, coords: &'b [NormalizedCoordinate],
+                     variation_data: VariationData<'a>) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
-            variation_data: self.variation_data,
+            variation_data,
             coords
         }
     }
@@ -444,7 +444,7 @@ pub struct GradientStopsIter<'a, 'b> {
     palette: u16,
     index: u16,
     variation_data: VariationData<'a>,
-    coords: &'a[NormalizedCoordinate]
+    coords: &'b [NormalizedCoordinate]
 }
 
 impl Iterator for GradientStopsIter<'_, '_> {
@@ -708,7 +708,7 @@ impl<'a> Table<'a> {
             .map(|v| v.1)
     }
 
-    fn variation_data(&self) -> VariationData {
+    pub fn variation_data(&self) -> VariationData {
         VariationData {
             variation_store: self.item_variation_store.unwrap(),
             delta_map: self.var_index_map.unwrap(),
@@ -877,7 +877,7 @@ impl<'a> Table<'a> {
                     offset + color_line_offset.to_usize(),
                     painter.foreground_color(),
                 )?;
-                let variation_data = self.variation_data();
+
                 painter.paint(Paint::LinearGradient(LinearGradient {
                     x0: s.read::<i16>()?,
                     y0: s.read::<i16>()?,
@@ -887,7 +887,6 @@ impl<'a> Table<'a> {
                     y2: s.read::<i16>()?,
                     extend: color_line.extend,
                     color_line: ColorLine::NonVarColorLine(color_line),
-                    variation_data
                 }))
             }
             5 => {
@@ -907,7 +906,6 @@ impl<'a> Table<'a> {
                     y2: s.read::<i16>()?,
                     extend: color_line.extend,
                     color_line: ColorLine::VarColorLine(color_line),
-                    variation_data
                 }))
             }
             6 => {
@@ -1247,7 +1245,7 @@ impl RecursionStack {
 }
 
 #[derive(Clone, Copy)]
-struct VariationData<'a> {
+pub struct VariationData<'a> {
     variation_store: ItemVariationStore<'a>,
     delta_map: DeltaSetIndexMap<'a>,
 }

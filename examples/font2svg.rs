@@ -385,7 +385,7 @@ impl<'a> GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", gradient_transform);
-        self.write_gradient_stops(gradient.stops(self.palette_index));
+        self.write_gradient_stops(gradient.stops(self.palette_index, self.face.variation_coordinates(), self.face.tables().colr.unwrap().variation_data()));
         self.svg.end_element();
 
         self.svg.start_element("path");
@@ -413,7 +413,7 @@ impl<'a> GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", self.transform);
-        self.write_gradient_stops(gradient.stops(self.palette_index));
+        self.write_gradient_stops(gradient.stops(self.palette_index, self.face.tables().colr.unwrap().variation_data(), self.face.variation_coordinates()));
         self.svg.end_element();
 
         self.svg.start_element("path");

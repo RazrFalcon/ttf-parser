@@ -4,6 +4,7 @@
 
 use crate::parser::{FromData, LazyArray16, NumFrom, Stream};
 use crate::NormalizedCoordinate;
+use std::convert::TryFrom;
 
 #[derive(Clone, Copy)]
 pub(crate) struct ItemVariationStore<'a> {
@@ -80,7 +81,7 @@ impl<'a> ItemVariationStore<'a> {
         let offset = self.data_offsets.get(outer_index)?;
         let mut s = Stream::new_at(self.data, usize::num_from(offset))?;
         let item_count = s.read::<u16>()?;
-        let short_delta_count = s.read::<u16>()?;
+        let word_delta_count = s.read::<u16>()?;
         let region_index_count = s.read::<u16>()?;
         let region_indices = s.read_array16::<u16>(region_index_count)?;
 
@@ -88,20 +89,35 @@ impl<'a> ItemVariationStore<'a> {
             return None;
         }
 
-        let delta_set_len = usize::from(short_delta_count) + usize::from(region_index_count);
+        let has_long_words = (word_delta_count & 0x8000) != 0;
+        let word_delta_count = word_delta_count & 0x7FFF;
+
+        let delta_set_len = usize::from(word_delta_count) + usize::from(region_index_count);
         s.advance(usize::from(inner_index).checked_mul(delta_set_len)?);
 
         let mut delta = 0.0;
         let mut i = 0;
-        while i < short_delta_count {
+        while i < word_delta_count {
             let idx = region_indices.get(i)?;
-            delta += f32::from(s.read::<i16>()?) * self.regions.evaluate_region(idx, coordinates);
+            let num = if has_long_words {
+                // TODO: better cast
+                s.read::<i32>()? as f32
+            } else {
+                f32::from(s.read::<i16>()?)
+            };
+            delta += num * self.regions.evaluate_region(idx, coordinates);
             i += 1;
         }
 
         while i < region_index_count {
             let idx = region_indices.get(i)?;
-            delta += f32::from(s.read::<i8>()?) * self.regions.evaluate_region(idx, coordinates);
+            let num = if has_long_words {
+                // TODO: f32 might not be enough?
+                f32::from(s.read::<i16>()?)
+            } else {
+                f32::from(s.read::<i8>()?)
+            };
+            delta += num * self.regions.evaluate_region(idx, coordinates);
             i += 1;
         }
 

@@ -679,7 +679,7 @@ impl Default for VarCoords {
     fn default() -> Self {
         Self {
             data: [NormalizedCoordinate::default(); MAX_VAR_COORDS],
-            len: u8::default()
+            len: u8::default(),
         }
     }
 }

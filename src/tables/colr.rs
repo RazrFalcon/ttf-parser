@@ -4,11 +4,11 @@
 // NOTE: Parts of the implementation have been inspired by
 // [skrifa](https://github.com/googlefonts/fontations/tree/main/skrifa).
 
+use crate::hvar::DeltaSetIndexMap;
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
+use crate::var_store::ItemVariationStore;
 use crate::{cpal, Fixed, LazyArray32, NormalizedCoordinate, Transform, VarCoords};
 use crate::{GlyphId, RgbaColor};
-use crate::hvar::DeltaSetIndexMap;
-use crate::var_store::ItemVariationStore;
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -219,7 +219,7 @@ struct VarColorStopRaw {
     stop_offset: F2DOT14,
     palette_index: u16,
     alpha: F2DOT14,
-    var_index_base: u32
+    var_index_base: u32,
 }
 
 impl FromData for VarColorStopRaw {
@@ -231,7 +231,7 @@ impl FromData for VarColorStopRaw {
             stop_offset: s.read::<F2DOT14>()?,
             palette_index: s.read::<u16>()?,
             alpha: s.read::<F2DOT14>()?,
-            var_index_base: s.read::<u32>()?
+            var_index_base: s.read::<u32>()?,
         })
     }
 }
@@ -265,7 +265,13 @@ impl NonVarColorLine<'_> {
 
 impl VarColorLine<'_> {
     // TODO: Color stops should be sorted, but hard to do without allocations
-    fn get(&self, palette: u16, index: u16, variation_data: VariationData, coordinates: &[NormalizedCoordinate]) -> Option<ColorStop> {
+    fn get(
+        &self,
+        palette: u16,
+        index: u16,
+        variation_data: VariationData,
+        coordinates: &[NormalizedCoordinate],
+    ) -> Option<ColorStop> {
         let info = self.colors.get(index)?;
 
         let mut color = if info.palette_index == u16::MAX {
@@ -274,25 +280,11 @@ impl VarColorLine<'_> {
             self.palettes.get(palette, info.palette_index)?
         };
 
-        color.apply_alpha(info.alpha.to_f32());
+        let deltas = variation_data.read_deltas::<2>(info.var_index_base, coordinates);
+        let stop_offset = info.stop_offset.apply_float_delta(deltas[0]);
+        color.apply_alpha(info.alpha.apply_float_delta(deltas[1]));
 
-        let stop_delta = variation_data.delta_map.map(info.var_index_base)
-            .and_then(|d| variation_data.variation_store.parse_delta(d.0, d.1, coordinates))
-            .unwrap_or(0.0);
-        let alpha_delta = variation_data.delta_map.map(info.var_index_base + 1)
-            .and_then(|d| variation_data.variation_store.parse_delta(d.0, d.1, coordinates))
-            .unwrap_or(0.0);
-
-        let stop_offset = info.stop_offset.to_f32() + stop_delta;
-        color.add_alpha(alpha_delta);
-
-        println!("{:?}", stop_delta);
-        println!("{:?}", alpha_delta);
-
-        Some(ColorStop {
-            stop_offset,
-            color,
-        })
+        Some(ColorStop { stop_offset, color })
     }
 }
 
@@ -307,7 +299,7 @@ struct VarColorLine<'a> {
 #[derive(Clone)]
 enum ColorLine<'a> {
     VarColorLine(VarColorLine<'a>),
-    NonVarColorLine(NonVarColorLine<'a>)
+    NonVarColorLine(NonVarColorLine<'a>),
 }
 
 /// A [gradient extend](
@@ -347,14 +339,18 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
 }
 
 impl<'a> LinearGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16, coords: &'b [NormalizedCoordinate],
-                     variation_data: VariationData<'a>) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(
+        &'b self,
+        palette: u16,
+        coords: &'b [NormalizedCoordinate],
+        variation_data: VariationData<'a>,
+    ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
             variation_data,
-            coords
+            coords,
         }
     }
 }
@@ -388,15 +384,18 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
 }
 
 impl<'a> RadialGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16,
-                     variation_data: VariationData<'a>,
-                     coords: &'a [NormalizedCoordinate]) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(
+        &'b self,
+        palette: u16,
+        variation_data: VariationData<'a>,
+        coords: &'a [NormalizedCoordinate],
+    ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
             variation_data,
-            coords
+            coords,
         }
     }
 }
@@ -426,14 +425,18 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
 }
 
 impl<'a> SweepGradient<'a> {
-    pub fn stops<'b>(&'b self, palette: u16,
-                     variation_data: VariationData<'a>, coords: &'a [NormalizedCoordinate]) -> GradientStopsIter<'a, 'b> {
+    pub fn stops<'b>(
+        &'b self,
+        palette: u16,
+        variation_data: VariationData<'a>,
+        coords: &'a [NormalizedCoordinate],
+    ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
             variation_data,
-            coords
+            coords,
         }
     }
 }
@@ -444,7 +447,7 @@ pub struct GradientStopsIter<'a, 'b> {
     palette: u16,
     index: u16,
     variation_data: VariationData<'a>,
-    coords: &'b [NormalizedCoordinate]
+    coords: &'b [NormalizedCoordinate],
 }
 
 impl Iterator for GradientStopsIter<'_, '_> {
@@ -453,7 +456,7 @@ impl Iterator for GradientStopsIter<'_, '_> {
     fn next(&mut self) -> Option<Self::Item> {
         let len = match self.color_line {
             ColorLine::VarColorLine(vcl) => vcl.colors.len(),
-            ColorLine::NonVarColorLine(nvcl) => nvcl.colors.len()
+            ColorLine::NonVarColorLine(nvcl) => nvcl.colors.len(),
         };
 
         if self.index == len {
@@ -464,8 +467,10 @@ impl Iterator for GradientStopsIter<'_, '_> {
         self.index = self.index.checked_add(1)?;
 
         match self.color_line {
-            ColorLine::VarColorLine(vcl) => vcl.get(self.palette, index, self.variation_data, self.coords),
-            ColorLine::NonVarColorLine(nvcl) => nvcl.get(self.palette, index)
+            ColorLine::VarColorLine(vcl) => {
+                vcl.get(self.palette, index, self.variation_data, self.coords)
+            }
+            ColorLine::NonVarColorLine(nvcl) => nvcl.get(self.palette, index),
         }
     }
 }
@@ -633,7 +638,7 @@ impl<'a> Table<'a> {
             clip_list_offsets_offset: Offset32(0),
             clip_list: ClipList::default(),
             item_variation_store: None,
-            var_index_map: None
+            var_index_map: None,
         };
 
         if version == 0 {
@@ -680,7 +685,7 @@ impl<'a> Table<'a> {
         }
 
         if let Some(offset) = var_index_map_offset {
-            let var_index_map_data= data.get(offset.to_usize()..)?;
+            let var_index_map_data = data.get(offset.to_usize()..)?;
             let var_index_map = DeltaSetIndexMap::new(var_index_map_data);
             table.var_index_map = Some(var_index_map);
         }
@@ -714,7 +719,6 @@ impl<'a> Table<'a> {
             delta_map: self.var_index_map.unwrap(),
         }
     }
-
 
     /// Whether the table contains a definition for the given glyph.
     pub fn contains(&self, glyph_id: GlyphId) -> bool {
@@ -894,7 +898,7 @@ impl<'a> Table<'a> {
                 let var_color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_var_color_line(
                     offset + var_color_line_offset.to_usize(),
-                    painter.foreground_color()
+                    painter.foreground_color(),
                 )?;
                 let variation_data = self.variation_data();
                 painter.paint(Paint::LinearGradient(LinearGradient {
@@ -1248,4 +1252,24 @@ impl RecursionStack {
 pub struct VariationData<'a> {
     variation_store: ItemVariationStore<'a>,
     delta_map: DeltaSetIndexMap<'a>,
+}
+
+impl VariationData<'_> {
+    fn read_deltas<const N: usize>(
+        &self,
+        var_index_base: u32,
+        coordinates: &[NormalizedCoordinate],
+    ) -> [f32; N] {
+        let mut deltas = [0.0; N];
+
+        for i in 0..N {
+            deltas[i] = self
+                .delta_map
+                .map(var_index_base + i as u32)
+                .and_then(|d| self.variation_store.parse_delta(d.0, d.1, coordinates))
+                .unwrap_or(0.0);
+        }
+
+        deltas
+    }
 }

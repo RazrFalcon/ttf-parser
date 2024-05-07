@@ -127,6 +127,11 @@ impl F2DOT14 {
     pub fn to_f32(self) -> f32 {
         f32::from(self.0) / 16384.0
     }
+
+    #[inline]
+    pub fn apply_float_delta(&self, delta: f32) -> f32 {
+        self.to_f32() + delta * (1.0 / 16384.0)
+    }
 }
 
 impl FromData for F2DOT14 {

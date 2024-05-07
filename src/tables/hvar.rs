@@ -25,7 +25,7 @@ impl<'a> DeltaSetIndexMap<'a> {
         let entry_format = s.read::<u8>()?;
         let map_count = if format == 0 {
             s.read::<u16>()? as u32
-        }   else {
+        } else {
             s.read::<u32>()?
         };
 

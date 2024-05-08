@@ -715,8 +715,8 @@ impl<'a> Table<'a> {
 
     pub fn variation_data(&self) -> VariationData {
         VariationData {
-            variation_store: self.item_variation_store.unwrap(),
-            delta_map: self.var_index_map.unwrap(),
+            variation_store: self.item_variation_store,
+            delta_map: self.var_index_map,
         }
     }
 
@@ -1149,8 +1149,6 @@ impl<'a> Table<'a> {
                 let tx = f32::from(s.read::<i16>()?) + deltas[0];
                 let ty = f32::from(s.read::<i16>()?) + deltas[1];
 
-
-
                 painter.translate(tx, ty);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
@@ -1176,7 +1174,7 @@ impl<'a> Table<'a> {
                     coords,
                 );
                 painter.pop_transform();
-            },
+            }
             17 => {
                 // PaintVarScale
                 let paint_offset = s.read::<Offset24>()?;
@@ -1188,7 +1186,6 @@ impl<'a> Table<'a> {
                 let deltas = self
                     .variation_data()
                     .read_deltas::<2>(var_index_base, coords);
-
 
                 let sx = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
                 let sy = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
@@ -1224,7 +1221,7 @@ impl<'a> Table<'a> {
                 painter.pop_transform();
                 painter.pop_transform();
                 painter.pop_transform();
-            },
+            }
             19 => {
                 // PaintVarScaleAroundCenter
                 let paint_offset = s.read::<Offset24>()?;
@@ -1270,7 +1267,7 @@ impl<'a> Table<'a> {
                     coords,
                 );
                 painter.pop_transform();
-            },
+            }
             21 => {
                 // PaintVarScaleUniform
                 let paint_offset = s.read::<Offset24>()?;
@@ -1316,6 +1313,36 @@ impl<'a> Table<'a> {
                 painter.pop_transform();
                 painter.pop_transform();
             }
+            23 => {
+                // PaintVarScaleUniformAroundCenter
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(6);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<3>(var_index_base, coords);
+
+                let scale = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
+                let center_x = f32::from(s.read::<i16>()?) + deltas[1];
+                let center_y = f32::from(s.read::<i16>()?) + deltas[2];
+
+                painter.translate(center_x, center_y);
+                painter.scale(scale, scale);
+                painter.translate(-center_x, -center_y);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+                painter.pop_transform();
+                painter.pop_transform();
+            }
             24 => {
                 // PaintRotate
                 let paint_offset = s.read::<Offset24>()?;
@@ -1331,12 +1358,66 @@ impl<'a> Table<'a> {
                 );
                 painter.pop_transform();
             }
+            25 => {
+                // PaintVarRotate
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(2);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<1>(var_index_base, coords);
+
+                let angle = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
+
+                painter.rotate(angle);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+            }
             26 => {
-                // PaintRotate
+                // PaintRotateAroundCenter
                 let paint_offset = s.read::<Offset24>()?;
                 let angle = s.read::<F2DOT14>()?.to_f32();
                 let center_x = f32::from(s.read::<i16>()?);
                 let center_y = f32::from(s.read::<i16>()?);
+
+                painter.translate(center_x, center_y);
+                painter.rotate(angle);
+                painter.translate(-center_x, -center_y);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+                painter.pop_transform();
+                painter.pop_transform();
+            }
+            27 => {
+                // PaintVarRotateAroundCenter
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(6);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<3>(var_index_base, coords);
+
+                let angle = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
+                let center_x = f32::from(s.read::<i16>()?) + deltas[1];
+                let center_y = f32::from(s.read::<i16>()?) + deltas[2];
 
                 painter.translate(center_x, center_y);
                 painter.rotate(angle);
@@ -1368,6 +1449,31 @@ impl<'a> Table<'a> {
                 );
                 painter.pop_transform();
             }
+            29 => {
+                // PaintVarSkew
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(4);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<2>(var_index_base, coords);
+
+                let skew_x = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
+                let skew_y = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
+
+                painter.skew(skew_x, skew_y);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+            }
             30 => {
                 // PaintSkewAroundCenter
                 let paint_offset = s.read::<Offset24>()?;
@@ -1375,6 +1481,37 @@ impl<'a> Table<'a> {
                 let skew_y = s.read::<F2DOT14>()?.to_f32();
                 let center_x = f32::from(s.read::<i16>()?);
                 let center_y = f32::from(s.read::<i16>()?);
+
+                painter.translate(center_x, center_y);
+                painter.skew(skew_x, skew_y);
+                painter.translate(-center_x, -center_y);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+                painter.pop_transform();
+                painter.pop_transform();
+            }
+            31 => {
+                // PaintVarSkewAroundCenter
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(8);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<4>(var_index_base, coords);
+
+                let skew_x = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
+                let skew_y = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
+                let center_x = f32::from(s.read::<i16>()?) + deltas[2];
+                let center_y = f32::from(s.read::<i16>()?) + deltas[3];
 
                 painter.translate(center_x, center_y);
                 painter.skew(skew_x, skew_y);
@@ -1497,23 +1634,34 @@ impl RecursionStack {
 
 #[derive(Clone, Copy)]
 pub struct VariationData<'a> {
-    variation_store: ItemVariationStore<'a>,
-    delta_map: DeltaSetIndexMap<'a>,
+    variation_store: Option<ItemVariationStore<'a>>,
+    delta_map: Option<DeltaSetIndexMap<'a>>,
 }
 
 impl VariationData<'_> {
+    // Adapted from fontations
     fn read_deltas<const N: usize>(
         &self,
         var_index_base: u32,
         coordinates: &[NormalizedCoordinate],
     ) -> [f32; N] {
+        const NO_VARIATION_DELTAS: u32 = 0xFFFFFFFF;
         let mut deltas = [0.0; N];
+
+        if coordinates.is_empty()
+            || self.variation_store.is_none()
+            || var_index_base == NO_VARIATION_DELTAS
+        {
+            return deltas;
+        }
+
+        let variation_store = self.variation_store.as_ref().unwrap();
 
         for i in 0..N {
             deltas[i] = self
                 .delta_map
-                .map(var_index_base + i as u32)
-                .and_then(|d| self.variation_store.parse_delta(d.0, d.1, coordinates))
+                .and_then(|d| d.map(var_index_base + i as u32))
+                .and_then(|d| variation_store.parse_delta(d.0, d.1, coordinates))
                 .unwrap_or(0.0);
         }
 

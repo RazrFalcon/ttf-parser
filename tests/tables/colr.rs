@@ -1,6 +1,6 @@
 use crate::{convert, Unit::*};
 use ttf_parser::colr::{self, ClipBox, CompositeMode, GradientExtend, Paint, Painter};
-use ttf_parser::{cpal, GlyphId, RgbaColor};
+use ttf_parser::{cpal, Face, GlyphId, RgbaColor};
 
 #[test]
 fn basic() {
@@ -84,8 +84,6 @@ fn basic() {
         Command::Paint(b.clone()),
     ]);
 }
-
-
 
 #[derive(Clone, Debug, PartialEq)]
 struct CustomStop(f32, RgbaColor);
@@ -186,4 +184,176 @@ impl<'a> Painter<'a> for VecPainter {
         self.0.push(Command::PopClip)
     }
 
+}
+
+// A static COLRv1 test font from Google Fonts:
+// https://github.com/googlefonts/color-fonts
+static COLR1_STATIC: &[u8] = include_bytes!("../fonts/colr_1_variable.ttf");
+
+mod colr1_static {
+    use ttf_parser::{Face, GlyphId, RgbaColor};
+    use ttf_parser::colr::ClipBox;
+    use ttf_parser::colr::CompositeMode::*;
+    use ttf_parser::colr::GradientExtend::*;
+    use crate::colr::{COLR1_STATIC, CustomStop, VecPainter};
+    use crate::colr::Command::*;
+    use crate::colr::CustomPaint::*;
+
+    #[test]
+    fn linear_gradient() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(9), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushClipBox(ClipBox { x_min: 100.0, y_min: 250.0, x_max: 900.0, y_max: 950.0 }),
+            OutlineGlyph(GlyphId(9)),
+            PushClip,
+            Paint(LinearGradient(100.0, 250.0, 900.0, 250.0, 100.0, 300.0, Repeat, vec![
+                CustomStop(0.2000122, RgbaColor { red: 255, green: 0, blue: 0, alpha: 255 }),
+                CustomStop(0.7999878, RgbaColor { red: 0, green: 0, blue: 255, alpha: 255 })])),
+            PopClip,
+            PopClip]
+        )
+    }
+
+    #[test]
+    fn sweep_gradient() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(13), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushClipBox(ClipBox { x_min: 0.0, y_min: 0.0, x_max: 1000.0, y_max: 1000.0 }),
+            OutlineGlyph(GlyphId(176)),
+            PushClip,
+            Paint(SweepGradient(500.0, 600.0, -0.666687, 0.666687, Pad, vec![
+                CustomStop(0.25, RgbaColor { red: 250, green: 240, blue: 230, alpha: 255 }),
+                CustomStop(0.416687, RgbaColor { red: 0, green: 0, blue: 255, alpha: 255 }),
+                CustomStop(0.583313, RgbaColor { red: 255, green: 0, blue: 0, alpha: 255 }),
+                CustomStop(0.75, RgbaColor { red: 47, green: 79, blue: 79, alpha: 255 })])),
+            PopClip,
+            PopClip]
+        )
+    }
+
+    #[test]
+    fn scale_around_center() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(84), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushLayer(SourceOver),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
+            PopClip,
+            PushLayer(DestinationOver),
+            Translate(500.0, 500.0),
+            Scale(0.5, 1.5),
+            Translate(-500.0, -500.0),
+            OutlineGlyph(
+                GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
+            PopClip,
+            PopTransform,
+            PopTransform,
+            PopTransform,
+            PopLayer,
+            PopLayer]
+        )
+    }
+
+    #[test]
+    fn scale_uniform_around_center() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(85), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushLayer(SourceOver),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
+            PopClip,
+            PushLayer(DestinationOver),
+            Translate(500.0, 500.0),
+            Scale(1.5, 1.5),
+            Translate(-500.0, -500.0),
+            OutlineGlyph(
+                GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
+            PopClip,
+            PopTransform,
+            PopTransform,
+            PopTransform,
+            PopLayer,
+            PopLayer]
+        )
+    }
+
+    #[test]
+    fn scale() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(86), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushLayer(SourceOver),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
+            PopClip,
+            PushLayer(DestinationOver),
+            Scale(0.5, 1.5),
+            OutlineGlyph(
+                GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
+            PopClip,
+            PopTransform,
+            PopLayer,
+            PopLayer]
+        )
+    }
+
+    #[test]
+    fn scale_uniform() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(87), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushLayer(SourceOver),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
+            PopClip,
+            PushLayer(DestinationOver),
+            Scale(1.5, 1.5),
+            OutlineGlyph(
+                GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
+            PopClip,
+            PopTransform,
+            PopLayer,
+            PopLayer]
+        )
+    }
+
+    #[test]
+    fn radial_gradient() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(93), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushClipBox(ClipBox { x_min: 0.0, y_min: 0.0, x_max: 1000.0, y_max: 1000.0 }),
+            OutlineGlyph(GlyphId(2)),
+            PushClip,
+            Paint(RadialGradient(166.0, 768.0, 0.0, 256.0, 166.0, 768.0, Pad, vec![
+                CustomStop(0.0, RgbaColor { red: 0, green: 128, blue: 0, alpha: 255 }),
+                CustomStop(0.5, RgbaColor { red: 255, green: 255, blue: 255, alpha: 255 }),
+                CustomStop(1.0, RgbaColor { red: 255, green: 0, blue: 0, alpha: 255 })])),
+            PopClip,
+            PopClip]
+        )
+    }
 }

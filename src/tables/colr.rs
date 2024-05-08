@@ -730,7 +730,7 @@ impl<'a> Table<'a> {
             .map(|v| v.1)
     }
 
-    pub fn variation_data(&self) -> VariationData<'a> {
+    fn variation_data(&self) -> VariationData<'a> {
         VariationData {
             variation_store: self.item_variation_store,
             delta_map: self.var_index_map,
@@ -1050,7 +1050,7 @@ impl<'a> Table<'a> {
                     end_angle: s.read::<F2DOT14>()?.to_f32(),
                     extend: color_line.extend,
                     color_line: ColorLine::NonVarColorLine(color_line),
-                    variation_data: self.variation_data()
+                    variation_data: self.variation_data(),
                 }))
             }
             9 => {
@@ -1076,7 +1076,7 @@ impl<'a> Table<'a> {
                     end_angle: s.read::<F2DOT14>()?.apply_float_delta(deltas[3]),
                     extend: color_line.extend,
                     color_line: ColorLine::VarColorLine(color_line),
-                    variation_data: self.variation_data()
+                    variation_data: self.variation_data(),
                 }))
             }
             10 => {

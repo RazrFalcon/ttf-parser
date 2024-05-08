@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::path::PathBuf;
+use base64::engine::general_purpose::STANDARD;
 
 use ttf_parser as ttf;
 use ttf_parser::colr::{ClipBox, Paint};
@@ -174,7 +175,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             svg.write_attribute_raw("xlink:href", |buf| {
                 buf.extend_from_slice(b"data:image/png;base64, ");
 
-                let mut enc = base64::write::EncoderWriter::new(buf, base64::STANDARD);
+                let mut enc = base64::write::EncoderWriter::new(buf, &STANDARD);
                 enc.write_all(img.data).unwrap();
                 enc.finish().unwrap();
             });
@@ -188,7 +189,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             svg.write_attribute_raw("xlink:href", |buf| {
                 buf.extend_from_slice(b"data:image/svg+xml;base64, ");
 
-                let mut enc = base64::write::EncoderWriter::new(buf, base64::STANDARD);
+                let mut enc = base64::write::EncoderWriter::new(buf, &STANDARD);
                 enc.write_all(img.data).unwrap();
                 enc.finish().unwrap();
             });

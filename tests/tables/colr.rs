@@ -380,16 +380,9 @@ mod colr1_static {
     fn translate() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(109), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(114), 0, &mut vec_painter);
 
-        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform {
-            a: 1.0,
-            b: 0.0,
-            c: 0.0,
-            d: 1.0,
-            e: 125.0,
-            f: 125.0
-        })));
+        assert!(vec_painter.0.contains(&Translate(0.0, 100.0)));
     }
 
     #[test]
@@ -478,75 +471,40 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(99), 0, &mut vec_painter);
-        eprintln!("{:?}", vec_painter.0);
         assert!(vec_painter.0.contains(&Rotate(0.87341005)))
     }
 
     #[test]
     fn rotate_around_center() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
+        face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(101), 0, &mut vec_painter);
-        assert_eq!(vec_painter.0, vec![
-            PushLayer(SourceOver),
-            OutlineGlyph(GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
-            PopClip,
-            PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
-            Rotate(0.13891602),
-            Translate(-500.0, -500.0),
-            OutlineGlyph(GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
-            PopClip,
-            PopTransform,
-            PopTransform,
-            PopTransform,
-            PopLayer,
-            PopLayer,
-        ]
-        )
+        assert!(vec_painter.0.contains(&Rotate(0.9336252)))
     }
 
     #[test]
     fn skew() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
+        face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(103), 0, &mut vec_painter);
-        assert!(vec_painter.0.contains(&Skew(0.13891602, 0.0)));
+        assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
     }
 
     #[test]
     fn skew_around_center() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
+        face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(104), 0, &mut vec_painter);
-        assert_eq!(vec_painter.0, vec![
-            PushLayer(SourceOver),
-            OutlineGlyph(GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
-            PopClip,
-            PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
-            Skew(0.13891602, 0.0),
-            Translate(-500.0, -500.0),
-            OutlineGlyph(GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
-            PopClip,
-            PopTransform,
-            PopTransform,
-            PopTransform,
-            PopLayer,
-            PopLayer])
+        assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
     }
 
     #[test]
     fn transform() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
+        face.set_variation(Tag::from_bytes(b"TRDX"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(109), 0, &mut vec_painter);
 
@@ -555,7 +513,7 @@ mod colr1_variable {
             b: 0.0,
             c: 0.0,
             d: 1.0,
-            e: 125.0,
+            e: 274.9939,
             f: 125.0
         }
         )));
@@ -563,27 +521,11 @@ mod colr1_variable {
 
     #[test]
     fn translate() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
+        face.set_variation(Tag::from_bytes(b"TLDX"), 100.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(109), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(114), 0, &mut vec_painter);
 
-        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform {
-            a: 1.0,
-            b: 0.0,
-            c: 0.0,
-            d: 1.0,
-            e: 125.0,
-            f: 125.0
-        })));
+        assert!(vec_painter.0.contains(&Translate(99.975586, 100.0)));
     }
-
-    #[test]
-    fn composite() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
-        let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(131), 0, &mut vec_painter);
-
-        assert!(vec_painter.0.contains(&Command::PushLayer(Xor)));
-    }
-
 }

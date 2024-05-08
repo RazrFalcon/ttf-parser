@@ -93,7 +93,7 @@ impl<'a> ItemVariationStore<'a> {
 
         let delta_set_len = if has_long_words {
             4 * word_delta_count + 2 * region_index_count.checked_sub(word_delta_count)?
-        }   else {
+        } else {
             2 * region_index_count
         };
         s.advance(usize::from(inner_index).checked_mul(usize::from(delta_set_len))?);

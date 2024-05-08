@@ -1007,7 +1007,7 @@ pub struct Face<'a> {
     tables: FaceTables<'a>, // Parsed tables.
     #[cfg(feature = "variable-fonts")]
     coordinates: VarCoords,
-    foreground_color: RgbaColor
+    foreground_color: RgbaColor,
 }
 
 impl<'a> Face<'a> {
@@ -1050,7 +1050,7 @@ impl<'a> Face<'a> {
             #[cfg(feature = "variable-fonts")]
             coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
-            foreground_color: RgbaColor::new(0, 0, 0, 255)
+            foreground_color: RgbaColor::new(0, 0, 0, 255),
         };
 
         #[cfg(feature = "variable-fonts")]
@@ -1150,7 +1150,7 @@ impl<'a> Face<'a> {
             #[cfg(feature = "variable-fonts")]
             coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
-            foreground_color: RgbaColor::new(0, 0, 0, 255)
+            foreground_color: RgbaColor::new(0, 0, 0, 255),
         };
 
         #[cfg(feature = "variable-fonts")]
@@ -2190,9 +2190,13 @@ impl<'a> Face<'a> {
         palette: u16,
         painter: &mut dyn colr::Painter<'a>,
     ) -> Option<()> {
-        self.tables
-            .colr?
-            .paint(glyph_id, palette, painter, self.coords(), self.foreground_color())
+        self.tables.colr?.paint(
+            glyph_id,
+            palette,
+            painter,
+            self.coords(),
+            self.foreground_color(),
+        )
     }
 
     /// Returns an iterator over variation axes.

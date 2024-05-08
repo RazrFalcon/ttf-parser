@@ -1,5 +1,5 @@
 use crate::{convert, Unit::*};
-use ttf_parser::colr::{self, ClipBox, Paint, Painter};
+use ttf_parser::colr::{self, ClipBox, CompositeMode, GradientExtend, Paint, Painter, VariationData};
 use ttf_parser::{cpal, GlyphId, RgbaColor};
 
 #[test]
@@ -56,60 +56,132 @@ fn basic() {
     assert!(!colr.contains(GlyphId(6)));
     assert!(colr.contains(GlyphId(7)));
 
+    let a = CustomPaint::Solid(a);
+    let b = CustomPaint::Solid(b);
+    let c = CustomPaint::Solid(c);
+
     assert_eq!(paint(1), None);
 
-    assert_eq!(paint(2).unwrap(), vec![
-        Command::Outline(12),
-        Command::PaintColor(c),
-        Command::Outline(13),
-        Command::PaintColor(a),
-    ]);
+    assert_eq!(
+        paint(2).unwrap(), vec![
+        Command::OutlineGlyph(GlyphId(12)),
+        Command::Paint(c.clone()),
+        Command::OutlineGlyph(GlyphId(13)),
+        Command::Paint(a.clone())]
+    );
 
     assert_eq!(paint(3).unwrap(), vec![
-        Command::Outline(10),
-        Command::PaintColor(c),
-        Command::Outline(11),
-        Command::PaintColor(b),
-        Command::Outline(12),
-        Command::PaintColor(c),
+        Command::OutlineGlyph(GlyphId(10)),
+        Command::Paint(c.clone()),
+        Command::OutlineGlyph(GlyphId(11)),
+        Command::Paint(b.clone()),
+        Command::OutlineGlyph(GlyphId(12)),
+        Command::Paint(c.clone()),
     ]);
 
     assert_eq!(paint(7).unwrap(), vec![
-        Command::Outline(11),
-        Command::PaintColor(b),
+        Command::OutlineGlyph(GlyphId(11)),
+        Command::Paint(b.clone()),
     ]);
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Debug, PartialEq)]
+struct CustomStop(f32, RgbaColor);
+
+#[derive(Clone, Debug, PartialEq)]
+enum CustomPaint {
+    Solid(RgbaColor),
+    LinearGradient(f32, f32, f32, f32, f32, f32, GradientExtend, Vec<CustomStop>),
+    RadialGradient(f32, f32, f32, f32, f32, f32, GradientExtend, Vec<CustomStop>),
+    SweepGradient(f32, f32, f32, f32, GradientExtend, Vec<CustomStop>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 enum Command {
-    Outline(u16),
-    PaintColor(RgbaColor),
+    OutlineGlyph(GlyphId),
+    Paint(CustomPaint),
+    PushLayer(CompositeMode),
+    PopLayer,
+    Translate(f32, f32),
+    Scale(f32, f32),
+    Rotate(f32),
+    Skew(f32, f32),
+    Transform(ttf_parser::Transform),
+    PopTransform,
+    PushClip,
+    PushClipBox(ClipBox),
+    PopClip
 }
 
 struct VecPainter(Vec<Command>);
 
-impl Painter<'_> for VecPainter {
+impl<'a> Painter<'a> for VecPainter {
     fn outline_glyph(&mut self, glyph_id: GlyphId) {
-        self.0.push(Command::Outline(glyph_id.0));
+        self.0.push(Command::OutlineGlyph(glyph_id));
     }
 
-    fn paint(&mut self, paint: Paint) {
-        match paint {
-            Paint::Solid(color) => self.0.push(Command::PaintColor(color)),
-            _ => {}
-        }
+    fn paint(&mut self, paint: Paint<'a>) {
+        let custom_paint = match paint {
+            Paint::Solid(color) => CustomPaint::Solid(color),
+            Paint::LinearGradient(lg) => CustomPaint::LinearGradient(lg.x0, lg.y0,
+                                                                     lg.x1, lg.y1,
+                                                                     lg.x2, lg.y2,
+                                                                     lg.extend, lg.stops(0, &[], VariationData::default()).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+            Paint::RadialGradient(rg) => CustomPaint::RadialGradient(rg.x0, rg.y0,
+                                                                     rg.r0, rg.r1,
+                                                                     rg.x1, rg.y1,
+                                                                     // TODO: Make less ugly
+                                                                     rg.extend, rg.stops(0, VariationData::default(), &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+            Paint::SweepGradient(sg) => CustomPaint::SweepGradient(sg.center_x, sg.center_y,
+                                                                     sg.start_angle, sg.end_angle,
+                                                                     sg.extend, sg.stops(0, VariationData::default(), &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+        };
+
+        self.0.push(Command::Paint(custom_paint));
     }
 
-    // TODO: test v1
-    fn push_layer(&mut self, _mode: colr::CompositeMode) {}
-    fn pop_layer(&mut self) {}
-    fn translate(&mut self, _tx: f32, _ty: f32) {}
-    fn scale(&mut self, _sx: f32, _sy: f32) {}
-    fn rotate(&mut self, _angle: f32) {}
-    fn skew(&mut self, _skew_x: f32, _skew_y: f32) {}
-    fn transform(&mut self, _transform: ttf_parser::Transform) {}
-    fn pop_transform(&mut self) {}
-    fn push_clip(&mut self) {}
-    fn push_clip_box(&mut self, _clipbox: ClipBox) {}
-    fn pop_clip(&mut self) {}
+    fn push_layer(&mut self, mode: colr::CompositeMode) {
+        self.0.push(Command::PushLayer(mode));
+    }
+
+    fn pop_layer(&mut self) {
+        self.0.push(Command::PopLayer)
+    }
+
+    fn translate(&mut self, tx: f32, ty: f32) {
+        self.0.push(Command::Translate(tx, ty))
+    }
+
+    fn scale(&mut self, sx: f32, sy: f32) {
+       self.0.push(Command::Scale(sx, sy))
+    }
+
+    fn rotate(&mut self, angle: f32) {
+       self.0.push(Command::Rotate(angle))
+    }
+
+    fn skew(&mut self, skew_x: f32, skew_y: f32) {
+       self.0.push(Command::Skew(skew_x, skew_y))
+    }
+
+    fn transform(&mut self, transform: ttf_parser::Transform) {
+       self.0.push(Command::Transform(transform))
+    }
+
+    fn pop_transform(&mut self) {
+       self.0.push(Command::PopTransform)
+    }
+
+    fn push_clip(&mut self) {
+       self.0.push(Command::PushClip)
+    }
+
+    fn push_clip_box(&mut self, clipbox: ClipBox) {
+       self.0.push(Command::PushClipBox(clipbox))
+    }
+
+    fn pop_clip(&mut self) {
+        self.0.push(Command::PopClip)
+    }
+
 }

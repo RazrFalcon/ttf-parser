@@ -19,7 +19,7 @@ struct BaseGlyphRecord {
     num_layers: u16,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ClipBox {
     pub x_min: f32,
     pub y_min: f32,
@@ -86,7 +86,12 @@ impl Default for ClipList<'_> {
 
 impl<'a> ClipList<'a> {
     #[inline]
-    pub fn get(&self, index: u32, variation_data: &VariationData, coords: &[NormalizedCoordinate]) -> Option<ClipBox> {
+    pub fn get(
+        &self,
+        index: u32,
+        variation_data: &VariationData,
+        coords: &[NormalizedCoordinate],
+    ) -> Option<ClipBox> {
         let record = self.records.get(index)?;
         let offset = record.clip_box_offset.to_usize();
         self.data.get(offset..).and_then(|data| {
@@ -98,9 +103,8 @@ impl<'a> ClipList<'a> {
                 var_s.advance(8);
                 let var_index_base = var_s.read::<u32>()?;
 
-                variation_data
-                    .read_deltas::<4>(var_index_base, coords)
-            }   else {
+                variation_data.read_deltas::<4>(var_index_base, coords)
+            } else {
                 [0.0, 0.0, 0.0, 0.0]
             };
 
@@ -115,7 +119,12 @@ impl<'a> ClipList<'a> {
 
     /// Returns a ClipBox by glyph ID.
     #[inline]
-    pub fn find(&self, glyph_id: GlyphId, variation_data: &VariationData, coords: &[NormalizedCoordinate]) -> Option<ClipBox> {
+    pub fn find(
+        &self,
+        glyph_id: GlyphId,
+        variation_data: &VariationData,
+        coords: &[NormalizedCoordinate],
+    ) -> Option<ClipBox> {
         let index = self
             .records
             .into_iter()
@@ -179,7 +188,7 @@ impl FromData for BaseGlyphPaintRecord {
 
 /// A [gradient extend](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GradientExtend {
     Pad,
     Repeat,
@@ -742,14 +751,21 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
         coords: &[NormalizedCoordinate],
-        foreground_color: RgbaColor
+        foreground_color: RgbaColor,
     ) -> Option<()> {
         let mut recursion_stack = RecursionStack {
             stack: [0; 64],
             len: 0,
         };
 
-        self.paint_impl(glyph_id, palette, painter, &mut recursion_stack, coords, foreground_color)
+        self.paint_impl(
+            glyph_id,
+            palette,
+            painter,
+            &mut recursion_stack,
+            coords,
+            foreground_color,
+        )
     }
 
     fn paint_impl(
@@ -759,10 +775,17 @@ impl<'a> Table<'a> {
         painter: &mut dyn Painter<'a>,
         recusion_stack: &mut RecursionStack,
         coords: &[NormalizedCoordinate],
-        foreground_color: RgbaColor
+        foreground_color: RgbaColor,
     ) -> Option<()> {
         if let Some(base) = self.get_v1(glyph_id) {
-            self.paint_v1(base, palette, painter, recusion_stack, coords, foreground_color)
+            self.paint_v1(
+                base,
+                palette,
+                painter,
+                recusion_stack,
+                coords,
+                foreground_color,
+            )
         } else if let Some(base) = self.get_v0(glyph_id) {
             self.paint_v0(base, palette, painter, foreground_color)
         } else {
@@ -775,7 +798,7 @@ impl<'a> Table<'a> {
         base: BaseGlyphRecord,
         palette: u16,
         painter: &mut dyn Painter,
-        foreground_color: RgbaColor
+        foreground_color: RgbaColor,
     ) -> Option<()> {
         let start = base.first_layer_index;
         let end = start.checked_add(base.num_layers)?;
@@ -803,9 +826,11 @@ impl<'a> Table<'a> {
         painter: &mut dyn Painter<'a>,
         recursion_stack: &mut RecursionStack,
         coords: &[NormalizedCoordinate],
-        foreground_color: RgbaColor
+        foreground_color: RgbaColor,
     ) -> Option<()> {
-        let clip_box = self.clip_list.find(base.glyph_id, &self.variation_data(), coords);
+        let clip_box = self
+            .clip_list
+            .find(base.glyph_id, &self.variation_data(), coords);
         if let Some(clip_box) = clip_box {
             painter.push_clip_box(clip_box);
         }
@@ -816,7 +841,7 @@ impl<'a> Table<'a> {
             painter,
             recursion_stack,
             coords,
-            foreground_color
+            foreground_color,
         );
 
         if clip_box.is_some() {
@@ -833,7 +858,7 @@ impl<'a> Table<'a> {
         painter: &mut dyn Painter<'a>,
         recursion_stack: &mut RecursionStack,
         coords: &[NormalizedCoordinate],
-        foreground_color: RgbaColor
+        foreground_color: RgbaColor,
     ) -> Option<()> {
         let mut s = Stream::new_at(self.data, offset)?;
         let format = s.read::<u8>()?;
@@ -852,7 +877,7 @@ impl<'a> Table<'a> {
             &mut s,
             format,
             coords,
-            foreground_color
+            foreground_color,
         );
         recursion_stack.pop();
 
@@ -868,7 +893,7 @@ impl<'a> Table<'a> {
         s: &mut Stream,
         format: u8,
         coords: &[NormalizedCoordinate],
-        foreground_color: RgbaColor
+        foreground_color: RgbaColor,
     ) -> Option<()> {
         match format {
             1 => {
@@ -885,7 +910,7 @@ impl<'a> Table<'a> {
                         painter,
                         recursion_stack,
                         coords,
-                        foreground_color
+                        foreground_color,
                     );
                 }
             }
@@ -925,10 +950,8 @@ impl<'a> Table<'a> {
             4 => {
                 // PaintLinearGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(
-                    offset + color_line_offset.to_usize(),
-                    foreground_color
-                )?;
+                let color_line =
+                    self.parse_color_line(offset + color_line_offset.to_usize(), foreground_color)?;
 
                 painter.paint(Paint::LinearGradient(LinearGradient {
                     x0: s.read::<i16>()? as f32,
@@ -946,7 +969,7 @@ impl<'a> Table<'a> {
                 let var_color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_var_color_line(
                     offset + var_color_line_offset.to_usize(),
-                    foreground_color
+                    foreground_color,
                 )?;
                 let mut var_s = s.clone();
                 var_s.advance(12);
@@ -970,10 +993,8 @@ impl<'a> Table<'a> {
             6 => {
                 // PaintRadialGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(
-                    offset + color_line_offset.to_usize(),
-                    foreground_color
-                )?;
+                let color_line =
+                    self.parse_color_line(offset + color_line_offset.to_usize(), foreground_color)?;
                 painter.paint(Paint::RadialGradient(RadialGradient {
                     x0: s.read::<i16>()? as f32,
                     y0: s.read::<i16>()? as f32,
@@ -990,7 +1011,7 @@ impl<'a> Table<'a> {
                 let color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_var_color_line(
                     offset + color_line_offset.to_usize(),
-                    foreground_color
+                    foreground_color,
                 )?;
 
                 let mut var_s = s.clone();
@@ -1015,10 +1036,8 @@ impl<'a> Table<'a> {
             8 => {
                 // PaintSweepGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(
-                    offset + color_line_offset.to_usize(),
-                    foreground_color
-                )?;
+                let color_line =
+                    self.parse_color_line(offset + color_line_offset.to_usize(), foreground_color)?;
                 painter.paint(Paint::SweepGradient(SweepGradient {
                     center_x: s.read::<i16>()? as f32,
                     center_y: s.read::<i16>()? as f32,
@@ -1033,7 +1052,7 @@ impl<'a> Table<'a> {
                 let color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_var_color_line(
                     offset + color_line_offset.to_usize(),
-                    foreground_color
+                    foreground_color,
                 )?;
 
                 let mut var_s = s.clone();
@@ -1066,7 +1085,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
 
                 painter.pop_clip();
@@ -1074,7 +1093,14 @@ impl<'a> Table<'a> {
             11 => {
                 // PaintColrGlyph
                 let glyph_id = s.read::<GlyphId>()?;
-                self.paint_impl(glyph_id, palette, painter, recursion_stack, coords, foreground_color);
+                self.paint_impl(
+                    glyph_id,
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                    foreground_color,
+                );
             }
             12 => {
                 // PaintTransform
@@ -1097,7 +1123,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1133,7 +1159,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1150,7 +1176,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1176,7 +1202,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1193,7 +1219,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1219,7 +1245,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1240,7 +1266,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1272,7 +1298,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1290,7 +1316,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1315,7 +1341,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1335,7 +1361,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1366,7 +1392,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1384,7 +1410,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1409,7 +1435,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1429,7 +1455,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1460,7 +1486,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1479,7 +1505,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1505,7 +1531,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
             }
@@ -1526,7 +1552,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1558,7 +1584,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1577,7 +1603,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.push_layer(composite_mode);
                 self.parse_paint(
@@ -1586,7 +1612,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
-                    foreground_color
+                    foreground_color,
                 );
                 painter.pop_layer();
                 painter.pop_layer();
@@ -1671,7 +1697,7 @@ impl RecursionStack {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct VariationData<'a> {
     variation_store: Option<ItemVariationStore<'a>>,
     delta_map: Option<DeltaSetIndexMap<'a>>,

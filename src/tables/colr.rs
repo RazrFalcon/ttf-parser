@@ -21,10 +21,10 @@ struct BaseGlyphRecord {
 
 #[derive(Clone, Copy, Debug)]
 pub struct ClipBox {
-    pub x_min: i16,
-    pub y_min: i16,
-    pub x_max: i16,
-    pub y_max: i16,
+    pub x_min: f32,
+    pub y_min: f32,
+    pub x_max: f32,
+    pub y_max: f32,
 }
 
 #[derive(Clone)]
@@ -69,7 +69,7 @@ impl ClipRecord {
 
 /// A [clip list](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct ClipList<'a> {
     data: &'a [u8],
     records: LazyArray32<'a, ClipRecord>,
@@ -86,32 +86,41 @@ impl Default for ClipList<'_> {
 
 impl<'a> ClipList<'a> {
     #[inline]
-    pub fn get(&self, index: u32) -> Option<ClipBox> {
+    pub fn get(&self, index: u32, variation_data: &VariationData, coords: &[NormalizedCoordinate]) -> Option<ClipBox> {
         let record = self.records.get(index)?;
         let offset = record.clip_box_offset.to_usize();
         self.data.get(offset..).and_then(|data| {
             let mut s = Stream::new(data);
-            // TODO: Add format 2
-            // Format = 1
-            s.read::<u8>()?;
+            let format = s.read::<u8>()?;
+
+            let deltas = if format == 2 {
+                let mut var_s = s.clone();
+                var_s.advance(8);
+                let var_index_base = var_s.read::<u32>()?;
+
+                variation_data
+                    .read_deltas::<4>(var_index_base, coords)
+            }   else {
+                [0.0, 0.0, 0.0, 0.0]
+            };
 
             Some(ClipBox {
-                x_min: s.read::<i16>()?,
-                y_min: s.read::<i16>()?,
-                x_max: s.read::<i16>()?,
-                y_max: s.read::<i16>()?,
+                x_min: s.read::<i16>()? as f32 + deltas[0],
+                y_min: s.read::<i16>()? as f32 + deltas[0],
+                x_max: s.read::<i16>()? as f32 + deltas[0],
+                y_max: s.read::<i16>()? as f32 + deltas[0],
             })
         })
     }
 
     /// Returns a ClipBox by glyph ID.
     #[inline]
-    pub fn find(&self, glyph_id: GlyphId) -> Option<ClipBox> {
+    pub fn find(&self, glyph_id: GlyphId, variation_data: &VariationData, coords: &[NormalizedCoordinate]) -> Option<ClipBox> {
         let index = self
             .records
             .into_iter()
             .position(|v| v.glyphs_range().contains(&glyph_id))?;
-        self.get(index as u32)
+        self.get(index as u32, variation_data, coords)
     }
 }
 
@@ -794,7 +803,7 @@ impl<'a> Table<'a> {
         recursion_stack: &mut RecursionStack,
         coords: &[NormalizedCoordinate],
     ) -> Option<()> {
-        let clip_box = self.clip_list.find(base.glyph_id);
+        let clip_box = self.clip_list.find(base.glyph_id, &self.variation_data(), coords);
         if let Some(clip_box) = clip_box {
             painter.push_clip_box(clip_box);
         }

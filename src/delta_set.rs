@@ -1,5 +1,6 @@
+use core::convert::TryFrom;
+
 use crate::parser::Stream;
-use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct DeltaSetIndexMap<'a> {

@@ -6,9 +6,10 @@
 
 use crate::delta_set::DeltaSetIndexMap;
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
-use crate::var_store::ItemVariationStore;
 use crate::{cpal, Fixed, LazyArray32, NormalizedCoordinate, Transform};
 use crate::{GlyphId, RgbaColor};
+#[cfg(feature = "variable-fonts")]
+use crate::var_store::ItemVariationStore;
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -99,6 +100,7 @@ impl<'a> ClipList<'a> {
     pub fn get(
         &self,
         index: u32,
+        #[cfg(feature = "variable-fonts")]
         variation_data: &VariationData,
         coords: &[NormalizedCoordinate],
     ) -> Option<ClipBox> {
@@ -108,15 +110,15 @@ impl<'a> ClipList<'a> {
             let mut s = Stream::new(data);
             let format = s.read::<u8>()?;
 
+            #[cfg(not(feature = "variable-fonts"))]
+            let deltas = [0.0, 0.0, 0.0, 0.0];
+            #[cfg(feature = "variable-fonts")]
             let deltas = if format == 2 {
-                let mut var_s = s.clone();
-                var_s.advance(8);
-                let var_index_base = var_s.read::<u32>()?;
-
-                variation_data.read_deltas::<4>(var_index_base, coords)
-            } else {
+                get_deltas::<4>(&s, 8, &variation_data, coords)?
+            }   else {
                 [0.0, 0.0, 0.0, 0.0]
             };
+
 
             Some(ClipBox {
                 x_min: s.read::<i16>()? as f32 + deltas[0],
@@ -132,6 +134,7 @@ impl<'a> ClipList<'a> {
     pub fn find(
         &self,
         glyph_id: GlyphId,
+        #[cfg(feature = "variable-fonts")]
         variation_data: &VariationData,
         coords: &[NormalizedCoordinate],
     ) -> Option<ClipBox> {
@@ -300,6 +303,7 @@ impl VarColorLine<'_> {
         &self,
         palette: u16,
         index: u16,
+        #[cfg(feature = "variable-fonts")]
         variation_data: VariationData,
         coordinates: &[NormalizedCoordinate],
     ) -> Option<ColorStop> {
@@ -360,6 +364,7 @@ pub struct LinearGradient<'a> {
     pub y2: f32,
     /// The extend of the gradient.
     pub extend: GradientExtend,
+    #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
 }
@@ -414,6 +419,7 @@ pub struct RadialGradient<'a> {
     pub y1: f32,
     /// The extend radial gradient.
     pub extend: GradientExtend,
+    #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
 }
@@ -464,6 +470,7 @@ pub struct SweepGradient<'a> {
     pub end_angle: f32,
     /// The extend of the sweep gradient.
     pub extend: GradientExtend,
+    #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
 }
@@ -506,6 +513,7 @@ pub struct GradientStopsIter<'a, 'b> {
     color_line: &'b ColorLine<'a>,
     palette: u16,
     index: u16,
+    #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
     coords: &'b [NormalizedCoordinate],
 }
@@ -735,7 +743,9 @@ impl<'a> Table<'a> {
             layer_paint_offsets: LazyArray32::default(),
             clip_list_offsets_offset: Offset32(0),
             clip_list: ClipList::default(),
+            #[cfg(feature = "variable-fonts")]
             item_variation_store: None,
+            #[cfg(feature = "variable-fonts")]
             var_index_map: None,
         };
 
@@ -746,7 +756,9 @@ impl<'a> Table<'a> {
         table.base_glyph_paints_offset = s.read::<Offset32>()?;
         let layer_list_offset = s.read::<Option<Offset32>>()?;
         let clip_list_offset = s.read::<Option<Offset32>>()?;
+        #[cfg(feature = "variable-fonts")]
         let var_index_map_offset = s.read::<Option<Offset32>>()?;
+        #[cfg(feature = "variable-fonts")]
         let item_variation_offset = s.read::<Option<Offset32>>()?;
 
         {
@@ -775,6 +787,7 @@ impl<'a> Table<'a> {
             };
         }
 
+        #[cfg(feature = "variable-fonts")]
         if let Some(offset) = item_variation_offset {
             let item_var_data = data.get(offset.to_usize()..)?;
             let s = Stream::new(item_var_data);
@@ -782,6 +795,7 @@ impl<'a> Table<'a> {
             table.item_variation_store = Some(var_store);
         }
 
+        #[cfg(feature = "variable-fonts")]
         if let Some(offset) = var_index_map_offset {
             let var_index_map_data = data.get(offset.to_usize()..)?;
             let var_index_map = DeltaSetIndexMap::new(var_index_map_data);
@@ -811,6 +825,7 @@ impl<'a> Table<'a> {
             .map(|v| v.1)
     }
 
+    #[cfg(feature = "variable-fonts")]
     fn variation_data(&self) -> VariationData<'a> {
         VariationData {
             variation_store: self.item_variation_store,
@@ -1238,8 +1253,6 @@ impl<'a> Table<'a> {
                     f: s.read::<Fixed>()?.apply_float_delta(deltas[5]),
                 };
 
-                println!("VarTransform: {:?}, {:?}", ts.a, ts.b);
-
                 painter.push_transform(ts);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
@@ -1582,7 +1595,6 @@ impl<'a> Table<'a> {
             }
             28 => {
                 // PaintSkew
-                eprintln!("Reached");
                 let paint_offset = s.read::<Offset24>()?;
                 let skew_x = s.read::<F2DOT14>()?.to_f32();
                 let skew_y = s.read::<F2DOT14>()?.to_f32();
@@ -1786,6 +1798,7 @@ impl RecursionStack {
     }
 }
 
+#[cfg(feature = "variable-fonts")]
 #[derive(Clone, Copy, Debug, Default)]
 struct VariationData<'a> {
     variation_store: Option<ItemVariationStore<'a>>,
@@ -1821,4 +1834,12 @@ impl VariationData<'_> {
 
         deltas
     }
+}
+
+fn get_deltas<const N: usize>(s: &Stream, advance: usize, variation_data: &VariationData, coords: &[NormalizedCoordinate]) -> Option<[f32; N]> {
+    let mut var_s = s.clone();
+    var_s.advance(advance);
+    let var_index_base = var_s.read::<u32>()?;
+
+    Some(variation_data.read_deltas::<N>(var_index_base, coords))
 }

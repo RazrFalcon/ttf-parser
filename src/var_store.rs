@@ -91,15 +91,19 @@ impl<'a> ItemVariationStore<'a> {
         let has_long_words = (word_delta_count & 0x8000) != 0;
         let word_delta_count = word_delta_count & 0x7FFF;
 
-        let delta_set_len = usize::from(word_delta_count) + usize::from(region_index_count);
-        s.advance(usize::from(inner_index).checked_mul(delta_set_len)?);
+        let delta_set_len = if has_long_words {
+            4 * word_delta_count + 2 * region_index_count.checked_sub(word_delta_count)?
+        }   else {
+            2 * region_index_count
+        };
+        s.advance(usize::from(inner_index).checked_mul(usize::from(delta_set_len))?);
 
         let mut delta = 0.0;
         let mut i = 0;
         while i < word_delta_count {
             let idx = region_indices.get(i)?;
             let num = if has_long_words {
-                // TODO: better cast
+                // TODO: use f64?
                 s.read::<i32>()? as f32
             } else {
                 f32::from(s.read::<i16>()?)

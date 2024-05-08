@@ -1,5 +1,5 @@
 use crate::{convert, Unit::*};
-use ttf_parser::colr::{self, ClipBox, CompositeMode, GradientExtend, Paint, Painter, VariationData};
+use ttf_parser::colr::{self, ClipBox, CompositeMode, GradientExtend, Paint, Painter};
 use ttf_parser::{cpal, GlyphId, RgbaColor};
 
 #[test]
@@ -126,15 +126,15 @@ impl<'a> Painter<'a> for VecPainter {
             Paint::LinearGradient(lg) => CustomPaint::LinearGradient(lg.x0, lg.y0,
                                                                      lg.x1, lg.y1,
                                                                      lg.x2, lg.y2,
-                                                                     lg.extend, lg.stops(0, &[], VariationData::default()).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+                                                                     lg.extend, lg.stops(0, &[]).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
             Paint::RadialGradient(rg) => CustomPaint::RadialGradient(rg.x0, rg.y0,
                                                                      rg.r0, rg.r1,
                                                                      rg.x1, rg.y1,
                                                                      // TODO: Make less ugly
-                                                                     rg.extend, rg.stops(0, VariationData::default(), &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+                                                                     rg.extend, rg.stops(0, &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
             Paint::SweepGradient(sg) => CustomPaint::SweepGradient(sg.center_x, sg.center_y,
                                                                      sg.start_angle, sg.end_angle,
-                                                                     sg.extend, sg.stops(0, VariationData::default(), &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+                                                                     sg.extend, sg.stops(0, &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
         };
 
         self.0.push(Command::Paint(custom_paint));

@@ -388,7 +388,6 @@ impl<'a> GlyphPainter<'a> {
         self.write_gradient_stops(gradient.stops(
             self.palette_index,
             self.face.variation_coordinates(),
-            self.face.tables().colr.unwrap().variation_data(),
         ));
         self.svg.end_element();
 
@@ -419,7 +418,6 @@ impl<'a> GlyphPainter<'a> {
             .write_transform_attribute("gradientTransform", self.transform);
         self.write_gradient_stops(gradient.stops(
             self.palette_index,
-            self.face.tables().colr.unwrap().variation_data(),
             self.face.variation_coordinates(),
         ));
         self.svg.end_element();

@@ -337,6 +337,7 @@ pub struct LinearGradient<'a> {
     pub x2: f32,
     pub y2: f32,
     pub extend: GradientExtend,
+    variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
 }
 
@@ -361,13 +362,12 @@ impl<'a> LinearGradient<'a> {
         &'b self,
         palette: u16,
         coords: &'b [NormalizedCoordinate],
-        variation_data: VariationData<'a>,
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
-            variation_data,
+            variation_data: self.variation_data,
             coords,
         }
     }
@@ -382,6 +382,7 @@ pub struct RadialGradient<'a> {
     pub x1: f32,
     pub y1: f32,
     pub extend: GradientExtend,
+    variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
 }
 
@@ -405,14 +406,13 @@ impl<'a> RadialGradient<'a> {
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        variation_data: VariationData<'a>,
         coords: &'a [NormalizedCoordinate],
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
-            variation_data,
+            variation_data: self.variation_data,
             coords,
         }
     }
@@ -425,6 +425,7 @@ pub struct SweepGradient<'a> {
     pub start_angle: f32,
     pub end_angle: f32,
     pub extend: GradientExtend,
+    variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
 }
 
@@ -443,17 +444,17 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
 }
 
 impl<'a> SweepGradient<'a> {
+    // TODO: Figure out how to not make use
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        variation_data: VariationData<'a>,
         coords: &'a [NormalizedCoordinate],
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
-            variation_data,
+            variation_data: self.variation_data,
             coords,
         }
     }
@@ -729,7 +730,7 @@ impl<'a> Table<'a> {
             .map(|v| v.1)
     }
 
-    pub fn variation_data(&self) -> VariationData {
+    pub fn variation_data(&self) -> VariationData<'a> {
         VariationData {
             variation_store: self.item_variation_store,
             delta_map: self.var_index_map,
@@ -961,6 +962,7 @@ impl<'a> Table<'a> {
                     x2: s.read::<i16>()? as f32,
                     y2: s.read::<i16>()? as f32,
                     extend: color_line.extend,
+                    variation_data: self.variation_data(),
                     color_line: ColorLine::NonVarColorLine(color_line),
                 }))
             }
@@ -987,6 +989,7 @@ impl<'a> Table<'a> {
                     x2: s.read::<i16>()? as f32 + deltas[4],
                     y2: s.read::<i16>()? as f32 + deltas[5],
                     extend: color_line.extend,
+                    variation_data: self.variation_data(),
                     color_line: ColorLine::VarColorLine(color_line),
                 }))
             }
@@ -1003,6 +1006,7 @@ impl<'a> Table<'a> {
                     y1: s.read::<i16>()? as f32,
                     r1: s.read::<u16>()? as f32,
                     extend: color_line.extend,
+                    variation_data: self.variation_data(),
                     color_line: ColorLine::NonVarColorLine(color_line),
                 }))
             }
@@ -1030,6 +1034,7 @@ impl<'a> Table<'a> {
                     y1: s.read::<i16>()? as f32 + deltas[4],
                     r1: s.read::<u16>()? as f32 + deltas[5],
                     extend: color_line.extend,
+                    variation_data: self.variation_data(),
                     color_line: ColorLine::VarColorLine(color_line),
                 }))
             }
@@ -1045,6 +1050,7 @@ impl<'a> Table<'a> {
                     end_angle: s.read::<F2DOT14>()?.to_f32(),
                     extend: color_line.extend,
                     color_line: ColorLine::NonVarColorLine(color_line),
+                    variation_data: self.variation_data()
                 }))
             }
             9 => {
@@ -1070,6 +1076,7 @@ impl<'a> Table<'a> {
                     end_angle: s.read::<F2DOT14>()?.apply_float_delta(deltas[3]),
                     extend: color_line.extend,
                     color_line: ColorLine::VarColorLine(color_line),
+                    variation_data: self.variation_data()
                 }))
             }
             10 => {
@@ -1698,13 +1705,13 @@ impl RecursionStack {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct VariationData<'a> {
+struct VariationData<'a> {
     variation_store: Option<ItemVariationStore<'a>>,
     delta_map: Option<DeltaSetIndexMap<'a>>,
 }
 
 impl VariationData<'_> {
-    // Adapted from fontations
+    // Inspired from `fontations`.
     fn read_deltas<const N: usize>(
         &self,
         var_index_base: u32,

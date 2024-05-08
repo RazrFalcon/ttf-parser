@@ -115,7 +115,6 @@ impl<'a> ItemVariationStore<'a> {
         while i < region_index_count {
             let idx = region_indices.get(i)?;
             let num = if has_long_words {
-                // TODO: f32 might not be enough?
                 f32::from(s.read::<i16>()?)
             } else {
                 f32::from(s.read::<i8>()?)

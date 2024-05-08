@@ -130,7 +130,6 @@ impl<'a> Painter<'a> for VecPainter {
             Paint::RadialGradient(rg) => CustomPaint::RadialGradient(rg.x0, rg.y0,
                                                                      rg.r0, rg.r1,
                                                                      rg.x1, rg.y1,
-                                                                     // TODO: Make less ugly
                                                                      rg.extend, rg.stops(0, &[]).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
             Paint::SweepGradient(sg) => CustomPaint::SweepGradient(sg.center_x, sg.center_y,
                                                                    sg.start_angle, sg.end_angle,
@@ -185,7 +184,7 @@ impl<'a> Painter<'a> for VecPainter {
     }
 }
 
-// A static COLRv1 test font from Google Fonts:
+// A static and variable COLRv1 test font from Google Fonts:
 // https://github.com/googlefonts/color-fonts
 static COLR1_STATIC: &[u8] = include_bytes!("../fonts/colr_1.ttf");
 static COLR1_VARIABLE: &[u8] = include_bytes!("../fonts/colr_1_variable.ttf");

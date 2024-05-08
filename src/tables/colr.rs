@@ -116,16 +116,20 @@ impl<'a> ClipList<'a> {
             let deltas = [0.0, 0.0, 0.0, 0.0];
             #[cfg(feature = "variable-fonts")]
             let deltas = if format == 2 {
-                get_deltas::<4>(&s, 8, &variation_data, coords)?
+                let mut var_s = s.clone();
+                var_s.advance(8);
+                let var_index_base = var_s.read::<u32>()?;
+
+                variation_data.read_deltas::<4>(var_index_base, coords)
             } else {
                 [0.0, 0.0, 0.0, 0.0]
             };
 
             Some(ClipBox {
                 x_min: s.read::<i16>()? as f32 + deltas[0],
-                y_min: s.read::<i16>()? as f32 + deltas[0],
-                x_max: s.read::<i16>()? as f32 + deltas[0],
-                y_max: s.read::<i16>()? as f32 + deltas[0],
+                y_min: s.read::<i16>()? as f32 + deltas[1],
+                x_max: s.read::<i16>()? as f32 + deltas[2],
+                y_max: s.read::<i16>()? as f32 + deltas[3],
             })
         })
     }
@@ -389,7 +393,6 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
             .field("x2", &self.x2)
             .field("y2", &self.y2)
             .field("extend", &self.extend)
-            // TODO: Avoid hardcoding foregrounf color here?
             // .field("stops", &self.stops(0))
             .finish()
     }
@@ -446,7 +449,6 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
             .field("x1", &self.x1)
             .field("y1", &self.y1)
             .field("extend", &self.extend)
-            // TODO: Avoid hardcoding foregrounf color here?
             // .field("stops", &self.stops(0))
             .finish()
     }
@@ -497,7 +499,6 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
             .field("start_angle", &self.start_angle)
             .field("end_angle", &self.end_angle)
             .field("extend", &self.extend)
-            // TODO: Avoid hardcoding foregrounf color here?
             // .field("stops", &self.stops(0))
             .finish()
     }
@@ -826,7 +827,7 @@ impl<'a> Table<'a> {
 
     /// Returns `true` if the current table has version 0.
     ///
-    /// A simple table can only emit `outline`, `paint_foreground` and `paint_color`
+    /// A simple table can only emit `outline_glyph`, `paint`
     /// [`Painter`] methods.
     pub fn is_simple(&self) -> bool {
         self.version == 0
@@ -1895,18 +1896,4 @@ impl VariationData<'_> {
 
         deltas
     }
-}
-
-#[cfg(feature = "variable-fonts")]
-fn get_deltas<const N: usize>(
-    s: &Stream,
-    advance: usize,
-    variation_data: &VariationData,
-    coords: &[NormalizedCoordinate],
-) -> Option<[f32; N]> {
-    let mut var_s = s.clone();
-    var_s.advance(advance);
-    let var_index_base = var_s.read::<u32>()?;
-
-    Some(variation_data.read_deltas::<N>(var_index_base, coords))
 }

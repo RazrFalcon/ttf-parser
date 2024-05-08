@@ -148,23 +148,23 @@ impl<'a> Painter<'a> for VecPainter {
         self.0.push(Command::PopLayer)
     }
 
-    fn translate(&mut self, tx: f32, ty: f32) {
+    fn push_translate(&mut self, tx: f32, ty: f32) {
         self.0.push(Command::Translate(tx, ty))
     }
 
-    fn scale(&mut self, sx: f32, sy: f32) {
+    fn push_scale(&mut self, sx: f32, sy: f32) {
         self.0.push(Command::Scale(sx, sy))
     }
 
-    fn rotate(&mut self, angle: f32) {
+    fn push_rotate(&mut self, angle: f32) {
         self.0.push(Command::Rotate(angle))
     }
 
-    fn skew(&mut self, skew_x: f32, skew_y: f32) {
+    fn push_skew(&mut self, skew_x: f32, skew_y: f32) {
         self.0.push(Command::Skew(skew_x, skew_y))
     }
 
-    fn transform(&mut self, transform: ttf_parser::Transform) {
+    fn push_transform(&mut self, transform: ttf_parser::Transform) {
         self.0.push(Command::Transform(transform))
     }
 

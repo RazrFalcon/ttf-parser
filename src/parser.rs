@@ -159,7 +159,7 @@ impl FromData for Fixed {
 
 impl Fixed {
     #[inline]
-    pub fn apply_float_delta(&self, delta: f32) -> f32 {
+    pub(crate) fn apply_float_delta(&self, delta: f32) -> f32 {
         self.0 + (delta as f64 * (1.0 / 65536.0)) as f32
     }
 }

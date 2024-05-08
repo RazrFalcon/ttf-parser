@@ -35,7 +35,7 @@ Font parsing starts with a [`Face`].
 
 #![no_std]
 #![forbid(unsafe_code)]
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
 #![allow(clippy::get_first)] // we use it for readability
@@ -405,28 +405,37 @@ impl BBox {
     }
 }
 
+/// An affine transform.
 #[derive(Clone, Copy, PartialEq)]
 pub struct Transform {
+    /// The 'a' component of the transform.
     pub a: f32,
+    /// The 'b' component of the transform.
     pub b: f32,
+    /// The 'c' component of the transform.
     pub c: f32,
+    /// The 'd' component of the transform.
     pub d: f32,
+    /// The 'e' component of the transform.
     pub e: f32,
+    /// The 'f' component of the transform.
     pub f: f32,
 }
 
 impl Transform {
+    /// Creates a new transform with the specified components.
     #[inline]
     pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Self {
         Transform { a, b, c, d, e, f }
     }
 
-    #[cfg(feature = "variable-fonts")]
+    /// Creates a new translation transform.
     #[inline]
     pub fn new_translate(tx: f32, ty: f32) -> Self {
         Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty)
     }
 
+    /// Combines two transforms with each other.
     #[inline]
     pub fn combine(ts1: Self, ts2: Self) -> Self {
         Transform {
@@ -447,6 +456,7 @@ impl Transform {
         *y = self.b * tx + self.d * ty + self.f;
     }
 
+    /// Checks whether a transform is the identity transform.
     #[inline]
     pub fn is_default(&self) -> bool {
         // A direct float comparison is fine in our case.
@@ -2240,10 +2250,12 @@ impl<'a> Face<'a> {
         Some(())
     }
 
+    /// Sets the foreground color of the face. Is used by the COLRv1 table.
     pub fn set_foreground_color(&mut self, color: RgbaColor) {
         self.foreground_color = color;
     }
 
+    /// Gets the foreground color of the face.
     pub fn foreground_color(&self) -> RgbaColor {
         self.foreground_color
     }

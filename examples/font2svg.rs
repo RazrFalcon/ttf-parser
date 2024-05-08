@@ -138,9 +138,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut column = 0;
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
-    for id in 103..104 {
-        println!("{:?}", id);
-        // println!("GLYPH {:?}", id);
+    for id in 0..NUM_GLYPHS {
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
         let y = row as f64 * cell_size;
@@ -490,7 +488,6 @@ impl GlyphPainter<'_> {
 
 impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
     fn outline_glyph(&mut self, glyph_id: ttf::GlyphId) {
-        // println!("OUTLINE");
         self.path_buf.clear();
         let mut builder = Builder(self.path_buf);
         match self.face.outline_glyph(glyph_id, &mut builder) {
@@ -541,27 +538,27 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.end_element(); // g
     }
 
-    fn translate(&mut self, tx: f32, ty: f32) {
-        self.transform(ttf::Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty));
+    fn push_translate(&mut self, tx: f32, ty: f32) {
+        self.push_transform(ttf::Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty));
     }
 
-    fn scale(&mut self, sx: f32, sy: f32) {
-        self.transform(ttf::Transform::new(sx, 0.0, 0.0, sy, 0.0, 0.0));
+    fn push_scale(&mut self, sx: f32, sy: f32) {
+        self.push_transform(ttf::Transform::new(sx, 0.0, 0.0, sy, 0.0, 0.0));
     }
 
-    fn rotate(&mut self, angle: f32) {
+    fn push_rotate(&mut self, angle: f32) {
         let cc = (angle * std::f32::consts::PI).cos();
         let ss = (angle * std::f32::consts::PI).sin();
-        self.transform(ttf::Transform::new(cc, ss, -ss, cc, 0.0, 0.0));
+        self.push_transform(ttf::Transform::new(cc, ss, -ss, cc, 0.0, 0.0));
     }
 
-    fn skew(&mut self, skew_x: f32, skew_y: f32) {
+    fn push_skew(&mut self, skew_x: f32, skew_y: f32) {
         let x = (-skew_x * std::f32::consts::PI).tan();
         let y = (skew_y * std::f32::consts::PI).tan();
-        self.transform(ttf::Transform::new(1.0, y, x, 1.0, 0.0, 0.0));
+        self.push_transform(ttf::Transform::new(1.0, y, x, 1.0, 0.0, 0.0));
     }
 
-    fn transform(&mut self, transform: ttf::Transform) {
+    fn push_transform(&mut self, transform: ttf::Transform) {
         self.transforms_stack.push(self.transform);
         self.transform = ttf::Transform::combine(self.transform, transform);
     }

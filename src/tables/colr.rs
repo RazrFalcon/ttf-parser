@@ -19,19 +19,29 @@ struct BaseGlyphRecord {
     num_layers: u16,
 }
 
+/// A [ClipBox](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ClipBox {
+    /// The horizontal minimum of the clip box.
     pub x_min: f32,
+    /// The vertical minimum of the clip box.
     pub y_min: f32,
+    /// The horizontal maximum of the clip box.
     pub x_max: f32,
+    /// The vertical maximum of the clip box.
     pub y_max: f32,
 }
 
+/// A paint.
 #[derive(Clone, Debug)]
 pub enum Paint<'a> {
+    /// A paint with a solid color.
     Solid(RgbaColor),
+    /// A paint with a linear gradient.
     LinearGradient(LinearGradient<'a>),
+    /// A paint with a radial gradient.
     RadialGradient(RadialGradient<'a>),
+    /// A paint with a sweep gradient.
     SweepGradient(SweepGradient<'a>),
 }
 
@@ -190,8 +200,11 @@ impl FromData for BaseGlyphPaintRecord {
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GradientExtend {
+    /// The `Pad` gradient extend mode.
     Pad,
+    /// The `Repeat` gradient extend mode.
     Repeat,
+    /// The `Reflect` gradient extend mode.
     Reflect,
 }
 
@@ -324,18 +337,28 @@ enum ColorLine<'a> {
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
 #[derive(Clone, Copy, Debug)]
 pub struct ColorStop {
+    /// The offset of the color stop.
     pub stop_offset: f32,
+    /// The color of the color stop.
     pub color: RgbaColor,
 }
 
+/// A [linear gradient](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-4-and-5-paintlineargradient-paintvarlineargradient)
 #[derive(Clone)]
 pub struct LinearGradient<'a> {
+    /// The `x0` value of the linear gradient.
     pub x0: f32,
+    /// The `y0` value of the linear gradient.
     pub y0: f32,
+    /// The `x1` value of the linear gradient.
     pub x1: f32,
+    /// The `y1` value of the linear gradient.
     pub y1: f32,
+    /// The `x2` value of the linear gradient.
     pub x2: f32,
+    /// The `y2` value of the linear gradient.
     pub y2: f32,
+    /// The extend of the gradient.
     pub extend: GradientExtend,
     variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
@@ -358,6 +381,7 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
 }
 
 impl<'a> LinearGradient<'a> {
+    /// Returns an iterator over the stops of the linear gradient.
     pub fn stops<'b>(
         &'b self,
         palette: u16,
@@ -373,14 +397,22 @@ impl<'a> LinearGradient<'a> {
     }
 }
 
+/// A [radial gradient](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-6-and-7-paintradialgradient-paintvarradialgradient)
 #[derive(Clone)]
 pub struct RadialGradient<'a> {
+    /// The `x0` value of the radial gradient.
     pub x0: f32,
+    /// The `y0` value of the radial gradient.
     pub y0: f32,
+    /// The `r0` value of the radial gradient.
     pub r0: f32,
+    /// The `r1` value of the radial gradient.
     pub r1: f32,
+    /// The `x1` value of the radial gradient.
     pub x1: f32,
+    /// The `y1` value of the radial gradient.
     pub y1: f32,
+    /// The extend radial gradient.
     pub extend: GradientExtend,
     variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
@@ -403,6 +435,7 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
 }
 
 impl<'a> RadialGradient<'a> {
+    /// Returns an iterator over the stops of the radial gradient.
     pub fn stops<'b>(
         &'b self,
         palette: u16,
@@ -418,12 +451,18 @@ impl<'a> RadialGradient<'a> {
     }
 }
 
+/// A [sweep gradient](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-8-and-9-paintsweepgradient-paintvarsweepgradient)
 #[derive(Clone)]
 pub struct SweepGradient<'a> {
+    /// The x of the center of the sweep gradient.
     pub center_x: f32,
+    /// The y of the center of the sweep gradient.
     pub center_y: f32,
+    /// The start angle of the sweep gradient.
     pub start_angle: f32,
+    /// The end angle of the sweep gradient.
     pub end_angle: f32,
+    /// The extend of the sweep gradient.
     pub extend: GradientExtend,
     variation_data: VariationData<'a>,
     color_line: ColorLine<'a>,
@@ -444,7 +483,8 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
 }
 
 impl<'a> SweepGradient<'a> {
-    // TODO: Figure out how to not make use
+    /// An iterator over the stops of the sweep gradient.
+    // TODO: Make API nicer (same for radial and linear gradient)
     pub fn stops<'b>(
         &'b self,
         palette: u16,
@@ -460,6 +500,7 @@ impl<'a> SweepGradient<'a> {
     }
 }
 
+/// An iterator over stops of a gradient.
 #[derive(Clone, Copy)]
 pub struct GradientStopsIter<'a, 'b> {
     color_line: &'b ColorLine<'a>,
@@ -500,35 +541,64 @@ impl core::fmt::Debug for GradientStopsIter<'_, '_> {
     }
 }
 
+/// A [composite mode](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#format-32-paintcomposite)
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum CompositeMode {
+    /// The composite mode 'Clear'.
     Clear,
+    /// The composite mode 'Source'.
     Source,
+    /// The composite mode 'Destination'.
     Destination,
+    /// The composite mode 'SourceOver'.
     SourceOver,
+    /// The composite mode 'DestinationOver'.
     DestinationOver,
+    /// The composite mode 'SourceIn'.
     SourceIn,
+    /// The composite mode 'DestinationIn'.
     DestinationIn,
+    /// The composite mode 'SourceOut'.
     SourceOut,
+    /// The composite mode 'DestinationOut'.
     DestinationOut,
+    /// The composite mode 'SourceAtop'.
     SourceAtop,
+    /// The composite mode 'DestinationAtop'.
     DestinationAtop,
+    /// The composite mode 'Xor'.
     Xor,
+    /// The composite mode 'Plus'.
     Plus,
+    /// The composite mode 'Screen'.
     Screen,
+    /// The composite mode 'Overlay'.
     Overlay,
+    /// The composite mode 'Darken'.
     Darken,
+    /// The composite mode 'Lighten'.
     Lighten,
+    /// The composite mode 'ColorDodge'.
     ColorDodge,
+    /// The composite mode 'ColorBurn'.
     ColorBurn,
+    /// The composite mode 'HardLight'.
     HardLight,
+    /// The composite mode 'SoftLight'.
     SoftLight,
+    /// The composite mode 'Difference'.
     Difference,
+    /// The composite mode 'Exclusion'.
     Exclusion,
+    /// The composite mode 'Multiply'.
     Multiply,
+    /// The composite mode 'Hue'.
     Hue,
+    /// The composite mode 'Saturation'.
     Saturation,
+    /// The composite mode 'Color'.
     Color,
+    /// The composite mode 'Luminosity'.
     Luminosity,
 }
 
@@ -574,25 +644,36 @@ impl FromData for CompositeMode {
 ///
 /// See [COLR](https://learn.microsoft.com/en-us/typography/opentype/spec/colr) for details.
 pub trait Painter<'a> {
-    /// Outlines a glyph and stores it until the next paint command.
+    /// Outline a glyph and store it.
     fn outline_glyph(&mut self, glyph_id: GlyphId);
-    /// Paints the current glyph outline using the provided color.
+    /// Paint the stored outline using the provided color.
     fn paint(&mut self, paint: Paint<'a>);
 
+    /// Push a new clip path using the currently stored outline.
     fn push_clip(&mut self);
 
+    /// Push a new clip path using the clip box.
     fn push_clip_box(&mut self, clipbox: ClipBox);
+    /// Pop the last clip path.
     fn pop_clip(&mut self);
 
+    /// Push a new layer with the given composite mode.
     fn push_layer(&mut self, mode: CompositeMode);
+    /// Pop the last layer.
     fn pop_layer(&mut self);
 
-    fn translate(&mut self, tx: f32, ty: f32);
-    fn scale(&mut self, sx: f32, sy: f32);
-    /// Explain why.
-    fn rotate(&mut self, angle: f32);
-    fn skew(&mut self, skew_x: f32, skew_y: f32);
-    fn transform(&mut self, transform: Transform);
+    // TODO: Unify transforms into one callback.
+    /// Push a translation transform.
+    fn push_translate(&mut self, tx: f32, ty: f32);
+    /// Push a scaling transform.
+    fn push_scale(&mut self, sx: f32, sy: f32);
+    /// Push a rotation transform.
+    fn push_rotate(&mut self, angle: f32);
+    /// Push a skewing transform.
+    fn push_skew(&mut self, skew_x: f32, skew_y: f32);
+    /// Push a transform.
+    fn push_transform(&mut self, transform: Transform);
+    /// Pop the last transform.
     fn pop_transform(&mut self);
 }
 
@@ -1123,7 +1204,7 @@ impl<'a> Table<'a> {
                     f: s.read::<Fixed>().map(|n| n.0)?,
                 };
 
-                painter.transform(ts);
+                painter.push_transform(ts);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1159,7 +1240,7 @@ impl<'a> Table<'a> {
 
                 println!("VarTransform: {:?}, {:?}", ts.a, ts.b);
 
-                painter.transform(ts);
+                painter.push_transform(ts);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1176,7 +1257,7 @@ impl<'a> Table<'a> {
                 let tx = f32::from(s.read::<i16>()?);
                 let ty = f32::from(s.read::<i16>()?);
 
-                painter.translate(tx, ty);
+                painter.push_translate(tx, ty);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1202,7 +1283,7 @@ impl<'a> Table<'a> {
                 let tx = f32::from(s.read::<i16>()?) + deltas[0];
                 let ty = f32::from(s.read::<i16>()?) + deltas[1];
 
-                painter.translate(tx, ty);
+                painter.push_translate(tx, ty);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1219,7 +1300,7 @@ impl<'a> Table<'a> {
                 let sx = s.read::<F2DOT14>()?.to_f32();
                 let sy = s.read::<F2DOT14>()?.to_f32();
 
-                painter.scale(sx, sy);
+                painter.push_scale(sx, sy);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1245,7 +1326,7 @@ impl<'a> Table<'a> {
                 let sx = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
                 let sy = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
 
-                painter.scale(sx, sy);
+                painter.push_scale(sx, sy);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1264,9 +1345,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?);
                 let center_y = f32::from(s.read::<i16>()?);
 
-                painter.translate(center_x, center_y);
-                painter.scale(sx, sy);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_scale(sx, sy);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1296,9 +1377,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?) + deltas[2];
                 let center_y = f32::from(s.read::<i16>()?) + deltas[3];
 
-                painter.translate(center_x, center_y);
-                painter.scale(sx, sy);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_scale(sx, sy);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1316,7 +1397,7 @@ impl<'a> Table<'a> {
                 let paint_offset = s.read::<Offset24>()?;
                 let scale = s.read::<F2DOT14>()?.to_f32();
 
-                painter.scale(scale, scale);
+                painter.push_scale(scale, scale);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1341,7 +1422,7 @@ impl<'a> Table<'a> {
 
                 let scale = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
 
-                painter.scale(scale, scale);
+                painter.push_scale(scale, scale);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1359,9 +1440,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?);
                 let center_y = f32::from(s.read::<i16>()?);
 
-                painter.translate(center_x, center_y);
-                painter.scale(scale, scale);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_scale(scale, scale);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1390,9 +1471,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?) + deltas[1];
                 let center_y = f32::from(s.read::<i16>()?) + deltas[2];
 
-                painter.translate(center_x, center_y);
-                painter.scale(scale, scale);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_scale(scale, scale);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1410,7 +1491,7 @@ impl<'a> Table<'a> {
                 let paint_offset = s.read::<Offset24>()?;
                 let angle = s.read::<F2DOT14>()?.to_f32();
 
-                painter.rotate(angle);
+                painter.push_rotate(angle);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1435,7 +1516,7 @@ impl<'a> Table<'a> {
 
                 let angle = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
 
-                painter.rotate(angle);
+                painter.push_rotate(angle);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1453,9 +1534,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?);
                 let center_y = f32::from(s.read::<i16>()?);
 
-                painter.translate(center_x, center_y);
-                painter.rotate(angle);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_rotate(angle);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1484,9 +1565,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?) + deltas[1];
                 let center_y = f32::from(s.read::<i16>()?) + deltas[2];
 
-                painter.translate(center_x, center_y);
-                painter.rotate(angle);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_rotate(angle);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1506,7 +1587,7 @@ impl<'a> Table<'a> {
                 let skew_x = s.read::<F2DOT14>()?.to_f32();
                 let skew_y = s.read::<F2DOT14>()?.to_f32();
 
-                painter.skew(skew_x, skew_y);
+                painter.push_skew(skew_x, skew_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1532,7 +1613,7 @@ impl<'a> Table<'a> {
                 let skew_x = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
                 let skew_y = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
 
-                painter.skew(skew_x, skew_y);
+                painter.push_skew(skew_x, skew_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1551,9 +1632,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?);
                 let center_y = f32::from(s.read::<i16>()?);
 
-                painter.translate(center_x, center_y);
-                painter.skew(skew_x, skew_y);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_skew(skew_x, skew_y);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1583,9 +1664,9 @@ impl<'a> Table<'a> {
                 let center_x = f32::from(s.read::<i16>()?) + deltas[2];
                 let center_y = f32::from(s.read::<i16>()?) + deltas[3];
 
-                painter.translate(center_x, center_y);
-                painter.skew(skew_x, skew_y);
-                painter.translate(-center_x, -center_y);
+                painter.push_translate(center_x, center_y);
+                painter.push_skew(skew_x, skew_y);
+                painter.push_translate(-center_x, -center_y);
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,

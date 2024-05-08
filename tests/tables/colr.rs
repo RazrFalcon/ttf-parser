@@ -1,6 +1,6 @@
 use crate::{convert, Unit::*};
 use ttf_parser::colr::{self, ClipBox, CompositeMode, GradientExtend, Paint, Painter};
-use ttf_parser::{cpal, Face, GlyphId, RgbaColor};
+use ttf_parser::{cpal, GlyphId, RgbaColor};
 
 #[test]
 fn basic() {
@@ -406,9 +406,8 @@ mod colr1_static {
 mod colr1_variable {
     use ttf_parser::{Face, GlyphId, RgbaColor, Tag};
     use ttf_parser::colr::ClipBox;
-    use ttf_parser::colr::CompositeMode::*;
     use ttf_parser::colr::GradientExtend::*;
-    use crate::colr::{COLR1_STATIC, COLR1_VARIABLE, Command, CustomStop, VecPainter};
+    use crate::colr::{COLR1_STATIC, COLR1_VARIABLE, CustomStop, VecPainter};
     use crate::colr::Command::*;
     use crate::colr::CustomPaint::*;
 

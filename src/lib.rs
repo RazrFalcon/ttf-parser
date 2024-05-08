@@ -60,6 +60,7 @@ macro_rules! try_opt_or {
 
 #[cfg(feature = "apple-layout")]
 mod aat;
+mod delta_set;
 #[cfg(feature = "opentype-layout")]
 mod ggg;
 mod language;

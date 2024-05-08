@@ -4,7 +4,7 @@
 // NOTE: Parts of the implementation have been inspired by
 // [skrifa](https://github.com/googlefonts/fontations/tree/main/skrifa).
 
-use crate::hvar::DeltaSetIndexMap;
+use crate::delta_set::DeltaSetIndexMap;
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
 use crate::var_store::ItemVariationStore;
 use crate::{cpal, Fixed, LazyArray32, NormalizedCoordinate, Transform};

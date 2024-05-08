@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use ttf_parser as ttf;
 use ttf_parser::colr::{ClipBox, Paint};
-use ttf_parser::{GlyphId, RgbaColor, Transform};
+use ttf_parser::Transform;
 
 const FONT_SIZE: f64 = 128.0;
 const COLUMNS: u32 = 20;
@@ -105,16 +105,16 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let NUM_GLYPHS = face.number_of_glyphs();
+    let num_glyphs = face.number_of_glyphs();
 
     let units_per_em = face.units_per_em();
     let scale = FONT_SIZE / units_per_em as f64;
 
     let cell_size = face.height() as f64 * FONT_SIZE / units_per_em as f64;
-    let rows = (NUM_GLYPHS as f64 / COLUMNS as f64).ceil() as u32;
+    let rows = (num_glyphs as f64 / COLUMNS as f64).ceil() as u32;
 
     let mut svg = xmlwriter::XmlWriter::with_capacity(
-        NUM_GLYPHS as usize * 512,
+        num_glyphs as usize * 512,
         xmlwriter::Options::default(),
     );
     svg.start_element("svg");
@@ -131,14 +131,14 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         ),
     );
 
-    draw_grid(NUM_GLYPHS, cell_size, &mut svg);
+    draw_grid(num_glyphs, cell_size, &mut svg);
 
     let mut path_buf = String::with_capacity(256);
     let mut row = 0;
     let mut column = 0;
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
-    for id in 0..NUM_GLYPHS {
+    for id in 0..num_glyphs {
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;
         let y = row as f64 * cell_size;

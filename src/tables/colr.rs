@@ -972,7 +972,7 @@ impl<'a> Table<'a> {
             7 => {
                 // PaintVarRadialGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(
+                let color_line = self.parse_var_color_line(
                     offset + color_line_offset.to_usize(),
                     painter.foreground_color(),
                 )?;
@@ -993,7 +993,7 @@ impl<'a> Table<'a> {
                     y1: s.read::<i16>()? as f32 + deltas[4],
                     r1: s.read::<u16>()? as f32 + deltas[5],
                     extend: color_line.extend,
-                    color_line: ColorLine::NonVarColorLine(color_line),
+                    color_line: ColorLine::VarColorLine(color_line),
                 }))
             }
             8 => {
@@ -1015,7 +1015,7 @@ impl<'a> Table<'a> {
             9 => {
                 // PaintVarSweepGradient
                 let color_line_offset = s.read::<Offset24>()?;
-                let color_line = self.parse_color_line(
+                let color_line = self.parse_var_color_line(
                     offset + color_line_offset.to_usize(),
                     painter.foreground_color(),
                 )?;
@@ -1034,7 +1034,7 @@ impl<'a> Table<'a> {
                     start_angle: s.read::<F2DOT14>()?.apply_float_delta(deltas[2]),
                     end_angle: s.read::<F2DOT14>()?.apply_float_delta(deltas[3]),
                     extend: color_line.extend,
-                    color_line: ColorLine::NonVarColorLine(color_line),
+                    color_line: ColorLine::VarColorLine(color_line),
                 }))
             }
             10 => {

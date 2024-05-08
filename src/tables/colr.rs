@@ -1134,11 +1134,64 @@ impl<'a> Table<'a> {
                 );
                 painter.pop_transform();
             }
+            15 => {
+                // PaintVarTranslate
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(4);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<2>(var_index_base, coords);
+
+                let tx = f32::from(s.read::<i16>()?) + deltas[0];
+                let ty = f32::from(s.read::<i16>()?) + deltas[1];
+
+
+
+                painter.translate(tx, ty);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+            }
             16 => {
                 // PaintScale
                 let paint_offset = s.read::<Offset24>()?;
                 let sx = s.read::<F2DOT14>()?.to_f32();
                 let sy = s.read::<F2DOT14>()?.to_f32();
+
+                painter.scale(sx, sy);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+            },
+            17 => {
+                // PaintVarScale
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(4);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<2>(var_index_base, coords);
+
+
+                let sx = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
+                let sy = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
 
                 painter.scale(sx, sy);
                 self.parse_paint(
@@ -1171,11 +1224,66 @@ impl<'a> Table<'a> {
                 painter.pop_transform();
                 painter.pop_transform();
                 painter.pop_transform();
+            },
+            19 => {
+                // PaintVarScaleAroundCenter
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(8);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<4>(var_index_base, coords);
+
+                let sx = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
+                let sy = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
+                let center_x = f32::from(s.read::<i16>()?) + deltas[2];
+                let center_y = f32::from(s.read::<i16>()?) + deltas[3];
+
+                painter.translate(center_x, center_y);
+                painter.scale(sx, sy);
+                painter.translate(-center_x, -center_y);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+                painter.pop_transform();
+                painter.pop_transform();
             }
             20 => {
                 // PaintScaleUniform
                 let paint_offset = s.read::<Offset24>()?;
                 let scale = s.read::<F2DOT14>()?.to_f32();
+
+                painter.scale(scale, scale);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+            },
+            21 => {
+                // PaintVarScaleUniform
+                let paint_offset = s.read::<Offset24>()?;
+
+                let mut var_s = s.clone();
+                var_s.advance(2);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<1>(var_index_base, coords);
+
+                let scale = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
 
                 painter.scale(scale, scale);
                 self.parse_paint(

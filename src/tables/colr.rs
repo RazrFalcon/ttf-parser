@@ -808,18 +808,22 @@ impl<'a> Table<'a> {
         }
 
         #[cfg(feature = "variable-fonts")]
-        if let Some(offset) = item_variation_offset {
-            let item_var_data = data.get(offset.to_usize()..)?;
-            let s = Stream::new(item_var_data);
-            let var_store = ItemVariationStore::parse(s)?;
-            table.item_variation_store = Some(var_store);
+        {
+            if let Some(offset) = item_variation_offset {
+                let item_var_data = data.get(offset.to_usize()..)?;
+                let s = Stream::new(item_var_data);
+                let var_store = ItemVariationStore::parse(s)?;
+                table.item_variation_store = Some(var_store);
+            }
         }
 
         #[cfg(feature = "variable-fonts")]
-        if let Some(offset) = var_index_map_offset {
-            let var_index_map_data = data.get(offset.to_usize()..)?;
-            let var_index_map = DeltaSetIndexMap::new(var_index_map_data);
-            table.var_index_map = Some(var_index_map);
+        {
+            if let Some(offset) = var_index_map_offset {
+                let var_index_map_data = data.get(offset.to_usize()..)?;
+                let var_index_map = DeltaSetIndexMap::new(var_index_map_data);
+                table.var_index_map = Some(var_index_map);
+            }
         }
 
         Some(table)

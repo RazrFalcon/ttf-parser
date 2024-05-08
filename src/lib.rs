@@ -2191,7 +2191,9 @@ impl<'a> Face<'a> {
         palette: u16,
         painter: &mut dyn colr::Painter<'a>,
     ) -> Option<()> {
-        self.tables.colr?.paint(glyph_id, palette, painter)
+        self.tables
+            .colr?
+            .paint(glyph_id, palette, painter, self.coords())
     }
 
     /// Returns an iterator over variation axes.

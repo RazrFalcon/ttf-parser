@@ -7,7 +7,7 @@
 use crate::hvar::DeltaSetIndexMap;
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
 use crate::var_store::ItemVariationStore;
-use crate::{cpal, Fixed, LazyArray32, NormalizedCoordinate, Transform, VarCoords};
+use crate::{cpal, Fixed, LazyArray32, NormalizedCoordinate, Transform};
 use crate::{GlyphId, RgbaColor};
 
 /// A [base glyph](
@@ -27,7 +27,7 @@ pub struct ClipBox {
     pub y_max: f32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Paint<'a> {
     Solid(RgbaColor),
     LinearGradient(LinearGradient<'a>),
@@ -69,7 +69,7 @@ impl ClipRecord {
 
 /// A [clip list](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct ClipList<'a> {
     data: &'a [u8],
     records: LazyArray32<'a, ClipRecord>,
@@ -592,7 +592,7 @@ pub trait Painter<'a> {
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/colr).
 ///
 /// Currently, only version 0 is supported.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Table<'a> {
     pub(crate) palettes: cpal::Table<'a>,
     data: &'a [u8],
@@ -1641,7 +1641,7 @@ impl RecursionStack {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct VariationData<'a> {
     variation_store: Option<ItemVariationStore<'a>>,
     delta_map: Option<DeltaSetIndexMap<'a>>,

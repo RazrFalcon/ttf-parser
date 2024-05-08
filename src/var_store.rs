@@ -4,9 +4,8 @@
 
 use crate::parser::{FromData, LazyArray16, NumFrom, Stream};
 use crate::NormalizedCoordinate;
-use std::convert::TryFrom;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct ItemVariationStore<'a> {
     data: &'a [u8],
     data_offsets: LazyArray16<'a, u32>,
@@ -125,7 +124,7 @@ impl<'a> ItemVariationStore<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct VariationRegionList<'a> {
     axis_count: u16,
     regions: LazyArray16<'a, RegionAxisCoordinatesRecord>,
@@ -153,7 +152,7 @@ impl<'a> VariationRegionList<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct RegionAxisCoordinatesRecord {
     start_coord: i16,
     peak_coord: i16,

@@ -508,10 +508,6 @@ impl RgbaColor {
     pub(crate) fn apply_alpha(&mut self, alpha: f32) {
         self.alpha = (((f32::from(self.alpha) / 255.0) * alpha) * 255.0) as u8;
     }
-
-    pub(crate) fn add_alpha(&mut self, alpha: f32) {
-        self.alpha = (((f32::from(self.alpha) / 255.0) + alpha) * 255.0) as u8;
-    }
 }
 
 /// A trait for glyph outline construction.

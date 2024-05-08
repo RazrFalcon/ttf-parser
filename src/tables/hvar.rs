@@ -7,7 +7,7 @@ use crate::parser::{Offset, Offset32, Stream};
 use crate::var_store::ItemVariationStore;
 use crate::{GlyphId, NormalizedCoordinate};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct DeltaSetIndexMap<'a> {
     data: &'a [u8],
 }

@@ -876,6 +876,7 @@ impl<'a> Table<'a> {
                 // PaintSolid
                 let palette_index = s.read::<u16>()?;
                 let alpha = s.read::<F2DOT14>()?;
+
                 let mut color = if palette_index == u16::MAX {
                     painter.foreground_color()
                 } else {
@@ -886,7 +887,23 @@ impl<'a> Table<'a> {
                 painter.paint(Paint::Solid(color));
             }
             3 => {
-                // TODO:
+                // PaintVarSolid
+                let palette_index = s.read::<u16>()?;
+                let alpha = s.read::<F2DOT14>()?;
+                let var_index_base = s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<1>(var_index_base, coords);
+
+                let mut color = if palette_index == u16::MAX {
+                    painter.foreground_color()
+                } else {
+                    self.palettes.get(palette, palette_index)?
+                };
+
+                color.apply_alpha(alpha.apply_float_delta(deltas[0]));
+                painter.paint(Paint::Solid(color));
             }
             4 => {
                 // PaintLinearGradient
@@ -921,12 +938,6 @@ impl<'a> Table<'a> {
                 let deltas = self
                     .variation_data()
                     .read_deltas::<6>(var_index_base, coords);
-
-                println!(
-                    "Stops: {:?}, {:?}",
-                    s.read::<i16>()? as f32 + deltas[0],
-                    s.read::<i16>()? as f32 + deltas[1]
-                );
 
                 painter.paint(Paint::LinearGradient(LinearGradient {
                     x0: s.read::<i16>()? as f32 + deltas[0],

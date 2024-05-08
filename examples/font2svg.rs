@@ -138,7 +138,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut column = 0;
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
-    for id in 0..NUM_GLYPHS {
+    for id in 103..104 {
         println!("{:?}", id);
         // println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);

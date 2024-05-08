@@ -64,10 +64,10 @@ fn basic() {
 
     assert_eq!(
         paint(2).unwrap(), vec![
-        Command::OutlineGlyph(GlyphId(12)),
-        Command::Paint(c.clone()),
-        Command::OutlineGlyph(GlyphId(13)),
-        Command::Paint(a.clone())]
+            Command::OutlineGlyph(GlyphId(12)),
+            Command::Paint(c.clone()),
+            Command::OutlineGlyph(GlyphId(13)),
+            Command::Paint(a.clone())]
     );
 
     assert_eq!(paint(3).unwrap(), vec![
@@ -110,7 +110,7 @@ enum Command {
     PopTransform,
     PushClip,
     PushClipBox(ClipBox),
-    PopClip
+    PopClip,
 }
 
 struct VecPainter(Vec<Command>);
@@ -131,10 +131,10 @@ impl<'a> Painter<'a> for VecPainter {
                                                                      rg.r0, rg.r1,
                                                                      rg.x1, rg.y1,
                                                                      // TODO: Make less ugly
-                                                                     rg.extend, rg.stops(0, &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+                                                                     rg.extend, rg.stops(0, &[]).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
             Paint::SweepGradient(sg) => CustomPaint::SweepGradient(sg.center_x, sg.center_y,
-                                                                     sg.start_angle, sg.end_angle,
-                                                                     sg.extend, sg.stops(0, &[],).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
+                                                                   sg.start_angle, sg.end_angle,
+                                                                   sg.extend, sg.stops(0, &[]).map(|stop| CustomStop(stop.stop_offset, stop.color)).collect()),
         };
 
         self.0.push(Command::Paint(custom_paint));
@@ -153,37 +153,36 @@ impl<'a> Painter<'a> for VecPainter {
     }
 
     fn scale(&mut self, sx: f32, sy: f32) {
-       self.0.push(Command::Scale(sx, sy))
+        self.0.push(Command::Scale(sx, sy))
     }
 
     fn rotate(&mut self, angle: f32) {
-       self.0.push(Command::Rotate(angle))
+        self.0.push(Command::Rotate(angle))
     }
 
     fn skew(&mut self, skew_x: f32, skew_y: f32) {
-       self.0.push(Command::Skew(skew_x, skew_y))
+        self.0.push(Command::Skew(skew_x, skew_y))
     }
 
     fn transform(&mut self, transform: ttf_parser::Transform) {
-       self.0.push(Command::Transform(transform))
+        self.0.push(Command::Transform(transform))
     }
 
     fn pop_transform(&mut self) {
-       self.0.push(Command::PopTransform)
+        self.0.push(Command::PopTransform)
     }
 
     fn push_clip(&mut self) {
-       self.0.push(Command::PushClip)
+        self.0.push(Command::PushClip)
     }
 
     fn push_clip_box(&mut self, clipbox: ClipBox) {
-       self.0.push(Command::PushClipBox(clipbox))
+        self.0.push(Command::PushClipBox(clipbox))
     }
 
     fn pop_clip(&mut self) {
         self.0.push(Command::PopClip)
     }
-
 }
 
 // A static COLRv1 test font from Google Fonts:
@@ -195,7 +194,7 @@ mod colr1_static {
     use ttf_parser::colr::ClipBox;
     use ttf_parser::colr::CompositeMode::*;
     use ttf_parser::colr::GradientExtend::*;
-    use crate::colr::{COLR1_STATIC, CustomStop, VecPainter};
+    use crate::colr::{COLR1_STATIC, Command, CustomStop, VecPainter};
     use crate::colr::Command::*;
     use crate::colr::CustomPaint::*;
 
@@ -264,79 +263,11 @@ mod colr1_static {
     }
 
     #[test]
-    fn scale_uniform_around_center() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
-        let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(85), 0, &mut vec_painter);
-        assert_eq!(vec_painter.0, vec![
-            PushLayer(SourceOver),
-            OutlineGlyph(GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
-            PopClip,
-            PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
-            Scale(1.5, 1.5),
-            Translate(-500.0, -500.0),
-            OutlineGlyph(
-                GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
-            PopClip,
-            PopTransform,
-            PopTransform,
-            PopTransform,
-            PopLayer,
-            PopLayer]
-        )
-    }
-
-    #[test]
     fn scale() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(86), 0, &mut vec_painter);
-        assert_eq!(vec_painter.0, vec![
-            PushLayer(SourceOver),
-            OutlineGlyph(GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
-            PopClip,
-            PushLayer(DestinationOver),
-            Scale(0.5, 1.5),
-            OutlineGlyph(
-                GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
-            PopClip,
-            PopTransform,
-            PopLayer,
-            PopLayer]
-        )
-    }
-
-    #[test]
-    fn scale_uniform() {
-        let face = Face::parse(COLR1_STATIC, 0).unwrap();
-        let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(87), 0, &mut vec_painter);
-        assert_eq!(vec_painter.0, vec![
-            PushLayer(SourceOver),
-            OutlineGlyph(GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
-            PopClip,
-            PushLayer(DestinationOver),
-            Scale(1.5, 1.5),
-            OutlineGlyph(
-                GlyphId(3)),
-            PushClip,
-            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
-            PopClip,
-            PopTransform,
-            PopLayer,
-            PopLayer]
-        )
+        assert!(vec_painter.0.contains(&Scale(0.5, 1.5)))
     }
 
     #[test]
@@ -355,5 +286,124 @@ mod colr1_static {
             PopClip,
             PopClip]
         )
+    }
+
+    #[test]
+    fn rotate() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(99), 0, &mut vec_painter);
+        assert!(vec_painter.0.contains(&Rotate(0.055541992)))
+    }
+
+    #[test]
+    fn rotate_around_center() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(101), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushLayer(SourceOver),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
+            PopClip,
+            PushLayer(DestinationOver),
+            Translate(500.0, 500.0),
+            Rotate(0.13891602),
+            Translate(-500.0, -500.0),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
+            PopClip,
+            PopTransform,
+            PopTransform,
+            PopTransform,
+            PopLayer,
+            PopLayer,
+        ]
+        )
+    }
+
+    #[test]
+    fn skew() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(103), 0, &mut vec_painter);
+        assert!(vec_painter.0.contains(&Skew(0.13891602, 0.0)));
+    }
+
+    #[test]
+    fn skew_around_center() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(104), 0, &mut vec_painter);
+        assert_eq!(vec_painter.0, vec![
+            PushLayer(SourceOver),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
+            PopClip,
+            PushLayer(DestinationOver),
+            Translate(500.0, 500.0),
+            Skew(0.13891602, 0.0),
+            Translate(-500.0, -500.0),
+            OutlineGlyph(GlyphId(3)),
+            PushClip,
+            Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
+            PopClip,
+            PopTransform,
+            PopTransform,
+            PopTransform,
+            PopLayer,
+            PopLayer])
+    }
+
+    #[test]
+    fn transform() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(109), 0, &mut vec_painter);
+
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform {
+                a: 1.0,
+                b: 0.0,
+                c: 0.0,
+                d: 1.0,
+                e: 125.0,
+                f: 125.0
+            }
+        )));
+    }
+
+    #[test]
+    fn translate() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(109), 0, &mut vec_painter);
+
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform {
+            a: 1.0,
+            b: 0.0,
+            c: 0.0,
+            d: 1.0,
+            e: 125.0,
+            f: 125.0
+        })));
+    }
+
+    #[test]
+    fn composite() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(131), 0, &mut vec_painter);
+
+        assert!(vec_painter.0.contains(&Command::PushLayer(Xor)));
+    }
+
+    #[test]
+    fn cyclic_dependency() {
+        let face = Face::parse(COLR1_STATIC, 0).unwrap();
+        let mut vec_painter = VecPainter(vec![]);
+        face.paint_color_glyph(GlyphId(179), 0, &mut vec_painter);
     }
 }

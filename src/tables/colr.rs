@@ -1501,6 +1501,7 @@ impl<'a> Table<'a> {
             }
             28 => {
                 // PaintSkew
+                eprintln!("Reached");
                 let paint_offset = s.read::<Offset24>()?;
                 let skew_x = s.read::<F2DOT14>()?.to_f32();
                 let skew_y = s.read::<F2DOT14>()?.to_f32();

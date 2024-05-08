@@ -574,8 +574,6 @@ pub trait Painter<'a> {
     fn push_clip_box(&mut self, clipbox: ClipBox);
     fn pop_clip(&mut self);
 
-    fn foreground_color(&self) -> RgbaColor;
-
     fn push_layer(&mut self, mode: CompositeMode);
     fn pop_layer(&mut self);
 
@@ -744,13 +742,14 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
         coords: &[NormalizedCoordinate],
+        foreground_color: RgbaColor
     ) -> Option<()> {
         let mut recursion_stack = RecursionStack {
             stack: [0; 64],
             len: 0,
         };
 
-        self.paint_impl(glyph_id, palette, painter, &mut recursion_stack, coords)
+        self.paint_impl(glyph_id, palette, painter, &mut recursion_stack, coords, foreground_color)
     }
 
     fn paint_impl(
@@ -760,11 +759,12 @@ impl<'a> Table<'a> {
         painter: &mut dyn Painter<'a>,
         recusion_stack: &mut RecursionStack,
         coords: &[NormalizedCoordinate],
+        foreground_color: RgbaColor
     ) -> Option<()> {
         if let Some(base) = self.get_v1(glyph_id) {
-            self.paint_v1(base, palette, painter, recusion_stack, coords)
+            self.paint_v1(base, palette, painter, recusion_stack, coords, foreground_color)
         } else if let Some(base) = self.get_v0(glyph_id) {
-            self.paint_v0(base, palette, painter)
+            self.paint_v0(base, palette, painter, foreground_color)
         } else {
             None
         }
@@ -775,6 +775,7 @@ impl<'a> Table<'a> {
         base: BaseGlyphRecord,
         palette: u16,
         painter: &mut dyn Painter,
+        foreground_color: RgbaColor
     ) -> Option<()> {
         let start = base.first_layer_index;
         let end = start.checked_add(base.num_layers)?;
@@ -784,7 +785,7 @@ impl<'a> Table<'a> {
             if layer.palette_index == 0xFFFF {
                 // A special case.
                 painter.outline_glyph(layer.glyph_id);
-                painter.paint(Paint::Solid(painter.foreground_color()));
+                painter.paint(Paint::Solid(foreground_color));
             } else {
                 let color = self.palettes.get(palette, layer.palette_index)?;
                 painter.outline_glyph(layer.glyph_id);
@@ -802,6 +803,7 @@ impl<'a> Table<'a> {
         painter: &mut dyn Painter<'a>,
         recursion_stack: &mut RecursionStack,
         coords: &[NormalizedCoordinate],
+        foreground_color: RgbaColor
     ) -> Option<()> {
         let clip_box = self.clip_list.find(base.glyph_id, &self.variation_data(), coords);
         if let Some(clip_box) = clip_box {
@@ -814,6 +816,7 @@ impl<'a> Table<'a> {
             painter,
             recursion_stack,
             coords,
+            foreground_color
         );
 
         if clip_box.is_some() {
@@ -830,6 +833,7 @@ impl<'a> Table<'a> {
         painter: &mut dyn Painter<'a>,
         recursion_stack: &mut RecursionStack,
         coords: &[NormalizedCoordinate],
+        foreground_color: RgbaColor
     ) -> Option<()> {
         let mut s = Stream::new_at(self.data, offset)?;
         let format = s.read::<u8>()?;
@@ -848,6 +852,7 @@ impl<'a> Table<'a> {
             &mut s,
             format,
             coords,
+            foreground_color
         );
         recursion_stack.pop();
 
@@ -863,6 +868,7 @@ impl<'a> Table<'a> {
         s: &mut Stream,
         format: u8,
         coords: &[NormalizedCoordinate],
+        foreground_color: RgbaColor
     ) -> Option<()> {
         match format {
             1 => {
@@ -879,6 +885,7 @@ impl<'a> Table<'a> {
                         painter,
                         recursion_stack,
                         coords,
+                        foreground_color
                     );
                 }
             }
@@ -888,7 +895,7 @@ impl<'a> Table<'a> {
                 let alpha = s.read::<F2DOT14>()?;
 
                 let mut color = if palette_index == u16::MAX {
-                    painter.foreground_color()
+                    foreground_color
                 } else {
                     self.palettes.get(palette, palette_index)?
                 };
@@ -907,7 +914,7 @@ impl<'a> Table<'a> {
                     .read_deltas::<1>(var_index_base, coords);
 
                 let mut color = if palette_index == u16::MAX {
-                    painter.foreground_color()
+                    foreground_color
                 } else {
                     self.palettes.get(palette, palette_index)?
                 };
@@ -920,7 +927,7 @@ impl<'a> Table<'a> {
                 let color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_color_line(
                     offset + color_line_offset.to_usize(),
-                    painter.foreground_color(),
+                    foreground_color
                 )?;
 
                 painter.paint(Paint::LinearGradient(LinearGradient {
@@ -939,7 +946,7 @@ impl<'a> Table<'a> {
                 let var_color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_var_color_line(
                     offset + var_color_line_offset.to_usize(),
-                    painter.foreground_color(),
+                    foreground_color
                 )?;
                 let mut var_s = s.clone();
                 var_s.advance(12);
@@ -965,7 +972,7 @@ impl<'a> Table<'a> {
                 let color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_color_line(
                     offset + color_line_offset.to_usize(),
-                    painter.foreground_color(),
+                    foreground_color
                 )?;
                 painter.paint(Paint::RadialGradient(RadialGradient {
                     x0: s.read::<i16>()? as f32,
@@ -983,7 +990,7 @@ impl<'a> Table<'a> {
                 let color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_var_color_line(
                     offset + color_line_offset.to_usize(),
-                    painter.foreground_color(),
+                    foreground_color
                 )?;
 
                 let mut var_s = s.clone();
@@ -1010,7 +1017,7 @@ impl<'a> Table<'a> {
                 let color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_color_line(
                     offset + color_line_offset.to_usize(),
-                    painter.foreground_color(),
+                    foreground_color
                 )?;
                 painter.paint(Paint::SweepGradient(SweepGradient {
                     center_x: s.read::<i16>()? as f32,
@@ -1026,7 +1033,7 @@ impl<'a> Table<'a> {
                 let color_line_offset = s.read::<Offset24>()?;
                 let color_line = self.parse_var_color_line(
                     offset + color_line_offset.to_usize(),
-                    painter.foreground_color(),
+                    foreground_color
                 )?;
 
                 let mut var_s = s.clone();
@@ -1059,6 +1066,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
 
                 painter.pop_clip();
@@ -1066,7 +1074,7 @@ impl<'a> Table<'a> {
             11 => {
                 // PaintColrGlyph
                 let glyph_id = s.read::<GlyphId>()?;
-                self.paint_impl(glyph_id, palette, painter, recursion_stack, coords);
+                self.paint_impl(glyph_id, palette, painter, recursion_stack, coords, foreground_color);
             }
             12 => {
                 // PaintTransform
@@ -1089,6 +1097,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1124,6 +1133,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1140,6 +1150,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1165,6 +1176,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1181,6 +1193,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1206,6 +1219,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1226,6 +1240,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1257,6 +1272,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1274,6 +1290,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1298,6 +1315,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1317,6 +1335,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1347,6 +1366,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1364,6 +1384,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1388,6 +1409,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1407,6 +1429,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1437,6 +1460,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1455,6 +1479,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1480,6 +1505,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
             }
@@ -1500,6 +1526,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1531,6 +1558,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_transform();
                 painter.pop_transform();
@@ -1549,6 +1577,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.push_layer(composite_mode);
                 self.parse_paint(
@@ -1557,6 +1586,7 @@ impl<'a> Table<'a> {
                     painter,
                     recursion_stack,
                     coords,
+                    foreground_color
                 );
                 painter.pop_layer();
                 painter.pop_layer();

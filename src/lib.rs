@@ -1007,6 +1007,7 @@ pub struct Face<'a> {
     tables: FaceTables<'a>, // Parsed tables.
     #[cfg(feature = "variable-fonts")]
     coordinates: VarCoords,
+    foreground_color: RgbaColor
 }
 
 impl<'a> Face<'a> {
@@ -1049,6 +1050,7 @@ impl<'a> Face<'a> {
             #[cfg(feature = "variable-fonts")]
             coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
+            foreground_color: RgbaColor::new(0, 0, 0, 255)
         };
 
         #[cfg(feature = "variable-fonts")]
@@ -1148,6 +1150,7 @@ impl<'a> Face<'a> {
             #[cfg(feature = "variable-fonts")]
             coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
+            foreground_color: RgbaColor::new(0, 0, 0, 255)
         };
 
         #[cfg(feature = "variable-fonts")]
@@ -2189,7 +2192,7 @@ impl<'a> Face<'a> {
     ) -> Option<()> {
         self.tables
             .colr?
-            .paint(glyph_id, palette, painter, self.coords())
+            .paint(glyph_id, palette, painter, self.coords(), self.foreground_color())
     }
 
     /// Returns an iterator over variation axes.
@@ -2201,11 +2204,11 @@ impl<'a> Face<'a> {
 
     /// Sets a variation axis coordinate.
     ///
-    /// This is the only mutable method in the library.
+    /// This is one of the two only mutable methods in the library.
     /// We can simplify the API a lot by storing the variable coordinates
     /// in the face object itself.
     ///
-    /// Since coordinates are stored on the stack, we allow only 32 of them.
+    /// Since coordinates are stored on the stack, we allow only 64 of them.
     ///
     /// Returns `None` when face is not variable or doesn't have such axis.
     #[cfg(feature = "variable-fonts")]
@@ -2231,6 +2234,14 @@ impl<'a> Face<'a> {
         }
 
         Some(())
+    }
+
+    pub fn set_foreground_color(&mut self, color: RgbaColor) {
+        self.foreground_color = color;
+    }
+
+    pub fn foreground_color(&self) -> RgbaColor {
+        self.foreground_color
     }
 
     /// Returns the current normalized variation coordinates.

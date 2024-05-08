@@ -606,10 +606,6 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
 
         self.clip_with_path(&clip_path);
     }
-
-    fn foreground_color(&self) -> RgbaColor {
-        RgbaColor::new(0, 0, 0, 255)
-    }
 }
 
 fn color_glyph(

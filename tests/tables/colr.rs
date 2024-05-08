@@ -35,7 +35,7 @@ fn basic() {
     let colr = colr::Table::parse(cpal, &colr_data).unwrap();
     let paint = |id| {
         let mut painter = VecPainter(vec![]);
-        colr.paint(GlyphId(id), 0, &mut painter, &[]).map(|_| painter.0)
+        colr.paint(GlyphId(id), 0, &mut painter, &[], RgbaColor::new(0, 0, 0, 255)).map(|_| painter.0)
     };
 
     let a = RgbaColor::new(20, 15, 10, 25);
@@ -112,5 +112,4 @@ impl Painter<'_> for VecPainter {
     fn push_clip(&mut self) {}
     fn push_clip_box(&mut self, _clipbox: ClipBox) {}
     fn pop_clip(&mut self) {}
-    fn foreground_color(&self) -> RgbaColor {RgbaColor::new(128, 128, 128, 255)}
 }

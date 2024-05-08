@@ -793,11 +793,6 @@ impl<'a> Stream<'a> {
 pub trait Offset {
     /// Converts the offset to `usize`.
     fn to_usize(&self) -> usize;
-
-    /// Checks that offset is null.
-    fn is_null(&self) -> bool {
-        self.to_usize() == 0
-    }
 }
 
 /// A type-safe u16 offset.

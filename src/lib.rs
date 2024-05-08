@@ -2285,30 +2285,6 @@ impl<'a> Face<'a> {
     }
 }
 
-struct DefaultTableProvider<'a> {
-    data: &'a [u8],
-    tables: LazyArrayIter16<'a, TableRecord>,
-}
-
-impl<'a> Iterator for DefaultTableProvider<'a> {
-    type Item = Result<(Tag, Option<&'a [u8]>), FaceParsingError>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.tables.next().map(|table| {
-            Ok((table.tag, {
-                let offset = usize::num_from(table.offset);
-                let length = usize::num_from(table.length);
-                let end = offset
-                    .checked_add(length)
-                    .ok_or(FaceParsingError::MalformedFont)?;
-                let range = offset..end;
-                self.data.get(range)
-            }))
-        })
-    }
-}
-
 impl core::fmt::Debug for Face<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "Face()")

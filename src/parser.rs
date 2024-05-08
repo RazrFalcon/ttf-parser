@@ -130,7 +130,7 @@ impl F2DOT14 {
 
     #[inline]
     pub fn apply_float_delta(&self, delta: f32) -> f32 {
-        self.to_f32() + delta * (1.0 / 16384.0)
+        self.to_f32() + (delta as f64 * (1.0 / 16384.0)) as f32
     }
 }
 
@@ -154,6 +154,13 @@ impl FromData for Fixed {
     fn parse(data: &[u8]) -> Option<Self> {
         // TODO: is it safe to cast?
         i32::parse(data).map(|n| Fixed(n as f32 / 65536.0))
+    }
+}
+
+impl Fixed {
+    #[inline]
+    pub fn apply_float_delta(&self, delta: f32) -> f32 {
+        self.0 + (delta as f64 * (1.0 / 65536.0)) as f32
     }
 }
 

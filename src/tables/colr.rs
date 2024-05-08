@@ -825,6 +825,7 @@ impl<'a> Table<'a> {
         let mut s = Stream::new_at(self.data, offset)?;
         let format = s.read::<u8>()?;
 
+        // Cycle detected
         if recursion_stack.contains(offset) {
             return None;
         }
@@ -968,6 +969,33 @@ impl<'a> Table<'a> {
                     color_line: ColorLine::NonVarColorLine(color_line),
                 }))
             }
+            7 => {
+                // PaintVarRadialGradient
+                let color_line_offset = s.read::<Offset24>()?;
+                let color_line = self.parse_color_line(
+                    offset + color_line_offset.to_usize(),
+                    painter.foreground_color(),
+                )?;
+
+                let mut var_s = s.clone();
+                var_s.advance(12);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<6>(var_index_base, coords);
+
+                painter.paint(Paint::RadialGradient(RadialGradient {
+                    x0: s.read::<i16>()? as f32 + deltas[0],
+                    y0: s.read::<i16>()? as f32 + deltas[1],
+                    r0: s.read::<u16>()? as f32 + deltas[2],
+                    x1: s.read::<i16>()? as f32 + deltas[3],
+                    y1: s.read::<i16>()? as f32 + deltas[4],
+                    r1: s.read::<u16>()? as f32 + deltas[5],
+                    extend: color_line.extend,
+                    color_line: ColorLine::NonVarColorLine(color_line),
+                }))
+            }
             8 => {
                 // PaintSweepGradient
                 let color_line_offset = s.read::<Offset24>()?;
@@ -980,6 +1008,31 @@ impl<'a> Table<'a> {
                     center_y: s.read::<i16>()? as f32,
                     start_angle: s.read::<F2DOT14>()?.to_f32(),
                     end_angle: s.read::<F2DOT14>()?.to_f32(),
+                    extend: color_line.extend,
+                    color_line: ColorLine::NonVarColorLine(color_line),
+                }))
+            }
+            9 => {
+                // PaintVarSweepGradient
+                let color_line_offset = s.read::<Offset24>()?;
+                let color_line = self.parse_color_line(
+                    offset + color_line_offset.to_usize(),
+                    painter.foreground_color(),
+                )?;
+
+                let mut var_s = s.clone();
+                var_s.advance(8);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<4>(var_index_base, coords);
+
+                painter.paint(Paint::SweepGradient(SweepGradient {
+                    center_x: s.read::<i16>()? as f32 + deltas[0],
+                    center_y: s.read::<i16>()? as f32 + deltas[1],
+                    start_angle: s.read::<F2DOT14>()?.apply_float_delta(deltas[2]),
+                    end_angle: s.read::<F2DOT14>()?.apply_float_delta(deltas[3]),
                     extend: color_line.extend,
                     color_line: ColorLine::NonVarColorLine(color_line),
                 }))
@@ -1019,6 +1072,41 @@ impl<'a> Table<'a> {
                     e: s.read::<Fixed>().map(|n| n.0)?,
                     f: s.read::<Fixed>().map(|n| n.0)?,
                 };
+
+                painter.transform(ts);
+                self.parse_paint(
+                    offset + paint_offset.to_usize(),
+                    palette,
+                    painter,
+                    recursion_stack,
+                    coords,
+                );
+                painter.pop_transform();
+            }
+            13 => {
+                // PaintVarTransform
+                let paint_offset = s.read::<Offset24>()?;
+                let ts_offset = s.read::<Offset24>()?;
+                let mut s = Stream::new_at(self.data, offset + ts_offset.to_usize())?;
+
+                let mut var_s = s.clone();
+                var_s.advance(24);
+                let var_index_base = var_s.read::<u32>()?;
+
+                let deltas = self
+                    .variation_data()
+                    .read_deltas::<6>(var_index_base, coords);
+
+                let ts = Transform {
+                    a: s.read::<Fixed>()?.apply_float_delta(deltas[0]),
+                    b: s.read::<Fixed>()?.apply_float_delta(deltas[1]),
+                    c: s.read::<Fixed>()?.apply_float_delta(deltas[2]),
+                    d: s.read::<Fixed>()?.apply_float_delta(deltas[3]),
+                    e: s.read::<Fixed>()?.apply_float_delta(deltas[4]),
+                    f: s.read::<Fixed>()?.apply_float_delta(deltas[5]),
+                };
+
+                println!("VarTransform: {:?}, {:?}", ts.a, ts.b);
 
                 painter.transform(ts);
                 self.parse_paint(

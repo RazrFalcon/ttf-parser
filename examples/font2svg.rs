@@ -138,7 +138,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut column = 0;
     let mut gradient_index = 1;
     let mut clip_path_index = 1;
-    for id in 90..91 {
+    for id in 109..110 {
         // println!("GLYPH {:?}", id);
         let gid = ttf::GlyphId(id);
         let x = column as f64 * cell_size;

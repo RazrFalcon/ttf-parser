@@ -128,6 +128,7 @@ impl F2DOT14 {
         f32::from(self.0) / 16384.0
     }
 
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn apply_float_delta(&self, delta: f32) -> f32 {
         self.to_f32() + (delta as f64 * (1.0 / 16384.0)) as f32
@@ -158,6 +159,7 @@ impl FromData for Fixed {
 }
 
 impl Fixed {
+    #[cfg(feature = "variable-fonts")]
     #[inline]
     pub(crate) fn apply_float_delta(&self, delta: f32) -> f32 {
         self.0 + (delta as f64 * (1.0 / 65536.0)) as f32

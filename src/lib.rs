@@ -60,6 +60,7 @@ macro_rules! try_opt_or {
 
 #[cfg(feature = "apple-layout")]
 mod aat;
+#[cfg(feature = "variable-fonts")]
 mod delta_set;
 #[cfg(feature = "opentype-layout")]
 mod ggg;
@@ -682,6 +683,7 @@ struct VarCoords {
     len: u8,
 }
 
+#[cfg(feature = "variable-fonts")]
 impl Default for VarCoords {
     fn default() -> Self {
         Self {
@@ -2205,6 +2207,7 @@ impl<'a> Face<'a> {
             glyph_id,
             palette,
             painter,
+            #[cfg(feature = "variable-fonts")]
             self.coords(),
             self.foreground_color(),
         )

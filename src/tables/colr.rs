@@ -4,12 +4,15 @@
 // NOTE: Parts of the implementation have been inspired by
 // [skrifa](https://github.com/googlefonts/fontations/tree/main/skrifa).
 
+#[cfg(feature = "variable-fonts")]
 use crate::delta_set::DeltaSetIndexMap;
 use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F2DOT14};
-use crate::{cpal, Fixed, LazyArray32, NormalizedCoordinate, Transform};
-use crate::{GlyphId, RgbaColor};
 #[cfg(feature = "variable-fonts")]
 use crate::var_store::ItemVariationStore;
+#[cfg(feature = "variable-fonts")]
+use crate::NormalizedCoordinate;
+use crate::{cpal, Fixed, LazyArray32, Transform};
+use crate::{GlyphId, RgbaColor};
 
 /// A [base glyph](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyph-and-layer-records).
@@ -100,9 +103,8 @@ impl<'a> ClipList<'a> {
     pub fn get(
         &self,
         index: u32,
-        #[cfg(feature = "variable-fonts")]
-        variation_data: &VariationData,
-        coords: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] variation_data: &VariationData,
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
     ) -> Option<ClipBox> {
         let record = self.records.get(index)?;
         let offset = record.clip_box_offset.to_usize();
@@ -115,10 +117,9 @@ impl<'a> ClipList<'a> {
             #[cfg(feature = "variable-fonts")]
             let deltas = if format == 2 {
                 get_deltas::<4>(&s, 8, &variation_data, coords)?
-            }   else {
+            } else {
                 [0.0, 0.0, 0.0, 0.0]
             };
-
 
             Some(ClipBox {
                 x_min: s.read::<i16>()? as f32 + deltas[0],
@@ -134,15 +135,20 @@ impl<'a> ClipList<'a> {
     pub fn find(
         &self,
         glyph_id: GlyphId,
-        #[cfg(feature = "variable-fonts")]
-        variation_data: &VariationData,
-        coords: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] variation_data: &VariationData,
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
     ) -> Option<ClipBox> {
         let index = self
             .records
             .into_iter()
             .position(|v| v.glyphs_range().contains(&glyph_id))?;
-        self.get(index as u32, variation_data, coords)
+        self.get(
+            index as u32,
+            #[cfg(feature = "variable-fonts")]
+            variation_data,
+            #[cfg(feature = "variable-fonts")]
+            coords,
+        )
     }
 }
 
@@ -248,6 +254,7 @@ impl FromData for ColorStopRaw {
 
 /// A [var color stop](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#color-references-colorstop-and-colorline).
+#[cfg(feature = "variable-fonts")]
 #[derive(Clone, Copy, Debug)]
 struct VarColorStopRaw {
     stop_offset: F2DOT14,
@@ -256,6 +263,7 @@ struct VarColorStopRaw {
     var_index_base: u32,
 }
 
+#[cfg(feature = "variable-fonts")]
 impl FromData for VarColorStopRaw {
     const SIZE: usize = 10;
 
@@ -297,15 +305,15 @@ impl NonVarColorLine<'_> {
     }
 }
 
+#[cfg(feature = "variable-fonts")]
 impl VarColorLine<'_> {
     // TODO: Color stops should be sorted, but hard to do without allocations
     fn get(
         &self,
         palette: u16,
         index: u16,
-        #[cfg(feature = "variable-fonts")]
-        variation_data: VariationData,
-        coordinates: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] variation_data: VariationData,
+        #[cfg(feature = "variable-fonts")] coordinates: &[NormalizedCoordinate],
     ) -> Option<ColorStop> {
         let info = self.colors.get(index)?;
 
@@ -323,6 +331,7 @@ impl VarColorLine<'_> {
     }
 }
 
+#[cfg(feature = "variable-fonts")]
 #[derive(Clone)]
 struct VarColorLine<'a> {
     extend: GradientExtend,
@@ -333,6 +342,7 @@ struct VarColorLine<'a> {
 
 #[derive(Clone)]
 enum ColorLine<'a> {
+    #[cfg(feature = "variable-fonts")]
     VarColorLine(VarColorLine<'a>),
     NonVarColorLine(NonVarColorLine<'a>),
 }
@@ -390,13 +400,15 @@ impl<'a> LinearGradient<'a> {
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        coords: &'b [NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &'b [NormalizedCoordinate],
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
+            #[cfg(feature = "variable-fonts")]
             variation_data: self.variation_data,
+            #[cfg(feature = "variable-fonts")]
             coords,
         }
     }
@@ -445,13 +457,15 @@ impl<'a> RadialGradient<'a> {
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        coords: &'a [NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &'a [NormalizedCoordinate],
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
+            #[cfg(feature = "variable-fonts")]
             variation_data: self.variation_data,
+            #[cfg(feature = "variable-fonts")]
             coords,
         }
     }
@@ -495,13 +509,15 @@ impl<'a> SweepGradient<'a> {
     pub fn stops<'b>(
         &'b self,
         palette: u16,
-        coords: &'a [NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &'a [NormalizedCoordinate],
     ) -> GradientStopsIter<'a, 'b> {
         GradientStopsIter {
             color_line: &self.color_line,
             palette,
             index: 0,
+            #[cfg(feature = "variable-fonts")]
             variation_data: self.variation_data,
+            #[cfg(feature = "variable-fonts")]
             coords,
         }
     }
@@ -515,6 +531,7 @@ pub struct GradientStopsIter<'a, 'b> {
     index: u16,
     #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
+    #[cfg(feature = "variable-fonts")]
     coords: &'b [NormalizedCoordinate],
 }
 
@@ -523,6 +540,7 @@ impl Iterator for GradientStopsIter<'_, '_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let len = match self.color_line {
+            #[cfg(feature = "variable-fonts")]
             ColorLine::VarColorLine(vcl) => vcl.colors.len(),
             ColorLine::NonVarColorLine(nvcl) => nvcl.colors.len(),
         };
@@ -535,6 +553,7 @@ impl Iterator for GradientStopsIter<'_, '_> {
         self.index = self.index.checked_add(1)?;
 
         match self.color_line {
+            #[cfg(feature = "variable-fonts")]
             ColorLine::VarColorLine(vcl) => {
                 vcl.get(self.palette, index, self.variation_data, self.coords)
             }
@@ -847,7 +866,7 @@ impl<'a> Table<'a> {
         glyph_id: GlyphId,
         palette: u16,
         painter: &mut dyn Painter<'a>,
-        coords: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
         let mut recursion_stack = RecursionStack {
@@ -860,6 +879,7 @@ impl<'a> Table<'a> {
             palette,
             painter,
             &mut recursion_stack,
+            #[cfg(feature = "variable-fonts")]
             coords,
             foreground_color,
         )
@@ -871,7 +891,7 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
         recusion_stack: &mut RecursionStack,
-        coords: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
         if let Some(base) = self.get_v1(glyph_id) {
@@ -880,6 +900,7 @@ impl<'a> Table<'a> {
                 palette,
                 painter,
                 recusion_stack,
+                #[cfg(feature = "variable-fonts")]
                 coords,
                 foreground_color,
             )
@@ -922,12 +943,16 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
         recursion_stack: &mut RecursionStack,
-        coords: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
-        let clip_box = self
-            .clip_list
-            .find(base.glyph_id, &self.variation_data(), coords);
+        let clip_box = self.clip_list.find(
+            base.glyph_id,
+            #[cfg(feature = "variable-fonts")]
+            &self.variation_data(),
+            #[cfg(feature = "variable-fonts")]
+            coords,
+        );
         if let Some(clip_box) = clip_box {
             painter.push_clip_box(clip_box);
         }
@@ -937,6 +962,7 @@ impl<'a> Table<'a> {
             palette,
             painter,
             recursion_stack,
+            #[cfg(feature = "variable-fonts")]
             coords,
             foreground_color,
         );
@@ -954,7 +980,7 @@ impl<'a> Table<'a> {
         palette: u16,
         painter: &mut dyn Painter<'a>,
         recursion_stack: &mut RecursionStack,
-        coords: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
         let mut s = Stream::new_at(self.data, offset)?;
@@ -973,6 +999,7 @@ impl<'a> Table<'a> {
             recursion_stack,
             &mut s,
             format,
+            #[cfg(feature = "variable-fonts")]
             coords,
             foreground_color,
         );
@@ -989,7 +1016,7 @@ impl<'a> Table<'a> {
         recursion_stack: &mut RecursionStack,
         s: &mut Stream,
         format: u8,
-        coords: &[NormalizedCoordinate],
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
         match format {
@@ -1006,6 +1033,7 @@ impl<'a> Table<'a> {
                         palette,
                         painter,
                         recursion_stack,
+                        #[cfg(feature = "variable-fonts")]
                         coords,
                         foreground_color,
                     );
@@ -1025,6 +1053,7 @@ impl<'a> Table<'a> {
                 color.apply_alpha(alpha.to_f32());
                 painter.paint(Paint::Solid(color));
             }
+            #[cfg(feature = "variable-fonts")]
             3 => {
                 // PaintVarSolid
                 let palette_index = s.read::<u16>()?;
@@ -1058,10 +1087,12 @@ impl<'a> Table<'a> {
                     x2: s.read::<i16>()? as f32,
                     y2: s.read::<i16>()? as f32,
                     extend: color_line.extend,
+                    #[cfg(feature = "variable-fonts")]
                     variation_data: self.variation_data(),
                     color_line: ColorLine::NonVarColorLine(color_line),
                 }))
             }
+            #[cfg(feature = "variable-fonts")]
             5 => {
                 // PaintVarLinearGradient
                 let var_color_line_offset = s.read::<Offset24>()?;
@@ -1102,10 +1133,12 @@ impl<'a> Table<'a> {
                     y1: s.read::<i16>()? as f32,
                     r1: s.read::<u16>()? as f32,
                     extend: color_line.extend,
+                    #[cfg(feature = "variable-fonts")]
                     variation_data: self.variation_data(),
                     color_line: ColorLine::NonVarColorLine(color_line),
                 }))
             }
+            #[cfg(feature = "variable-fonts")]
             7 => {
                 // PaintVarRadialGradient
                 let color_line_offset = s.read::<Offset24>()?;
@@ -1146,9 +1179,11 @@ impl<'a> Table<'a> {
                     end_angle: s.read::<F2DOT14>()?.to_f32(),
                     extend: color_line.extend,
                     color_line: ColorLine::NonVarColorLine(color_line),
+                    #[cfg(feature = "variable-fonts")]
                     variation_data: self.variation_data(),
                 }))
             }
+            #[cfg(feature = "variable-fonts")]
             9 => {
                 // PaintVarSweepGradient
                 let color_line_offset = s.read::<Offset24>()?;
@@ -1187,6 +1222,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1201,6 +1237,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1225,11 +1262,13 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             13 => {
                 // PaintVarTransform
                 let paint_offset = s.read::<Offset24>()?;
@@ -1276,11 +1315,13 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             15 => {
                 // PaintVarTranslate
                 let paint_offset = s.read::<Offset24>()?;
@@ -1319,11 +1360,13 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             17 => {
                 // PaintVarScale
                 let paint_offset = s.read::<Offset24>()?;
@@ -1366,6 +1409,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1373,6 +1417,7 @@ impl<'a> Table<'a> {
                 painter.pop_transform();
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             19 => {
                 // PaintVarScaleAroundCenter
                 let paint_offset = s.read::<Offset24>()?;
@@ -1416,11 +1461,13 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             21 => {
                 // PaintVarScaleUniform
                 let paint_offset = s.read::<Offset24>()?;
@@ -1461,6 +1508,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1468,6 +1516,7 @@ impl<'a> Table<'a> {
                 painter.pop_transform();
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             23 => {
                 // PaintVarScaleUniformAroundCenter
                 let paint_offset = s.read::<Offset24>()?;
@@ -1510,11 +1559,13 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             25 => {
                 // PaintVarRotate
                 let paint_offset = s.read::<Offset24>()?;
@@ -1555,6 +1606,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1562,6 +1614,7 @@ impl<'a> Table<'a> {
                 painter.pop_transform();
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             27 => {
                 // PaintVarRotateAroundCenter
                 let paint_offset = s.read::<Offset24>()?;
@@ -1605,11 +1658,13 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             29 => {
                 // PaintVarSkew
                 let paint_offset = s.read::<Offset24>()?;
@@ -1652,6 +1707,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1659,6 +1715,7 @@ impl<'a> Table<'a> {
                 painter.pop_transform();
                 painter.pop_transform();
             }
+            #[cfg(feature = "variable-fonts")]
             31 => {
                 // PaintVarSkewAroundCenter
                 let paint_offset = s.read::<Offset24>()?;
@@ -1703,6 +1760,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1712,6 +1770,7 @@ impl<'a> Table<'a> {
                     palette,
                     painter,
                     recursion_stack,
+                    #[cfg(feature = "variable-fonts")]
                     coords,
                     foreground_color,
                 );
@@ -1741,6 +1800,7 @@ impl<'a> Table<'a> {
         })
     }
 
+    #[cfg(feature = "variable-fonts")]
     fn parse_var_color_line(
         &self,
         offset: usize,
@@ -1805,6 +1865,7 @@ struct VariationData<'a> {
     delta_map: Option<DeltaSetIndexMap<'a>>,
 }
 
+#[cfg(feature = "variable-fonts")]
 impl VariationData<'_> {
     // Inspired from `fontations`.
     fn read_deltas<const N: usize>(
@@ -1836,7 +1897,13 @@ impl VariationData<'_> {
     }
 }
 
-fn get_deltas<const N: usize>(s: &Stream, advance: usize, variation_data: &VariationData, coords: &[NormalizedCoordinate]) -> Option<[f32; N]> {
+#[cfg(feature = "variable-fonts")]
+fn get_deltas<const N: usize>(
+    s: &Stream,
+    advance: usize,
+    variation_data: &VariationData,
+    coords: &[NormalizedCoordinate],
+) -> Option<[f32; N]> {
     let mut var_s = s.clone();
     var_s.advance(advance);
     let var_index_base = var_s.read::<u32>()?;

@@ -361,18 +361,23 @@ impl Rect {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct BBox {
-    x_min: f32,
-    y_min: f32,
-    x_max: f32,
-    y_max: f32,
+/// A rectangle described by the left-lower and upper-right points.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RectF {
+    /// The horizontal minimum of the rect.
+    pub x_min: f32,
+    /// The vertical minimum of the rect.
+    pub y_min: f32,
+    /// The horizontal maximum of the rect.
+    pub x_max: f32,
+    /// The vertical maximum of the rect.
+    pub y_max: f32,
 }
 
-impl BBox {
+impl RectF {
     #[inline]
     fn new() -> Self {
-        BBox {
+        RectF {
             x_min: core::f32::MAX,
             y_min: core::f32::MAX,
             x_max: core::f32::MIN,

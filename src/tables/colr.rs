@@ -11,7 +11,7 @@ use crate::parser::{FromData, LazyArray16, Offset, Offset24, Offset32, Stream, F
 use crate::var_store::ItemVariationStore;
 #[cfg(feature = "variable-fonts")]
 use crate::NormalizedCoordinate;
-use crate::{cpal, Fixed, LazyArray32, Transform};
+use crate::{cpal, Fixed, LazyArray32, RectF, Transform};
 use crate::{GlyphId, RgbaColor};
 
 /// A [base glyph](
@@ -24,17 +24,7 @@ struct BaseGlyphRecord {
 }
 
 /// A [ClipBox](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ClipBox {
-    /// The horizontal minimum of the clip box.
-    pub x_min: f32,
-    /// The vertical minimum of the clip box.
-    pub y_min: f32,
-    /// The horizontal maximum of the clip box.
-    pub x_max: f32,
-    /// The vertical maximum of the clip box.
-    pub y_max: f32,
-}
+pub type ClipBox = RectF;
 
 /// A paint.
 #[derive(Clone, Debug)]

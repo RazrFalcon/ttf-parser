@@ -13,7 +13,7 @@ use core::num::NonZeroU16;
 
 use crate::glyf;
 use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream, F2DOT14};
-use crate::{BBox, GlyphId, NormalizedCoordinate, OutlineBuilder, Rect, Transform};
+use crate::{GlyphId, NormalizedCoordinate, OutlineBuilder, Rect, RectF, Transform};
 
 /// 'The TrueType rasterizer dynamically generates 'phantom' points for each glyph
 /// that represent horizontal and vertical advance widths and side bearings,
@@ -1739,7 +1739,7 @@ impl<'a> Table<'a> {
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
     ) -> Option<Rect> {
-        let mut b = glyf::Builder::new(Transform::default(), BBox::new(), builder);
+        let mut b = glyf::Builder::new(Transform::default(), RectF::new(), builder);
         let glyph_data = glyf_table.get(glyph_id)?;
         outline_var_impl(
             glyf_table,

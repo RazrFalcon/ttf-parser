@@ -64,8 +64,8 @@ There are roughly three types of TrueType tables:
 | `bloc` table      | ✓                      | ✓                   |                                |
 | `CBDT` table      | ~ (no 8, 9)            | ✓                   |                                |
 | `CBLC` table      | ✓                      | ✓                   |                                |
-| `COLR` table      | ~ (only v0)            | ✓                   |                                |
-| `CPAL` table      | ~ (only v0)            | ✓                   |                                |
+| `COLR` table      | ✓                      | ✓                   |                                |
+| `CPAL` table      | ✓                      | ✓                   |                                |
 | `CFF `&nbsp;table | ✓                      | ✓                   | ~ (no `seac` support)          |
 | `CFF2` table      | ✓                      | ✓                   |                                |
 | `cmap` table      | ~ (no 8)               | ✓                   | ~ (no 2,8,10,14; Unicode-only) |
@@ -195,3 +195,4 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+

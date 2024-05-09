@@ -1,6 +1,7 @@
+use base64::engine::general_purpose::STANDARD;
+
 use std::io::Write;
 use std::path::PathBuf;
-use base64::engine::general_purpose::STANDARD;
 
 use ttf_parser as ttf;
 use ttf_parser::colr::{ClipBox, Paint};

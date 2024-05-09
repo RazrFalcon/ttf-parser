@@ -83,23 +83,13 @@ impl ClipRecord {
 
 /// A [clip list](
 /// https://learn.microsoft.com/en-us/typography/opentype/spec/colr#baseglyphlist-layerlist-and-cliplist).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct ClipList<'a> {
     data: &'a [u8],
     records: LazyArray32<'a, ClipRecord>,
 }
 
-impl Default for ClipList<'_> {
-    fn default() -> Self {
-        Self {
-            data: &[],
-            records: LazyArray32::default(),
-        }
-    }
-}
-
 impl<'a> ClipList<'a> {
-    #[inline]
     pub fn get(
         &self,
         index: u32,
@@ -364,19 +354,19 @@ pub struct ColorStop {
 /// A [linear gradient](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-4-and-5-paintlineargradient-paintvarlineargradient)
 #[derive(Clone)]
 pub struct LinearGradient<'a> {
-    /// The `x0` value of the linear gradient.
+    /// The `x0` value.
     pub x0: f32,
-    /// The `y0` value of the linear gradient.
+    /// The `y0` value.
     pub y0: f32,
-    /// The `x1` value of the linear gradient.
+    /// The `x1` value.
     pub x1: f32,
-    /// The `y1` value of the linear gradient.
+    /// The `y1` value.
     pub y1: f32,
-    /// The `x2` value of the linear gradient.
+    /// The `x2` value.
     pub x2: f32,
-    /// The `y2` value of the linear gradient.
+    /// The `y2` value.
     pub y2: f32,
-    /// The extend of the gradient.
+    /// The extend.
     pub extend: GradientExtend,
     #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
@@ -393,13 +383,14 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
             .field("x2", &self.x2)
             .field("y2", &self.y2)
             .field("extend", &self.extend)
-            // .field("stops", &self.stops(0))
+            .field("stops", &self.stops(0, &[]))
             .finish()
     }
 }
 
 impl<'a> LinearGradient<'a> {
-    /// Returns an iterator over the stops of the linear gradient.
+    /// Returns an iterator over the stops of the linear gradient. Stops need to be sorted
+    /// manually by the caller.
     pub fn stops<'b>(
         &'b self,
         palette: u16,
@@ -420,19 +411,19 @@ impl<'a> LinearGradient<'a> {
 /// A [radial gradient](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-6-and-7-paintradialgradient-paintvarradialgradient)
 #[derive(Clone)]
 pub struct RadialGradient<'a> {
-    /// The `x0` value of the radial gradient.
+    /// The `x0` value.
     pub x0: f32,
-    /// The `y0` value of the radial gradient.
+    /// The `y0` value.
     pub y0: f32,
-    /// The `r0` value of the radial gradient.
+    /// The `r0` value.
     pub r0: f32,
-    /// The `r1` value of the radial gradient.
+    /// The `r1` value.
     pub r1: f32,
-    /// The `x1` value of the radial gradient.
+    /// The `x1` value.
     pub x1: f32,
-    /// The `y1` value of the radial gradient.
+    /// The `y1` value.
     pub y1: f32,
-    /// The extend radial gradient.
+    /// The extend.
     pub extend: GradientExtend,
     #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
@@ -449,13 +440,14 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
             .field("x1", &self.x1)
             .field("y1", &self.y1)
             .field("extend", &self.extend)
-            // .field("stops", &self.stops(0))
+            .field("stops", &self.stops(0, &[]))
             .finish()
     }
 }
 
 impl<'a> RadialGradient<'a> {
-    /// Returns an iterator over the stops of the radial gradient.
+    /// Returns an iterator over the stops of the radial gradient. Stops need to be sorted
+    /// manually by the caller.
     pub fn stops<'b>(
         &'b self,
         palette: u16,
@@ -476,15 +468,15 @@ impl<'a> RadialGradient<'a> {
 /// A [sweep gradient](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-8-and-9-paintsweepgradient-paintvarsweepgradient)
 #[derive(Clone)]
 pub struct SweepGradient<'a> {
-    /// The x of the center of the sweep gradient.
+    /// The x of the center.
     pub center_x: f32,
-    /// The y of the center of the sweep gradient.
+    /// The y of the center.
     pub center_y: f32,
-    /// The start angle of the sweep gradient.
+    /// The start angle.
     pub start_angle: f32,
-    /// The end angle of the sweep gradient.
+    /// The end angle.
     pub end_angle: f32,
-    /// The extend of the sweep gradient.
+    /// The extend.
     pub extend: GradientExtend,
     #[cfg(feature = "variable-fonts")]
     variation_data: VariationData<'a>,
@@ -499,14 +491,16 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
             .field("start_angle", &self.start_angle)
             .field("end_angle", &self.end_angle)
             .field("extend", &self.extend)
-            // .field("stops", &self.stops(0))
+            .field("stops", &self.stops(0, &[]))
             .finish()
     }
 }
 
 impl<'a> SweepGradient<'a> {
-    /// An iterator over the stops of the sweep gradient.
-    // TODO: Make API nicer (same for radial and linear gradient)
+    // TODO: Make API nicer so that variable coordinates don't
+    // need to be passed by the caller (same for radial and linear gradient)
+    /// An iterator over the stops of the sweep gradient. Stops need to be sorted
+    /// manually by the caller.
     pub fn stops<'b>(
         &'b self,
         palette: u16,

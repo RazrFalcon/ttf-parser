@@ -202,7 +202,7 @@ mod colr1_static {
     fn linear_gradient() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(9), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(9), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert_eq!(vec_painter.0, vec![
             PushClipBox(ClipBox { x_min: 100.0, y_min: 250.0, x_max: 900.0, y_max: 950.0 }),
             OutlineGlyph(GlyphId(9)),
@@ -219,7 +219,7 @@ mod colr1_static {
     fn sweep_gradient() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(13), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(13), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert_eq!(vec_painter.0, vec![
             PushClipBox(ClipBox { x_min: 0.0, y_min: 0.0, x_max: 1000.0, y_max: 1000.0 }),
             OutlineGlyph(GlyphId(176)),
@@ -238,7 +238,7 @@ mod colr1_static {
     fn scale_around_center() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(84), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(84), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert_eq!(vec_painter.0, vec![
             PushLayer(SourceOver),
             OutlineGlyph(GlyphId(3)),
@@ -266,7 +266,7 @@ mod colr1_static {
     fn scale() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(86), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(86), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Scale(0.5, 1.5)))
     }
 
@@ -274,7 +274,7 @@ mod colr1_static {
     fn radial_gradient() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(93), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(93), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert_eq!(vec_painter.0, vec![
             PushClipBox(ClipBox { x_min: 0.0, y_min: 0.0, x_max: 1000.0, y_max: 1000.0 }),
             OutlineGlyph(GlyphId(2)),
@@ -292,7 +292,7 @@ mod colr1_static {
     fn rotate() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(99), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(99), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Rotate(0.055541992)))
     }
 
@@ -300,7 +300,7 @@ mod colr1_static {
     fn rotate_around_center() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(101), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(101), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert_eq!(vec_painter.0, vec![
             PushLayer(SourceOver),
             OutlineGlyph(GlyphId(3)),
@@ -328,7 +328,7 @@ mod colr1_static {
     fn skew() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(103), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(103), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Skew(0.13891602, 0.0)));
     }
 
@@ -336,7 +336,7 @@ mod colr1_static {
     fn skew_around_center() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(104), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(104), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert_eq!(vec_painter.0, vec![
             PushLayer(SourceOver),
             OutlineGlyph(GlyphId(3)),
@@ -362,7 +362,7 @@ mod colr1_static {
     fn transform() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(109), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(109), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
         assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform {
                 a: 1.0,
@@ -379,7 +379,7 @@ mod colr1_static {
     fn translate() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(114), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(114), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
         assert!(vec_painter.0.contains(&Translate(0.0, 100.0)));
     }
@@ -388,7 +388,7 @@ mod colr1_static {
     fn composite() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(131), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(131), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
         assert!(vec_painter.0.contains(&Command::PushLayer(Xor)));
     }
@@ -397,7 +397,7 @@ mod colr1_static {
     fn cyclic_dependency() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(179), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(179), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
     }
 }
 
@@ -416,7 +416,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SWPS"), 45.0);
         face.set_variation(Tag::from_bytes(b"SWPE"), 58.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(13), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(13), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Paint(SweepGradient(500.0, 600.0, -0.416687, 0.9888916, Pad, vec![
             CustomStop(0.25, RgbaColor { red: 250, green: 240, blue: 230, alpha: 255 }),
             CustomStop(0.416687, RgbaColor { red: 0, green: 0, blue: 255, alpha: 255 }),
@@ -431,7 +431,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SCSX"), 1.1);
         face.set_variation(Tag::from_bytes(b"SCSY"), -0.9);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(84), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(84), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Scale(1.599942, 0.60009766)))
     }
 
@@ -441,7 +441,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SCSX"), 1.1);
         face.set_variation(Tag::from_bytes(b"SCSY"), -0.9);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(86), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(86), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Scale(1.599942, 0.60009766)))
     }
 
@@ -449,7 +449,7 @@ mod colr1_variable {
     fn radial_gradient() {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(93), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(93), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert_eq!(vec_painter.0, vec![
             PushClipBox(ClipBox { x_min: 0.0, y_min: 0.0, x_max: 1000.0, y_max: 1000.0 }),
             OutlineGlyph(GlyphId(2)),
@@ -468,7 +468,7 @@ mod colr1_variable {
         let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
         face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(99), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(99), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Rotate(0.87341005)))
     }
 
@@ -477,7 +477,7 @@ mod colr1_variable {
         let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
         face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(101), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(101), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Rotate(0.9336252)))
     }
 
@@ -486,7 +486,7 @@ mod colr1_variable {
         let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
         face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(103), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(103), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
     }
 
@@ -495,7 +495,7 @@ mod colr1_variable {
         let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
         face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(104), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(104), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
         assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
     }
 
@@ -504,7 +504,7 @@ mod colr1_variable {
         let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
         face.set_variation(Tag::from_bytes(b"TRDX"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(109), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(109), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
         assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform {
             a: 1.0,
@@ -522,7 +522,7 @@ mod colr1_variable {
         let mut face = Face::parse(COLR1_VARIABLE, 0).unwrap();
         face.set_variation(Tag::from_bytes(b"TLDX"), 100.0);
         let mut vec_painter = VecPainter(vec![]);
-        face.paint_color_glyph(GlyphId(114), 0, &mut vec_painter);
+        face.paint_color_glyph(GlyphId(114), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
         assert!(vec_painter.0.contains(&Translate(99.975586, 100.0)));
     }

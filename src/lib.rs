@@ -1025,7 +1025,6 @@ pub struct Face<'a> {
     tables: FaceTables<'a>, // Parsed tables.
     #[cfg(feature = "variable-fonts")]
     coordinates: VarCoords,
-    foreground_color: RgbaColor,
 }
 
 impl<'a> Face<'a> {
@@ -1068,7 +1067,6 @@ impl<'a> Face<'a> {
             #[cfg(feature = "variable-fonts")]
             coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
-            foreground_color: RgbaColor::new(0, 0, 0, 255),
         };
 
         #[cfg(feature = "variable-fonts")]
@@ -1168,7 +1166,6 @@ impl<'a> Face<'a> {
             #[cfg(feature = "variable-fonts")]
             coordinates: VarCoords::default(),
             tables: Self::parse_tables(raw_tables)?,
-            foreground_color: RgbaColor::new(0, 0, 0, 255),
         };
 
         #[cfg(feature = "variable-fonts")]
@@ -2206,6 +2203,7 @@ impl<'a> Face<'a> {
         &self,
         glyph_id: GlyphId,
         palette: u16,
+        foreground_color: RgbaColor,
         painter: &mut dyn colr::Painter<'a>,
     ) -> Option<()> {
         self.tables.colr?.paint(
@@ -2214,7 +2212,7 @@ impl<'a> Face<'a> {
             painter,
             #[cfg(feature = "variable-fonts")]
             self.coords(),
-            self.foreground_color(),
+            foreground_color,
         )
     }
 
@@ -2257,16 +2255,6 @@ impl<'a> Face<'a> {
         }
 
         Some(())
-    }
-
-    /// Sets the foreground color of the face. Is used by the COLRv1 table.
-    pub fn set_foreground_color(&mut self, color: RgbaColor) {
-        self.foreground_color = color;
-    }
-
-    /// Gets the foreground color of the face.
-    pub fn foreground_color(&self) -> RgbaColor {
-        self.foreground_color
     }
 
     /// Returns the current normalized variation coordinates.

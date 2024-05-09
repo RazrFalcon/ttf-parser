@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use ttf_parser as ttf;
 use ttf_parser::colr::{ClipBox, Paint};
-use ttf_parser::Transform;
+use ttf_parser::{RgbaColor, Transform};
 
 const FONT_SIZE: f64 = 128.0;
 const COLUMNS: u32 = 100;
@@ -385,9 +385,11 @@ impl<'a> GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", gradient_transform);
-        self.write_gradient_stops(
-            gradient.stops(self.palette_index, self.face.variation_coordinates()),
-        );
+        self.write_gradient_stops(gradient.stops(
+            self.palette_index,
+            #[cfg(feature = "variable-fonts")]
+            self.face.variation_coordinates(),
+        ));
         self.svg.end_element();
 
         self.svg.start_element("path");
@@ -415,9 +417,11 @@ impl<'a> GlyphPainter<'a> {
         self.svg.write_spread_method_attribute(gradient.extend);
         self.svg
             .write_transform_attribute("gradientTransform", self.transform);
-        self.write_gradient_stops(
-            gradient.stops(self.palette_index, self.face.variation_coordinates()),
-        );
+        self.write_gradient_stops(gradient.stops(
+            self.palette_index,
+            #[cfg(feature = "variable-fonts")]
+            self.face.variation_coordinates(),
+        ));
         self.svg.end_element();
 
         self.svg.start_element("path");
@@ -633,7 +637,12 @@ fn color_glyph(
         outline_transform: ttf::Transform::default(),
         transforms_stack: vec![ttf::Transform::default()],
     };
-    face.paint_color_glyph(glyph_id, palette_index, &mut painter);
+    face.paint_color_glyph(
+        glyph_id,
+        palette_index,
+        RgbaColor::new(0, 0, 0, 255),
+        &mut painter,
+    );
     *gradient_index = painter.gradient_index;
     *clip_path_index = painter.clip_path_index;
 

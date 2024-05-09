@@ -510,7 +510,7 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
 impl<'a> SweepGradient<'a> {
     // TODO: Make API nicer so that variable coordinates don't
     // need to be passed by the caller (same for radial and linear gradient)
-    /// An iterator over the stops of the sweep gradient. Stops need to be sorted
+    /// Returns an iterator over the stops of the sweep gradient. Stops need to be sorted
     /// manually by the caller.
     pub fn stops<'b>(
         &'b self,

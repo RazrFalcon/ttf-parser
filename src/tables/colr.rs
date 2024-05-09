@@ -373,7 +373,14 @@ impl<'a> core::fmt::Debug for LinearGradient<'a> {
             .field("x2", &self.x2)
             .field("y2", &self.y2)
             .field("extend", &self.extend)
-            .field("stops", &self.stops(0, &[]))
+            .field(
+                "stops",
+                &self.stops(
+                    0,
+                    #[cfg(feature = "variable-fonts")]
+                    &[],
+                ),
+            )
             .finish()
     }
 }
@@ -430,7 +437,14 @@ impl<'a> core::fmt::Debug for RadialGradient<'a> {
             .field("x1", &self.x1)
             .field("y1", &self.y1)
             .field("extend", &self.extend)
-            .field("stops", &self.stops(0, &[]))
+            .field(
+                "stops",
+                &self.stops(
+                    0,
+                    #[cfg(feature = "variable-fonts")]
+                    &[],
+                ),
+            )
             .finish()
     }
 }
@@ -481,7 +495,14 @@ impl<'a> core::fmt::Debug for SweepGradient<'a> {
             .field("start_angle", &self.start_angle)
             .field("end_angle", &self.end_angle)
             .field("extend", &self.extend)
-            .field("stops", &self.stops(0, &[]))
+            .field(
+                "stops",
+                &self.stops(
+                    0,
+                    #[cfg(feature = "variable-fonts")]
+                    &[],
+                ),
+            )
             .finish()
     }
 }
@@ -782,8 +803,7 @@ impl<'a> Table<'a> {
             table.clip_list_offsets_offset = offset;
             let clip_data = data.get(offset.to_usize()..)?;
             let mut s = Stream::new(clip_data);
-            // Format
-            s.read::<u8>()?;
+            s.skip::<u8>(); // Format
             let count = s.read::<u32>()?;
             table.clip_list = ClipList {
                 data: clip_data,

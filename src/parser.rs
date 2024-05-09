@@ -127,6 +127,12 @@ impl F2DOT14 {
     pub fn to_f32(self) -> f32 {
         f32::from(self.0) / 16384.0
     }
+
+    #[cfg(feature = "variable-fonts")]
+    #[inline]
+    pub fn apply_float_delta(&self, delta: f32) -> f32 {
+        self.to_f32() + (delta as f64 * (1.0 / 16384.0)) as f32
+    }
 }
 
 impl FromData for F2DOT14 {
@@ -149,6 +155,14 @@ impl FromData for Fixed {
     fn parse(data: &[u8]) -> Option<Self> {
         // TODO: is it safe to cast?
         i32::parse(data).map(|n| Fixed(n as f32 / 65536.0))
+    }
+}
+
+impl Fixed {
+    #[cfg(feature = "variable-fonts")]
+    #[inline]
+    pub(crate) fn apply_float_delta(&self, delta: f32) -> f32 {
+        self.0 + (delta as f64 * (1.0 / 65536.0)) as f32
     }
 }
 
@@ -781,11 +795,6 @@ impl<'a> Stream<'a> {
 pub trait Offset {
     /// Converts the offset to `usize`.
     fn to_usize(&self) -> usize;
-
-    /// Checks that offset is null.
-    fn is_null(&self) -> bool {
-        self.to_usize() == 0
-    }
 }
 
 /// A type-safe u16 offset.
@@ -814,6 +823,40 @@ impl FromData for Option<Offset16> {
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let offset = Offset16::parse(data)?;
+        if offset.0 != 0 {
+            Some(Some(offset))
+        } else {
+            Some(None)
+        }
+    }
+}
+
+/// A type-safe u24 offset.
+#[derive(Clone, Copy, Debug)]
+pub struct Offset24(pub u32);
+
+impl Offset for Offset24 {
+    #[inline]
+    fn to_usize(&self) -> usize {
+        usize::num_from(self.0)
+    }
+}
+
+impl FromData for Offset24 {
+    const SIZE: usize = 3;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        U24::parse(data).map(|n| Offset24(n.0))
+    }
+}
+
+impl FromData for Option<Offset24> {
+    const SIZE: usize = Offset24::SIZE;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let offset = Offset24::parse(data)?;
         if offset.0 != 0 {
             Some(Some(offset))
         } else {

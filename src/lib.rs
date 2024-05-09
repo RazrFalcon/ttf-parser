@@ -50,6 +50,8 @@ extern crate std;
 
 #[cfg(feature = "apple-layout")]
 mod aat;
+#[cfg(feature = "variable-fonts")]
+mod delta_set;
 #[cfg(feature = "opentype-layout")]
 mod ggg;
 mod language;
@@ -349,18 +351,23 @@ impl Rect {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct BBox {
-    x_min: f32,
-    y_min: f32,
-    x_max: f32,
-    y_max: f32,
+/// A rectangle described by the left-lower and upper-right points.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RectF {
+    /// The horizontal minimum of the rect.
+    pub x_min: f32,
+    /// The vertical minimum of the rect.
+    pub y_min: f32,
+    /// The horizontal maximum of the rect.
+    pub x_max: f32,
+    /// The vertical maximum of the rect.
+    pub y_max: f32,
 }
 
-impl BBox {
+impl RectF {
     #[inline]
     fn new() -> Self {
-        BBox {
+        RectF {
             x_min: core::f32::MAX,
             y_min: core::f32::MAX,
             x_max: core::f32::MIN,
@@ -395,28 +402,37 @@ impl BBox {
     }
 }
 
+/// An affine transform.
 #[derive(Clone, Copy, PartialEq)]
-pub(crate) struct Transform {
+pub struct Transform {
+    /// The 'a' component of the transform.
     pub a: f32,
+    /// The 'b' component of the transform.
     pub b: f32,
+    /// The 'c' component of the transform.
     pub c: f32,
+    /// The 'd' component of the transform.
     pub d: f32,
+    /// The 'e' component of the transform.
     pub e: f32,
+    /// The 'f' component of the transform.
     pub f: f32,
 }
 
 impl Transform {
+    /// Creates a new transform with the specified components.
     #[inline]
     pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Self {
         Transform { a, b, c, d, e, f }
     }
 
-    #[cfg(feature = "variable-fonts")]
+    /// Creates a new translation transform.
     #[inline]
     pub fn new_translate(tx: f32, ty: f32) -> Self {
         Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty)
     }
 
+    /// Combines two transforms with each other.
     #[inline]
     pub fn combine(ts1: Self, ts2: Self) -> Self {
         Transform {
@@ -437,6 +453,7 @@ impl Transform {
         *y = self.b * tx + self.d * ty + self.f;
     }
 
+    /// Checks whether a transform is the identity transform.
     #[inline]
     pub fn is_default(&self) -> bool {
         // A direct float comparison is fine in our case.
@@ -493,6 +510,10 @@ impl RgbaColor {
             red,
             alpha,
         }
+    }
+
+    pub(crate) fn apply_alpha(&mut self, alpha: f32) {
+        self.alpha = (((f32::from(self.alpha) / 255.0) * alpha) * 255.0) as u8;
     }
 }
 
@@ -648,13 +669,23 @@ impl FromData for TableRecord {
 }
 
 #[cfg(feature = "variable-fonts")]
-const MAX_VAR_COORDS: usize = 32;
+const MAX_VAR_COORDS: usize = 64;
 
 #[cfg(feature = "variable-fonts")]
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct VarCoords {
     data: [NormalizedCoordinate; MAX_VAR_COORDS],
     len: u8,
+}
+
+#[cfg(feature = "variable-fonts")]
+impl Default for VarCoords {
+    fn default() -> Self {
+        Self {
+            data: [NormalizedCoordinate::default(); MAX_VAR_COORDS],
+            len: u8::default(),
+        }
+    }
 }
 
 #[cfg(feature = "variable-fonts")]
@@ -2168,9 +2199,17 @@ impl<'a> Face<'a> {
         &self,
         glyph_id: GlyphId,
         palette: u16,
-        painter: &mut dyn colr::Painter,
+        foreground_color: RgbaColor,
+        painter: &mut dyn colr::Painter<'a>,
     ) -> Option<()> {
-        self.tables.colr?.paint(glyph_id, palette, painter)
+        self.tables.colr?.paint(
+            glyph_id,
+            palette,
+            painter,
+            #[cfg(feature = "variable-fonts")]
+            self.coords(),
+            foreground_color,
+        )
     }
 
     /// Returns an iterator over variation axes.
@@ -2182,11 +2221,11 @@ impl<'a> Face<'a> {
 
     /// Sets a variation axis coordinate.
     ///
-    /// This is the only mutable method in the library.
+    /// This is one of the two only mutable methods in the library.
     /// We can simplify the API a lot by storing the variable coordinates
     /// in the face object itself.
     ///
-    /// Since coordinates are stored on the stack, we allow only 32 of them.
+    /// Since coordinates are stored on the stack, we allow only 64 of them.
     ///
     /// Returns `None` when face is not variable or doesn't have such axis.
     #[cfg(feature = "variable-fonts")]
@@ -2263,30 +2302,6 @@ impl<'a> Face<'a> {
     #[inline]
     fn coords(&self) -> &[NormalizedCoordinate] {
         self.coordinates.as_slice()
-    }
-}
-
-struct DefaultTableProvider<'a> {
-    data: &'a [u8],
-    tables: LazyArrayIter16<'a, TableRecord>,
-}
-
-impl<'a> Iterator for DefaultTableProvider<'a> {
-    type Item = Result<(Tag, Option<&'a [u8]>), FaceParsingError>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.tables.next().map(|table| {
-            Ok((table.tag, {
-                let offset = usize::num_from(table.offset);
-                let length = usize::num_from(table.length);
-                let end = offset
-                    .checked_add(length)
-                    .ok_or(FaceParsingError::MalformedFont)?;
-                let range = offset..end;
-                self.data.get(range)
-            }))
-        })
     }
 }
 

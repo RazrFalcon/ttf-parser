@@ -20,7 +20,7 @@ use super::index::{parse_index, skip_index, Index};
 use super::std_names::STANDARD_NAMES;
 use super::{calc_subroutine_bias, conv_subroutine_index, Builder, CFFError, IsEven, StringId};
 use crate::parser::{LazyArray16, NumFrom, Stream, TryNumFrom};
-use crate::{BBox, DummyOutline, GlyphId, OutlineBuilder, Rect};
+use crate::{DummyOutline, GlyphId, OutlineBuilder, Rect, RectF};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: usize = 48;
@@ -376,7 +376,7 @@ fn parse_char_string(
 
     let mut inner_builder = Builder {
         builder,
-        bbox: BBox::new(),
+        bbox: RectF::new(),
     };
 
     let stack = ArgumentsStack {

@@ -20,7 +20,7 @@ impl<'a> Table<'a> {
         let mut s = Stream::new(data);
 
         let version = s.read::<u16>()?;
-        if version != 0 {
+        if version > 1 {
             return None;
         }
 

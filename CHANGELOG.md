@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   Thanks to [Fuzzyzilla](https://github.com/Fuzzyzilla).
 - Increase lenience of embed permissions for older OS/2 versions.
   Thanks to [Fuzzyzilla](https://github.com/Fuzzyzilla).
+- Bump MSRV to 1.51
 
 ## [0.20.0] - 2023-10-15
 ### Added

@@ -1744,6 +1744,7 @@ impl<'a> Face<'a> {
     }
 
     /// Checks if the face allows outline data to be embedded.
+    ///
     /// If false, only bitmaps may be embedded in accordance with [`Self::permissions`].
     ///
     /// If the font contains no bitmaps and this flag is not set, it implies no embedding is allowed.

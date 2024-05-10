@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+## [0.21.0] - 2024-05-10
+### Added
+- `COLR` / `CPAL` v1 support.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+
+### Changed
+- Replace `Face::is_bitmap_embedding_allowed` with `Face::is_outline_embedding_allowed`.
+  The old one had a bool flag flipped.
+  Thanks to [Fuzzyzilla](https://github.com/Fuzzyzilla).
+- Increase lenience of embed permissions for older OS/2 versions.
+  Thanks to [Fuzzyzilla](https://github.com/Fuzzyzilla).
 
 ## [0.20.0] - 2023-10-15
 ### Added
@@ -409,7 +420,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.0...v0.19.1

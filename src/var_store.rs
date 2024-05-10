@@ -91,11 +91,14 @@ impl<'a> ItemVariationStore<'a> {
         let has_long_words = (word_delta_count & 0x8000) != 0;
         let word_delta_count = word_delta_count & 0x7FFF;
 
-        let delta_set_len = if has_long_words {
-            4 * word_delta_count + 2 * region_index_count.checked_sub(word_delta_count)?
-        } else {
-            2 * region_index_count
-        };
+        // From the spec: The length of the data for each row, in bytes, is
+        // regionIndexCount + (wordDeltaCount & WORD_DELTA_COUNT_MASK)
+        // if the LONG_WORDS flag is not set, or 2 x that amount if the flag is set.
+        let mut delta_set_len = word_delta_count + region_index_count;
+        if has_long_words {
+            delta_set_len = delta_set_len * 2;
+        }
+
         s.advance(usize::from(inner_index).checked_mul(usize::from(delta_set_len))?);
 
         let mut delta = 0.0;

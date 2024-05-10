@@ -1755,7 +1755,7 @@ impl<'a> Face<'a> {
             .unwrap_or(false)
     }
 
-    /// Checks if the face bitmaps embedding is allowed.
+    /// Returns [Unicode Ranges](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#ur).
     #[inline]
     pub fn unicode_ranges(&self) -> UnicodeRanges {
         self.tables

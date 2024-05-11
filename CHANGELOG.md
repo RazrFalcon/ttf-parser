@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.21.1] - 2024-05-11
+### Fixed
+- Delta set length calculation in variable fonts.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).<br>
+  Got broken in the previous version.
+
 ## [0.21.0] - 2024-05-10
 ### Added
 - `COLR` / `CPAL` v1 support.
@@ -421,7 +428,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.1...v0.19.2

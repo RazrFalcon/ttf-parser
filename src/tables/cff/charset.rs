@@ -190,7 +190,7 @@ impl Charset<'_> {
 }
 
 pub(crate) fn parse_charset<'a>(number_of_glyphs: u16, s: &mut Stream<'a>) -> Option<Charset<'a>> {
-    if number_of_glyphs < 2 {
+    if number_of_glyphs < 1 {
         return None;
     }
 

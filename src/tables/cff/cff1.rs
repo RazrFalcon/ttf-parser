@@ -892,7 +892,7 @@ impl<'a> Table<'a> {
             Some(charset_id::EXPERT_SUBSET) => Charset::ExpertSubset,
             Some(offset) => {
                 let mut s = Stream::new_at(data, offset)?;
-                parse_charset(number_of_glyphs.get(), &mut s)?
+                parse_charset(number_of_glyphs, &mut s)?
             }
             None => Charset::ISOAdobe, // default
         };

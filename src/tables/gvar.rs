@@ -1837,19 +1837,20 @@ fn outline_var_impl(
             transform = Transform::combine(transform, component.transform);
 
             let mut b = glyf::Builder::new(transform, builder.bbox, builder.builder);
-            let glyph_data = glyf_table.get(component.glyph_id)?;
-            outline_var_impl(
-                glyf_table,
-                gvar_table,
-                component.glyph_id,
-                glyph_data,
-                coordinates,
-                depth + 1,
-                &mut b,
-            )?;
+            if let Some(glyph_data) = glyf_table.get(component.glyph_id) {
+                outline_var_impl(
+                    glyf_table,
+                    gvar_table,
+                    component.glyph_id,
+                    glyph_data,
+                    coordinates,
+                    depth + 1,
+                    &mut b,
+                )?;
 
-            // Take updated bbox.
-            builder.bbox = b.bbox;
+                // Take updated bbox.
+                builder.bbox = b.bbox;
+            }
         }
 
         Some(())

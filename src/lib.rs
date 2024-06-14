@@ -74,7 +74,7 @@ pub use tables::CFFError;
 #[cfg(feature = "apple-layout")]
 pub use tables::{ankr, feat, kerx, morx, trak};
 #[cfg(feature = "variable-fonts")]
-pub use tables::{avar, cff2, fvar, gvar, hvar, mvar};
+pub use tables::{avar, cff2, fvar, gvar, hvar, mvar, vvar};
 pub use tables::{cbdt, cblc, cff1 as cff, vhea};
 pub use tables::{
     cmap, colr, cpal, glyf, head, hhea, hmtx, kern, loca, maxp, name, os2, post, sbix, svg, vorg,
@@ -991,7 +991,7 @@ pub struct FaceTables<'a> {
     #[cfg(feature = "variable-fonts")]
     pub mvar: Option<mvar::Table<'a>>,
     #[cfg(feature = "variable-fonts")]
-    pub vvar: Option<hvar::Table<'a>>,
+    pub vvar: Option<vvar::Table<'a>>,
 }
 
 /// A font face.
@@ -1298,7 +1298,7 @@ impl<'a> Face<'a> {
             #[cfg(feature = "variable-fonts")]
             mvar: raw_tables.mvar.and_then(mvar::Table::parse),
             #[cfg(feature = "variable-fonts")]
-            vvar: raw_tables.vvar.and_then(hvar::Table::parse),
+            vvar: raw_tables.vvar.and_then(vvar::Table::parse),
         })
     }
 
@@ -1858,7 +1858,7 @@ impl<'a> Face<'a> {
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
                 if let Some(hvar) = self.tables.hvar {
-                    if let Some(offset) = hvar.advance_offset(glyph_id, self.coords()) {
+                    if let Some(offset) = hvar.advance_width_offset(glyph_id, self.coords()) {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         advance += offset + 0.5;
                     }
@@ -1886,7 +1886,7 @@ impl<'a> Face<'a> {
             if self.is_variable() {
                 // Ignore variation offset when `vvar` is not set.
                 if let Some(vvar) = self.tables.vvar {
-                    if let Some(offset) = vvar.advance_offset(glyph_id, self.coords()) {
+                    if let Some(offset) = vvar.advance_height_offset(glyph_id, self.coords()) {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         advance += offset + 0.5;
                     }
@@ -1902,11 +1902,11 @@ impl<'a> Face<'a> {
         }
     }
 
-    /// Returns glyph's horizontal side bearing.
+    /// Returns glyph's horizontal left bearing.
     ///
     /// This method is affected by variation axes.
     #[inline]
-    pub fn glyph_hor_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+    pub fn glyph_left_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
         #[cfg(feature = "variable-fonts")]
         {
             let mut bearing = self.tables.hmtx?.side_bearing(glyph_id)? as f32;
@@ -1914,7 +1914,7 @@ impl<'a> Face<'a> {
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
                 if let Some(hvar) = self.tables.hvar {
-                    if let Some(offset) = hvar.side_bearing_offset(glyph_id, self.coords()) {
+                    if let Some(offset) = hvar.left_side_bearing_offset(glyph_id, self.coords()) {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         bearing += offset + 0.5;
                     }
@@ -1930,11 +1930,11 @@ impl<'a> Face<'a> {
         }
     }
 
-    /// Returns glyph's vertical side bearing.
+    /// Returns glyph's top side bearing.
     ///
     /// This method is affected by variation axes.
     #[inline]
-    pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+    pub fn glyph_top_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
         #[cfg(feature = "variable-fonts")]
         {
             let mut bearing = self.tables.vmtx?.side_bearing(glyph_id)? as f32;
@@ -1942,7 +1942,7 @@ impl<'a> Face<'a> {
             if self.is_variable() {
                 // Ignore variation offset when `vvar` is not set.
                 if let Some(vvar) = self.tables.vvar {
-                    if let Some(offset) = vvar.side_bearing_offset(glyph_id, self.coords()) {
+                    if let Some(offset) = vvar.top_side_bearing_offset(glyph_id, self.coords()) {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         bearing += offset + 0.5;
                     }
@@ -1960,8 +1960,30 @@ impl<'a> Face<'a> {
 
     /// Returns glyph's vertical origin according to
     /// [Vertical Origin Table](https://docs.microsoft.com/en-us/typography/opentype/spec/vorg).
+    ///
+    /// This method is affected by variation axes.
     pub fn glyph_y_origin(&self, glyph_id: GlyphId) -> Option<i16> {
-        self.tables.vorg.map(|vorg| vorg.glyph_y_origin(glyph_id))
+        #[cfg(feature = "variable-fonts")]
+        {
+            let mut origin = self.tables.vorg.map(|vorg| vorg.glyph_y_origin(glyph_id))? as f32;
+
+            if self.is_variable() {
+                // Ignore variation offset when `vvar` is not set.
+                if let Some(vvar) = self.tables.vvar {
+                    if let Some(offset) = vvar.vertical_origin_offset(glyph_id, self.coords()) {
+                        // We can't use `round()` in `no_std`, so this is the next best thing.
+                        origin += offset + 0.5;
+                    }
+                }
+            }
+
+            i16::try_num_from(origin)
+        }
+
+        #[cfg(not(feature = "variable-fonts"))]
+        {
+            self.tables.vorg.map(|vorg| vorg.glyph_y_origin(glyph_id))
+        }
     }
 
     /// Returns glyph's name.

@@ -561,7 +561,7 @@ uint16_t ttfp_get_glyph_ver_advance(const ttfp_face *face, uint16_t glyph_id);
  *
  * @return Glyph's side bearing or 0 when not set.
  */
-int16_t ttfp_get_glyph_hor_side_bearing(const ttfp_face *face, uint16_t glyph_id);
+int16_t ttfp_get_glyph_left_side_bearing(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's vertical side bearing.
@@ -570,7 +570,7 @@ int16_t ttfp_get_glyph_hor_side_bearing(const ttfp_face *face, uint16_t glyph_id
  *
  * @return Glyph's side bearing or 0 when not set.
  */
-int16_t ttfp_get_glyph_ver_side_bearing(const ttfp_face *face, uint16_t glyph_id);
+int16_t ttfp_get_glyph_top_side_bearing(const ttfp_face *face, uint16_t glyph_id);
 
 /**
  * @brief Returns glyph's vertical origin.

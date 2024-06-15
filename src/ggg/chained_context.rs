@@ -45,16 +45,14 @@ impl<'a> ChainedContextLookup<'a> {
             2 => {
                 let coverage = Coverage::parse(s.read_at_offset16(data)?)?;
 
-                let parse_func = || {
-                    match s.read::<Option<Offset16>>()? {
-                        Some(offset) => ClassDefinition::parse(data.get(offset.to_usize()..)?)?,
-                        None => ClassDefinition::Empty,
-                    }
+                let mut parse_func = || match s.read::<Option<Offset16>>()? {
+                    Some(offset) => Some(ClassDefinition::parse(data.get(offset.to_usize()..)?)?),
+                    None => Some(ClassDefinition::Empty),
                 };
 
-                let backtrack_classes = parse_func();
-                let input_classes = parse_func();
-                let lookahead_classes = parse_func();
+                let backtrack_classes = parse_func()?;
+                let input_classes = parse_func()?;
+                let lookahead_classes = parse_func()?;
 
                 let count = s.read::<u16>()?;
                 let offsets = s.read_array16(count)?;

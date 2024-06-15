@@ -1858,7 +1858,7 @@ impl<'a> Face<'a> {
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
                 if let Some(hvar) = self.tables.hvar {
-                    if let Some(offset) = hvar.advance_width_offset(glyph_id, self.coords()) {
+                    if let Some(offset) = hvar.advance_offset(glyph_id, self.coords()) {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         advance += offset + 0.5;
                     }
@@ -1886,7 +1886,7 @@ impl<'a> Face<'a> {
             if self.is_variable() {
                 // Ignore variation offset when `vvar` is not set.
                 if let Some(vvar) = self.tables.vvar {
-                    if let Some(offset) = vvar.advance_height_offset(glyph_id, self.coords()) {
+                    if let Some(offset) = vvar.advance_offset(glyph_id, self.coords()) {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         advance += offset + 0.5;
                     }

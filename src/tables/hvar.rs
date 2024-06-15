@@ -42,7 +42,7 @@ impl<'a> Table<'a> {
 
     /// Returns the advance width offset for a glyph.
     #[inline]
-    pub fn advance_width_offset(
+    pub fn advance_offset(
         &self,
         glyph_id: GlyphId,
         coordinates: &[NormalizedCoordinate],

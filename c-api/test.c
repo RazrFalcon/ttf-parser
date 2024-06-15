@@ -63,9 +63,9 @@ int main() {
     assert(ttfp_get_glyph_var_index(face, 0x0041, 0xFE03) == 0);
 
     assert(ttfp_get_glyph_hor_advance(face, 0x0041) == 544);
-    assert(ttfp_get_glyph_left_side_bearing(face, 0x0041) == 3);
+    assert(ttfp_get_glyph_hor_side_bearing(face, 0x0041) == 3);
     assert(ttfp_get_glyph_ver_advance(face, 0x0041) == 0);
-    assert(ttfp_get_glyph_top_side_bearing(face, 0x0041) == 0);
+    assert(ttfp_get_glyph_ver_side_bearing(face, 0x0041) == 0);
     assert(ttfp_get_glyph_y_origin(face, a_gid) == 0);
 
     assert(ttfp_get_name_records_count(face) == 20);

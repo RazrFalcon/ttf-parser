@@ -87,7 +87,7 @@ impl<'a> Table<'a> {
         &self,
         glyph_id: GlyphId,
         coordinates: &[NormalizedCoordinate],
-        set_data: &[u8]
+        set_data: &[u8],
     ) -> Option<f32> {
         let (outer_idx, inner_idx) = DeltaSetIndexMap::new(set_data).map(glyph_id.0 as u32)?;
         self.variation_store

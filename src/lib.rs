@@ -1902,11 +1902,11 @@ impl<'a> Face<'a> {
         }
     }
 
-    /// Returns glyph's horizontal left bearing.
+    /// Returns glyph's horizontal side bearing.
     ///
     /// This method is affected by variation axes.
     #[inline]
-    pub fn glyph_left_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+    pub fn glyph_hor_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
         #[cfg(feature = "variable-fonts")]
         {
             let mut bearing = self.tables.hmtx?.side_bearing(glyph_id)? as f32;
@@ -1930,11 +1930,11 @@ impl<'a> Face<'a> {
         }
     }
 
-    /// Returns glyph's top side bearing.
+    /// Returns glyph's vertical side bearing.
     ///
     /// This method is affected by variation axes.
     #[inline]
-    pub fn glyph_top_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
+    pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
         #[cfg(feature = "variable-fonts")]
         {
             let mut bearing = self.tables.vmtx?.side_bearing(glyph_id)? as f32;

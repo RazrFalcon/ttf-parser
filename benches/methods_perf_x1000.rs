@@ -85,7 +85,7 @@ fn glyph_left_side_bearing(bencher: &mut bencher::Bencher) {
     let face = ttf::Face::parse(&font_data, 0).unwrap();
     bencher.iter(|| {
         for _ in 0..1000 {
-            bencher::black_box(face.glyph_left_side_bearing(ttf::GlyphId(2)).unwrap());
+            bencher::black_box(face.glyph_hor_side_bearing(ttf::GlyphId(2)).unwrap());
         }
     })
 }

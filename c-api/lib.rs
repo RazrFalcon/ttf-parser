@@ -649,22 +649,22 @@ pub extern "C" fn ttfp_get_glyph_ver_advance(face: *const ttfp_face, glyph_id: G
     face_from_ptr(face).glyph_ver_advance(glyph_id).unwrap_or(0)
 }
 
-/// @brief Returns glyph's left side bearing.
+/// @brief Returns glyph's horizontal side bearing.
 ///
 /// @return Glyph's side bearing or 0 when not set.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_left_side_bearing(face: *const ttfp_face, glyph_id: GlyphId) -> i16 {
-    face_from_ptr(face).glyph_left_side_bearing(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_hor_side_bearing(face: *const ttfp_face, glyph_id: GlyphId) -> i16 {
+    face_from_ptr(face).glyph_hor_side_bearing(glyph_id).unwrap_or(0)
 }
 
-/// @brief Returns glyph's top side bearing.
+/// @brief Returns glyph's vertical side bearing.
 ///
 /// This function is affected by variation axes.
 ///
 /// @return Glyph's side bearing or 0 when not set.
 #[no_mangle]
-pub extern "C" fn ttfp_get_glyph_top_side_bearing(face: *const ttfp_face, glyph_id: GlyphId) -> i16 {
-    face_from_ptr(face).glyph_top_side_bearing(glyph_id).unwrap_or(0)
+pub extern "C" fn ttfp_get_glyph_ver_side_bearing(face: *const ttfp_face, glyph_id: GlyphId) -> i16 {
+    face_from_ptr(face).glyph_ver_side_bearing(glyph_id).unwrap_or(0)
 }
 
 /// @brief Returns glyph's vertical origin.

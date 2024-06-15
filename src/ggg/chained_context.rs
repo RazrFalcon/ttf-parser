@@ -1,5 +1,5 @@
 use super::{ClassDefinition, Coverage, SequenceLookupRecord};
-use crate::parser::{FromSlice, LazyArray16, LazyOffsetArray16, Stream};
+use crate::parser::{FromSlice, LazyArray16, LazyOffsetArray16, Offset, Offset16, Stream};
 
 /// A [Chained Contextual Lookup Subtable](
 /// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chseqctxt1).
@@ -44,9 +44,18 @@ impl<'a> ChainedContextLookup<'a> {
             }
             2 => {
                 let coverage = Coverage::parse(s.read_at_offset16(data)?)?;
-                let backtrack_classes = ClassDefinition::parse(s.read_at_offset16(data)?)?;
-                let input_classes = ClassDefinition::parse(s.read_at_offset16(data)?)?;
-                let lookahead_classes = ClassDefinition::parse(s.read_at_offset16(data)?)?;
+                let backtrack_classes = match s.read::<Offset16>()?.to_usize() {
+                    0 => ClassDefinition::Empty,
+                    offset => ClassDefinition::parse(data.get(offset..)?)?,
+                };
+                let input_classes = match s.read::<Offset16>()?.to_usize() {
+                    0 => ClassDefinition::Empty,
+                    offset => ClassDefinition::parse(data.get(offset..)?)?,
+                };
+                let lookahead_classes = match s.read::<Offset16>()?.to_usize() {
+                    0 => ClassDefinition::Empty,
+                    offset => ClassDefinition::parse(data.get(offset..)?)?,
+                };
                 let count = s.read::<u16>()?;
                 let offsets = s.read_array16(count)?;
                 Some(Self::Format2 {

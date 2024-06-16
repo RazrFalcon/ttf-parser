@@ -80,7 +80,7 @@ fn glyph_hor_advance(bencher: &mut bencher::Bencher) {
     })
 }
 
-fn glyph_left_side_bearing(bencher: &mut bencher::Bencher) {
+fn glyph_hor_side_bearing(bencher: &mut bencher::Bencher) {
     let font_data = std::fs::read("fonts/SourceSansPro-Regular.ttf").unwrap();
     let face = ttf::Face::parse(&font_data, 0).unwrap();
     bencher.iter(|| {
@@ -100,6 +100,6 @@ bencher::benchmark_group!(
     subscript_metrics,
     x_height,
     glyph_hor_advance,
-    glyph_left_side_bearing
+    glyph_hor_side_bearing
 );
 bencher::benchmark_main!(perf);

@@ -866,7 +866,7 @@ impl<'a> Table<'a> {
         self.get_v1(glyph_id).is_some() || self.get_v0(glyph_id).is_some()
     }
 
-    /// Return the clip box for a glyph.
+    /// Returns the clip box for a glyph.
     pub fn clip_box(
         &self,
         glyph_id: GlyphId,

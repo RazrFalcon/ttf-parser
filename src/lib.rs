@@ -432,6 +432,12 @@ impl Transform {
         Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty)
     }
 
+    /// Creates a new scale transform.
+    #[inline]
+    pub fn new_scale(sx: f32, sy: f32) -> Self {
+        Transform::new(sx, 0.0, 0.0, sy, 0.0, 0.0)
+    }
+
     /// Combines two transforms with each other.
     #[inline]
     pub fn combine(ts1: Self, ts2: Self) -> Self {

@@ -147,10 +147,6 @@ impl<'a> Painter<'a> for VecPainter {
         self.0.push(Command::PopLayer)
     }
 
-    fn push_translate(&mut self, tx: f32, ty: f32) {
-        self.0.push(Command::Translate(tx, ty))
-    }
-
     fn push_scale(&mut self, sx: f32, sy: f32) {
         self.0.push(Command::Scale(sx, sy))
     }
@@ -246,9 +242,9 @@ mod colr1_static {
             Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
             PopClip,
             PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
+            Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
             Scale(0.5, 1.5),
-            Translate(-500.0, -500.0),
+            Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(
                 GlyphId(3)),
             PushClip,
@@ -308,9 +304,9 @@ mod colr1_static {
             Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
             PopClip,
             PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
+            Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
             Rotate(0.13891602),
-            Translate(-500.0, -500.0),
+            Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(GlyphId(3)),
             PushClip,
             Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
@@ -344,9 +340,9 @@ mod colr1_static {
             Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
             PopClip,
             PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
+            Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
             Skew(0.13891602, 0.0),
-            Translate(-500.0, -500.0),
+            Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(GlyphId(3)),
             PushClip,
             Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
@@ -381,7 +377,7 @@ mod colr1_static {
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(114), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
-        assert!(vec_painter.0.contains(&Translate(0.0, 100.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_translate(0.0, 100.0))));
     }
 
     #[test]
@@ -524,6 +520,6 @@ mod colr1_variable {
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(114), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
-        assert!(vec_painter.0.contains(&Translate(99.975586, 100.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_translate(99.975586, 100.0))));
     }
 }

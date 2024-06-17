@@ -970,7 +970,11 @@ impl<'a> Table<'a> {
         #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
-        let clip_box = self.clip_box(base.glyph_id, coords);
+        let clip_box = self.clip_box(
+            base.glyph_id,
+            #[cfg(feature = "variable-fonts")]
+            coords,
+        );
         if let Some(clip_box) = clip_box {
             painter.push_clip_box(clip_box);
         }

@@ -866,6 +866,21 @@ impl<'a> Table<'a> {
         self.get_v1(glyph_id).is_some() || self.get_v0(glyph_id).is_some()
     }
 
+    /// Return the clip box for a glyph.
+    pub fn clip_box(
+        &self,
+        glyph_id: GlyphId,
+        #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
+    ) -> Option<ClipBox> {
+        self.clip_list.find(
+            glyph_id,
+            #[cfg(feature = "variable-fonts")]
+            &self.variation_data(),
+            #[cfg(feature = "variable-fonts")]
+            coords,
+        )
+    }
+
     // This method should only be called from outside, not from within `colr.rs`.
     // From inside, you always should call paint_impl, so that the recursion stack can
     // be passed on and any kind of recursion can be prevented.
@@ -955,13 +970,7 @@ impl<'a> Table<'a> {
         #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
-        let clip_box = self.clip_list.find(
-            base.glyph_id,
-            #[cfg(feature = "variable-fonts")]
-            &self.variation_data(),
-            #[cfg(feature = "variable-fonts")]
-            coords,
-        );
+        let clip_box = self.clip_box(base.glyph_id, coords);
         if let Some(clip_box) = clip_box {
             painter.push_clip_box(clip_box);
         }

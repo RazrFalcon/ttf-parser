@@ -8,7 +8,7 @@ use ttf_parser::colr::{ClipBox, Paint};
 use ttf_parser::{RgbaColor, Transform};
 
 const FONT_SIZE: f64 = 128.0;
-const COLUMNS: u32 = 100;
+const COLUMNS: u32 = 20;
 
 const HELP: &str = "\
 Usage:
@@ -542,10 +542,6 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
 
     fn pop_layer(&mut self) {
         self.svg.end_element(); // g
-    }
-
-    fn push_translate(&mut self, tx: f32, ty: f32) {
-        self.push_transform(ttf::Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty));
     }
 
     fn push_scale(&mut self, sx: f32, sy: f32) {

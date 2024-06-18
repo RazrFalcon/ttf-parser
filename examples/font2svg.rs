@@ -8,7 +8,7 @@ use ttf_parser::colr::{ClipBox, Paint};
 use ttf_parser::{RgbaColor, Transform};
 
 const FONT_SIZE: f64 = 128.0;
-const COLUMNS: u32 = 20;
+const COLUMNS: u32 = 100;
 
 const HELP: &str = "\
 Usage:

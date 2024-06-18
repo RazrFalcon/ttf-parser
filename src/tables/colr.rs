@@ -694,10 +694,6 @@ pub trait Painter<'a> {
     fn push_layer(&mut self, mode: CompositeMode);
     /// Pop the last layer.
     fn pop_layer(&mut self);
-
-    // TODO: Unify transforms into one callback.
-    /// Push a rotation transform.
-    fn push_rotate(&mut self, angle: f32);
     /// Push a transform.
     fn push_transform(&mut self, transform: Transform);
     /// Pop the last transform.
@@ -1569,7 +1565,7 @@ impl<'a> Table<'a> {
                 let paint_offset = s.read::<Offset24>()?;
                 let angle = s.read::<F2DOT14>()?.to_f32();
 
-                painter.push_rotate(angle);
+                painter.push_transform(Transform::new_rotate(angle));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1596,7 +1592,7 @@ impl<'a> Table<'a> {
 
                 let angle = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
 
-                painter.push_rotate(angle);
+                painter.push_transform(Transform::new_rotate(angle));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1615,7 +1611,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?);
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_rotate(angle);
+                painter.push_transform(Transform::new_rotate(angle));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
@@ -1648,7 +1644,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?) + deltas[2];
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_rotate(angle);
+                painter.push_transform(Transform::new_rotate(angle));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),

@@ -432,6 +432,22 @@ impl Transform {
         Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty)
     }
 
+    /// Creates a new rotation transform.
+    #[inline]
+    pub fn new_rotate(angle: f32) -> Self {
+        #[cfg(feature = "no-std")]
+        let (cc, ss) = (
+            libm::cos((angle * core::f32::consts::PI) as f64) as f32,
+            libm::sin((angle * core::f32::consts::PI) as f64) as f32,
+        );
+        #[cfg(feature = "std")]
+        let (cc, ss) = (
+            (angle * std::f32::consts::PI).cos(),
+            (angle * std::f32::consts::PI).sin(),
+        );
+        Transform::new(cc, ss, -ss, cc, 0.0, 0.0)
+    }
+
     /// Creates a new skew transform.
     #[inline]
     pub fn new_skew(skew_x: f32, skew_y: f32) -> Self {

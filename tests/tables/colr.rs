@@ -102,8 +102,6 @@ enum Command {
     Paint(CustomPaint),
     PushLayer(CompositeMode),
     PopLayer,
-    Rotate(f32),
-    Skew(f32, f32),
     Transform(ttf_parser::Transform),
     PopTransform,
     PushClip,
@@ -143,10 +141,6 @@ impl<'a> Painter<'a> for VecPainter {
 
     fn pop_layer(&mut self) {
         self.0.push(Command::PopLayer)
-    }
-
-    fn push_rotate(&mut self, angle: f32) {
-        self.0.push(Command::Rotate(angle))
     }
 
     fn push_transform(&mut self, transform: ttf_parser::Transform) {
@@ -279,7 +273,7 @@ mod colr1_static {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(99), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Rotate(0.055541992)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_rotate(0.055541992))))
     }
 
     #[test]
@@ -295,7 +289,7 @@ mod colr1_static {
             PopClip,
             PushLayer(DestinationOver),
             Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
-            Rotate(0.13891602),
+            Transform(ttf_parser::Transform::new_rotate(0.13891602)),
             Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(GlyphId(3)),
             PushClip,
@@ -455,7 +449,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(99), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Rotate(0.87341005)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_rotate(0.87341005))))
     }
 
     #[test]
@@ -464,7 +458,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(101), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Rotate(0.9336252)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_rotate(0.9336252))))
     }
 
     #[test]

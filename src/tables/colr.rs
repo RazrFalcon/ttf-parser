@@ -696,8 +696,6 @@ pub trait Painter<'a> {
     fn pop_layer(&mut self);
 
     // TODO: Unify transforms into one callback.
-    /// Push a scaling transform.
-    fn push_scale(&mut self, sx: f32, sy: f32);
     /// Push a rotation transform.
     fn push_rotate(&mut self, angle: f32);
     /// Push a skewing transform.
@@ -1374,7 +1372,7 @@ impl<'a> Table<'a> {
                 let sx = s.read::<F2DOT14>()?.to_f32();
                 let sy = s.read::<F2DOT14>()?.to_f32();
 
-                painter.push_scale(sx, sy);
+                painter.push_transform(Transform::new_scale(sx, sy));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1402,7 +1400,7 @@ impl<'a> Table<'a> {
                 let sx = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
                 let sy = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
 
-                painter.push_scale(sx, sy);
+                painter.push_transform(Transform::new_scale(sx, sy));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1422,7 +1420,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?);
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_scale(sx, sy);
+                painter.push_transform(Transform::new_scale(sx, sy));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
@@ -1456,7 +1454,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?) + deltas[3];
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_scale(sx, sy);
+                painter.push_transform(Transform::new_scale(sx, sy));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
@@ -1475,7 +1473,7 @@ impl<'a> Table<'a> {
                 let paint_offset = s.read::<Offset24>()?;
                 let scale = s.read::<F2DOT14>()?.to_f32();
 
-                painter.push_scale(scale, scale);
+                painter.push_transform(Transform::new_scale(scale, scale));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1502,7 +1500,7 @@ impl<'a> Table<'a> {
 
                 let scale = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
 
-                painter.push_scale(scale, scale);
+                painter.push_transform(Transform::new_scale(scale, scale));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1521,7 +1519,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?);
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_scale(scale, scale);
+                painter.push_transform(Transform::new_scale(scale, scale));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
@@ -1554,7 +1552,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?) + deltas[2];
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_scale(scale, scale);
+                painter.push_transform(Transform::new_scale(scale, scale));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),

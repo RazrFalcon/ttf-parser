@@ -102,8 +102,6 @@ enum Command {
     Paint(CustomPaint),
     PushLayer(CompositeMode),
     PopLayer,
-    Translate(f32, f32),
-    Scale(f32, f32),
     Rotate(f32),
     Skew(f32, f32),
     Transform(ttf_parser::Transform),
@@ -145,10 +143,6 @@ impl<'a> Painter<'a> for VecPainter {
 
     fn pop_layer(&mut self) {
         self.0.push(Command::PopLayer)
-    }
-
-    fn push_scale(&mut self, sx: f32, sy: f32) {
-        self.0.push(Command::Scale(sx, sy))
     }
 
     fn push_rotate(&mut self, angle: f32) {
@@ -243,7 +237,7 @@ mod colr1_static {
             PopClip,
             PushLayer(DestinationOver),
             Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
-            Scale(0.5, 1.5),
+            Transform(ttf_parser::Transform::new_scale(0.5, 1.5)),
             Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(
                 GlyphId(3)),
@@ -263,7 +257,7 @@ mod colr1_static {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(86), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Scale(0.5, 1.5)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_scale(0.5, 1.5))))
     }
 
     #[test]
@@ -428,7 +422,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SCSY"), -0.9);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(84), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Scale(1.599942, 0.60009766)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_scale(1.599942, 0.60009766))))
     }
 
     #[test]
@@ -438,7 +432,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SCSY"), -0.9);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(86), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Scale(1.599942, 0.60009766)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_scale(1.599942, 0.60009766))))
     }
 
     #[test]

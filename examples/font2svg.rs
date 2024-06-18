@@ -544,10 +544,6 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.svg.end_element(); // g
     }
 
-    fn push_scale(&mut self, sx: f32, sy: f32) {
-        self.push_transform(ttf::Transform::new(sx, 0.0, 0.0, sy, 0.0, 0.0));
-    }
-
     fn push_rotate(&mut self, angle: f32) {
         let cc = (angle * std::f32::consts::PI).cos();
         let ss = (angle * std::f32::consts::PI).sin();

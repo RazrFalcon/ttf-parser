@@ -149,10 +149,6 @@ impl<'a> Painter<'a> for VecPainter {
         self.0.push(Command::Rotate(angle))
     }
 
-    fn push_skew(&mut self, skew_x: f32, skew_y: f32) {
-        self.0.push(Command::Skew(skew_x, skew_y))
-    }
-
     fn push_transform(&mut self, transform: ttf_parser::Transform) {
         self.0.push(Command::Transform(transform))
     }
@@ -319,7 +315,7 @@ mod colr1_static {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(103), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Skew(0.13891602, 0.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_skew(0.13891602, 0.0))));
     }
 
     #[test]
@@ -335,7 +331,7 @@ mod colr1_static {
             PopClip,
             PushLayer(DestinationOver),
             Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
-            Skew(0.13891602, 0.0),
+            Transform(ttf_parser::Transform::new_skew(0.13891602, 0.0)),
             Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(GlyphId(3)),
             PushClip,
@@ -477,7 +473,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(103), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_skew(0.3944702, 0.0))));
     }
 
     #[test]
@@ -486,7 +482,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(104), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_skew(0.3944702, 0.0))));
     }
 
     #[test]

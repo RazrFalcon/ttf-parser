@@ -550,12 +550,6 @@ impl<'a> ttf::colr::Painter<'a> for GlyphPainter<'a> {
         self.push_transform(ttf::Transform::new(cc, ss, -ss, cc, 0.0, 0.0));
     }
 
-    fn push_skew(&mut self, skew_x: f32, skew_y: f32) {
-        let x = (-skew_x * std::f32::consts::PI).tan();
-        let y = (skew_y * std::f32::consts::PI).tan();
-        self.push_transform(ttf::Transform::new(1.0, y, x, 1.0, 0.0, 0.0));
-    }
-
     fn push_transform(&mut self, transform: ttf::Transform) {
         self.transforms_stack.push(self.transform);
         self.transform = ttf::Transform::combine(self.transform, transform);

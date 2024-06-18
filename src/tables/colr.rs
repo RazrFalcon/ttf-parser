@@ -698,8 +698,6 @@ pub trait Painter<'a> {
     // TODO: Unify transforms into one callback.
     /// Push a rotation transform.
     fn push_rotate(&mut self, angle: f32);
-    /// Push a skewing transform.
-    fn push_skew(&mut self, skew_x: f32, skew_y: f32);
     /// Push a transform.
     fn push_transform(&mut self, transform: Transform);
     /// Pop the last transform.
@@ -1670,7 +1668,7 @@ impl<'a> Table<'a> {
                 let skew_x = s.read::<F2DOT14>()?.to_f32();
                 let skew_y = s.read::<F2DOT14>()?.to_f32();
 
-                painter.push_skew(skew_x, skew_y);
+                painter.push_transform(Transform::new_skew(skew_x, skew_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1698,7 +1696,7 @@ impl<'a> Table<'a> {
                 let skew_x = s.read::<F2DOT14>()?.apply_float_delta(deltas[0]);
                 let skew_y = s.read::<F2DOT14>()?.apply_float_delta(deltas[1]);
 
-                painter.push_skew(skew_x, skew_y);
+                painter.push_transform(Transform::new_skew(skew_x, skew_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
                     palette,
@@ -1718,7 +1716,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?);
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_skew(skew_x, skew_y);
+                painter.push_transform(Transform::new_skew(skew_x, skew_y));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),
@@ -1752,7 +1750,7 @@ impl<'a> Table<'a> {
                 let center_y = f32::from(s.read::<i16>()?) + deltas[3];
 
                 painter.push_transform(Transform::new_translate(center_x, center_y));
-                painter.push_skew(skew_x, skew_y);
+                painter.push_transform(Transform::new_skew(skew_x, skew_y));
                 painter.push_transform(Transform::new_translate(-center_x, -center_y));
                 self.parse_paint(
                     offset + paint_offset.to_usize(),

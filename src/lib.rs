@@ -432,6 +432,22 @@ impl Transform {
         Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty)
     }
 
+    /// Creates a new skew transform.
+    #[inline]
+    pub fn new_skew(skew_x: f32, skew_y: f32) -> Self {
+        #[cfg(feature = "no-std")]
+        let (x, y) = (
+            libm::tan((skew_x * core::f32::consts::PI) as f64) as f32,
+            libm::tan((skew_y * core::f32::consts::PI) as f64) as f32,
+        );
+        #[cfg(feature = "std")]
+        let (x, y) = (
+            (skew_x * std::f32::consts::PI).tan(),
+            (skew_y * std::f32::consts::PI).tan(),
+        );
+        Transform::new(1.0, y, -x, 1.0, 0.0, 0.0)
+    }
+
     /// Creates a new scale transform.
     #[inline]
     pub fn new_scale(sx: f32, sy: f32) -> Self {

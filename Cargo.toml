@@ -17,7 +17,7 @@ libm = { version = "0.2.8", optional = true }
 
 [features]
 default = ["std", "opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
-# Enables the use of the standard library. Deactivate this and activate the no-std
+# Enables the use of the standard library. Deactivate this and activate the no-std-float
 # feature to compile for targets that don't have std.
 std = []
 no-std-float = ["libm"]

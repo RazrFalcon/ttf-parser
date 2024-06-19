@@ -31,7 +31,7 @@ jobs:
       run: cargo build --no-default-features --features std
 
     - name: Build with variable-fonts
-      run: cargo build --no-default-features --features variable-fonts
+      run: cargo build --no-default-features --features variable-fonts,no-std-float
 
     - name: Build with all features
       run: cargo build --all-features

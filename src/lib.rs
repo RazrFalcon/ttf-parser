@@ -432,6 +432,30 @@ impl Transform {
         Transform::new(1.0, 0.0, 0.0, 1.0, tx, ty)
     }
 
+    /// Creates a new rotation transform.
+    #[inline]
+    pub fn new_rotate(angle: f32) -> Self {
+        let cc = (angle * core::f32::consts::PI).cos();
+        let ss = (angle * core::f32::consts::PI).sin();
+
+        Transform::new(cc, ss, -ss, cc, 0.0, 0.0)
+    }
+
+    /// Creates a new skew transform.
+    #[inline]
+    pub fn new_skew(skew_x: f32, skew_y: f32) -> Self {
+        let x = (skew_x * core::f32::consts::PI).tan();
+        let y = (skew_y * core::f32::consts::PI).tan();
+
+        Transform::new(1.0, y, -x, 1.0, 0.0, 0.0)
+    }
+
+    /// Creates a new scale transform.
+    #[inline]
+    pub fn new_scale(sx: f32, sy: f32) -> Self {
+        Transform::new(sx, 0.0, 0.0, sy, 0.0, 0.0)
+    }
+
     /// Combines two transforms with each other.
     #[inline]
     pub fn combine(ts1: Self, ts2: Self) -> Self {
@@ -2346,4 +2370,25 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
 
     s.skip::<u32>(); // version
     s.read::<u32>()
+}
+
+#[allow(missing_docs)]
+#[cfg(all(not(feature = "std"), feature = "no-std-float"))]
+pub(crate) trait NoStdFloat {
+    fn sin(self) -> Self;
+    fn cos(self) -> Self;
+    fn tan(self) -> Self;
+}
+
+#[cfg(all(not(feature = "std"), feature = "no-std-float"))]
+impl NoStdFloat for f32 {
+    fn sin(self) -> Self {
+        libm::sinf(self)
+    }
+    fn cos(self) -> Self {
+        libm::cosf(self)
+    }
+    fn tan(self) -> Self {
+        libm::tanf(self)
+    }
 }

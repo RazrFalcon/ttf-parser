@@ -12,9 +12,15 @@ readme = "README.md"
 edition = "2018"
 exclude = ["benches/**"]
 
+[dependencies]
+libm = { version = "0.2.8", optional = true }
+
 [features]
 default = ["std", "opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
+# Enables the use of the standard library. Deactivate this and activate the no-std-float
+# feature to compile for targets that don't have std.
 std = []
+no-std-float = ["libm"]
 # Enables variable fonts support. Increases binary size almost twice.
 # Includes avar, CFF2, fvar, gvar, HVAR, MVAR and VVAR tables.
 variable-fonts = []

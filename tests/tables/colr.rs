@@ -102,10 +102,6 @@ enum Command {
     Paint(CustomPaint),
     PushLayer(CompositeMode),
     PopLayer,
-    Translate(f32, f32),
-    Scale(f32, f32),
-    Rotate(f32),
-    Skew(f32, f32),
     Transform(ttf_parser::Transform),
     PopTransform,
     PushClip,
@@ -145,22 +141,6 @@ impl<'a> Painter<'a> for VecPainter {
 
     fn pop_layer(&mut self) {
         self.0.push(Command::PopLayer)
-    }
-
-    fn push_translate(&mut self, tx: f32, ty: f32) {
-        self.0.push(Command::Translate(tx, ty))
-    }
-
-    fn push_scale(&mut self, sx: f32, sy: f32) {
-        self.0.push(Command::Scale(sx, sy))
-    }
-
-    fn push_rotate(&mut self, angle: f32) {
-        self.0.push(Command::Rotate(angle))
-    }
-
-    fn push_skew(&mut self, skew_x: f32, skew_y: f32) {
-        self.0.push(Command::Skew(skew_x, skew_y))
     }
 
     fn push_transform(&mut self, transform: ttf_parser::Transform) {
@@ -246,9 +226,9 @@ mod colr1_static {
             Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
             PopClip,
             PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
-            Scale(0.5, 1.5),
-            Translate(-500.0, -500.0),
+            Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
+            Transform(ttf_parser::Transform::new_scale(0.5, 1.5)),
+            Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(
                 GlyphId(3)),
             PushClip,
@@ -267,7 +247,7 @@ mod colr1_static {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(86), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Scale(0.5, 1.5)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_scale(0.5, 1.5))))
     }
 
     #[test]
@@ -293,7 +273,7 @@ mod colr1_static {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(99), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Rotate(0.055541992)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_rotate(0.055541992))))
     }
 
     #[test]
@@ -308,9 +288,9 @@ mod colr1_static {
             Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
             PopClip,
             PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
-            Rotate(0.13891602),
-            Translate(-500.0, -500.0),
+            Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
+            Transform(ttf_parser::Transform::new_rotate(0.13891602)),
+            Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(GlyphId(3)),
             PushClip,
             Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
@@ -329,7 +309,7 @@ mod colr1_static {
         let face = Face::parse(COLR1_STATIC, 0).unwrap();
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(103), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Skew(0.13891602, 0.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_skew(0.13891602, 0.0))));
     }
 
     #[test]
@@ -344,9 +324,9 @@ mod colr1_static {
             Paint(Solid(RgbaColor { red: 0, green: 0, blue: 255, alpha: 127 })),
             PopClip,
             PushLayer(DestinationOver),
-            Translate(500.0, 500.0),
-            Skew(0.13891602, 0.0),
-            Translate(-500.0, -500.0),
+            Transform(ttf_parser::Transform::new_translate(500.0, 500.0)),
+            Transform(ttf_parser::Transform::new_skew(0.13891602, 0.0)),
+            Transform(ttf_parser::Transform::new_translate(-500.0, -500.0)),
             OutlineGlyph(GlyphId(3)),
             PushClip,
             Paint(Solid(RgbaColor { red: 255, green: 165, blue: 0, alpha: 178 })),
@@ -381,7 +361,7 @@ mod colr1_static {
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(114), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
-        assert!(vec_painter.0.contains(&Translate(0.0, 100.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_translate(0.0, 100.0))));
     }
 
     #[test]
@@ -432,7 +412,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SCSY"), -0.9);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(84), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Scale(1.599942, 0.60009766)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_scale(1.599942, 0.60009766))))
     }
 
     #[test]
@@ -442,7 +422,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SCSY"), -0.9);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(86), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Scale(1.599942, 0.60009766)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_scale(1.599942, 0.60009766))))
     }
 
     #[test]
@@ -469,7 +449,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(99), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Rotate(0.87341005)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_rotate(0.87341005))))
     }
 
     #[test]
@@ -478,7 +458,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"ROTA"), 150.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(101), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Rotate(0.9336252)))
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_rotate(0.9336252))))
     }
 
     #[test]
@@ -487,7 +467,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(103), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_skew(0.3944702, 0.0))));
     }
 
     #[test]
@@ -496,7 +476,7 @@ mod colr1_variable {
         face.set_variation(Tag::from_bytes(b"SKXA"), 46.0);
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(104), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
-        assert!(vec_painter.0.contains(&Skew(0.3944702, 0.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_skew(0.3944702, 0.0))));
     }
 
     #[test]
@@ -524,6 +504,6 @@ mod colr1_variable {
         let mut vec_painter = VecPainter(vec![]);
         face.paint_color_glyph(GlyphId(114), 0, RgbaColor::new(0, 0, 0, 255), &mut vec_painter);
 
-        assert!(vec_painter.0.contains(&Translate(99.975586, 100.0)));
+        assert!(vec_painter.0.contains(&Transform(ttf_parser::Transform::new_translate(99.975586, 100.0))));
     }
 }

@@ -599,6 +599,23 @@ impl<'a> Table<'a> {
         outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)?
     }
 
+    /// Returns the bbox of a glyph.
+    /// Unlike the `outline` method, it does calculate the bbox
+    /// manually by outlining the glyph, but it instead takes the
+    /// bbox that are encoded as part of the glyf program.
+    #[inline]
+    pub(crate) fn bbox(&self, glyph_id: GlyphId) -> Option<Rect> {
+        let glyph_data = self.get(glyph_id)?;
+        let mut s = Stream::new(glyph_data);
+        s.read::<i16>()?; // number of contours
+        Some(Rect {
+            x_min: s.read::<i16>()?,
+            y_min: s.read::<i16>()?,
+            x_max: s.read::<i16>()?,
+            y_max: s.read::<i16>()?,
+        })
+    }
+
     #[inline]
     pub(crate) fn get(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
         let range = self.loca_table.glyph_range(glyph_id)?;

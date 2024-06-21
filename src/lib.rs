@@ -2341,6 +2341,38 @@ impl<'a> Face<'a> {
         }
     }
 
+    /// Return an array containing the phantom points of a glyph. The first element
+    /// of a tuple contains the x coordinate, the second the y coordinate. They are
+    /// arranged in the order `PHANTOM_LEFT`, `PHANTOM_RIGHT`, `PHANTOM_TOP`,
+    /// `PHANTOM_BOT`.
+    #[inline]
+    pub fn phantom_points(&self, glyph_id: GlyphId) -> Option<[(i16, i16); 4]> {
+        let bbox = self.tables.glyf?.bbox(glyph_id).unwrap_or(Rect::zero());
+
+        let lsb = self.glyph_hor_side_bearing(glyph_id);
+        let mut phantoms = [(0, 0); 4];
+        let h_delta = if let Some(lsb) = lsb {
+            bbox.x_min - lsb
+        } else {
+            0
+        };
+
+        let v_orig = bbox.y_max + self.glyph_ver_side_bearing(glyph_id).unwrap_or(0);
+        let h_adv = self
+            .glyph_hor_advance(glyph_id)
+            .unwrap_or(self.units_per_em() / 2) as i16;
+        let v_adv = self
+            .glyph_ver_advance(glyph_id)
+            .unwrap_or(self.units_per_em()) as i16;
+
+        phantoms[0].0 = h_delta;
+        phantoms[1].0 = h_adv + h_delta;
+        phantoms[2].1 = v_orig;
+        phantoms[3].1 = v_orig - v_adv;
+
+        Some(phantoms)
+    }
+
     #[cfg(not(feature = "variable-fonts"))]
     #[inline]
     fn apply_metrics_variation_to(&self, _: Tag, _: &mut i16) {}

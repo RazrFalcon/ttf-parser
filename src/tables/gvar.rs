@@ -11,7 +11,7 @@ use core::cmp;
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
-use crate::glyf;
+use crate::{glyf, PhantomPoints, PointF};
 use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream, F2DOT14};
 use crate::{GlyphId, NormalizedCoordinate, OutlineBuilder, Rect, RectF, Transform};
 
@@ -179,7 +179,7 @@ impl<'a> VariationTuples<'a> {
         all_points: glyf::GlyphPointsIter,
         points: glyf::GlyphPointsIter,
         point: glyf::GlyphPoint,
-    ) -> Option<(f32, f32)> {
+    ) -> Option<PointF> {
         let mut x = f32::from(point.x);
         let mut y = f32::from(point.y);
 
@@ -232,13 +232,13 @@ impl<'a> VariationTuples<'a> {
             }
         }
 
-        Some((x, y))
+        Some(PointF { x, y })
     }
 
     // This is just like `apply()`, but without `infer_deltas`,
     // since we use it only for component points and not a contour.
     // And since there are no contour and no points, `infer_deltas()` will do nothing.
-    fn apply_null(&mut self) -> Option<(f32, f32)> {
+    fn apply_null(&mut self) -> Option<PointF> {
         let mut x = 0.0;
         let mut y = 0.0;
 
@@ -258,7 +258,7 @@ impl<'a> VariationTuples<'a> {
             }
         }
 
-        Some((x, y))
+        Some(PointF { x, y })
     }
 }
 
@@ -1757,6 +1757,23 @@ impl<'a> Table<'a> {
         );
         b.bbox.to_rect()
     }
+
+    pub(crate) fn phantom_points(
+        &self,
+        glyf_table: glyf::Table,
+        coordinates: &[NormalizedCoordinate],
+        glyph_id: GlyphId,
+    ) -> Option<PhantomPoints> {
+        let outline_points = glyf_table.outline_points(glyph_id);
+        let mut tuples = VariationTuples::default();
+        self.parse_variation_data(glyph_id, coordinates, outline_points, &mut tuples)?;
+        Some(PhantomPoints {
+            left: tuples.apply_null()?,
+            right: tuples.apply_null()?,
+            top: tuples.apply_null()?,
+            bottom: tuples.apply_null()?,
+        })
+    }
 }
 
 impl core::fmt::Debug for Table<'_> {
@@ -1803,8 +1820,8 @@ fn outline_var_impl(
         gvar_table.parse_variation_data(glyph_id, coordinates, points_len, &mut tuples)?;
 
         while let Some(point) = glyph_points.next() {
-            let (x, y) = tuples.apply(all_glyph_points.clone(), glyph_points.clone(), point)?;
-            builder.push_point(x, y, point.on_curve_point, point.last_point);
+            let p = tuples.apply(all_glyph_points.clone(), glyph_points.clone(), point)?;
+            builder.push_point(p.x, p.y, point.on_curve_point, point.last_point);
         }
 
         Some(())
@@ -1824,14 +1841,14 @@ fn outline_var_impl(
         gvar_table.parse_variation_data(glyph_id, coordinates, components_count, &mut tuples)?;
 
         for component in components {
-            let (tx, ty) = tuples.apply_null()?;
+            let t = tuples.apply_null()?;
 
             let mut transform = builder.transform;
 
             // Variation component offset should be applied only when
             // the ARGS_ARE_XY_VALUES flag is set.
             if component.flags.args_are_xy_values() {
-                transform = Transform::combine(transform, Transform::new_translate(tx, ty));
+                transform = Transform::combine(transform, Transform::new_translate(t.x, t.y));
             }
 
             transform = Transform::combine(transform, component.transform);

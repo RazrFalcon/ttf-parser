@@ -514,6 +514,30 @@ impl core::fmt::Debug for Transform {
     }
 }
 
+/// A float point.
+#[derive(Clone, Copy, Debug)]
+pub struct PointF {
+    /// The X-axis coordinate.
+    pub x: f32,
+    /// The Y-axis coordinate.
+    pub y: f32,
+}
+
+/// Phantom points.
+///
+/// Available only for variable fonts with the `gvar` table.
+#[derive(Clone, Copy, Debug)]
+pub struct PhantomPoints {
+    /// Left side bearing point.
+    pub left: PointF,
+    /// Right side bearing point.
+    pub right: PointF,
+    /// Top side bearing point.
+    pub top: PointF,
+    /// Bottom side bearing point.
+    pub bottom: PointF,
+}
+
 /// A RGBA color in the sRGB color space.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1886,6 +1910,9 @@ impl<'a> Face<'a> {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         advance += offset + 0.5;
                     }
+                } else if let Some(points) = self.glyph_phantom_points(glyph_id) {
+                    // We can't use `round()` in `no_std`, so this is the next best thing.
+                    advance += points.right.x + 0.5
                 }
             }
 
@@ -1914,6 +1941,9 @@ impl<'a> Face<'a> {
                         // We can't use `round()` in `no_std`, so this is the next best thing.
                         advance += offset + 0.5;
                     }
+                } else if let Some(points) = self.glyph_phantom_points(glyph_id) {
+                    // We can't use `round()` in `no_std`, so this is the next best thing.
+                    advance += points.bottom.y + 0.5
                 }
             }
 
@@ -2312,6 +2342,16 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn has_non_default_variation_coordinates(&self) -> bool {
         self.coordinates.as_slice().iter().any(|c| c.0 != 0)
+    }
+
+    /// Parses glyph's phantom points.
+    ///
+    /// Available only for variable fonts with the `gvar` table.
+    #[cfg(feature = "variable-fonts")]
+    pub fn glyph_phantom_points(&self, glyph_id: GlyphId) -> Option<PhantomPoints> {
+        let glyf = self.tables.glyf?;
+        let gvar = self.tables.gvar?;
+        gvar.phantom_points(glyf, self.coords(), glyph_id)
     }
 
     #[cfg(feature = "variable-fonts")]

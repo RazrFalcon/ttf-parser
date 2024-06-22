@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `Face::glyph_hor_advance` and `Face::glyph_ver_advance` include `gvar`'s phantom points
+  when `HVAR`/`VVAR` tables are missing. Affects only variable fonts.
+- `Face::glyph_phantom_points`
+
 ### Fixed
 - `opentype_layout::LookupFlags::mark_attachment_type` parsing.
 

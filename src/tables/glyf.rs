@@ -604,4 +604,32 @@ impl<'a> Table<'a> {
         let range = self.loca_table.glyph_range(glyph_id)?;
         self.data.get(range)
     }
+
+    /// Returns the number of points in this outline.
+    pub(crate) fn outline_points(&self, glyph_id: GlyphId) -> u16 {
+        self.outline_points_impl(glyph_id).unwrap_or(0)
+    }
+
+    fn outline_points_impl(&self, glyph_id: GlyphId) -> Option<u16> {
+        let data = self.get(glyph_id)?;
+        let mut s = Stream::new(data);
+        let number_of_contours = s.read::<i16>()?;
+
+        // Skip bbox.
+        s.advance(8);
+
+        if number_of_contours > 0 {
+            // Simple glyph.
+            let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
+            let glyph_points = parse_simple_outline(s.tail()?, number_of_contours)?;
+            Some(glyph_points.points_left)
+        } else if number_of_contours < 0 {
+            // Composite glyph.
+            let components = CompositeGlyphIter::new(s.tail()?);
+            Some(components.clone().count() as u16)
+        } else {
+            // An empty glyph.
+            None
+        }
+    }
 }

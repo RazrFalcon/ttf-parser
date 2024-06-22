@@ -1767,6 +1767,12 @@ impl<'a> Table<'a> {
         let outline_points = glyf_table.outline_points(glyph_id);
         let mut tuples = VariationTuples::default();
         self.parse_variation_data(glyph_id, coordinates, outline_points, &mut tuples)?;
+
+        // Skip all outline deltas.
+        for _ in 0..outline_points {
+            tuples.apply_null()?;
+        }
+
         Some(PhantomPoints {
             left: tuples.apply_null()?,
             right: tuples.apply_null()?,

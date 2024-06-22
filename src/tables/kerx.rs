@@ -166,7 +166,9 @@ pub struct AnchorPoints<'a>(&'a [u8]);
 impl AnchorPoints<'_> {
     /// Returns a mark and current anchor points at action index.
     pub fn get(&self, action_index: u16) -> Option<(u16, u16)> {
-        let offset = usize::from(action_index) * u16::SIZE;
+        // Each action contains two 16-bit fields, so we must
+        // double the action_index to get the correct offset here.
+        let offset = usize::from(action_index) * u16::SIZE * 2;
         let mut s = Stream::new_at(self.0, offset)?;
         Some((s.read::<u16>()?, s.read::<u16>()?))
     }

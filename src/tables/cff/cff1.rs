@@ -543,21 +543,41 @@ fn _parse_char_string(
                         return Err(CFFError::NestingLimitReached);
                     }
 
+                    let mut base_ctx = CharStringParserContext {
+                        metadata: ctx.metadata,
+                        glyph_id: base_char,
+                        local_subrs: ctx.local_subrs,
+                        width: None,
+                        stems_len: 0,
+                        has_endchar: false,
+                        has_seac: false,
+                    };
+
                     let base_char_string = ctx
                         .metadata
                         .char_strings
                         .get(u32::from(base_char.0))
                         .ok_or(CFFError::InvalidSeacCode)?;
-                    _parse_char_string(ctx, base_char_string, depth + 1, p)?;
+                    _parse_char_string(&mut base_ctx, base_char_string, depth + 1, p)?;
                     p.x = dx;
                     p.y = dy;
+
+                    let mut accent_ctx = CharStringParserContext {
+                        metadata: ctx.metadata,
+                        glyph_id: accent_char,
+                        local_subrs: ctx.local_subrs,
+                        width: None,
+                        stems_len: 0,
+                        has_endchar: false,
+                        has_seac: false,
+                    };
 
                     let accent_char_string = ctx
                         .metadata
                         .char_strings
                         .get(u32::from(accent_char.0))
                         .ok_or(CFFError::InvalidSeacCode)?;
-                    _parse_char_string(ctx, accent_char_string, depth + 1, p)?;
+                    _parse_char_string(&mut accent_ctx, accent_char_string, depth + 1, p)?;
                 } else if p.stack.len() == 1 && ctx.width.is_none() {
                     ctx.width = Some(p.stack.pop());
                 }

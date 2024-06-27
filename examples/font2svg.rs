@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use base64::engine::general_purpose::STANDARD;
 
 use std::io::Write;
@@ -167,7 +169,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 &mut svg,
                 &mut path_buf,
             );
-        } else if let Some(img) = face.glyph_raster_image(gid, std::u16::MAX) {
+        } else if let Some(img) = face.glyph_raster_image(gid, u16::MAX) {
             svg.start_element("image");
             svg.write_attribute("x", &(x + 2.0 + img.x as f64));
             svg.write_attribute("y", &(y - img.y as f64));
@@ -208,7 +210,7 @@ fn process(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Elapsed: {}ms", now.elapsed().as_micros() as f64 / 1000.0);
 
-    std::fs::write(&args.svg_path, &svg.end_document())?;
+    std::fs::write(&args.svg_path, svg.end_document())?;
 
     Ok(())
 }

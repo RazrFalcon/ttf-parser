@@ -290,7 +290,7 @@ impl<'a> Subtable6<'a> {
                 .value(right)
                 .unwrap_or(0);
 
-            let array_offset = usize::try_from(l + r).ok()?.checked_mul(i16::SIZE)?;
+            let array_offset = usize::from(l + r).checked_mul(i16::SIZE)?;
             let vector_offset: u16 = Stream::read_at(kerning_array_data, array_offset)?;
 
             Stream::read_at(kerning_vector_data, usize::from(vector_offset))

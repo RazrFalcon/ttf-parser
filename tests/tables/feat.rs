@@ -1,3 +1,5 @@
+#![allow(clippy::bool_assert_comparison)]
+
 use ttf_parser::feat::Table;
 use crate::{convert, Unit::*};
 

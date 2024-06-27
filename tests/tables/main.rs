@@ -93,7 +93,7 @@ fn tables_count_overflow() {
     use Unit::*;
     let data = convert(&[
         Raw(&[0x00, 0x01, 0x00, 0x00]), // magic
-        UInt16(std::u16::MAX),          // numTables
+        UInt16(u16::MAX),               // numTables
         UInt16(0),                      // searchRange
         UInt16(0),                      // entrySelector
         UInt16(0),                      // rangeShift
@@ -129,10 +129,10 @@ fn font_collection_num_fonts_overflow() {
         Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
         UInt16(0),                      // majorVersion
         UInt16(0),                      // minorVersion
-        UInt32(std::u32::MAX),          // numFonts
+        UInt32(u32::MAX),               // numFonts
     ]);
 
-    assert_eq!(fonts_in_collection(&data), Some(std::u32::MAX));
+    assert_eq!(fonts_in_collection(&data), Some(u32::MAX));
     assert_eq!(
         Face::parse(&data, 0).unwrap_err(),
         FaceParsingError::MalformedFont
@@ -152,7 +152,7 @@ fn font_index_overflow() {
 
     assert_eq!(fonts_in_collection(&data), Some(1));
     assert_eq!(
-        Face::parse(&data, std::u32::MAX).unwrap_err(),
+        Face::parse(&data, u32::MAX).unwrap_err(),
         FaceParsingError::FaceIndexOutOfBounds
     );
 }

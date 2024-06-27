@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Face::glyph_phantom_points`
 
 ### Fixed
+- (`CFF`) Allow MoveTo with width commands in nested subroutines.
 - `opentype_layout::LookupFlags::mark_attachment_type` parsing.
 
 ## [0.21.1] - 2024-05-11

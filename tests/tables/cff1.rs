@@ -448,6 +448,15 @@ test_cs!(vmove_to_with_width, &[
     rect(0, 20, 0, 20)
 );
 
+// Use only the first width.
+test_cs!(two_vmove_to_with_width, &[
+    CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
+    CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
+    UInt8(operator::ENDCHAR),
+], "M 0 20 Z M 0 40 Z ",
+    rect(0, 20, 0, 40)
+);
+
 test_cs!(line_to, &[
     CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
     CFFInt(30), CFFInt(40), UInt8(operator::LINE_TO),
@@ -636,13 +645,6 @@ test_cs_err!(line_to_without_move_to, &[
     CFFInt(10), CFFInt(20), UInt8(operator::LINE_TO),
     UInt8(operator::ENDCHAR),
 ], CFFError::MissingMoveTo);
-
-// Width must be set only once.
-test_cs_err!(two_vmove_to_with_width, &[
-    CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-    CFFInt(10), CFFInt(20), UInt8(operator::VERTICAL_MOVE_TO),
-    UInt8(operator::ENDCHAR),
-], CFFError::InvalidArgumentsStackLength);
 
 test_cs_err!(move_to_with_too_many_coords, &[
     CFFInt(10), CFFInt(10), CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),

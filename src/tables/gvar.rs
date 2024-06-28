@@ -792,14 +792,16 @@ mod packed_points {
                 deltas_are_words: false,
                 run_count: 100,
             }));
-            data.extend([2; 100]);
-
+            for _ in 0..100 {
+                data.push(2);
+            }
             data.push(gen_control(NewControl {
                 deltas_are_words: false,
                 run_count: 50,
             }));
-            data.extend([2; 50]);
-
+            for _ in 0..50 {
+                data.push(2);
+            }
             let points_iter = PackedPointsIter::new(&mut Stream::new(&data))
                 .unwrap()
                 .unwrap();

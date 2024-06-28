@@ -4,8 +4,10 @@
 
 use crate::parser::{Offset as _, Offset32, Stream};
 
+/// A WASM module. Contains the WASM Raw Data
 #[derive(Clone, Copy, Debug)]
 pub struct Table<'a> {
+    /// Raw WASM data in WASM format.
     pub wasm_data: &'a [u8],
 }
 

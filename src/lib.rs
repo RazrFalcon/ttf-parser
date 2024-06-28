@@ -71,7 +71,8 @@ pub use fvar::VariationAxis;
 pub use language::Language;
 pub use name::{name_id, PlatformId};
 pub use os2::{Permissions, ScriptMetrics, Style, UnicodeRanges, Weight, Width};
-/* pub */ use tables::wasm;
+// #[cfg(feature = "wasm-shaper")]
+pub use tables::wasm;
 pub use tables::CFFError;
 #[cfg(feature = "apple-layout")]
 pub use tables::{ankr, feat, kerx, morx, trak};

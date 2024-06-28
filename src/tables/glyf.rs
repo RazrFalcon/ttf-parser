@@ -618,21 +618,18 @@ impl<'a> Table<'a> {
         // Skip bbox.
         s.advance(8);
 
-        use core::cmp::Ordering::*;
-
-        match number_of_contours.cmp(&0) {
-            Greater => {
-                // Simple glyph.
-                let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
-                let glyph_points = parse_simple_outline(s.tail()?, number_of_contours)?;
-                Some(glyph_points.points_left)
-            }
-            Less => {
-                // Composite glyph.
-                let components = CompositeGlyphIter::new(s.tail()?);
-                Some(components.clone().count() as u16)
-            }
-            Equal => None, // An empty glyph.
+        if number_of_contours > 0 {
+            // Simple glyph.
+            let number_of_contours = NonZeroU16::new(number_of_contours as u16)?;
+            let glyph_points = parse_simple_outline(s.tail()?, number_of_contours)?;
+            Some(glyph_points.points_left)
+        } else if number_of_contours < 0 {
+            // Composite glyph.
+            let components = CompositeGlyphIter::new(s.tail()?);
+            Some(components.clone().count() as u16)
+        } else {
+            // An empty glyph.
+            None
         }
     }
 }

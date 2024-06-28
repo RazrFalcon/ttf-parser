@@ -41,6 +41,11 @@ glyph-names = []
 # enable this feature.
 gvar-alloc = ["std"]
 
+# Enables experimental features, such as the WASM Shaper experimental feature, 
+# ported from HarfBuzz. https://github.com/harfbuzz/harfbuzz/blob/main/docs/wasm-shaper.md
+experimental = ["wasm-shaper"]
+wasm-shaper = []
+
 [dev-dependencies]
 base64 = "0.22.1"
 pico-args = "0.5"

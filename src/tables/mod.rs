@@ -52,6 +52,9 @@ pub mod mvar;
 #[cfg(feature = "variable-fonts")]
 pub mod vvar;
 
+// #[cfg(feature = "wasm-shaper")]
+pub mod wasm;
+
 pub use cff::cff1;
 #[cfg(feature = "variable-fonts")]
 pub use cff::cff2;

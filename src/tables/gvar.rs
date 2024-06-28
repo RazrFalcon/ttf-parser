@@ -11,8 +11,8 @@ use core::cmp;
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
-use crate::{glyf, PhantomPoints, PointF};
 use crate::parser::{LazyArray16, Offset, Offset16, Offset32, Stream, F2DOT14};
+use crate::{glyf, PhantomPoints, PointF};
 use crate::{GlyphId, NormalizedCoordinate, OutlineBuilder, Rect, RectF, Transform};
 
 /// 'The TrueType rasterizer dynamically generates 'phantom' points for each glyph
@@ -525,7 +525,7 @@ mod packed_points {
             // Check that points data size is smaller than the storage type
             // used by the iterator.
             let data_len = s.offset() - start;
-            if data_len > usize::from(core::u16::MAX) {
+            if data_len > usize::from(u16::MAX) {
                 return None;
             }
 
@@ -802,7 +802,6 @@ mod packed_points {
             for _ in 0..50 {
                 data.push(2);
             }
-
             let points_iter = PackedPointsIter::new(&mut Stream::new(&data))
                 .unwrap()
                 .unwrap();

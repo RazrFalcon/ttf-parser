@@ -1897,8 +1897,8 @@ impl VariationData<'_> {
 
         let variation_store = self.variation_store.as_ref().unwrap();
 
-        for i in 0..N {
-            deltas[i] = self
+        for (i, delta) in deltas.iter_mut().enumerate() {
+            *delta = self
                 .delta_map
                 .and_then(|d| d.map(var_index_base + i as u32))
                 .and_then(|d| variation_store.parse_delta(d.0, d.1, coordinates))

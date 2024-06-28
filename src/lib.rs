@@ -43,6 +43,7 @@ Font parsing starts with a [`Face`].
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::bool_assert_comparison)]
 
 #[cfg(feature = "std")]
 #[macro_use]
@@ -368,19 +369,19 @@ impl RectF {
     #[inline]
     fn new() -> Self {
         RectF {
-            x_min: core::f32::MAX,
-            y_min: core::f32::MAX,
-            x_max: core::f32::MIN,
-            y_max: core::f32::MIN,
+            x_min: f32::MAX,
+            y_min: f32::MAX,
+            x_max: f32::MIN,
+            y_max: f32::MIN,
         }
     }
 
     #[inline]
     fn is_default(&self) -> bool {
-        self.x_min == core::f32::MAX
-            && self.y_min == core::f32::MAX
-            && self.x_max == core::f32::MIN
-            && self.y_max == core::f32::MIN
+        self.x_min == f32::MAX
+            && self.y_min == f32::MAX
+            && self.x_max == f32::MIN
+            && self.y_max == f32::MIN
     }
 
     #[inline]

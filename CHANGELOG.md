@@ -5,14 +5,51 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.22.0] - 2024-06-29
 ### Added
-- `Face::glyph_hor_advance` and `Face::glyph_ver_advance` include `gvar`'s phantom points
-  when `HVAR`/`VVAR` tables are missing. Affects only variable fonts.
 - `Face::glyph_phantom_points`
+- `hvar::Table::right_side_bearing_offset`. Thanks to [LaurenzV](https://github.com/LaurenzV).
+- `vvar::Table::advance_offset`. Thanks to [LaurenzV](https://github.com/LaurenzV).
+- `vvar::Table::top_side_bearing_offset`. Thanks to [LaurenzV](https://github.com/LaurenzV).
+- `vvar::Table::bottom_side_bearing_offset`. Thanks to [LaurenzV](https://github.com/LaurenzV).
+- `vvar::Table::vertical_origin_offset`. Thanks to [LaurenzV](https://github.com/LaurenzV).
+- `colr::Table::clip_box`. Thanks to [LaurenzV](https://github.com/LaurenzV).
+
+### Changed
+- `no_std` build of `ttf-parser` requires `--features=no-std-float` now.
+  This is because we need trigonometry functions to flatten transforms in `COLR`.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+- `colr::Painter` no longer has `push_translate`, `push_scale`, `push_rotate` and `push_skew`.
+  Only `push_transform` left.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+- Split `hvar::Table` into `hvar::Table` and `vvar::Table`.
+  Previously, we treated both `HVAR` and `VVAR` tables as identical,
+  but `VVAR` actually has additional fields.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+- Rename `hvar::Table::side_bearing_offset` into `hvar::Table::left_side_bearing_offset`.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
 
 ### Fixed
+- `Face::glyph_hor_advance` and `Face::glyph_ver_advance` include `gvar`'s phantom points
+  when `HVAR`/`VVAR` tables are missing. Affects only variable fonts.
 - (`CFF`) Allow MoveTo with width commands in nested subroutines.
 - `opentype_layout::LookupFlags::mark_attachment_type` parsing.
+- (`CFF`) Allow empty charsets in `cff::parse_charset`.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+- (`gvar`) Empty sub-glyphs/components is no longer an error.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+- (`GSUB`/`GPOS`) Allow `NULL` offsets in `ChainedContextLookup` Format2 subtables.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+- `Face::glyph_y_origin` properly handles variable fonts now.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+- (`kerx`) Fix `AnchorPoints` parsing.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
+
+### Removed
+- `push_translate`, `push_scale`, `push_rotate` and `push_skew` from `colr::Painter`.
+  Use `colr::Painter::push_transform` instead.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
 
 ## [0.21.1] - 2024-05-11
 ### Fixed
@@ -436,7 +473,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.19.2...v0.20.0

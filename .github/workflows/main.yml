@@ -24,14 +24,14 @@ jobs:
         toolchain: ${{ matrix.rust }}
         override: true
 
-    - name: Build with no-std-float
-      run: cargo build --no-default-features --features no-std-float
+    - name: Build with no default features
+      run: cargo build --no-default-features
 
     - name: Build with std
       run: cargo build --no-default-features --features std
 
     - name: Build with variable-fonts
-      run: cargo build --no-default-features --features variable-fonts,no-std-float
+      run: cargo build --no-default-features --features variable-fonts
 
     - name: Build with all features
       run: cargo build --all-features

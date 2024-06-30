@@ -61,6 +61,8 @@ mod tables;
 #[cfg(feature = "variable-fonts")]
 mod var_store;
 
+#[allow(unused_imports)]
+use core_maths::*;
 use head::IndexToLocationFormat;
 pub use parser::{Fixed, FromData, LazyArray16, LazyArray32, LazyArrayIter16, LazyArrayIter32};
 use parser::{NumFrom, Offset, Offset32, Stream, TryNumFrom};
@@ -2411,25 +2413,4 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
 
     s.skip::<u32>(); // version
     s.read::<u32>()
-}
-
-#[allow(missing_docs)]
-#[cfg(all(not(feature = "std"), feature = "no-std-float"))]
-pub(crate) trait NoStdFloat {
-    fn sin(self) -> Self;
-    fn cos(self) -> Self;
-    fn tan(self) -> Self;
-}
-
-#[cfg(all(not(feature = "std"), feature = "no-std-float"))]
-impl NoStdFloat for f32 {
-    fn sin(self) -> Self {
-        libm::sinf(self)
-    }
-    fn cos(self) -> Self {
-        libm::cosf(self)
-    }
-    fn tan(self) -> Self {
-        libm::tanf(self)
-    }
 }

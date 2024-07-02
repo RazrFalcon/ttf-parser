@@ -41,11 +41,11 @@ jobs:
 
     - name: Build C API
       working-directory: c-api
-      run: cargo build --no-default-features --features=no-std-float
+      run: cargo build --no-default-features
 
     - name: Build C API with variable-fonts
       working-directory: c-api
-      run: cargo build --no-default-features --features=variable-fonts,no-std-float
+      run: cargo build --no-default-features --features=variable-fonts
 
     - name: Test C API
       working-directory: c-api

@@ -25,13 +25,13 @@ jobs:
         override: true
 
     - name: Build with no default features
-      run: cargo build --no-default-features --features no-std-float
+      run: cargo build --no-default-features --features=no-std-float
 
     - name: Build with std
-      run: cargo build --no-default-features --features std
+      run: cargo build --no-default-features --features=std
 
     - name: Build with variable-fonts
-      run: cargo build --no-default-features --features variable-fonts,no-std-float
+      run: cargo build --no-default-features --features=variable-fonts,no-std-float
 
     - name: Build with all features
       run: cargo build --all-features
@@ -41,11 +41,11 @@ jobs:
 
     - name: Build C API
       working-directory: c-api
-      run: cargo build --no-default-features no-std-float
+      run: cargo build --no-default-features --features=no-std-float
 
     - name: Build C API with variable-fonts
       working-directory: c-api
-      run: cargo build --no-default-features --features variable-fonts,no-std-float
+      run: cargo build --no-default-features --features=variable-fonts,no-std-float
 
     - name: Test C API
       working-directory: c-api

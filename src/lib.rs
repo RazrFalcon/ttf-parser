@@ -49,6 +49,9 @@ Font parsing starts with a [`Face`].
 #[macro_use]
 extern crate std;
 
+#[allow(unused_imports)]
+use core_maths::*;
+
 #[cfg(feature = "apple-layout")]
 mod aat;
 #[cfg(feature = "variable-fonts")]
@@ -61,8 +64,6 @@ mod tables;
 #[cfg(feature = "variable-fonts")]
 mod var_store;
 
-#[allow(unused_imports)]
-use core_maths::*;
 use head::IndexToLocationFormat;
 pub use parser::{Fixed, FromData, LazyArray16, LazyArray32, LazyArrayIter16, LazyArrayIter32};
 use parser::{NumFrom, Offset, Offset32, Stream, TryNumFrom};

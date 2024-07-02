@@ -1,6 +1,6 @@
 [package]
 name = "ttf-parser"
-version = "0.22.0"
+version = "0.23.0"
 authors = ["Yevhenii Reizner <razrfalcon@gmail.com>"]
 keywords = ["ttf", "truetype", "opentype"]
 categories = ["parser-implementations"]
@@ -13,7 +13,7 @@ edition = "2018"
 exclude = ["benches/**"]
 
 [dependencies]
-core_maths = { version = "0.1.0"}
+core_maths = { version = "0.1.0" } # No-op for `std` builds.
 
 [features]
 default = ["std", "opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2024-07-02
+### Changed
+- Make `core_maths` dependency optional.
+  When building for `no_std` one must enable `no-std-float` build feature now.
+
 ## [0.23.0] - 2024-07-02
 ### Changed
 - Use `core_maths` instead of `libm`. Should simplify the build process.
@@ -481,7 +486,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.21.0...v0.21.1

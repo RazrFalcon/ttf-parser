@@ -77,6 +77,8 @@ pub use fvar::VariationAxis;
 pub use language::Language;
 pub use name::{name_id, PlatformId};
 pub use os2::{Permissions, ScriptMetrics, Style, UnicodeRanges, Weight, Width};
+#[cfg(feature = "wasm-shaper")]
+pub use tables::wasm;
 pub use tables::CFFError;
 #[cfg(feature = "apple-layout")]
 pub use tables::{ankr, feat, kerx, morx, trak};
@@ -977,6 +979,8 @@ pub struct RawFaceTables<'a> {
     pub mvar: Option<&'a [u8]>,
     #[cfg(feature = "variable-fonts")]
     pub vvar: Option<&'a [u8]>,
+    #[cfg(feature = "wasm-shaper")]
+    pub wasm: Option<&'a [u8]>,
 }
 
 /// Parsed face tables.
@@ -1047,6 +1051,8 @@ pub struct FaceTables<'a> {
     pub mvar: Option<mvar::Table<'a>>,
     #[cfg(feature = "variable-fonts")]
     pub vvar: Option<vvar::Table<'a>>,
+    #[cfg(feature = "wasm-shaper")]
+    pub wasm: Option<wasm::Table<'a>>,
 }
 
 /// A font face.
@@ -1193,6 +1199,8 @@ impl<'a> Face<'a> {
                 b"trak" => tables.trak = table_data,
                 b"vhea" => tables.vhea = table_data,
                 b"vmtx" => tables.vmtx = table_data,
+                #[cfg(feature = "wasm-shaper")]
+                b"Wasm" => tables.wasm = table_data,
                 _ => {}
             }
         }
@@ -1354,6 +1362,8 @@ impl<'a> Face<'a> {
             mvar: raw_tables.mvar.and_then(mvar::Table::parse),
             #[cfg(feature = "variable-fonts")]
             vvar: raw_tables.vvar.and_then(vvar::Table::parse),
+            #[cfg(feature = "wasm-shaper")]
+            wasm: raw_tables.wasm.and_then(wasm::Table::parse), 
         })
     }
 

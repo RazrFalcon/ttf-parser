@@ -599,6 +599,25 @@ impl<'a> Table<'a> {
         outline_impl(self.loca_table, self.data, glyph_data, 0, &mut b)?
     }
 
+    /// The bounding box of the glyph. Unlike the `outline` method, this method does not
+    /// calculate the bounding box manually by outlining the glyph, but instead uses the
+    /// bounding box in the `glyf` program. As a result, this method will be much faster,
+    /// but the bounding box could be more inaccurate.
+    #[inline]
+    pub fn bbox(&self, glyph_id: GlyphId) -> Option<Rect> {
+        let glyph_data = self.get(glyph_id)?;
+
+        let mut s = Stream::new(glyph_data);
+        // number of contours
+        let _ = s.read::<i16>()?;
+        Some(Rect {
+            x_min: s.read::<i16>()?,
+            y_min: s.read::<i16>()?,
+            x_max: s.read::<i16>()?,
+            y_max: s.read::<i16>()?,
+        })
+    }
+
     #[inline]
     pub(crate) fn get(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
         let range = self.loca_table.glyph_range(glyph_id)?;

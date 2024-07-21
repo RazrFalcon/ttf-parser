@@ -1,6 +1,7 @@
 //! A [Naming Table](
 //! https://docs.microsoft.com/en-us/typography/opentype/spec/name) implementation.
 
+use core::convert::TryFrom;
 #[cfg(feature = "std")]
 use std::string::String;
 #[cfg(feature = "std")]
@@ -64,6 +65,86 @@ impl FromData for PlatformId {
             3 => Some(PlatformId::Windows),
             4 => Some(PlatformId::Custom),
             _ => None,
+        }
+    }
+}
+
+/// A [Macintosh encoding ID](https://learn.microsoft.com/en-us/typography/opentype/spec/name#enc1).
+#[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MacintoshEncodingId {
+    Roman,
+    Japanese,
+    ChineseTraditional,
+    Korean,
+    Arabic,
+    Hebrew,
+    Greek,
+    Russian,
+    RSymbol,
+    Devanagari,
+    Gurmukhi,
+    Odia,
+    Bangla,
+    Tamil,
+    Telugu,
+    Kannada,
+    Malayalam,
+    Sinhalese,
+    Burmese,
+    Khmer,
+    Thai,
+    Laotian,
+    Georgian,
+    Armenian,
+    ChineseSimplified,
+    Tibetan,
+    Mongolian,
+    Geez,
+    Slavic,
+    Vietnamese,
+    Sindhi,
+    Uninterpreted,
+}
+
+impl TryFrom<u16> for MacintoshEncodingId {
+    type Error = &'static str;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            v if v == MacintoshEncodingId::Roman as u16 => Ok(MacintoshEncodingId::Roman),
+            v if v == MacintoshEncodingId::Japanese as u16 => Ok(MacintoshEncodingId::Japanese),
+            v if v == MacintoshEncodingId::ChineseTraditional as u16 => Ok(MacintoshEncodingId::ChineseTraditional),
+            v if v == MacintoshEncodingId::Korean as u16 => Ok(MacintoshEncodingId::Korean),
+            v if v == MacintoshEncodingId::Arabic as u16 => Ok(MacintoshEncodingId::Arabic),
+            v if v == MacintoshEncodingId::Hebrew as u16 => Ok(MacintoshEncodingId::Hebrew),
+            v if v == MacintoshEncodingId::Greek as u16 => Ok(MacintoshEncodingId::Greek),
+            v if v == MacintoshEncodingId::Russian as u16 => Ok(MacintoshEncodingId::Russian),
+            v if v == MacintoshEncodingId::RSymbol as u16 => Ok(MacintoshEncodingId::RSymbol),
+            v if v == MacintoshEncodingId::Devanagari as u16 => Ok(MacintoshEncodingId::Devanagari),
+            v if v == MacintoshEncodingId::Gurmukhi as u16 => Ok(MacintoshEncodingId::Gurmukhi),
+            v if v == MacintoshEncodingId::Odia as u16 => Ok(MacintoshEncodingId::Odia),
+            v if v == MacintoshEncodingId::Bangla as u16 => Ok(MacintoshEncodingId::Bangla),
+            v if v == MacintoshEncodingId::Tamil as u16 => Ok(MacintoshEncodingId::Tamil),
+            v if v == MacintoshEncodingId::Telugu as u16 => Ok(MacintoshEncodingId::Telugu),
+            v if v == MacintoshEncodingId::Kannada as u16 => Ok(MacintoshEncodingId::Kannada),
+            v if v == MacintoshEncodingId::Malayalam as u16 => Ok(MacintoshEncodingId::Malayalam),
+            v if v == MacintoshEncodingId::Sinhalese as u16 => Ok(MacintoshEncodingId::Sinhalese),
+            v if v == MacintoshEncodingId::Burmese as u16 => Ok(MacintoshEncodingId::Burmese),
+            v if v == MacintoshEncodingId::Khmer as u16 => Ok(MacintoshEncodingId::Khmer),
+            v if v == MacintoshEncodingId::Thai as u16 => Ok(MacintoshEncodingId::Thai),
+            v if v == MacintoshEncodingId::Laotian as u16 => Ok(MacintoshEncodingId::Laotian),
+            v if v == MacintoshEncodingId::Georgian as u16 => Ok(MacintoshEncodingId::Georgian),
+            v if v == MacintoshEncodingId::Armenian as u16 => Ok(MacintoshEncodingId::Armenian),
+            v if v == MacintoshEncodingId::ChineseSimplified as u16 => Ok(MacintoshEncodingId::ChineseSimplified),
+            v if v == MacintoshEncodingId::Tibetan as u16 => Ok(MacintoshEncodingId::Tibetan),
+            v if v == MacintoshEncodingId::Mongolian as u16 => Ok(MacintoshEncodingId::Mongolian),
+            v if v == MacintoshEncodingId::Geez as u16 => Ok(MacintoshEncodingId::Geez),
+            v if v == MacintoshEncodingId::Slavic as u16 => Ok(MacintoshEncodingId::Slavic),
+            v if v == MacintoshEncodingId::Vietnamese as u16 => Ok(MacintoshEncodingId::Vietnamese),
+            v if v == MacintoshEncodingId::Sindhi as u16 => Ok(MacintoshEncodingId::Sindhi),
+            v if v == MacintoshEncodingId::Uninterpreted as u16 => Ok(MacintoshEncodingId::Uninterpreted),
+            _ => Err("Invalid Encoding Id"),
         }
     }
 }
@@ -140,13 +221,29 @@ impl<'a> Name<'a> {
     /// - Unicode Platform ID
     /// - Windows Platform ID + Symbol
     /// - Windows Platform ID + Unicode BMP
+    /// - Macintosh Platform ID + Roman
     #[cfg(feature = "std")]
     #[inline(never)]
     pub fn to_string(&self) -> Option<String> {
         if self.is_unicode() {
             self.name_from_utf16_be()
         } else {
-            None
+            match self.platform_id {
+                PlatformId::Macintosh => {
+                    match MacintoshEncodingId::try_from(self.encoding_id).ok() {
+                        Some(MacintoshEncodingId::Roman) => {
+                            let mut name: Vec<u16> = Vec::new();
+                            for c in self.name {
+                                name.push(*c as u16);
+                            }
+
+                            String::from_utf16(&name).ok()
+                        },
+                        _ => None,
+                    }
+                },
+                _ =>  None,
+            }
         }
     }
 

@@ -19,7 +19,7 @@ fn main() {
 
     let mut family_names = Vec::new();
     for name in face.names() {
-        if name.name_id == ttf_parser::name_id::FULL_NAME && name.is_unicode() {
+        if name.name_id == ttf_parser::name_id::FULL_NAME {
             if let Some(family_name) = name.to_string() {
                 let language = name.language();
                 family_names.push(format!(
@@ -35,7 +35,7 @@ fn main() {
     let post_script_name = face
         .names()
         .into_iter()
-        .find(|name| name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME && name.is_unicode())
+        .find(|name| name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME)
         .and_then(|name| name.to_string());
 
     println!("Family names: {:?}", family_names);

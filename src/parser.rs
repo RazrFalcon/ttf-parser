@@ -764,6 +764,11 @@ impl<'a> Stream<'a> {
     /// Reads N bytes from the stream.
     #[inline]
     pub fn read_bytes(&mut self, len: usize) -> Option<&'a [u8]> {
+        // An integer overflow here on 32bit systems is almost guarantee to be caused
+        // by an incorrect parsing logic from the caller side.
+        // Simply using `checked_add` here would silently swallow errors, which is not what we want.
+        debug_assert!(self.offset as u64 + len as u64 <= u32::MAX as u64);
+
         let v = self.data.get(self.offset..self.offset + len)?;
         self.advance(len);
         Some(v)

@@ -123,7 +123,7 @@ fn empty_font_collection() {
 }
 
 #[test]
-fn font_collection_num_fonts_overflow() {
+fn font_collection_num_fonts_overflow_1() {
     use Unit::*;
     let data = convert(&[
         Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
@@ -133,6 +133,19 @@ fn font_collection_num_fonts_overflow() {
     ]);
 
     assert_eq!(fonts_in_collection(&data), Some(u32::MAX));
+}
+
+#[test]
+#[should_panic]
+fn font_collection_num_fonts_overflow_2() {
+    use Unit::*;
+    let data = convert(&[
+        Raw(&[0x74, 0x74, 0x63, 0x66]), // magic
+        UInt16(0),                      // majorVersion
+        UInt16(0),                      // minorVersion
+        UInt32(u32::MAX),               // numFonts
+    ]);
+
     assert_eq!(
         Face::parse(&data, 0).unwrap_err(),
         FaceParsingError::MalformedFont

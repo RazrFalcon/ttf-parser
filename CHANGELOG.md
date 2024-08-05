@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [0.24.1] - 2024-08-05
+### Added
+- (`glyf`) `glyf::Table::bbox`. Thanks to [LaurenzV](https://github.com/LaurenzV).
+
 ### Fixed
 - (`kerx`) `kerx::SubtablesIter` wasn't updating the current subtable index.
+- (`GPOS`) `gpos::AnchorMatrix` allows nullable/optional matrices now.
+  Thanks to [LaurenzV](https://github.com/LaurenzV).
 
 ## [0.24.0] - 2024-07-02
 ### Changed

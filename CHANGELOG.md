@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- (`kerx`) `kerx::SubtablesIter` wasn't updating the current subtable index.
 
 ## [0.24.0] - 2024-07-02
 ### Changed

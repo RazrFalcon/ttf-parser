@@ -448,6 +448,8 @@ impl<'a> Iterator for SubtablesIter<'a> {
             }
         };
 
+        self.table_index += 1;
+
         Some(Subtable {
             horizontal: coverage.is_horizontal(),
             variable: coverage.is_variable(),

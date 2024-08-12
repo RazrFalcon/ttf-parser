@@ -1,4 +1,4 @@
-use ttf_parser::stat::AxisValue;
+use ttf_parser::stat::{AxisValue, AxisValueTable};
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
@@ -101,40 +101,74 @@ fn main() {
         }
 
         println!("  Axis Values:");
-        for value in stat.values() {
-            // println!("    {value:?}");
-            match value {
-                AxisValue::Format1(value) => {
-                    let name = face
+        for table in stat.tables() {
+            match table {
+                AxisValueTable::Format1(table) => {
+                    let value_name = face
                         .names()
                         .into_iter()
-                        .filter(|name| name.name_id == value.value_name_id)
+                        .filter(|name| name.name_id == table.value_name_id)
                         .map(|name| name.to_string().unwrap())
                         .collect::<Vec<_>>()
                         .join(", ");
 
+                    let axis_name = &axis_names[table.axis_index as usize];
+                    let value = table.value;
+                    let flags = table.flags;
+
+                    println!("    {axis_name} {value:?}={value_name:?} flags={flags:?}");
+                }
+                AxisValueTable::Format2(table) => {
+                    let value_name = face
+                        .names()
+                        .into_iter()
+                        .filter(|name| name.name_id == table.value_name_id)
+                        .map(|name| name.to_string().unwrap())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+
+                    let axis_name = &axis_names[table.axis_index as usize];
+                    let nominal_value = table.nominal_value;
+                    let min_value = table.range_min_value;
+                    let max_value = table.range_max_value;
+                    let flags = table.flags;
+
+                    println!("    {axis_name} {min_value:?}..{max_value:?}={value_name:?} nominal={nominal_value:?} flags={flags:?}");
+                }
+                AxisValueTable::Format3(table) => {
+                    let value_name = face
+                        .names()
+                        .into_iter()
+                        .filter(|name| name.name_id == table.value_name_id)
+                        .map(|name| name.to_string().unwrap())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+
+                    let axis_name = &axis_names[table.axis_index as usize];
+                    let value = table.value;
+                    let linked_value = table.linked_value;
+                    let flags = table.flags;
+
                     println!(
-                        "    {}={:?}={name:?} flags={:?}",
-                        &axis_names[value.axis_index as usize], value.value, value.flags
+                        "    {axis_name} {value:?}<=>{linked_value:?} = {value_name:?} flags={flags:?}",
                     );
                 }
-                AxisValue::Format2(_) => todo!(),
-                AxisValue::Format3(value) => {
-                    let name = face
+                AxisValueTable::Format4(table) => {
+                    let value_name = face
                         .names()
                         .into_iter()
-                        .filter(|name| name.name_id == value.value_name_id)
+                        .filter(|name| name.name_id == table.value_name_id)
                         .map(|name| name.to_string().unwrap())
                         .collect::<Vec<_>>()
                         .join(", ");
 
-                    println!(
-                        "    {} {:?}<=>{:?} = {name:?} flags={:?}",
-                        &axis_names[value.axis_index as usize],
-                        value.value,
-                        value.linked_value,
-                        value.flags
-                    );
+                    let flags = table.flags;
+
+                    println!("    {value_name:?} flags={flags:?}");
+                    for pair in table.values {
+                        let AxisValue { axis_index, value } = pair;
+                        println!("      {axis_index} = {value:?}")
+                    }
                 }
             }
         }

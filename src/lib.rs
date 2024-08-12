@@ -84,7 +84,8 @@ pub use tables::{ankr, feat, kerx, morx, trak};
 pub use tables::{avar, cff2, fvar, gvar, hvar, mvar, vvar};
 pub use tables::{cbdt, cblc, cff1 as cff, vhea};
 pub use tables::{
-    cmap, colr, cpal, glyf, head, hhea, hmtx, kern, loca, maxp, name, os2, post, sbix, svg, vorg,
+    cmap, colr, cpal, glyf, head, hhea, hmtx, kern, loca, maxp, name, os2, post, sbix, stat, svg,
+    vorg,
 };
 #[cfg(feature = "opentype-layout")]
 pub use tables::{gdef, gpos, gsub, math};
@@ -938,6 +939,7 @@ pub struct RawFaceTables<'a> {
     pub os2: Option<&'a [u8]>,
     pub post: Option<&'a [u8]>,
     pub sbix: Option<&'a [u8]>,
+    pub stat: Option<&'a [u8]>,
     pub svg: Option<&'a [u8]>,
     pub vhea: Option<&'a [u8]>,
     pub vmtx: Option<&'a [u8]>,
@@ -1008,6 +1010,7 @@ pub struct FaceTables<'a> {
     pub os2: Option<os2::Table<'a>>,
     pub post: Option<post::Table<'a>>,
     pub sbix: Option<sbix::Table<'a>>,
+    pub stat: Option<stat::Table<'a>>,
     pub svg: Option<svg::Table<'a>>,
     pub vhea: Option<vhea::Table>,
     pub vmtx: Option<hmtx::Table<'a>>,
@@ -1189,6 +1192,7 @@ impl<'a> Face<'a> {
                 b"name" => tables.name = table_data,
                 b"post" => tables.post = table_data,
                 b"sbix" => tables.sbix = table_data,
+                b"STAT" => tables.stat = table_data,
                 #[cfg(feature = "apple-layout")]
                 b"trak" => tables.trak = table_data,
                 b"vhea" => tables.vhea = table_data,
@@ -1305,6 +1309,7 @@ impl<'a> Face<'a> {
             sbix: raw_tables
                 .sbix
                 .and_then(|data| sbix::Table::parse(maxp.number_of_glyphs, data)),
+            stat: raw_tables.stat.and_then(stat::Table::parse),
             svg: raw_tables.svg.and_then(svg::Table::parse),
             vhea: raw_tables.vhea.and_then(vhea::Table::parse),
             vmtx,

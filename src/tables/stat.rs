@@ -33,6 +33,7 @@ pub struct AxisValueTables<'a> {
     start: Offset32,
     offsets: LazyArray16<'a, Offset16>,
     index: u16,
+    version: u32,
 }
 
 impl<'a> Iterator for AxisValueTables<'a> {
@@ -66,6 +67,11 @@ impl<'a> Iterator for AxisValueTables<'a> {
                 Self::Item::Format3(value)
             }
             4 => {
+                // Format 4 tables didn't exist until v1.2.
+                if self.version < 0x00010002 {
+                    return None;
+                }
+
                 let value = AxisValueTableFormat4::parse(s.tail()?)?;
                 Self::Item::Format4(value)
             }
@@ -264,6 +270,10 @@ impl FromData for AxisRecord {
 pub struct Table<'a> {
     /// List of axes
     pub axes: LazyArray16<'a, AxisRecord>,
+    /// Fallback name when everything can be elided.
+    pub fallback_name_id: Option<u16>,
+    /// Version of the style attributes table.
+    pub version: u32,
     data: &'a [u8],
     value_lookup_start: Offset32,
     value_offsets: LazyArray16<'a, Offset16>,
@@ -273,12 +283,14 @@ impl<'a> Table<'a> {
     /// Parses a table from raw data.
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        let major = s.read::<u16>()?;
-        let minor = s.read::<u16>()?;
+        let version = s.read::<u32>()?;
 
-        match (major, minor) {
-            (1, 0) | (1, 1) | (1, 2) => {}
-            _ => return None,
+        // Supported versions are:
+        // - 1.0
+        // - 1.1 adds elidedFallbackNameId
+        // - 1.2 format 4 axis value table
+        if !(version == 0x00010000 || version == 0x00010001 || version == 0x00010002) {
+            return None;
         }
 
         let _axis_size = s.read::<u16>()?;
@@ -287,6 +299,13 @@ impl<'a> Table<'a> {
 
         let value_count = s.read::<u16>()?;
         let value_lookup_start = s.read::<Offset32>()?;
+
+        let fallback_name_id = if version >= 0x00010001 {
+            // If version >= 1.1 the field is required
+            Some(s.read::<u16>()?)
+        } else {
+            None
+        };
 
         let mut s = Stream::new_at(data, axis_offset)?;
         let axes = s.read_array16::<AxisRecord>(axis_count)?;
@@ -299,6 +318,8 @@ impl<'a> Table<'a> {
             data,
             value_lookup_start,
             value_offsets,
+            fallback_name_id,
+            version,
         })
     }
 
@@ -309,6 +330,7 @@ impl<'a> Table<'a> {
             start: self.value_lookup_start,
             offsets: self.value_offsets,
             index: 0,
+            version: self.version,
         }
     }
 }

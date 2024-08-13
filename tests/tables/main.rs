@@ -7,6 +7,7 @@
 #[rustfmt::skip] mod glyf;
 #[rustfmt::skip] mod hmtx;
 #[rustfmt::skip] mod maxp;
+#[rustfmt::skip] mod panose;
 #[rustfmt::skip] mod sbix;
 #[rustfmt::skip] mod trak;
 

@@ -1,6 +1,10 @@
 //! A [OS/2 and Windows Metrics Table](https://docs.microsoft.com/en-us/typography/opentype/spec/os2)
 //! implementation.
 
+pub mod panose;
+
+use panose::Panose;
+
 use crate::parser::Stream;
 use crate::LineMetrics;
 
@@ -11,6 +15,7 @@ const Y_SUBSCRIPT_X_SIZE_OFFSET: usize = 10;
 const Y_SUPERSCRIPT_X_SIZE_OFFSET: usize = 18;
 const Y_STRIKEOUT_SIZE_OFFSET: usize = 26;
 const Y_STRIKEOUT_POSITION_OFFSET: usize = 28;
+const PANOSE_OFFSET: usize = 32;
 const UNICODE_RANGES_OFFSET: usize = 42;
 const SELECTION_OFFSET: usize = 62;
 const TYPO_ASCENDER_OFFSET: usize = 68;
@@ -520,6 +525,12 @@ impl<'a> Table<'a> {
         let n3 = s.read::<u32>().unwrap_or(0) as u128;
         let n4 = s.read::<u32>().unwrap_or(0) as u128;
         UnicodeRanges(n4 << 96 | n3 << 64 | n2 << 32 | n1)
+    }
+
+    /// Returns the [PANOSE classification](https://monotype.github.io/panose/pan1.htm) information.
+    pub fn panose(&self) -> Option<Panose> {
+        let mut s = Stream::new_at(self.data, PANOSE_OFFSET).unwrap();
+        s.read::<Panose>()
     }
 
     #[inline]

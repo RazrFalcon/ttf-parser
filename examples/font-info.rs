@@ -96,6 +96,8 @@ fn main() {
         }
     }
 
+    println!("{:?}", face.tables().os2.unwrap().panose());
+
     println!("Elapsed: {}us", now.elapsed().as_micros());
 }
 

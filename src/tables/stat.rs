@@ -324,7 +324,7 @@ impl<'a> Table<'a> {
     }
 
     /// Iterator over the collection of axis value tables.
-    pub fn tables(&self) -> AxisValueTables<'a> {
+    pub fn subtables(&self) -> AxisValueTables<'a> {
         AxisValueTables {
             data: Stream::new(self.data),
             start: self.value_lookup_start,

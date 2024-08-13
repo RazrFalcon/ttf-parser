@@ -101,7 +101,7 @@ fn main() {
         }
 
         println!("  Axis Values:");
-        for table in stat.tables() {
+        for table in stat.subtables() {
             match table {
                 AxisValueTable::Format1(table) => {
                     let value_name = face

@@ -181,7 +181,7 @@ impl SelectionFlags {
 
 /// [Unicode Ranges](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#ur).
 #[derive(Clone, Copy, Default, Debug)]
-pub struct UnicodeRanges(u128);
+pub struct UnicodeRanges(pub u128);
 
 impl UnicodeRanges {
     /// Checks if ranges contain the specified character.
@@ -192,11 +192,6 @@ impl UnicodeRanges {
         } else {
             false
         }
-    }
-
-    /// Returns the raw unicode ranges value
-    pub fn as_raw(&self) -> u128 {
-        self.0
     }
 }
 

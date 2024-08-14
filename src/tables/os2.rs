@@ -193,6 +193,11 @@ impl UnicodeRanges {
             false
         }
     }
+
+    /// Returns the raw unicode ranges value
+    pub fn as_raw(&self) -> u128 {
+        self.0
+    }
 }
 
 fn char_range_index(c: char) -> i8 {

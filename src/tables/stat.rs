@@ -5,7 +5,7 @@ use crate::{
     Fixed, FromData, LazyArray16, Tag,
 };
 
-/// Axis-value pairing.
+/// Axis-value pairing for [`AxisValueSubtableFormat4`].
 #[derive(Clone, Copy, Debug)]
 pub struct AxisValue {
     /// Zero-based index into [`Table::axes`].
@@ -26,7 +26,7 @@ impl FromData for AxisValue {
     }
 }
 
-/// List of axis value subtables.
+/// Iterator over axis value subtables.
 #[derive(Clone, Debug)]
 pub struct AxisValueSubtables<'a> {
     data: Stream<'a>,
@@ -107,7 +107,7 @@ impl FromData for AxisRecord {
     }
 }
 
-/// [Flags](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#flags) for [`AxisValue`].
+/// [Flags](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#flags) for [`AxisValueSubtable`].
 #[derive(Clone, Copy)]
 pub struct AxisValueFlags(u16);
 
@@ -135,12 +135,12 @@ impl core::fmt::Debug for AxisValueFlags {
     }
 }
 
-/// Axis value table format 1
+/// Axis value subtable [format 1](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-1).
 #[derive(Clone, Copy, Debug)]
 pub struct AxisValueSubtableFormat1 {
     /// Zero-based index into [`Table::axes`].
     pub axis_index: u16,
-    /// Flags for AxisValue.
+    /// Flags for [`AxisValueSubtable`].
     pub flags: AxisValueFlags,
     /// The name ID of the display string.
     pub value_name_id: u16,
@@ -163,12 +163,12 @@ impl FromData for AxisValueSubtableFormat1 {
     }
 }
 
-/// Axis value table format 2
+/// Axis value subtable [format 2](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-2).
 #[derive(Clone, Copy, Debug)]
 pub struct AxisValueSubtableFormat2 {
     /// Zero-based index into [`Table::axes`].
     pub axis_index: u16,
-    /// Flags for AxisValue.
+    /// Flags for [`AxisValueSubtable`].
     pub flags: AxisValueFlags,
     /// The name ID of the display string.
     pub value_name_id: u16,
@@ -197,12 +197,12 @@ impl FromData for AxisValueSubtableFormat2 {
     }
 }
 
-/// Axis value table format 3
+/// Axis value subtable [format 3](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-3).
 #[derive(Clone, Copy, Debug)]
 pub struct AxisValueSubtableFormat3 {
     /// Zero-based index into [`Table::axes`].
     pub axis_index: u16,
-    /// Flags for AxisValue.
+    /// Flags for [`AxisValueSubtable`].
     pub flags: AxisValueFlags,
     /// The name ID of the display string.
     pub value_name_id: u16,
@@ -228,10 +228,10 @@ impl FromData for AxisValueSubtableFormat3 {
     }
 }
 
-/// Axis value table format 4
+/// Axis value subtable [format 4](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-4).
 #[derive(Clone, Copy, Debug)]
 pub struct AxisValueSubtableFormat4<'a> {
-    /// Flags for AxisValue.
+    /// Flags for [`AxisValueSubtable`].
     pub flags: AxisValueFlags,
     /// The name ID of the display string.
     pub value_name_id: u16,
@@ -255,7 +255,7 @@ impl<'a> AxisValueSubtableFormat4<'a> {
     }
 }
 
-/// An [axis value table](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-tables).
+/// An [axis value subtable](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-tables).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug)]
 pub enum AxisValueSubtable<'a> {
@@ -322,7 +322,7 @@ impl<'a> Table<'a> {
         })
     }
 
-    /// Iterator over the collection of axis value tables.
+    /// Returns an iterator over the collection of axis value tables.
     pub fn subtables(&self) -> AxisValueSubtables<'a> {
         AxisValueSubtables {
             data: Stream::new(self.data),
@@ -340,8 +340,8 @@ impl<'a> Table<'a> {
     /// if it is equal to the subtable's value or contained within the range defined by the
     /// subtable. If no matches are found `None` is returned. Typically a match value is not
     /// specified for non-variable fonts as multiple subtables for a given axis ought not exist. For
-    /// variable fonts a non-`None` match value should be specified as multiple records for the
-    /// variation axes exist.
+    /// variable fonts a non-`None` match value should be specified as multiple records for each of
+    /// the variation axes exist.
     ///
     /// Note: Format 4 subtables are explicitly ignored in this function.
     pub fn subtable_for_axis(

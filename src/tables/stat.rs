@@ -26,9 +26,9 @@ impl FromData for AxisValue {
     }
 }
 
-/// List of axis value tables.
+/// List of axis value subtables.
 #[derive(Clone, Debug)]
-pub struct AxisValueTables<'a> {
+pub struct AxisValueSubtables<'a> {
     data: Stream<'a>,
     start: Offset32,
     offsets: LazyArray16<'a, Offset16>,
@@ -36,7 +36,7 @@ pub struct AxisValueTables<'a> {
     version: u32,
 }
 
-impl<'a> Iterator for AxisValueTables<'a> {
+impl<'a> Iterator for AxisValueSubtables<'a> {
     type Item = AxisValueTable<'a>;
 
     #[inline]
@@ -324,8 +324,8 @@ impl<'a> Table<'a> {
     }
 
     /// Iterator over the collection of axis value tables.
-    pub fn subtables(&self) -> AxisValueTables<'a> {
-        AxisValueTables {
+    pub fn subtables(&self) -> AxisValueSubtables<'a> {
+        AxisValueSubtables {
             data: Stream::new(self.data),
             start: self.value_lookup_start,
             offsets: self.value_offsets,

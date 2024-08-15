@@ -287,7 +287,7 @@ impl<'a> Table<'a> {
         // Supported versions are:
         // - 1.0
         // - 1.1 adds elidedFallbackNameId
-        // - 1.2 format 4 axis value table
+        // - 1.2 adds format 4 axis value table
         if !(version == 0x00010000 || version == 0x00010001 || version == 0x00010002) {
             return None;
         }

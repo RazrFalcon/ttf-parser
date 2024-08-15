@@ -332,4 +332,70 @@ impl<'a> Table<'a> {
             version: self.version,
         }
     }
+
+    /// Returns the first matching subtable for a given axis.  If no match value is given the first
+    /// subtable for the axis is returned.  If a match value is given, the first subtable for the
+    /// axis where the value matches is returned.  A value matches if it is equal to the subtable's
+    /// value or contained within the range defined by the subtable.  If no matches are found `None`
+    /// is returned.  Typically a match value is not specified for non-variable fonts as multiple
+    /// subtables for a given axis ought not exist.  For variable fonts a non-`None` match value
+    /// should be specified as multiple records for the variation axes exist.
+    pub fn subtable_for_axis(
+        &self,
+        axis: Tag,
+        match_value: Option<Fixed>,
+    ) -> Option<AxisValueSubtable> {
+        for subtable in self.subtables() {
+            match subtable {
+                AxisValueSubtable::Format1(AxisValueSubtableFormat1 {
+                    axis_index, value, ..
+                })
+                | AxisValueSubtable::Format3(AxisValueSubtableFormat3 {
+                    axis_index, value, ..
+                }) => {
+                    if self.axes.get(axis_index)?.tag != axis {
+                        continue;
+                    }
+
+                    match match_value {
+                        Some(match_value) => {
+                            if match_value.0 == value.0 {
+                                return Some(subtable);
+                            }
+                        }
+                        None => return Some(subtable),
+                    }
+                }
+                AxisValueSubtable::Format2(AxisValueSubtableFormat2 {
+                    axis_index,
+                    range_min_value,
+                    range_max_value,
+                    ..
+                }) => {
+                    if self.axes.get(axis_index)?.tag == axis {
+                        continue;
+                    }
+
+                    match match_value {
+                        Some(match_value) => {
+                            if match_value.0 >= range_min_value.0
+                                && match_value.0 < range_max_value.0
+                            {
+                                return Some(subtable);
+                            }
+                        }
+                        None => return Some(subtable),
+                    }
+                }
+                AxisValueSubtable::Format4(_) => {
+                    // A query that's intended to search format 4 subtables can be performed
+                    // across multiple axes. A separate function that takes a collection of
+                    // axis-value pairs is more sutable than this.
+                    continue;
+                }
+            }
+        }
+
+        None
+    }
 }

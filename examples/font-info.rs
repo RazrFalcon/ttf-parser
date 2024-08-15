@@ -1,5 +1,3 @@
-use ttf_parser::stat::{AxisValue, AxisValueSubtable};
-
 fn main() {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 2 {
@@ -87,91 +85,7 @@ fn main() {
     }
 
     if let Some(stat) = face.tables().stat {
-        let axis_names = stat
-            .axes
-            .into_iter()
-            .map(|axis| axis.tag)
-            .collect::<Vec<_>>();
-
-        println!("Style attributes:");
-
-        println!("  Axes:");
-        for axis in axis_names.iter() {
-            println!("    {}", axis);
-        }
-
-        println!("  Axis Values:");
-        for table in stat.subtables() {
-            match table {
-                AxisValueSubtable::Format1(table) => {
-                    let value_name = face
-                        .names()
-                        .into_iter()
-                        .filter(|name| name.name_id == table.value_name_id)
-                        .map(|name| name.to_string().unwrap())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    let axis_name = &axis_names[table.axis_index as usize];
-                    let value = table.value;
-                    let flags = table.flags;
-
-                    println!("    {axis_name} {value:?}={value_name:?} flags={flags:?}");
-                }
-                AxisValueSubtable::Format2(table) => {
-                    let value_name = face
-                        .names()
-                        .into_iter()
-                        .filter(|name| name.name_id == table.value_name_id)
-                        .map(|name| name.to_string().unwrap())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    let axis_name = &axis_names[table.axis_index as usize];
-                    let nominal_value = table.nominal_value;
-                    let min_value = table.range_min_value;
-                    let max_value = table.range_max_value;
-                    let flags = table.flags;
-
-                    println!("    {axis_name} {min_value:?}..{max_value:?}={value_name:?} nominal={nominal_value:?} flags={flags:?}");
-                }
-                AxisValueSubtable::Format3(table) => {
-                    let value_name = face
-                        .names()
-                        .into_iter()
-                        .filter(|name| name.name_id == table.value_name_id)
-                        .map(|name| name.to_string().unwrap())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    let axis_name = &axis_names[table.axis_index as usize];
-                    let value = table.value;
-                    let linked_value = table.linked_value;
-                    let flags = table.flags;
-
-                    println!(
-                        "    {axis_name} {value:?}<=>{linked_value:?} = {value_name:?} flags={flags:?}",
-                    );
-                }
-                AxisValueSubtable::Format4(table) => {
-                    let value_name = face
-                        .names()
-                        .into_iter()
-                        .filter(|name| name.name_id == table.value_name_id)
-                        .map(|name| name.to_string().unwrap())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    let flags = table.flags;
-
-                    println!("    {value_name:?} flags={flags:?}");
-                    for pair in table.values {
-                        let AxisValue { axis_index, value } = pair;
-                        println!("      {axis_index} = {value:?}")
-                    }
-                }
-            }
-        }
+        print_opentype_style_attributes(&stat)
     }
 
     println!("Elapsed: {}us", now.elapsed().as_micros());
@@ -199,5 +113,17 @@ fn print_opentype_layout(name: &str, table: &ttf_parser::opentype_layout::Layout
     println!("  Features:");
     for feature in features {
         println!("    {}", feature);
+    }
+}
+
+fn print_opentype_style_attributes(table: &ttf_parser::stat::Table) {
+    println!("Style attributes:");
+
+    println!("  Axes:");
+    for axis in table.axes {
+        println!("    {}", axis.tag);
+        if let Some(subtable) = table.subtable_for_axis(axis.tag, None) {
+            println!("      {subtable:?}")
+        }
     }
 }

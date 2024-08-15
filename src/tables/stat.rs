@@ -93,6 +93,20 @@ pub struct AxisRecord {
     pub ordering: u16,
 }
 
+impl FromData for AxisRecord {
+    const SIZE: usize = 8;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut s = Stream::new(data);
+        Some(AxisRecord {
+            tag: s.read::<Tag>()?,
+            name_id: s.read::<u16>()?,
+            ordering: s.read::<u16>()?,
+        })
+    }
+}
+
 /// [Flags](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#flags) for [`AxisValue`].
 #[derive(Clone, Copy)]
 pub struct AxisValueFlags(u16);
@@ -249,20 +263,6 @@ pub enum AxisValueSubtable<'a> {
     Format2(AxisValueSubtableFormat2),
     Format3(AxisValueSubtableFormat3),
     Format4(AxisValueSubtableFormat4<'a>),
-}
-
-impl FromData for AxisRecord {
-    const SIZE: usize = 8;
-
-    #[inline]
-    fn parse(data: &[u8]) -> Option<Self> {
-        let mut s = Stream::new(data);
-        Some(AxisRecord {
-            tag: s.read::<Tag>()?,
-            name_id: s.read::<u16>()?,
-            ordering: s.read::<u16>()?,
-        })
-    }
 }
 
 /// A [Style Attributes Table](https://docs.microsoft.com/en-us/typography/opentype/spec/stat).

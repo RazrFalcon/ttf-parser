@@ -333,13 +333,17 @@ impl<'a> Table<'a> {
         }
     }
 
-    /// Returns the first matching subtable for a given axis.  If no match value is given the first
-    /// subtable for the axis is returned.  If a match value is given, the first subtable for the
-    /// axis where the value matches is returned.  A value matches if it is equal to the subtable's
-    /// value or contained within the range defined by the subtable.  If no matches are found `None`
-    /// is returned.  Typically a match value is not specified for non-variable fonts as multiple
-    /// subtables for a given axis ought not exist.  For variable fonts a non-`None` match value
-    /// should be specified as multiple records for the variation axes exist.
+    /// Returns the first matching subtable for a given axis.
+    ///
+    /// If no match value is given the first subtable for the axis is returned. If a match value is
+    /// given, the first subtable for the axis where the value matches is returned. A value matches
+    /// if it is equal to the subtable's value or contained within the range defined by the
+    /// subtable. If no matches are found `None` is returned. Typically a match value is not
+    /// specified for non-variable fonts as multiple subtables for a given axis ought not exist. For
+    /// variable fonts a non-`None` match value should be specified as multiple records for the
+    /// variation axes exist.
+    ///
+    /// Note: Format 4 subtables are explicitly ignored in this function.
     pub fn subtable_for_axis(
         &self,
         axis: Tag,

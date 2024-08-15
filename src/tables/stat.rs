@@ -37,7 +37,7 @@ pub struct AxisValueSubtables<'a> {
 }
 
 impl<'a> Iterator for AxisValueSubtables<'a> {
-    type Item = AxisValueTable<'a>;
+    type Item = AxisValueSubtable<'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -55,15 +55,15 @@ impl<'a> Iterator for AxisValueSubtables<'a> {
 
         let value = match format_variant {
             1 => {
-                let value = s.read::<AxisValueTableFormat1>()?;
+                let value = s.read::<AxisValueSubtableFormat1>()?;
                 Self::Item::Format1(value)
             }
             2 => {
-                let value = s.read::<AxisValueTableFormat2>()?;
+                let value = s.read::<AxisValueSubtableFormat2>()?;
                 Self::Item::Format2(value)
             }
             3 => {
-                let value = s.read::<AxisValueTableFormat3>()?;
+                let value = s.read::<AxisValueSubtableFormat3>()?;
                 Self::Item::Format3(value)
             }
             4 => {
@@ -72,7 +72,7 @@ impl<'a> Iterator for AxisValueSubtables<'a> {
                     return None;
                 }
 
-                let value = AxisValueTableFormat4::parse(s.tail()?)?;
+                let value = AxisValueSubtableFormat4::parse(s.tail()?)?;
                 Self::Item::Format4(value)
             }
             _ => return None,
@@ -123,7 +123,7 @@ impl core::fmt::Debug for AxisValueFlags {
 
 /// Axis value table format 1
 #[derive(Clone, Copy, Debug)]
-pub struct AxisValueTableFormat1 {
+pub struct AxisValueSubtableFormat1 {
     /// Zero-based index into [`Table::axes`].
     pub axis_index: u16,
     /// Flags for AxisValue.
@@ -134,13 +134,13 @@ pub struct AxisValueTableFormat1 {
     pub value: Fixed,
 }
 
-impl FromData for AxisValueTableFormat1 {
+impl FromData for AxisValueSubtableFormat1 {
     const SIZE: usize = 10;
 
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        Some(AxisValueTableFormat1 {
+        Some(AxisValueSubtableFormat1 {
             axis_index: s.read::<u16>()?,
             flags: AxisValueFlags(s.read::<u16>()?),
             value_name_id: s.read::<u16>()?,
@@ -151,7 +151,7 @@ impl FromData for AxisValueTableFormat1 {
 
 /// Axis value table format 2
 #[derive(Clone, Copy, Debug)]
-pub struct AxisValueTableFormat2 {
+pub struct AxisValueSubtableFormat2 {
     /// Zero-based index into [`Table::axes`].
     pub axis_index: u16,
     /// Flags for AxisValue.
@@ -166,13 +166,13 @@ pub struct AxisValueTableFormat2 {
     pub range_max_value: Fixed,
 }
 
-impl FromData for AxisValueTableFormat2 {
+impl FromData for AxisValueSubtableFormat2 {
     const SIZE: usize = 18;
 
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        Some(AxisValueTableFormat2 {
+        Some(AxisValueSubtableFormat2 {
             axis_index: s.read::<u16>()?,
             flags: AxisValueFlags(s.read::<u16>()?),
             value_name_id: s.read::<u16>()?,
@@ -185,7 +185,7 @@ impl FromData for AxisValueTableFormat2 {
 
 /// Axis value table format 3
 #[derive(Clone, Copy, Debug)]
-pub struct AxisValueTableFormat3 {
+pub struct AxisValueSubtableFormat3 {
     /// Zero-based index into [`Table::axes`].
     pub axis_index: u16,
     /// Flags for AxisValue.
@@ -198,13 +198,13 @@ pub struct AxisValueTableFormat3 {
     pub linked_value: Fixed,
 }
 
-impl FromData for AxisValueTableFormat3 {
+impl FromData for AxisValueSubtableFormat3 {
     const SIZE: usize = 14;
 
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let mut s = Stream::new(data);
-        Some(AxisValueTableFormat3 {
+        Some(AxisValueSubtableFormat3 {
             axis_index: s.read::<u16>()?,
             flags: AxisValueFlags(s.read::<u16>()?),
             value_name_id: s.read::<u16>()?,
@@ -216,7 +216,7 @@ impl FromData for AxisValueTableFormat3 {
 
 /// Axis value table format 4
 #[derive(Clone, Copy, Debug)]
-pub struct AxisValueTableFormat4<'a> {
+pub struct AxisValueSubtableFormat4<'a> {
     /// Flags for AxisValue.
     pub flags: u16,
     /// The name ID of the display string.
@@ -225,7 +225,7 @@ pub struct AxisValueTableFormat4<'a> {
     pub values: LazyArray16<'a, AxisValue>,
 }
 
-impl<'a> AxisValueTableFormat4<'a> {
+impl<'a> AxisValueSubtableFormat4<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let axis_count = s.read::<u16>()?;
@@ -233,7 +233,7 @@ impl<'a> AxisValueTableFormat4<'a> {
         let value_name_id = s.read::<u16>()?;
         let values = s.read_array16::<AxisValue>(axis_count)?;
 
-        Some(AxisValueTableFormat4 {
+        Some(AxisValueSubtableFormat4 {
             flags,
             value_name_id,
             values,
@@ -244,11 +244,11 @@ impl<'a> AxisValueTableFormat4<'a> {
 /// An [axis value table](https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-tables).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug)]
-pub enum AxisValueTable<'a> {
-    Format1(AxisValueTableFormat1),
-    Format2(AxisValueTableFormat2),
-    Format3(AxisValueTableFormat3),
-    Format4(AxisValueTableFormat4<'a>),
+pub enum AxisValueSubtable<'a> {
+    Format1(AxisValueSubtableFormat1),
+    Format2(AxisValueSubtableFormat2),
+    Format3(AxisValueSubtableFormat3),
+    Format4(AxisValueSubtableFormat4<'a>),
 }
 
 impl FromData for AxisRecord {

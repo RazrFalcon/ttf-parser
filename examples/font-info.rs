@@ -1,4 +1,4 @@
-use ttf_parser::stat::{AxisValue, AxisValueTable};
+use ttf_parser::stat::{AxisValue, AxisValueSubtable};
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
@@ -103,7 +103,7 @@ fn main() {
         println!("  Axis Values:");
         for table in stat.subtables() {
             match table {
-                AxisValueTable::Format1(table) => {
+                AxisValueSubtable::Format1(table) => {
                     let value_name = face
                         .names()
                         .into_iter()
@@ -118,7 +118,7 @@ fn main() {
 
                     println!("    {axis_name} {value:?}={value_name:?} flags={flags:?}");
                 }
-                AxisValueTable::Format2(table) => {
+                AxisValueSubtable::Format2(table) => {
                     let value_name = face
                         .names()
                         .into_iter()
@@ -135,7 +135,7 @@ fn main() {
 
                     println!("    {axis_name} {min_value:?}..{max_value:?}={value_name:?} nominal={nominal_value:?} flags={flags:?}");
                 }
-                AxisValueTable::Format3(table) => {
+                AxisValueSubtable::Format3(table) => {
                     let value_name = face
                         .names()
                         .into_iter()
@@ -153,7 +153,7 @@ fn main() {
                         "    {axis_name} {value:?}<=>{linked_value:?} = {value_name:?} flags={flags:?}",
                     );
                 }
-                AxisValueTable::Format4(table) => {
+                AxisValueSubtable::Format4(table) => {
                     let value_name = face
                         .names()
                         .into_iter()

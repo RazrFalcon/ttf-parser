@@ -272,8 +272,7 @@ pub struct Table<'a> {
     pub axes: LazyArray16<'a, AxisRecord>,
     /// Fallback name when everything can be elided.
     pub fallback_name_id: Option<u16>,
-    /// Version of the style attributes table.
-    pub version: u32,
+    version: u32,
     data: &'a [u8],
     value_lookup_start: Offset32,
     value_offsets: LazyArray16<'a, Offset16>,

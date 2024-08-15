@@ -232,7 +232,7 @@ impl FromData for AxisValueSubtableFormat3 {
 #[derive(Clone, Copy, Debug)]
 pub struct AxisValueSubtableFormat4<'a> {
     /// Flags for AxisValue.
-    pub flags: u16,
+    pub flags: AxisValueFlags,
     /// The name ID of the display string.
     pub value_name_id: u16,
     /// List of axis-value pairings.
@@ -243,7 +243,7 @@ impl<'a> AxisValueSubtableFormat4<'a> {
     fn parse(data: &'a [u8]) -> Option<Self> {
         let mut s = Stream::new(data);
         let axis_count = s.read::<u16>()?;
-        let flags = s.read::<u16>()?;
+        let flags = AxisValueFlags(s.read::<u16>()?);
         let value_name_id = s.read::<u16>()?;
         let values = s.read_array16::<AxisValue>(axis_count)?;
 

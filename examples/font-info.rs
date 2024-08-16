@@ -91,7 +91,7 @@ fn main() {
         for axis in stat.axes {
             println!("    {}", axis.tag);
             if let Some(subtable) = stat.subtable_for_axis(axis.tag, None) {
-                println!("      {subtable:?}")
+                println!("      {:?}", subtable)
             }
         }
     }

@@ -265,6 +265,78 @@ pub enum AxisValueSubtable<'a> {
     Format4(AxisValueSubtableFormat4<'a>),
 }
 
+impl<'a> AxisValueSubtable<'a> {
+    /// Returns the value from an axis value subtable.
+    ///
+    /// For formats 1 and 3 the value is returned, for formats 2 and 4 `None` is returned as there
+    /// is no single value associated with those formats.
+    pub fn value(&self) -> Option<Fixed> {
+        match self {
+            Self::Format1(AxisValueSubtableFormat1 { value, .. })
+            | Self::Format3(AxisValueSubtableFormat3 { value, .. }) => Some(*value),
+            _ => None,
+        }
+    }
+
+    /// Returns `true` if the axis subtable either is the value or is a range that contains the
+    /// value passed in as an argument.
+    ///
+    /// Note: this will always return false for format 4 subtables as they may contain multiple
+    /// axes.
+    pub fn contains(&self, value: Fixed) -> bool {
+        if let Some(subtable_value) = self.value() {
+            if subtable_value.0 == value.0 {
+                return true;
+            }
+        }
+
+        if let Self::Format2(AxisValueSubtableFormat2 {
+            range_min_value,
+            range_max_value,
+            ..
+        }) = self
+        {
+            // core::ops::Range doesn't work here because Fixed doesn't implement
+            // the required comparison traits.
+            if value.0 >= range_min_value.0 && value.0 < range_max_value.0 {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Returns the associated name ID.
+    pub fn name_id(&self) -> u16 {
+        match self {
+            Self::Format1(AxisValueSubtableFormat1 { value_name_id, .. })
+            | Self::Format2(AxisValueSubtableFormat2 { value_name_id, .. })
+            | Self::Format3(AxisValueSubtableFormat3 { value_name_id, .. })
+            | Self::Format4(AxisValueSubtableFormat4 { value_name_id, .. }) => *value_name_id,
+        }
+    }
+
+    #[inline]
+    fn flags(&self) -> AxisValueFlags {
+        match self {
+            Self::Format1(AxisValueSubtableFormat1 { flags, .. })
+            | Self::Format2(AxisValueSubtableFormat2 { flags, .. })
+            | Self::Format3(AxisValueSubtableFormat3 { flags, .. })
+            | Self::Format4(AxisValueSubtableFormat4 { flags, .. }) => *flags,
+        }
+    }
+
+    /// Returns `true` if the axis subtable has the `ELIDABLE_AXIS_VALUE_NAME` flag set.
+    pub fn is_elidable(&self) -> bool {
+        self.flags().elidable()
+    }
+
+    /// Returns `true` if the axis subtable has the `OLDER_SIBLING_FONT_ATTRIBUTE` flag set.
+    pub fn is_older_sibling(&self) -> bool {
+        self.flags().older_sibling_attribute()
+    }
+}
+
 /// A [Style Attributes Table](https://docs.microsoft.com/en-us/typography/opentype/spec/stat).
 #[derive(Clone, Copy, Debug)]
 pub struct Table<'a> {

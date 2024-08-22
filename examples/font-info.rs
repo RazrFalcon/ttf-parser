@@ -84,6 +84,18 @@ fn main() {
         }
     }
 
+    if let Some(stat) = face.tables().stat {
+        println!("Style attributes:");
+
+        println!("  Axes:");
+        for axis in stat.axes {
+            println!("    {}", axis.tag);
+            if let Some(subtable) = stat.subtable_for_axis(axis.tag, None) {
+                println!("      {:?}", subtable)
+            }
+        }
+    }
+
     println!("Elapsed: {}us", now.elapsed().as_micros());
 }
 

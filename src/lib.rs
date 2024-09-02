@@ -1410,13 +1410,18 @@ impl<'a> Face<'a> {
 
     /// Checks that face is marked as *Italic*.
     ///
-    /// Returns `false` when OS/2 table is not present.
+    /// Returns `false` when OS/2 and post tables are not present.
     #[inline]
     pub fn is_italic(&self) -> bool {
         self.tables
             .os2
             .map(|s| s.style() == Style::Italic)
             .unwrap_or(false)
+            || self
+                .tables
+                .post
+                .map(|s| s.italic_angle <= -1.0)
+                .unwrap_or(false)
     }
 
     /// Checks that face is marked as *Bold*.

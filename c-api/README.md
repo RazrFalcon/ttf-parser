@@ -19,6 +19,25 @@ gcc test.c -g -o test -L./target/debug/ -lttfparser
 env LD_LIBRARY_PATH=./target/debug/ ./test
 ```
 
+## Using cargo-c
+This crate can be built and installed using [cargo-c](https://crates.io/crates/cargo-c).
+
+### Build and test
+To build and used it uninstalled
+```sh
+cargo cbuild -v --library-type staticlib
+export PKG_CONFIG_PATH=<the path cbuild shows at the end>
+gcc test.c -g -o test `pkg-config --libs --cflags tffparser`
+./test
+```
+
+### Install
+To install it system-wide
+```sh
+cargo cinstall --destdir /tmp/ttf-parser
+sudo cp -a /tmp/ttf-parser/* /
+```
+
 ## Safety
 
 - The library doesn't use `unsafe` (except the bindings itself).

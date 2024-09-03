@@ -1402,21 +1402,14 @@ impl<'a> Face<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_regular(&self) -> bool {
-        self.tables
-            .os2
-            .map(|s| s.style() == Style::Normal)
-            .unwrap_or(false)
+        self.style() == Style::Normal
     }
 
     /// Checks that face is marked as *Italic*.
-    ///
-    /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_italic(&self) -> bool {
-        self.tables
-            .os2
-            .map(|s| s.style() == Style::Italic)
-            .unwrap_or(false)
+        // A face can have a Normal style and a non-zero italic angle, which also makes it italic.
+        self.style() == Style::Italic || self.italic_angle() != 0.0
     }
 
     /// Checks that face is marked as *Bold*.
@@ -1432,10 +1425,7 @@ impl<'a> Face<'a> {
     /// Returns `false` when OS/2 table is not present or when its version is < 4.
     #[inline]
     pub fn is_oblique(&self) -> bool {
-        self.tables
-            .os2
-            .map(|s| s.style() == Style::Oblique)
-            .unwrap_or(false)
+        self.style() == Style::Oblique
     }
 
     /// Returns face style.
@@ -1490,10 +1480,13 @@ impl<'a> Face<'a> {
 
     /// Returns face's italic angle.
     ///
-    /// Returns `None` when `post` table is not present.
+    /// Returns `0.0` when `post` table is not present.
     #[inline]
-    pub fn italic_angle(&self) -> Option<f32> {
-        self.tables.post.map(|table| table.italic_angle)
+    pub fn italic_angle(&self) -> f32 {
+        self.tables
+            .post
+            .map(|table| table.italic_angle)
+            .unwrap_or(0.0)
     }
 
     // Read https://github.com/freetype/freetype/blob/49270c17011491227ec7bd3fb73ede4f674aa065/src/sfnt/sfobjs.c#L1279

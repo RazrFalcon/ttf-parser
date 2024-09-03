@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- `Face::is_italic` checks for italic angle as well.
+- `Face::italic_angle` returns just a `f32` and not `Option<f32>` now.
 
 ## [0.24.1] - 2024-08-05
 ### Added

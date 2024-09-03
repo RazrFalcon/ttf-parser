@@ -363,7 +363,7 @@ pub extern "C" fn ttfp_get_width(face: *const ttfp_face) -> u16 {
 /// @return Face's italic angle or `0.0` when `post` table is not present.
 #[no_mangle]
 pub extern "C" fn ttfp_get_italic_angle(face: *const ttfp_face) -> f32 {
-    face_from_ptr(face).italic_angle().unwrap_or(0.0)
+    face_from_ptr(face).italic_angle()
 }
 
 /// @brief Returns a horizontal face ascender.

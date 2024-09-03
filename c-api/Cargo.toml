@@ -26,6 +26,13 @@ variable-fonts = ["ttf-parser/variable-fonts"]
 gvar-alloc = ["ttf-parser/gvar-alloc"]
 # opentype-layout is not supported.
 # apple-layout is not supported.
+capi = []
 
 [profile.release]
 lto = true
+
+[package.metadata.capi.header]
+generation = false
+
+[package.metadata.capi.install.include]
+asset = [{ from="ttfparser.h" }]

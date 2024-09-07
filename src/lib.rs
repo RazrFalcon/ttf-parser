@@ -1408,8 +1408,18 @@ impl<'a> Face<'a> {
     /// Checks that face is marked as *Italic*.
     #[inline]
     pub fn is_italic(&self) -> bool {
+        let panose_italic = self
+            .tables
+            .os2
+            .map(|os2| {
+                os2.panose()
+                    .map(|panose| panose.is_italic())
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
         // A face can have a Normal style and a non-zero italic angle, which also makes it italic.
-        self.style() == Style::Italic || self.italic_angle() != 0.0
+        self.style() == Style::Italic || self.italic_angle() != 0.0 || panose_italic
     }
 
     /// Checks that face is marked as *Bold*.
@@ -1417,7 +1427,19 @@ impl<'a> Face<'a> {
     /// Returns `false` when OS/2 table is not present.
     #[inline]
     pub fn is_bold(&self) -> bool {
-        self.tables.os2.map(|os2| os2.is_bold()).unwrap_or(false)
+        let panose_bold = self
+            .tables
+            .os2
+            .map(|os2| {
+                os2.panose()
+                    .map(|panose| panose.is_italic())
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
+        let sf_bold = self.tables.os2.map(|os2| os2.is_bold()).unwrap_or(false);
+
+        sf_bold || panose_bold
     }
 
     /// Checks that face is marked as *Oblique*.
@@ -1436,13 +1458,26 @@ impl<'a> Face<'a> {
 
     /// Checks that face is marked as *Monospaced*.
     ///
-    /// Returns `false` when `post` table is not present.
+    /// Returns `false` when neither `post` nor `os2` tables are not present.
     #[inline]
     pub fn is_monospaced(&self) -> bool {
-        self.tables
+        let panose_monospaced = self
+            .tables
+            .os2
+            .map(|os2| {
+                os2.panose()
+                    .map(|panose| panose.is_monospaced())
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
+        let post_monospaced = self
+            .tables
             .post
             .map(|post| post.is_monospaced)
-            .unwrap_or(false)
+            .unwrap_or(false);
+
+        post_monospaced || panose_monospaced
     }
 
     /// Checks that face is variable.

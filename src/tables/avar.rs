@@ -114,7 +114,7 @@ impl<'a> Table<'a> {
         })
     }
 
-    /// Maps a singel coordinate
+    /// Maps a single coordinate
     pub fn map_coordinate(
         &self,
         coordinates: &mut [NormalizedCoordinate],

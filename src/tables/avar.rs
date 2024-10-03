@@ -114,13 +114,22 @@ impl<'a> Table<'a> {
         })
     }
 
-    /// Maps coordinates.
-    pub fn map_coordinates(&self, coordinates: &mut [NormalizedCoordinate]) -> Option<()> {
+    /// Maps a single coordinate
+    pub fn map_coordinate(
+        &self,
+        coordinates: &mut [NormalizedCoordinate],
+        coordinate_index: usize,
+    ) -> Option<()> {
         if usize::from(self.segment_maps.count) != coordinates.len() {
             return None;
         }
 
-        for (map, coord) in self.segment_maps.into_iter().zip(coordinates) {
+        if let Some((map, coord)) = self
+            .segment_maps
+            .into_iter()
+            .zip(coordinates)
+            .nth(coordinate_index)
+        {
             *coord = NormalizedCoordinate::from(map_value(&map, coord.0)?);
         }
 

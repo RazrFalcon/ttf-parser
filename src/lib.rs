@@ -2320,16 +2320,17 @@ impl<'a> Face<'a> {
             return None;
         }
 
-        for (i, var_axis) in self.variation_axes().into_iter().enumerate() {
-            if var_axis.tag == axis {
-                self.coordinates.data[i] = var_axis.normalized_value(value);
-            }
-        }
+        if let Some((i, var_axis)) = self
+            .variation_axes()
+            .into_iter()
+            .enumerate()
+            .find(|(_, var_axis)| var_axis.tag == axis)
+        {
+            self.coordinates.data[i] = var_axis.normalized_value(value);
 
-        // TODO: optimize
-        if let Some(avar) = self.tables.avar {
-            // Ignore error.
-            let _ = avar.map_coordinates(self.coordinates.as_mut_slice());
+            if let Some(avar) = self.tables.avar {
+                let _ = avar.map_coordinate(self.coordinates.as_mut_slice(), i);
+            }
         }
 
         Some(())

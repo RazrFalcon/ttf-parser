@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - `Face::is_italic` checks for italic angle as well.
 - `Face::italic_angle` returns just a `f32` and not `Option<f32>` now.
+- Bump MSRV to 1.59
 
 ### Fixed
 - Only apply `avar` table to the variation axis being set.

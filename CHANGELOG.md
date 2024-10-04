@@ -5,9 +5,20 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.25.0] - 2024-10-04
+### Added
+- `STAT` table parsing. Thanks to [inferiorhumanorgans](https://github.com/inferiorhumanorgans).
+- `UnicodeRanges` internal field is public now.
+- `cargo-c` metadata to C API. Thanks to [lu-zero](https://github.com/lu-zero).
+
 ### Changed
 - `Face::is_italic` checks for italic angle as well.
 - `Face::italic_angle` returns just a `f32` and not `Option<f32>` now.
+
+### Fixed
+- Only apply `avar` table to the variation axis being set.
+  Thanks to [maxmelander](https://github.com/maxmelander).
 
 ## [0.24.1] - 2024-08-05
 ### Added
@@ -498,7 +509,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `GDEF` table parsing.
 
-[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/ttf-parser/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/RazrFalcon/ttf-parser/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/RazrFalcon/ttf-parser/compare/v0.22.0...v0.23.0

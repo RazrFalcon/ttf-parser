@@ -651,7 +651,7 @@ test_cs_err!(move_to_with_too_many_coords, &[
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
 
-test_cs_err!(move_to_with_not_enought_coords, &[
+test_cs_err!(move_to_with_not_enough_coords, &[
     CFFInt(10), UInt8(operator::MOVE_TO),
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
@@ -661,7 +661,7 @@ test_cs_err!(hmove_to_with_too_many_coords, &[
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
 
-test_cs_err!(hmove_to_with_not_enought_coords, &[
+test_cs_err!(hmove_to_with_not_enough_coords, &[
     UInt8(operator::HORIZONTAL_MOVE_TO),
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
@@ -671,7 +671,7 @@ test_cs_err!(vmove_to_with_too_many_coords, &[
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
 
-test_cs_err!(vmove_to_with_not_enought_coords, &[
+test_cs_err!(vmove_to_with_not_enough_coords, &[
     UInt8(operator::VERTICAL_MOVE_TO),
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
@@ -713,7 +713,7 @@ test_cs_err!(curve_to_with_invalid_num_of_coords_2, &[
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
 
-test_cs_err!(hh_curve_to_with_not_enought_coords, &[
+test_cs_err!(hh_curve_to_with_not_enough_coords, &[
     CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
     CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::HH_CURVE_TO),
     UInt8(operator::ENDCHAR),
@@ -726,7 +726,7 @@ test_cs_err!(hh_curve_to_with_too_many_coords, &[
     UInt8(operator::ENDCHAR),
 ], CFFError::InvalidArgumentsStackLength);
 
-test_cs_err!(vv_curve_to_with_not_enought_coords, &[
+test_cs_err!(vv_curve_to_with_not_enough_coords, &[
     CFFInt(10), CFFInt(20), UInt8(operator::MOVE_TO),
     CFFInt(30), CFFInt(40), CFFInt(50), UInt8(operator::VV_CURVE_TO),
     UInt8(operator::ENDCHAR),

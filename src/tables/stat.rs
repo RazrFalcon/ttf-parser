@@ -466,7 +466,7 @@ impl<'a> Table<'a> {
                 AxisValueSubtable::Format4(_) => {
                     // A query that's intended to search format 4 subtables can be performed
                     // across multiple axes. A separate function that takes a collection of
-                    // axis-value pairs is more sutable than this.
+                    // axis-value pairs is more suitable than this.
                     continue;
                 }
             }

@@ -85,7 +85,7 @@ public:
     {
         FT_Fixed coords[1] = {500 * 65536L};
         if (FT_Set_Var_Design_Coordinates(m_face, 1, coords)) {
-            throw "failed to set veriations";
+            throw "failed to set variations";
         }
     }
 
@@ -222,7 +222,7 @@ public:
     void setVariations()
     {
         if (!ttfp_set_variation(m_face, TTFP_TAG('w', 'g', 'h', 't'), 500)) {
-            throw "failed to set veriations";
+            throw "failed to set variations";
         }
     }
 

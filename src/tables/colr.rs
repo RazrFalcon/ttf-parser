@@ -904,7 +904,7 @@ impl<'a> Table<'a> {
         glyph_id: GlyphId,
         palette: u16,
         painter: &mut dyn Painter<'a>,
-        recusion_stack: &mut RecursionStack,
+        recursion_stack: &mut RecursionStack,
         #[cfg(feature = "variable-fonts")] coords: &[NormalizedCoordinate],
         foreground_color: RgbaColor,
     ) -> Option<()> {
@@ -913,7 +913,7 @@ impl<'a> Table<'a> {
                 base,
                 palette,
                 painter,
-                recusion_stack,
+                recursion_stack,
                 #[cfg(feature = "variable-fonts")]
                 coords,
                 foreground_color,

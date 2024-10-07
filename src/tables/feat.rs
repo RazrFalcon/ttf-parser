@@ -68,7 +68,7 @@ pub struct FeatureName<'a> {
     pub name_index: u16,
 }
 
-/// A list fo feature names.
+/// A list of feature names.
 #[derive(Clone, Copy)]
 pub struct FeatureNames<'a> {
     data: &'a [u8],

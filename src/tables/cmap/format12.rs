@@ -65,13 +65,16 @@ impl<'a> Subtable12<'a> {
         u16::try_from(id).ok().map(GlyphId)
     }
 
+    /// Iterate over each codepoint defined in this table.
+    pub fn codepoints_iter(&'a self) -> impl Iterator<Item = u32> + 'a {
+        self.groups
+            .into_iter()
+            .flat_map(|group| group.start_char_code..=group.end_char_code)
+    }
+
     /// Calls `f` for each codepoint defined in this table.
-    pub fn codepoints(&self, mut f: impl FnMut(u32)) {
-        for group in self.groups {
-            for code_point in group.start_char_code..=group.end_char_code {
-                f(code_point);
-            }
-        }
+    pub fn codepoints(&self, f: impl FnMut(u32)) {
+        self.codepoints_iter().for_each(f)
     }
 }
 

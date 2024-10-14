@@ -3,7 +3,7 @@ A high-level, safe, zero-allocation font parser for:
 * [TrueType](https://docs.microsoft.com/en-us/typography/truetype/),
 * [OpenType](https://docs.microsoft.com/en-us/typography/opentype/spec/), and
 * [AAT](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6AATIntro.html)
-fonts.
+  fonts.
 
 Font parsing starts with a [`Face`].
 

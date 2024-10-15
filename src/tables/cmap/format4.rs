@@ -100,18 +100,19 @@ impl<'a> Subtable4<'a> {
         None
     }
 
-    /// Calls `f` for each codepoint defined in this table.
-    pub fn codepoints(&self, mut f: impl FnMut(u32)) {
-        for (start, end) in self.start_codes.into_iter().zip(self.end_codes) {
-            // OxFFFF value is special and indicates codes end.
-            if start == end && start == 0xFFFF {
-                break;
-            }
+    /// Iterate over each codepoint defined in this table.
+    pub fn codepoints_iter(&'a self) -> impl Iterator<Item = u32> + 'a {
+        self.start_codes
+            .into_iter()
+            .zip(self.end_codes)
+            .take_while(|&(start, end)| !(start == end && start == 0xFFFF))
+            .flat_map(|(start, end)| start..=end)
+            .map(u32::from)
+    }
 
-            for code_point in start..=end {
-                f(u32::from(code_point));
-            }
-        }
+    /// Calls `f` for each codepoint defined in this table.
+    pub fn codepoints(&self, f: impl FnMut(u32)) {
+        self.codepoints_iter().for_each(f)
     }
 }
 
